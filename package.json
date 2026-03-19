@@ -1,0 +1,21 @@
+{
+  "name": "burnless",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "db:generate": "turbo db:generate --filter=@burnless/db",
+    "db:migrate": "turbo db:migrate --filter=@burnless/db",
+    "db:push": "turbo db:push --filter=@burnless/db",
+    "db:studio": "pnpm --filter @burnless/db db:studio"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.26.1",
+  "devDependencies": {
+    "turbo": "^2.8.20"
+  }
+}

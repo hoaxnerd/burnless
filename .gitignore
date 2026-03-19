@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+.next/
+dist/
+.turbo/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Generated
+.contentlayer/
+
+# Agents internal
+agents/*/HEARTBEAT.md
+
+
+
