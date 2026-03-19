@@ -12,6 +12,8 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
     "@burnless/db": "workspace:*",
+    "drizzle-orm": "^0.38.0",
+    "@burnless/engine": "workspace:*",
     "@burnless/types": "workspace:*",
     "@burnless/ui": "workspace:*",
     "lucide-react": "^0.468.0",

@@ -103,6 +103,8 @@ export interface Scenario {
   name: string;
   type: ScenarioType;
   isDefault: boolean;
+  isBudget: boolean;
+  budgetLockedAt: Date | null;
   description: string | null;
   createdAt: Date;
   updatedAt: Date;

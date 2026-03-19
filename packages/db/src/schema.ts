@@ -328,6 +328,8 @@ export const scenarios = pgTable(
     name: text("name").notNull(),
     type: scenarioTypeEnum("type").notNull().default("base"),
     isDefault: boolean("is_default").notNull().default(false),
+    isBudget: boolean("is_budget").notNull().default(false),
+    budgetLockedAt: timestamp("budget_locked_at", { mode: "date" }),
     description: text("description"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
