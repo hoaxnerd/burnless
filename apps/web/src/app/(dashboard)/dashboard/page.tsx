@@ -101,15 +101,15 @@ export default async function DashboardPage({
       )}
 
       {/* Header */}
-      <div className="mb-6 sm:mb-8 animate-slide-up">
-        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-surface-400">
+      <div className="mb-8 sm:mb-12 animate-slide-up">
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">Dashboard</h1>
+        <p className="mt-1.5 text-sm text-surface-400">
           {company.name} &mdash; Financial command center
         </p>
       </div>
 
       {/* Hero KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
         <HeroKpiCard
           variant="cash"
           label="Cash Position"
@@ -185,7 +185,7 @@ export default async function DashboardPage({
             }}
           />
 
-          {/* Charts */}
+          {/* Charts — 48px section gap */}
           <DashboardCharts
             revenueVsExpenses={revenueVsExpenses}
             cashData={metrics.cashPosition}
@@ -199,7 +199,7 @@ export default async function DashboardPage({
           />
 
           {/* Bottom section: Scenarios + Key Metrics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Pinned Scenarios */}
             {pinnedScenarios.length > 0 && (
               <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5">

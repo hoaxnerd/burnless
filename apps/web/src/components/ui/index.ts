@@ -5,5 +5,6 @@ export { DataTable } from "./data-table";
 export { Modal } from "./modal";
 export { Skeleton, MetricCardSkeleton, ChartCardSkeleton, TableRowSkeleton, PageSkeleton } from "./skeleton";
 export { ErrorBoundary } from "./error-boundary";
+export { FormField, CurrencyInput } from "./form-field";
 export { ThemeProvider, ThemeToggle, useTheme } from "./theme-toggle";
 export { KeyboardShortcutsProvider } from "./keyboard-shortcuts";

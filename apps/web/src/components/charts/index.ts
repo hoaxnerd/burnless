@@ -4,6 +4,7 @@ export { MultiLineChart } from "./multi-line-chart";
 export {
   chartColors,
   chartDefaults,
+  tooltipStyle,
   formatCompactCurrency,
   formatPercent,
   formatNumber,

@@ -27,14 +27,15 @@ export const chartColors = {
 export const chartDefaults = {
   strokeWidth: 2,
   dotRadius: 0,
-  activeDotRadius: 4,
+  activeDotRadius: 5,
   gridStroke: "#f1f5f9",
   axisStroke: "#94a3b8",
   fontSize: 11,
   fontFamily: "inherit",
   tooltipBg: "#ffffff",
-  tooltipBorder: "#e2e8f0",
-  animationDuration: 300,
+  tooltipBorder: "#e5e7eb",
+  animationDuration: 400,
+  animationEasing: "ease-out" as const,
 } as const;
 
 export function formatCompactCurrency(value: number): string {
@@ -66,3 +67,14 @@ export function formatMonthYear(monthKey: string): string {
   const date = new Date(Number(year), Number(month) - 1);
   return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 }
+
+/** Tooltip styling — CRED-tier with backdrop blur effect */
+export const tooltipStyle = {
+  background: "rgba(255, 255, 255, 0.95)",
+  backdropFilter: "blur(8px)",
+  border: `1px solid ${chartDefaults.tooltipBorder}`,
+  borderRadius: 12,
+  fontSize: chartDefaults.fontSize,
+  boxShadow: "0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04)",
+  padding: "8px 12px",
+} as const;

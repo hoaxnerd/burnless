@@ -9,72 +9,85 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { chartColors, chartDefaults, formatMonth, formatCompactCurrency } from "./chart-theme";
+import { chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
 
 interface AreaChartProps {
   data: Array<{ month: string; value: number }>;
   color?: string;
-  gradientFrom?: string;
   height?: number;
   formatValue?: (value: number) => string;
   showGrid?: boolean;
+  /** Show the latest value as a direct label on the chart */
+  showLatestLabel?: boolean;
 }
 
 export function AreaChartWidget({
   data,
-  color = chartColors.brand,
+  color = "#2563eb",
   height = 240,
   formatValue = formatCompactCurrency,
   showGrid = true,
+  showLatestLabel = false,
 }: AreaChartProps) {
   const gradientId = `area-gradient-${color.replace("#", "")}`;
+  const latestValue = data.length > 0 ? data[data.length - 1].value : null;
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <RechartsAreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.15} />
-            <stop offset="100%" stopColor={color} stopOpacity={0.01} />
-          </linearGradient>
-        </defs>
-        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />}
-        <XAxis
-          dataKey="month"
-          tickFormatter={formatMonth}
-          tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tickFormatter={formatValue}
-          tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
-          axisLine={false}
-          tickLine={false}
-          width={50}
-        />
-        <Tooltip
-          formatter={(value) => [formatValue(Number(value)), ""]}
-          labelFormatter={(label) => formatMonth(String(label))}
-          contentStyle={{
-            background: chartDefaults.tooltipBg,
-            border: `1px solid ${chartDefaults.tooltipBorder}`,
-            borderRadius: 8,
-            fontSize: chartDefaults.fontSize,
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-          }}
-        />
-        <Area
-          type="monotone"
-          dataKey="value"
-          stroke={color}
-          strokeWidth={chartDefaults.strokeWidth}
-          fill={`url(#${gradientId})`}
-          dot={false}
-          activeDot={{ r: chartDefaults.activeDotRadius, fill: color }}
-          animationDuration={chartDefaults.animationDuration}
-        />
-      </RechartsAreaChart>
-    </ResponsiveContainer>
+    <div className="relative">
+      {/* Direct label — latest value shown on chart */}
+      {showLatestLabel && latestValue !== null && (
+        <div className="absolute top-0 right-0 z-10">
+          <span
+            className="text-xs font-bold tabular-nums"
+            style={{ color }}
+          >
+            {formatValue(latestValue)}
+          </span>
+        </div>
+      )}
+
+      <ResponsiveContainer width="100%" height={height}>
+        <RechartsAreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.15} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.01} />
+            </linearGradient>
+          </defs>
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />}
+          <XAxis
+            dataKey="month"
+            tickFormatter={formatMonth}
+            tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tickFormatter={formatValue}
+            tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
+            axisLine={false}
+            tickLine={false}
+            width={50}
+          />
+          <Tooltip
+            formatter={(value) => [formatValue(Number(value)), ""]}
+            labelFormatter={(label) => formatMonth(String(label))}
+            contentStyle={tooltipStyle}
+            cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: "4 4" }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={chartDefaults.strokeWidth}
+            fill={`url(#${gradientId})`}
+            dot={false}
+            activeDot={{ r: chartDefaults.activeDotRadius, fill: color, strokeWidth: 2, stroke: "#fff" }}
+            animationDuration={chartDefaults.animationDuration}
+            animationEasing={chartDefaults.animationEasing}
+          />
+        </RechartsAreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

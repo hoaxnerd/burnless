@@ -8,9 +8,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from "recharts";
-import { chartColors, chartDefaults, formatMonth, formatCompactCurrency } from "./chart-theme";
+import { chartColors, chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
 
 interface MultiLineChartProps {
   data: Array<Record<string, unknown>>;
@@ -31,58 +30,82 @@ export function MultiLineChart({
   formatValue = formatCompactCurrency,
 }: MultiLineChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
-        <XAxis
-          dataKey="month"
-          tickFormatter={formatMonth}
-          tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tickFormatter={formatValue}
-          tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
-          axisLine={false}
-          tickLine={false}
-          width={55}
-        />
-        <Tooltip
-          formatter={(value, name) => {
-            const line = lines.find((l) => l.dataKey === name);
-            return [formatValue(Number(value)), line?.label ?? String(name)];
-          }}
-          labelFormatter={(label) => formatMonth(String(label))}
-          contentStyle={{
-            background: chartDefaults.tooltipBg,
-            border: `1px solid ${chartDefaults.tooltipBorder}`,
-            borderRadius: 8,
-            fontSize: chartDefaults.fontSize,
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-          }}
-        />
-        <Legend
-          wrapperStyle={{ fontSize: chartDefaults.fontSize }}
-          formatter={(value: string) => {
-            const line = lines.find((l) => l.dataKey === value);
-            return line?.label ?? value;
-          }}
-        />
+    <div>
+      {/* Inline legend — direct labels per CRED spec */}
+      <div className="flex items-center gap-4 mb-3">
         {lines.map((line, i) => (
-          <Line
-            key={line.dataKey}
-            type="monotone"
-            dataKey={line.dataKey}
-            stroke={line.color ?? chartColors.palette[i % chartColors.palette.length]}
-            strokeWidth={chartDefaults.strokeWidth}
-            strokeDasharray={line.dashed ? "6 3" : undefined}
-            dot={false}
-            activeDot={{ r: chartDefaults.activeDotRadius }}
-            animationDuration={chartDefaults.animationDuration}
-          />
+          <div key={line.dataKey} className="flex items-center gap-1.5">
+            <div className="relative flex items-center">
+              {line.dashed ? (
+                <svg width="14" height="3" className="block">
+                  <line
+                    x1="0"
+                    y1="1.5"
+                    x2="14"
+                    y2="1.5"
+                    stroke={line.color ?? chartColors.palette[i % chartColors.palette.length]}
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
+                </svg>
+              ) : (
+                <div
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      line.color ?? chartColors.palette[i % chartColors.palette.length],
+                  }}
+                />
+              )}
+            </div>
+            <span className="text-[11px] font-medium text-surface-500">
+              {line.label}
+            </span>
+          </div>
         ))}
-      </LineChart>
-    </ResponsiveContainer>
+      </div>
+
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
+          <XAxis
+            dataKey="month"
+            tickFormatter={formatMonth}
+            tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tickFormatter={formatValue}
+            tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
+            axisLine={false}
+            tickLine={false}
+            width={55}
+          />
+          <Tooltip
+            formatter={(value, name) => {
+              const line = lines.find((l) => l.dataKey === name);
+              return [formatValue(Number(value)), line?.label ?? String(name)];
+            }}
+            labelFormatter={(label) => formatMonth(String(label))}
+            contentStyle={tooltipStyle}
+          />
+          {lines.map((line, i) => (
+            <Line
+              key={line.dataKey}
+              type="monotone"
+              dataKey={line.dataKey}
+              stroke={line.color ?? chartColors.palette[i % chartColors.palette.length]}
+              strokeWidth={chartDefaults.strokeWidth}
+              strokeDasharray={line.dashed ? "6 3" : undefined}
+              dot={false}
+              activeDot={{ r: chartDefaults.activeDotRadius, strokeWidth: 2, stroke: "#fff" }}
+              animationDuration={chartDefaults.animationDuration}
+              animationEasing={chartDefaults.animationEasing}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
