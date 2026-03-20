@@ -48,8 +48,8 @@ export function BalanceSheetView({
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = () => {
-    const doc = generateBalanceSheetPDF(bs, {
+  const handleExportPDF = async () => {
+    const doc = await generateBalanceSheetPDF(bs, {
       title: "Balance Sheet",
       companyName: companyName ?? "Company",
       scenarioName: scenarioName ?? "Base",

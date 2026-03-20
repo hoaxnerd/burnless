@@ -52,8 +52,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = () => {
-    const doc = generateRunwaySummaryPDF(
+  const handleExportPDF = async () => {
+    const doc = await generateRunwaySummaryPDF(
       {
         startingCash,
         netBurnRate: latestBurn?.value ?? 0,

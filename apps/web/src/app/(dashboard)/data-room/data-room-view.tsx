@@ -69,7 +69,7 @@ export function DataRoomView({
     try {
       switch (id) {
         case "full-deck": {
-          const doc = generateInvestorDataRoomPDF({
+          const doc = await generateInvestorDataRoomPDF({
             companyName,
             scenarioName,
             profitAndLoss,
@@ -84,23 +84,23 @@ export function DataRoomView({
           break;
         }
         case "pnl": {
-          const doc = generateProfitLossPDF(profitAndLoss, { ...opts, title: "Profit & Loss Statement" });
+          const doc = await generateProfitLossPDF(profitAndLoss, { ...opts, title: "Profit & Loss Statement" });
           downloadPDF(doc, "profit-and-loss");
           break;
         }
         case "cashflow": {
-          const doc = generateCashFlowPDF(cashFlow, { ...opts, title: "Cash Flow Statement" });
+          const doc = await generateCashFlowPDF(cashFlow, { ...opts, title: "Cash Flow Statement" });
           downloadPDF(doc, "cash-flow");
           break;
         }
         case "balance": {
-          const doc = generateBalanceSheetPDF(balanceSheet, { ...opts, title: "Balance Sheet" });
+          const doc = await generateBalanceSheetPDF(balanceSheet, { ...opts, title: "Balance Sheet" });
           downloadPDF(doc, "balance-sheet");
           break;
         }
         case "runway": {
           const cashPosition = cashFlow.endingCash;
-          const doc = generateRunwaySummaryPDF(
+          const doc = await generateRunwaySummaryPDF(
             { startingCash, netBurnRate, grossBurnRate: 0, runwayMonths, cashPosition },
             { ...opts, title: "Runway Summary" }
           );

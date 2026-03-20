@@ -61,8 +61,8 @@ export function CashFlowView({
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = () => {
-    const doc = generateCashFlowPDF(cf, {
+  const handleExportPDF = async () => {
+    const doc = await generateCashFlowPDF(cf, {
       title: "Cash Flow Statement",
       companyName: companyName ?? "Company",
       scenarioName: scenarioName ?? "Base",

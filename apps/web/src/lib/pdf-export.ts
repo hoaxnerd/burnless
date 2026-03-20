@@ -1,11 +1,20 @@
 /**
  * PDF export utilities — generates financial report PDFs using jsPDF.
  * Works client-side. Handles P&L, Cash Flow, Balance Sheet, and Runway reports.
+ * jsPDF (~336KB) is lazy-loaded only when a PDF generation function is called.
  */
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import type jsPDFType from "jspdf";
 import { formatCurrency, formatCompactAmount, formatMonthKey, type CurrencyCode } from "@burnless/types";
+
+// Lazy-load jsPDF + autoTable only when PDF generation is triggered
+async function loadJsPDF() {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  return { jsPDF, autoTable };
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +50,7 @@ function fmtMonthHeader(monthKey: string, locale?: string): string {
 
 // ── PDF Header ──────────────────────────────────────────────────────────────
 
-function addPDFHeader(doc: jsPDF, opts: PDFReportOptions) {
+function addPDFHeader(doc: jsPDFType, opts: PDFReportOptions) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const date = opts.generatedAt ?? new Date();
 
@@ -71,7 +80,7 @@ function addPDFHeader(doc: jsPDF, opts: PDFReportOptions) {
   doc.line(20, 42, pageWidth - 20, 42);
 }
 
-function addPDFFooter(doc: jsPDF) {
+function addPDFFooter(doc: jsPDFType) {
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -87,7 +96,8 @@ function addPDFFooter(doc: jsPDF) {
 // ── Statement Table Rendering ───────────────────────────────────────────────
 
 function renderStatementTable(
-  doc: jsPDF,
+  doc: jsPDFType,
+  autoTable: typeof import("jspdf-autotable").default,
   rows: Array<{ item: StatementLineItem; isSummary?: boolean; isSubtotal?: boolean }>,
   startY: number,
   sectionTitle?: string,
@@ -172,7 +182,7 @@ function renderStatementTable(
 
 // ── Report Generators ───────────────────────────────────────────────────────
 
-export function generateProfitLossPDF(
+export async function generateProfitLossPDF(
   profitAndLoss: {
     revenue: StatementLineItem;
     cogs: StatementLineItem;
@@ -184,13 +194,15 @@ export function generateProfitLossPDF(
     netIncome: StatementLineItem;
   },
   opts: PDFReportOptions
-): jsPDF {
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Profit & Loss Statement" });
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: profitAndLoss.revenue },
       { item: profitAndLoss.cogs },
@@ -210,7 +222,7 @@ export function generateProfitLossPDF(
   return doc;
 }
 
-export function generateCashFlowPDF(
+export async function generateCashFlowPDF(
   cashFlow: {
     operatingCashFlow: StatementLineItem;
     investingCashFlow: StatementLineItem;
@@ -219,7 +231,8 @@ export function generateCashFlowPDF(
     endingCash: { month: string; value: number }[];
   },
   opts: PDFReportOptions
-): jsPDF {
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Cash Flow Statement" });
@@ -231,6 +244,7 @@ export function generateCashFlowPDF(
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: cashFlow.operatingCashFlow },
       { item: cashFlow.investingCashFlow },
@@ -247,20 +261,22 @@ export function generateCashFlowPDF(
   return doc;
 }
 
-export function generateBalanceSheetPDF(
+export async function generateBalanceSheetPDF(
   balanceSheet: {
     assets: StatementLineItem;
     liabilities: StatementLineItem;
     equity: StatementLineItem;
   },
   opts: PDFReportOptions
-): jsPDF {
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Balance Sheet" });
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: balanceSheet.assets },
       { item: balanceSheet.liabilities },
@@ -275,7 +291,7 @@ export function generateBalanceSheetPDF(
   return doc;
 }
 
-export function generateRunwaySummaryPDF(
+export async function generateRunwaySummaryPDF(
   data: {
     startingCash: number;
     netBurnRate: number;
@@ -284,7 +300,8 @@ export function generateRunwaySummaryPDF(
     cashPosition: { month: string; value: number }[];
   },
   opts: PDFReportOptions
-): jsPDF {
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Runway Summary" });
@@ -348,7 +365,7 @@ export function generateRunwaySummaryPDF(
  * Generate an investor data room PDF — a comprehensive financial summary
  * combining key metrics, P&L, cash flow, and runway in one document.
  */
-export function generateInvestorDataRoomPDF(
+export async function generateInvestorDataRoomPDF(
   data: {
     companyName: string;
     scenarioName: string;
@@ -385,9 +402,9 @@ export function generateInvestorDataRoomPDF(
     currency?: CurrencyCode;
     locale?: string;
   }
-): jsPDF {
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
   const currency = data.currency ?? "USD";
   const locale = data.locale;
   const clOpts = { currency: data.currency, locale: data.locale };
@@ -448,6 +465,7 @@ export function generateInvestorDataRoomPDF(
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: data.profitAndLoss.revenue },
       { item: data.profitAndLoss.cogs },
@@ -478,6 +496,7 @@ export function generateInvestorDataRoomPDF(
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: data.cashFlow.operatingCashFlow },
       { item: data.cashFlow.investingCashFlow },
@@ -502,6 +521,7 @@ export function generateInvestorDataRoomPDF(
 
   renderStatementTable(
     doc,
+    autoTable,
     [
       { item: data.balanceSheet.assets },
       { item: data.balanceSheet.liabilities },
@@ -519,6 +539,6 @@ export function generateInvestorDataRoomPDF(
 /**
  * Trigger a PDF download in the browser.
  */
-export function downloadPDF(doc: jsPDF, filename: string) {
+export function downloadPDF(doc: jsPDFType, filename: string) {
   doc.save(`${filename}.pdf`);
 }

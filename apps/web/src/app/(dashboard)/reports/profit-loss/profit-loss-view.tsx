@@ -65,8 +65,8 @@ export function ProfitLossView({
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = () => {
-    const doc = generateProfitLossPDF(pnl, {
+  const handleExportPDF = async () => {
+    const doc = await generateProfitLossPDF(pnl, {
       title: "Profit & Loss Statement",
       companyName: companyName ?? "Company",
       scenarioName: scenarioName ?? "Base",

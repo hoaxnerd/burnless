@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { CookieConsentBanner } from "@/components/cookie-consent";
 import { AnalyticsProvider } from "@/components/analytics-provider";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://burnless.com"),
@@ -40,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
