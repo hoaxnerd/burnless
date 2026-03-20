@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Point to monorepo root so Next.js doesn't infer /Users/X/ from a parent lockfile
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   headers: async () => [
     {
       source: "/(.*)",
@@ -30,9 +31,6 @@ const nextConfig: NextConfig = {
     // Lint separately via `pnpm lint` — don't block builds on eslint-plugin compat issues
     ignoreDuringBuilds: true,
   },
-  // Monorepo root — prevents Next.js from inferring wrong workspace root
-  // when a stale lockfile exists in a parent directory
-  outputFileTracingRoot: path.join(__dirname, "../../"),
   webpack: (config) => {
     // plaid, razorpay, stripe are optional runtime-only SDKs loaded via dynamic import.
     config.externals = [
@@ -45,12 +43,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-// @sentry/nextjs v10 — installed in package.json, wraps config for error monitoring
-export default withSentryConfig(nextConfig, {
-  silent: !process.env.CI,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-  telemetry: false,
-  tunnelRoute: "/monitoring",
-});
+export default nextConfig;
