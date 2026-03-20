@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
+import type StripeType from "stripe";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
 import { db, companies, scenarios, aiMessages, aiConversations } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
 import { env } from "@/lib/env";
 
+async function getStripe(): Promise<StripeType> {
+  const { default: Stripe } = await import("stripe");
+  return new Stripe(env.STRIPE_SECRET_KEY!);
+}
+
 /**
  * Billing API — manages subscription state and Stripe integration.
  *
- * GET /api/billing — Returns current subscription status with real usage
- * POST /api/billing — Creates a Stripe Checkout session for upgrading
+ * GET  /api/billing — Returns current subscription status with real usage
+ * POST /api/billing — Creates a Stripe Checkout session for upgrading,
+ *                      a Customer Portal session, or cancels at period end
  */
 
 interface SubscriptionStatus {
@@ -18,6 +25,7 @@ interface SubscriptionStatus {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   seats: number;
+  portalUrl?: string;
   usage: {
     scenarios: { used: number; limit: number };
     aiMessages: { used: number; limit: number };
@@ -71,8 +79,7 @@ export async function GET() {
 
   if (company?.stripeSubscriptionId && env.STRIPE_SECRET_KEY) {
     try {
-      const { default: Stripe } = await import("stripe");
-      const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+      const stripe = await getStripe();
       const sub = await stripe.subscriptions.retrieve(
         company.stripeSubscriptionId
       );
@@ -128,14 +135,88 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { plan } = body;
+    const action: string = body.action ?? "checkout";
 
+    const stripe = await getStripe();
+
+    // ----------------------------------------------------------------
+    // Action: portal — open Stripe Customer Portal for self-service
+    // ----------------------------------------------------------------
+    if (action === "portal") {
+      const [company] = await db
+        .select({ stripeCustomerId: companies.stripeCustomerId })
+        .from(companies)
+        .where(eq(companies.id, ctx.companyId))
+        .limit(1);
+
+      if (!company?.stripeCustomerId) {
+        return errorResponse("No billing account found. Subscribe to a plan first.", 400);
+      }
+
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: company.stripeCustomerId,
+        return_url: `${env.APP_URL}/settings?tab=billing`,
+      });
+
+      return NextResponse.json({ url: portalSession.url });
+    }
+
+    // ----------------------------------------------------------------
+    // Action: cancel — schedule cancellation at period end
+    // ----------------------------------------------------------------
+    if (action === "cancel") {
+      const [company] = await db
+        .select({ stripeSubscriptionId: companies.stripeSubscriptionId })
+        .from(companies)
+        .where(eq(companies.id, ctx.companyId))
+        .limit(1);
+
+      if (!company?.stripeSubscriptionId) {
+        return errorResponse("No active subscription to cancel.", 400);
+      }
+
+      const sub = await stripe.subscriptions.update(
+        company.stripeSubscriptionId,
+        { cancel_at_period_end: true }
+      );
+
+      return NextResponse.json({
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+        currentPeriodEnd: new Date(
+          (sub as unknown as { current_period_end: number }).current_period_end * 1000
+        ).toISOString(),
+      });
+    }
+
+    // ----------------------------------------------------------------
+    // Action: reactivate — undo scheduled cancellation
+    // ----------------------------------------------------------------
+    if (action === "reactivate") {
+      const [company] = await db
+        .select({ stripeSubscriptionId: companies.stripeSubscriptionId })
+        .from(companies)
+        .where(eq(companies.id, ctx.companyId))
+        .limit(1);
+
+      if (!company?.stripeSubscriptionId) {
+        return errorResponse("No subscription to reactivate.", 400);
+      }
+
+      const sub = await stripe.subscriptions.update(
+        company.stripeSubscriptionId,
+        { cancel_at_period_end: false }
+      );
+
+      return NextResponse.json({ cancelAtPeriodEnd: sub.cancel_at_period_end });
+    }
+
+    // ----------------------------------------------------------------
+    // Action: checkout (default) — create Stripe Checkout session
+    // ----------------------------------------------------------------
+    const { plan } = body;
     if (!plan || !["pro", "team"].includes(plan)) {
       return errorResponse("Invalid plan. Choose 'pro' or 'team'.", 400);
     }
-
-    const { default: Stripe } = await import("stripe");
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
     const priceIds: Record<string, string | undefined> = {
       pro: env.STRIPE_PRO_PRICE_ID,
@@ -147,11 +228,21 @@ export async function POST(request: Request) {
       return errorResponse(`Price not configured for plan: ${plan}`, 503);
     }
 
+    // Attach existing Stripe customer if we have one
+    const [company] = await db
+      .select({ stripeCustomerId: companies.stripeCustomerId })
+      .from(companies)
+      .where(eq(companies.id, ctx.companyId))
+      .limit(1);
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${env.APP_URL}/settings?billing=success`,
-      cancel_url: `${env.APP_URL}/settings?billing=canceled`,
+      success_url: `${env.APP_URL}/settings?tab=billing&billing=success`,
+      cancel_url: `${env.APP_URL}/settings?tab=billing&billing=canceled`,
+      ...(company?.stripeCustomerId
+        ? { customer: company.stripeCustomerId }
+        : {}),
       metadata: {
         companyId: ctx.companyId,
         userId: ctx.userId,
