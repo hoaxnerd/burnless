@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /overview/
+Disallow: /dashboard/
+Disallow: /expenses/
+Disallow: /revenue/
+Disallow: /funding/
+Disallow: /team/
+Disallow: /settings/
+Disallow: /scenarios/
+Disallow: /reports/
+Disallow: /data-room/
+Disallow: /import/
+Disallow: /ai/
+Disallow: /onboarding/
+
+Sitemap: https://burnless.app/sitemap.xml

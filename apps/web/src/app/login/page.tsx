@@ -462,11 +462,11 @@ export default function LoginPage() {
         {/* Footer */}
         <p className="mt-8 text-center text-xs text-surface-400">
           By continuing, you agree to our{" "}
-          <Link href="#" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
+          <Link href="/terms" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
             Terms
           </Link>
           {" "}and{" "}
-          <Link href="#" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
+          <Link href="/privacy" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
             Privacy Policy
           </Link>
         </p>
