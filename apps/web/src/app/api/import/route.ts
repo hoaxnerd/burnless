@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, transactions, financialAccounts, importBatches } from "@burnless/db";
+import { db, transactions, financialAccounts, importBatches, merchantCategoryMappings } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
-import { categorizeTransaction } from "@burnless/engine";
+import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import crypto from "crypto";
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -70,7 +70,20 @@ export async function POST(request: Request) {
 
   const validAccountIdSet = new Set(validAccounts.map((a) => a.id));
 
-  // 2. Build records and collect per-row errors, run AI categorization
+  // 2. Load merchant memory for this company
+  const merchantRows = await db
+    .select()
+    .from(merchantCategoryMappings)
+    .where(eq(merchantCategoryMappings.companyId, ctx.companyId));
+
+  const merchantMemory: MerchantMapping[] = merchantRows.map((r) => ({
+    merchantPattern: r.merchantPattern,
+    category: r.category,
+    subcategory: r.subcategory,
+    accountId: r.accountId,
+  }));
+
+  // 3. Build records and collect per-row errors, run AI categorization
   const errors: Array<{ index: number; message: string }> = [];
   const prepared: Array<{
     index: number;
@@ -85,6 +98,7 @@ export async function POST(request: Request) {
     metadata: Record<string, unknown> | null;
     suggestedCategory?: string;
     categoryConfidence?: number;
+    categorySource?: string;
   }> = [];
 
   for (let i = 0; i < txInput.length; i++) {
@@ -103,14 +117,16 @@ export async function POST(request: Request) {
 
     const externalId = tx.externalId || generateExternalId(tx);
 
-    // AI categorization
+    // AI categorization with merchant memory
     let suggestedCategory: string | undefined;
     let categoryConfidence: number | undefined;
+    let categorySource: string | undefined;
     if (tx.description) {
-      const result = categorizeTransaction(tx.description);
+      const result = categorizeWithMemory(tx.description, merchantMemory);
       if (result) {
         suggestedCategory = result.subcategory;
         categoryConfidence = result.confidence;
+        categorySource = result.source;
       }
     }
 
@@ -123,15 +139,20 @@ export async function POST(request: Request) {
       description: tx.description ?? null,
       source: "import" as const,
       externalId,
-      importBatchId: null, // Set during actual import
+      importBatchId: null,
       metadata: {
         ...(tx.metadata ?? {}),
         ...(suggestedCategory
-          ? { aiCategory: suggestedCategory, aiCategoryConfidence: categoryConfidence }
+          ? {
+              aiCategory: suggestedCategory,
+              aiCategoryConfidence: categoryConfidence,
+              aiCategorySource: categorySource,
+            }
           : {}),
       },
       suggestedCategory,
       categoryConfidence,
+      categorySource,
     });
   }
 
@@ -172,11 +193,12 @@ export async function POST(request: Request) {
 
   // 4. Dry run — return preview with AI categorization
   if (dryRun) {
-    const preview = prepared.map(({ index, suggestedCategory, categoryConfidence, importBatchId, ...rest }) => ({
+    const preview = prepared.map(({ index, suggestedCategory, categoryConfidence, categorySource, importBatchId, ...rest }) => ({
       ...rest,
       isDuplicate: existingDuplicates.has(rest.externalId) || false,
       suggestedCategory,
       categoryConfidence,
+      categorySource,
     }));
     return NextResponse.json({
       imported: toInsert.length,
@@ -203,7 +225,7 @@ export async function POST(request: Request) {
   try {
     const insertChunks = chunk(toInsert, 100);
     for (const batchChunk of insertChunks) {
-      const values = batchChunk.map(({ index, suggestedCategory, categoryConfidence, ...rest }) => ({
+      const values = batchChunk.map(({ index, suggestedCategory, categoryConfidence, categorySource, ...rest }) => ({
         ...rest,
         importBatchId: batch!.id,
       }));

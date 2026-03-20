@@ -27,6 +27,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Form state
   const [name, setName] = useState("");
   const [accountId, setAccountId] = useState("");
   const [category, setCategory] = useState<string>("operating_expense");
@@ -38,6 +39,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
 
+  // AI auto-categorization
   const [suggestion, setSuggestion] = useState<{ subcategory: string; category: string; confidence: number } | null>(null);
   const [suggestionApplied, setSuggestionApplied] = useState(false);
 
@@ -49,7 +51,11 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     }
     const result = categorizeTransaction(name);
     if (result && result.confidence >= 0.5) {
-      setSuggestion({ subcategory: result.subcategory, category: result.category, confidence: result.confidence });
+      setSuggestion({
+        subcategory: result.subcategory,
+        category: result.category,
+        confidence: result.confidence,
+      });
     } else {
       setSuggestion(null);
     }
@@ -58,6 +64,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
 
   const applySuggestion = () => {
     if (!suggestion) return;
+    // Map the engine category to our form category
     if (suggestion.category === "cogs") setCategory("cogs");
     else setCategory("operating_expense");
     setSuggestionApplied(true);
@@ -78,7 +85,11 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
         const acctRes = await fetch("/api/accounts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, type: "expense", category }),
+          body: JSON.stringify({
+            name,
+            type: "expense",
+            category,
+          }),
         });
         if (!acctRes.ok) throw new Error("Failed to create account");
         const acct = await acctRes.json();
@@ -93,7 +104,13 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
       const res = await fetch("/api/forecast-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenarioId, accountId: targetAccountId, method, parameters: params, startDate }),
+        body: JSON.stringify({
+          scenarioId,
+          accountId: targetAccountId,
+          method,
+          parameters: params,
+          startDate,
+        }),
       });
 
       if (!res.ok) {
@@ -101,6 +118,23 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
         throw new Error(data.error ?? "Failed to create expense");
       }
 
+      // Learn: save merchant→category mapping when user manually categorizes
+      // (either no suggestion existed, or user chose a different category)
+      if (name.length >= 3 && targetAccountId) {
+        const subcatName = suggestion?.subcategory ?? name;
+        fetch("/api/merchant-mappings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: name,
+            accountId: targetAccountId,
+            category,
+            subcategory: suggestionApplied ? suggestion?.subcategory ?? name : name,
+          }),
+        }).catch(() => {}); // fire-and-forget, don't block UX
+      }
+
+      // Reset and close
       setName("");
       setAccountId("");
       setAmount("");
@@ -145,6 +179,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
               required
               className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
+            {/* AI categorization suggestion */}
             {suggestion && !suggestionApplied && (
               <button
                 type="button"

@@ -133,9 +133,14 @@ export {
 export {
   categorizeTransaction,
   categorizeTransactions,
+  categorizeWithMemory,
+  categorizeTransactionsWithMemory,
+  extractMerchantKey,
   DEFAULT_CATEGORIZATION_RULES,
   type CategorizationRule,
   type CategorizationResult,
+  type EnrichedCategorizationResult,
+  type MerchantMapping,
 } from "./categorization";
 
 // Payment providers — import directly from "@burnless/engine/payments" when needed.

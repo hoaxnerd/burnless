@@ -993,3 +993,51 @@ export const privacyConsentsRelations = relations(
     }),
   })
 );
+
+// ── Merchant Category Mappings (learned from user overrides) ────────────────
+
+export const merchantCategoryMappings = pgTable(
+  "merchant_category_mappings",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    merchantPattern: text("merchant_pattern").notNull(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => financialAccounts.id, { onDelete: "cascade" }),
+    category: accountCategoryEnum("category").notNull(),
+    subcategory: text("subcategory").notNull(),
+    source: text("source").notNull().default("user_override"),
+    overrideCount: integer("override_count").notNull().default(1),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("merchant_mappings_company_idx").on(table.companyId),
+    uniqueIndex("merchant_mappings_company_pattern_idx").on(
+      table.companyId,
+      table.merchantPattern
+    ),
+  ]
+);
+
+export const merchantCategoryMappingsRelations = relations(
+  merchantCategoryMappings,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [merchantCategoryMappings.companyId],
+      references: [companies.id],
+    }),
+    account: one(financialAccounts, {
+      fields: [merchantCategoryMappings.accountId],
+      references: [financialAccounts.id],
+    }),
+  })
+);

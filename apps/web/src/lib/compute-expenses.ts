@@ -32,6 +32,7 @@ export interface ExpenseLineItem {
   accountCategory: "operating_expense" | "cogs";
   subcategory: string;
   subcategoryConfidence: number;
+  categorySource: "rule" | "merchant_memory" | "manual";
   method: string;
   currentAmount: number;
   prevAmount: number;
@@ -71,20 +72,20 @@ const ANOMALY_THRESHOLD = 0.20; // 20% MoM increase flags anomaly
 function deriveSubcategory(
   accountName: string,
   accountCategory: string,
-): { subcategory: string; confidence: number } {
+): { subcategory: string; confidence: number; source: "rule" | "merchant_memory" | "manual" } {
   // Try categorization engine first
   const result = categorizeTransaction(accountName);
   if (result && result.confidence >= 0.5) {
-    return { subcategory: result.subcategory, confidence: result.confidence };
+    return { subcategory: result.subcategory, confidence: result.confidence, source: "rule" };
   }
 
   // Fallback: derive from account category
   if (accountCategory === "cogs") {
-    return { subcategory: "Cost of Goods Sold", confidence: 0.6 };
+    return { subcategory: "Cost of Goods Sold", confidence: 0.6, source: "manual" };
   }
 
   // Generic operating expense fallback
-  return { subcategory: "Other", confidence: 0.3 };
+  return { subcategory: "Other", confidence: 0.3, source: "manual" };
 }
 
 // ── Main computation ─────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     const changePercent = prevAmount > 0 ? (currentAmount - prevAmount) / prevAmount : 0;
 
     // Derive subcategory from account name
-    const { subcategory, confidence } = deriveSubcategory(account.name, account.category);
+    const { subcategory, confidence, source } = deriveSubcategory(account.name, account.category);
 
     // Recurring detection: fixed method or very low variance across months
     const amounts = series.map((s) => s.value).filter((v) => v > 0);
@@ -167,6 +168,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       accountCategory: account.category as "operating_expense" | "cogs",
       subcategory,
       subcategoryConfidence: confidence,
+      categorySource: source,
       method: fLine.method,
       currentAmount,
       prevAmount,
@@ -189,6 +191,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       accountCategory: "operating_expense",
       subcategory: "People",
       subcategoryConfidence: 1.0,
+      categorySource: "manual",
       method: "fixed",
       currentAmount: hcCurrent,
       prevAmount: hcPrev,

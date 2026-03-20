@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag } from "lucide-react";
+import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles } from "lucide-react";
 import { formatCompactCurrency } from "@/components/charts";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
 
@@ -272,7 +272,23 @@ export function ExpenseTable({ lineItems, subcategories, onDelete }: ExpenseTabl
                         <span className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600">
                           {item.subcategory}
                         </span>
-                        {item.subcategoryConfidence < 0.7 && (
+                        {item.categorySource === "rule" && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600"
+                            title={`AI categorized (${Math.round(item.subcategoryConfidence * 100)}% confidence)`}
+                          >
+                            <Sparkles className="h-2.5 w-2.5" /> AI
+                          </span>
+                        )}
+                        {item.categorySource === "merchant_memory" && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
+                            title="Learned from your override"
+                          >
+                            <Sparkles className="h-2.5 w-2.5" /> Learned
+                          </span>
+                        )}
+                        {item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && (
                           <span className="text-[9px] text-surface-400" title="Low confidence categorization">
                             ?
                           </span>

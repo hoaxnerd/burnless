@@ -241,3 +241,93 @@ export function categorizeTransactions(
 
   return results;
 }
+
+// ── Merchant Memory ─────────────────────────────────────────────────────────
+
+export interface MerchantMapping {
+  merchantPattern: string;
+  category: AccountCategory;
+  subcategory: string;
+  accountId: string;
+}
+
+export interface EnrichedCategorizationResult extends CategorizationResult {
+  source: "rule" | "merchant_memory";
+  accountId?: string;
+}
+
+/**
+ * Extract a normalized merchant key from a transaction description.
+ *
+ * Strips amounts, dates, reference numbers and normalizes whitespace
+ * to produce a stable key for merchant memory lookups.
+ */
+export function extractMerchantKey(description: string): string {
+  return description
+    .toLowerCase()
+    .replace(/[#\d]{4,}/g, "")          // strip reference/card numbers
+    .replace(/\$[\d,.]+/g, "")           // strip dollar amounts
+    .replace(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/g, "") // strip dates
+    .replace(/[^a-z\s&'-]/g, " ")        // keep letters, spaces, common chars
+    .replace(/\s+/g, " ")               // collapse whitespace
+    .trim();
+}
+
+/**
+ * Categorize a transaction using merchant memory first, then fallback to rules.
+ *
+ * Merchant mappings (from user overrides) get highest priority (confidence 0.99)
+ * because they represent explicit user intent.
+ */
+export function categorizeWithMemory(
+  description: string,
+  merchantMappings: MerchantMapping[],
+  rules: CategorizationRule[] = DEFAULT_CATEGORIZATION_RULES,
+): EnrichedCategorizationResult | null {
+  const key = extractMerchantKey(description);
+
+  // Check merchant memory first
+  for (const mapping of merchantMappings) {
+    if (key.includes(mapping.merchantPattern.toLowerCase())) {
+      return {
+        category: mapping.category,
+        subcategory: mapping.subcategory,
+        confidence: 0.99,
+        source: "merchant_memory",
+        accountId: mapping.accountId,
+      };
+    }
+  }
+
+  // Fallback to rule-based
+  const result = categorizeTransaction(description, rules);
+  if (result) {
+    return { ...result, source: "rule" };
+  }
+
+  return null;
+}
+
+/**
+ * Batch categorize with merchant memory support.
+ *
+ * Returns a `Map<number, EnrichedCategorizationResult>` keyed by input index.
+ */
+export function categorizeTransactionsWithMemory(
+  descriptions: string[],
+  merchantMappings: MerchantMapping[],
+  rules: CategorizationRule[] = DEFAULT_CATEGORIZATION_RULES,
+): Map<number, EnrichedCategorizationResult> {
+  const results = new Map<number, EnrichedCategorizationResult>();
+
+  for (let i = 0; i < descriptions.length; i++) {
+    const desc = descriptions[i];
+    if (desc === undefined) continue;
+    const result = categorizeWithMemory(desc, merchantMappings, rules);
+    if (result !== null) {
+      results.set(i, result);
+    }
+  }
+
+  return results;
+}
