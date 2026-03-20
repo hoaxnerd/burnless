@@ -799,7 +799,7 @@ async function seed() {
       const r = seededRandom();
       const multiplier = 1 + (r * 2 - 1) * tmpl.variance;
       const amount = Math.round(tmpl.baseAmount * multiplier * 100) / 100;
-      const desc = tmpl.descriptions[Math.floor(r * tmpl.descriptions.length)];
+      const desc = tmpl.descriptions[Math.floor(r * tmpl.descriptions.length)]!;
       const id = txnId(tmpl.accountKey, monthStr, 0);
       const extId = `seed-${tmpl.accountKey}-${monthStr}`;
 
