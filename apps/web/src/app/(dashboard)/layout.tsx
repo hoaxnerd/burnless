@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
@@ -11,9 +12,13 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const user = session?.user
-    ? { name: session.user.name ?? null, email: session.user.email ?? null, image: session.user.image ?? null }
-    : null;
+  if (!session?.user) redirect("/login");
+
+  const user = {
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+    image: session.user.image ?? null,
+  };
 
   return (
     <Suspense fallback={null}>
