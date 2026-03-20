@@ -78,11 +78,19 @@ export {
   generateProfitAndLoss,
   generateCashFlow,
   generateBalanceSheet,
+  computeAccountsReceivable,
+  computeAccountsPayable,
+  computeDepreciation,
+  computeWorkingCapitalAdjustments,
   type AccountData,
   type StatementLineItem,
   type ProfitAndLoss,
   type CashFlowStatement,
   type BalanceSheet,
+  type WorkingCapitalConfig,
+  type WorkingCapitalAdjustments,
+  type PaymentTerms,
+  type CapitalAsset,
 } from "./statements";
 
 // Metrics calculator
