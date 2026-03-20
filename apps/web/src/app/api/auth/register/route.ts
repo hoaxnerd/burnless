@@ -51,11 +51,17 @@ export async function POST(request: Request) {
     })
     .returning({ id: users.id, email: users.email, name: users.name });
 
+  if (!user) {
+    return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+  }
+
   // Send welcome email (fire-and-forget — don't block registration)
-  const template = welcomeEmail(user.name ?? "there");
-  email.provider.send({ to: user.email, ...template }).catch((err) => {
-    console.error("[email] Failed to send welcome email:", err);
-  });
+  if (email.provider && user.email) {
+    const template = welcomeEmail(user.name ?? "there");
+    email.provider.send({ to: user.email, ...template }).catch((err: unknown) => {
+      console.error("[email] Failed to send welcome email:", err);
+    });
+  }
 
   return NextResponse.json(user, { status: 201 });
 }

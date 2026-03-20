@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
-
-// IMPORTANT: Do NOT add @sentry/nextjs here until the package is installed
-// via `pnpm add @sentry/nextjs`. Adding it without the dep breaks builds.
 
 const nextConfig: NextConfig = {
   headers: async () => [
@@ -47,4 +45,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// @sentry/nextjs v10 — installed in package.json, wraps config for error monitoring
+export default withSentryConfig(nextConfig, {
+  silent: !process.env.CI,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  telemetry: false,
+  tunnelRoute: "/monitoring",
+});

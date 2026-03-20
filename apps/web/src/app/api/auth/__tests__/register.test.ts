@@ -32,6 +32,19 @@ vi.mock("@/lib/password", () => ({
   hashPassword: vi.fn().mockResolvedValue("pbkdf2:100000:fakesalt:fakehash"),
 }));
 
+// Mock email module (welcome email is fire-and-forget)
+vi.mock("@/lib/email", () => ({
+  email: {
+    provider: {
+      send: vi.fn().mockResolvedValue(undefined),
+    },
+  },
+}));
+
+vi.mock("@/lib/email/templates", () => ({
+  welcomeEmail: vi.fn().mockReturnValue({ subject: "Welcome", html: "<p>Hi</p>" }),
+}));
+
 // Chain: db.select(...).from(...).where(...).limit(1)
 mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });
@@ -76,7 +89,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "Jane",
         })
       );
@@ -96,7 +109,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "founder@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
         })
       );
 
@@ -115,12 +128,12 @@ describe("POST /api/auth/register", () => {
       await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "Jane",
         })
       );
 
-      expect(hashPassword).toHaveBeenCalledWith("securepass123");
+      expect(hashPassword).toHaveBeenCalledWith("Secure1pass"); // meets: 8+ chars, uppercase, lowercase, number
       expect(mockValues).toHaveBeenCalledWith(
         expect.objectContaining({
           passwordHash: "pbkdf2:100000:fakesalt:fakehash",
@@ -136,7 +149,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "taken@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "Someone",
         })
       );
@@ -152,7 +165,7 @@ describe("POST /api/auth/register", () => {
       await POST(
         jsonRequest({
           email: "taken@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
         })
       );
 
@@ -165,7 +178,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "not-an-email",
-          password: "securepass123",
+          password: "Secure1pass",
         })
       );
 
@@ -177,7 +190,7 @@ describe("POST /api/auth/register", () => {
     it("returns 400 for missing email", async () => {
       const res = await POST(
         jsonRequest({
-          password: "securepass123",
+          password: "Secure1pass",
         })
       );
 
@@ -221,7 +234,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "",
         })
       );
@@ -238,7 +251,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "exactly8",
+          password: "Exact1ly",
           name: "Jane",
         })
       );
@@ -250,7 +263,40 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "seven77",
+          password: "Seve7n7",
+        })
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects password without uppercase letter", async () => {
+      const res = await POST(
+        jsonRequest({
+          email: "jane@startup.com",
+          password: "alllower1",
+        })
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects password without lowercase letter", async () => {
+      const res = await POST(
+        jsonRequest({
+          email: "jane@startup.com",
+          password: "ALLUPPER1",
+        })
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects password without a number", async () => {
+      const res = await POST(
+        jsonRequest({
+          email: "jane@startup.com",
+          password: "NoNumbers",
         })
       );
 
@@ -268,7 +314,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "Jane",
         })
       );
@@ -287,7 +333,7 @@ describe("POST /api/auth/register", () => {
       const res = await POST(
         jsonRequest({
           email: "jane@startup.com",
-          password: "securepass123",
+          password: "Secure1pass",
           name: "Jane",
         })
       );
