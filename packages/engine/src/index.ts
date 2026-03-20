@@ -138,29 +138,25 @@ export {
   type CategorizationResult,
 } from "./categorization";
 
-// Payment providers (Stripe + Razorpay)
-export {
-  StripePaymentProvider,
-  RazorpayPaymentProvider,
-  resolvePaymentProvider,
-  type PaymentProvider,
-  type PaymentProviderType,
-  type PaymentCustomer,
-  type PaymentPlan,
-  type PaymentSubscription,
-  type CreateCheckoutOptions,
-  type CheckoutSession,
+// Payment providers — import directly from "@burnless/engine/payments" when needed.
+// Not re-exported here to avoid bundling optional plaid/razorpay/stripe SDKs.
+export type {
+  PaymentProvider,
+  PaymentProviderType,
+  PaymentCustomer,
+  PaymentPlan,
+  PaymentSubscription,
+  CreateCheckoutOptions,
+  CheckoutSession,
 } from "./payments";
 
-// Bank connectors (Plaid + Account Aggregator)
-export {
-  PlaidBankConnector,
-  AccountAggregatorConnector,
-  resolveBankConnector,
-  type BankConnector,
-  type BankConnectorType,
-  type BankAccount,
-  type BankTransaction,
-  type BankSyncResult,
-  type LinkTokenOptions,
+// Bank connectors — import directly from "@burnless/engine/bank-connectors" when needed.
+// Not re-exported here to avoid bundling optional plaid SDK.
+export type {
+  BankConnector,
+  BankConnectorType,
+  BankAccount,
+  BankTransaction,
+  BankSyncResult,
+  LinkTokenOptions,
 } from "./bank-connectors";
