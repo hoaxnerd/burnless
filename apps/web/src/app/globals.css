@@ -377,3 +377,55 @@ body {
     animation: none;
   }
 }
+
+/* ── Print Styles ──────────────────────────────────────────────────────────── */
+@media print {
+  body {
+    font-size: 11pt;
+    color: #000;
+    background: #fff;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Hide navigation, sidebar, and interactive elements */
+  nav,
+  aside,
+  [data-sidebar],
+  button:not([data-print-visible]) {
+    display: none !important;
+  }
+
+  /* Maximize content area */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Clean card borders for print */
+  .rounded-xl {
+    border-color: #d1d5db !important;
+  }
+
+  /* Ensure charts print properly */
+  .recharts-responsive-container {
+    page-break-inside: avoid;
+  }
+
+  /* Page breaks */
+  .print\:break-before-page {
+    page-break-before: always;
+  }
+
+  .print\:break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Tabular numbers for financial data */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

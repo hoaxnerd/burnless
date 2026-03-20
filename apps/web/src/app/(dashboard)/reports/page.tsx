@@ -3,6 +3,13 @@ import { getCompany, getDefaultScenario } from "@/lib/data";
 
 const reports = [
   {
+    title: "Board Update",
+    description: "One-click investor-ready monthly report with AI narratives",
+    href: "/reports/board-update",
+    icon: "\uD83D\uDCCB",
+    featured: true,
+  },
+  {
     title: "Profit & Loss",
     description: "Income, expenses, and net profit over time",
     href: "/reports/profit-loss",
@@ -70,7 +77,11 @@ export default async function ReportsPage() {
           <Link
             key={report.title}
             href={available ? report.href : "#"}
-            className={`rounded-xl bg-surface-0 border border-surface-200 p-6 transition-all ${
+            className={`rounded-xl p-6 transition-all ${
+              "featured" in report && report.featured
+                ? "bg-brand-50 border-2 border-brand-200 md:col-span-2 lg:col-span-1"
+                : "bg-surface-0 border border-surface-200"
+            } ${
               available
                 ? "hover:border-brand-300 hover:shadow-sm"
                 : "opacity-60 pointer-events-none"
