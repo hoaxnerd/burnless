@@ -1041,3 +1041,31 @@ export const merchantCategoryMappingsRelations = relations(
     }),
   })
 );
+
+// ── AI Usage Logs (cost tracking per feature) ───────────────────────────────
+
+export const aiUsageLogs = pgTable(
+  "ai_usage_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    tier: text("tier").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    estimatedCostMicros: integer("estimated_cost_micros").notNull().default(0),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_usage_company_idx").on(table.companyId),
+    index("ai_usage_feature_idx").on(table.companyId, table.feature),
+    index("ai_usage_created_idx").on(table.companyId, table.createdAt),
+  ]
+);

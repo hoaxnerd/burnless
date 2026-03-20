@@ -40,6 +40,7 @@ export async function generateDigestNarrative(
         },
       ],
       financialContext: deterministic,
+      feature: "weekly_digest",
     });
 
     return result.response;

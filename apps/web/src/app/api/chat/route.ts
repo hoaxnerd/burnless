@@ -16,6 +16,7 @@ import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tool-executor";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
+import { initAiUsageTracking } from "@/lib/ai-usage-tracker";
 
 const chatSchema = z.object({
   message: z.string().min(1),
@@ -26,6 +27,9 @@ const chatSchema = z.object({
 export async function POST(request: Request) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+
+  // Initialize cost tracking (idempotent — runs once)
+  initAiUsageTracking(() => ctx.companyId);
 
   let body: z.infer<typeof chatSchema>;
   try {
