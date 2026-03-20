@@ -51,10 +51,18 @@ const bottomNavItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+interface UserInfo {
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
 export function DashboardShell({
   children,
+  user,
 }: {
   children: React.ReactNode;
+  user: UserInfo | null;
 }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -85,6 +93,7 @@ export function DashboardShell({
         setAiPanelOpen={setAiPanelOpen}
         commandPaletteOpen={commandPaletteOpen}
         setCommandPaletteOpen={setCommandPaletteOpen}
+        user={user}
       >
         {children}
       </DashboardContent>
@@ -104,12 +113,14 @@ function DashboardContent({
   setAiPanelOpen,
   commandPaletteOpen,
   setCommandPaletteOpen,
+  user,
 }: {
   children: React.ReactNode;
   aiPanelOpen: boolean;
   setAiPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  user: UserInfo | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -278,16 +289,27 @@ function DashboardContent({
 
           <div className="p-4 border-t border-surface-200">
             <div className={`flex items-center gap-3 ${sidebarCollapsed ? "justify-center" : ""}`}>
-              <div className="h-8 w-8 rounded-full bg-surface-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-medium text-surface-600">U</span>
-              </div>
+              {user?.image ? (
+                <img
+                  src={user.image}
+                  alt=""
+                  className="h-8 w-8 rounded-full flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-surface-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-medium text-surface-600">
+                    {(user?.name ?? user?.email ?? "U").charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-surface-900 truncate">
-                    User
+                    {user?.name ?? "User"}
                   </p>
                   <p className="text-xs text-surface-500 truncate">
-                    user@startup.com
+                    {user?.email ?? ""}
                   </p>
                 </div>
               )}
@@ -298,7 +320,7 @@ function DashboardContent({
 
         {/* Main content */}
         <main className="flex-1 bg-surface-50 overflow-auto" id="main-content" role="main">
-          <div className="p-4 sm:p-6 lg:p-8">
+          <div key={pathname} className="p-4 sm:p-6 lg:p-8 animate-page-enter">
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
