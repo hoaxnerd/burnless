@@ -914,3 +914,45 @@ export const aiMessagesRelations = relations(aiMessages, ({ one }) => ({
     references: [aiConversations.id],
   }),
 }));
+
+// ── Privacy Consent ──────────────────────────────────────────────────────────
+
+export const consentPurposeEnum = pgEnum("consent_purpose", [
+  "data_processing",
+  "ai_features",
+  "marketing",
+  "analytics",
+]);
+
+export const privacyConsents = pgTable(
+  "privacy_consents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    purpose: consentPurposeEnum("purpose").notNull(),
+    granted: boolean("granted").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    grantedAt: timestamp("granted_at", { mode: "date" }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("privacy_consents_user_idx").on(table.userId),
+    index("privacy_consents_user_purpose_idx").on(table.userId, table.purpose),
+  ]
+);
+
+export const privacyConsentsRelations = relations(
+  privacyConsents,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [privacyConsents.userId],
+      references: [users.id],
+    }),
+  })
+);
