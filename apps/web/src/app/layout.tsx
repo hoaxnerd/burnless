@@ -5,6 +5,7 @@ import { CookieConsentBanner } from "@/components/cookie-consent";
 import { AnalyticsProvider } from "@/components/analytics-provider";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://burnless.com"),
   title: "Burnless — AI Financial Planning for Startups",
   description:
     "Manage revenue, funding, and expenses with an AI companion that helps you make smarter financial decisions.",
