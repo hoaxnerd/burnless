@@ -188,6 +188,10 @@ export default function OnboardingPage() {
     setStep("review");
   };
 
+  const skipOnboarding = () => {
+    router.push("/dashboard");
+  };
+
   // ── Field update ────────────────────────────────────────────────────────
 
   const updateField = (name: keyof CompanyFields, value: string) => {
@@ -276,6 +280,18 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center animate-slide-up">
+          {/* Progress indicator */}
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-brand-600" />
+              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+            </div>
+            <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
+              Step 1 of 3
+            </span>
+          </div>
+
           <div className="h-14 w-14 rounded-2xl bg-brand-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
             <span className="text-white font-bold text-2xl">B</span>
           </div>
@@ -310,11 +326,14 @@ export default function OnboardingPage() {
 
           <button
             onClick={skipToForm}
-            className="mt-4 inline-flex items-center gap-1 text-sm text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-800 px-6 py-3.5 text-base font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
           >
-            <SkipForward className="w-3.5 h-3.5" />
-            Skip — fill in manually
+            <SkipForward className="w-4 h-4" />
+            I'll fill in manually
           </button>
+          <p className="mt-2 text-center text-xs text-surface-400">
+            You can always update this later in Settings
+          </p>
         </div>
       </div>
     );
@@ -357,6 +376,14 @@ export default function OnboardingPage() {
               ? `Found ${enrichedCount} field${enrichedCount !== 1 ? "s" : ""}`
               : "Searching..."}
           </p>
+
+          <button
+            onClick={skipToForm}
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl border border-surface-300 dark:border-surface-600 px-5 py-2.5 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+          >
+            <SkipForward className="w-4 h-4" />
+            Skip — I'll fill in manually
+          </button>
         </div>
       </div>
     );
@@ -372,6 +399,27 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-surface-50 dark:bg-surface-950 py-12 px-4">
         <div className="max-w-lg mx-auto animate-slide-up">
+          {/* Progress indicator */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-8 rounded-full bg-brand-600" />
+                <div className="h-2 w-8 rounded-full bg-brand-600" />
+                <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+              </div>
+              <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
+                Step 2 of 3
+              </span>
+            </div>
+            <button
+              onClick={skipOnboarding}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+              Skip all
+            </button>
+          </div>
+
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">
               {aiFieldCount > 0
@@ -498,8 +546,15 @@ export default function OnboardingPage() {
             <ArrowRight className="w-5 h-5" />
           </button>
 
+          <button
+            onClick={skipOnboarding}
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-surface-200 dark:border-surface-700 px-6 py-3 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+          >
+            I'll do this later
+          </button>
+
           <p className="mt-3 text-center text-xs text-surface-400">
-            You can update all fields later in Settings.
+            You can always fill this in from Settings.
           </p>
         </div>
       </div>
