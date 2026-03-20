@@ -102,7 +102,7 @@ export function validateFormula(expression: string): string | undefined {
   }
 
   // Check for obviously dangerous patterns
-  if (/\b(import|require|global|process|eval|Function)\b/i.test(expression)) {
+  if (/\b(import|require|global|globalThis|process|eval|Function|__proto__|constructor)\b/i.test(expression)) {
     return "Expression contains disallowed keyword";
   }
 
