@@ -281,15 +281,24 @@ export default function OnboardingPage() {
       <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center animate-slide-up">
           {/* Progress indicator */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-8 rounded-full bg-brand-600" />
-              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
-              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-8 rounded-full bg-brand-600" />
+                <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+                <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+              </div>
+              <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
+                Step 1 of 3
+              </span>
             </div>
-            <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
-              Step 1 of 3
-            </span>
+            <button
+              onClick={skipOnboarding}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+              Skip all
+            </button>
           </div>
 
           <div className="h-14 w-14 rounded-2xl bg-brand-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
@@ -383,6 +392,12 @@ export default function OnboardingPage() {
           >
             <SkipForward className="w-4 h-4" />
             Skip — I'll fill in manually
+          </button>
+          <button
+            onClick={skipOnboarding}
+            className="mt-3 inline-flex items-center justify-center gap-1.5 text-sm font-medium text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+          >
+            Skip all — go to dashboard
           </button>
         </div>
       </div>
