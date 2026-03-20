@@ -14,8 +14,9 @@
  */
 
 import type { LlmProvider } from "./base";
-import type { ProviderConfig } from "./types";
+import type { ProviderConfig, ModelTier } from "./types";
 import { AnthropicProvider } from "./anthropic";
+import { OpenAIProvider } from "./openai";
 
 // ── Provider registry ───────────────────────────────────────────────────────
 
@@ -23,9 +24,14 @@ type ProviderFactory = (config: ProviderConfig) => LlmProvider;
 
 const PROVIDER_MAP: Record<string, ProviderFactory> = {
   anthropic: (config) => new AnthropicProvider(config),
+  openai: (config) => new OpenAIProvider(config),
+  // OpenRouter uses the OpenAI-compatible API with a different base URL
+  openrouter: (config) =>
+    new OpenAIProvider({
+      ...config,
+      baseUrl: config.baseUrl ?? "https://openrouter.ai/api/v1",
+    }),
   // Future providers:
-  // openai: (config) => new OpenAIProvider(config),
-  // openrouter: (config) => new OpenRouterProvider(config),
   // gemini: (config) => new GeminiProvider(config),
 };
 
@@ -33,10 +39,53 @@ const PROVIDER_MAP: Record<string, ProviderFactory> = {
 
 const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-sonnet-4-20250514",
-  // openai: "gpt-4o",
-  // openrouter: "anthropic/claude-sonnet-4-20250514",
+  openai: "gpt-4o",
+  openrouter: "anthropic/claude-sonnet-4-20250514",
   // gemini: "gemini-2.0-flash",
 };
+
+// ── Tier → model mapping per provider ───────────────────────────────────────
+
+const TIER_MODELS: Record<string, Record<ModelTier, string>> = {
+  anthropic: {
+    fast: "claude-haiku-4-5-20251001",
+    standard: "claude-sonnet-4-20250514",
+    deep: "claude-sonnet-4-20250514", // use sonnet for deep too — opus only when justified
+  },
+  openai: {
+    fast: "gpt-4o-mini",
+    standard: "gpt-4o",
+    deep: "o4-mini",
+  },
+  openrouter: {
+    fast: "anthropic/claude-haiku-4-5-20251001",
+    standard: "anthropic/claude-sonnet-4-20250514",
+    deep: "anthropic/claude-sonnet-4-20250514",
+  },
+};
+
+/** Fallback order: if preferred tier model fails, try the next tier up. */
+const TIER_FALLBACK: Record<ModelTier, ModelTier[]> = {
+  fast: ["standard", "deep"],
+  standard: ["deep", "fast"],
+  deep: ["standard", "fast"],
+};
+
+/** Resolve the model ID for a given provider and tier. */
+export function resolveModelForTier(
+  providerName: string,
+  tier: ModelTier
+): string {
+  const tierMap = TIER_MODELS[providerName];
+  if (tierMap?.[tier]) return tierMap[tier];
+  // Fall back to the default model for this provider
+  return DEFAULT_MODELS[providerName] ?? "";
+}
+
+/** Get the fallback tiers to try if the preferred tier fails. */
+export function getFallbackTiers(tier: ModelTier): ModelTier[] {
+  return TIER_FALLBACK[tier];
+}
 
 // ── Factory ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +111,7 @@ export function createProvider(
     process.env.AI_PROVIDER ??
     (process.env.ANTHROPIC_API_KEY ? "anthropic" : null) ??
     (process.env.OPENAI_API_KEY ? "openai" : null) ??
+    (process.env.OPENROUTER_API_KEY ? "openrouter" : null) ??
     "anthropic";
 
   const factory = PROVIDER_MAP[providerName];
@@ -76,7 +126,8 @@ export function createProvider(
     options.apiKey ??
     process.env.AI_API_KEY ??
     (providerName === "anthropic" ? process.env.ANTHROPIC_API_KEY : undefined) ??
-    (providerName === "openai" ? process.env.OPENAI_API_KEY : undefined);
+    (providerName === "openai" ? process.env.OPENAI_API_KEY : undefined) ??
+    (providerName === "openrouter" ? process.env.OPENROUTER_API_KEY : undefined);
 
   if (!apiKey) {
     return null;
@@ -91,6 +142,28 @@ export function createProvider(
     model,
     maxTokens: options.maxTokens ?? 4096,
   });
+}
+
+/**
+ * Create a provider for a specific model tier.
+ *
+ * Resolves the right model for the given tier and provider.
+ * Returns null if no API key is available.
+ */
+export function createProviderForTier(
+  tier: ModelTier,
+  options: Omit<CreateProviderOptions, "model"> = {}
+): LlmProvider | null {
+  const providerName =
+    options.provider ??
+    process.env.AI_PROVIDER ??
+    (process.env.ANTHROPIC_API_KEY ? "anthropic" : null) ??
+    (process.env.OPENAI_API_KEY ? "openai" : null) ??
+    (process.env.OPENROUTER_API_KEY ? "openrouter" : null) ??
+    "anthropic";
+
+  const model = resolveModelForTier(providerName, tier);
+  return createProvider({ ...options, model });
 }
 
 // Singleton for the default provider — lazy-initialized
@@ -114,6 +187,7 @@ export function resetProvider(): void {
 
 // Re-export provider classes for direct use when needed
 export { AnthropicProvider } from "./anthropic";
+export { OpenAIProvider } from "./openai";
 export { LlmProvider } from "./base";
 export type {
   ProviderConfig,
@@ -124,4 +198,6 @@ export type {
   ToolDefinition,
   LlmMessage,
   StopReason,
+  ModelTier,
+  UsageRecord,
 } from "./types";
