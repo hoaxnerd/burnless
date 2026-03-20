@@ -7,10 +7,10 @@ import { test, expect } from "@playwright/test";
  * Since these tests don't have auth, they test the onboarding UI in isolation.
  */
 
-/** Click the "Skip — fill in manually" button (avoids matching skip-to-content link). */
+/** Click the "I'll fill in manually" button to skip enrichment and go to review form. */
 async function clickSkipToForm(page: import("@playwright/test").Page) {
   await page
-    .getByRole("button", { name: /skip/i })
+    .getByRole("button", { name: /fill in manually/i })
     .click();
 }
 
