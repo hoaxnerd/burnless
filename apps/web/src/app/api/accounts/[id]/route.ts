@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, financialAccounts } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { financialAccounts, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
@@ -23,11 +22,7 @@ export async function GET(
   if ("error" in ctx) return ctx.error;
   const { id } = await params;
 
-  const [row] = await db
-    .select()
-    .from(financialAccounts)
-    .where(and(eq(financialAccounts.id, id), eq(financialAccounts.companyId, ctx.companyId)));
-
+  const row = await findByIdForCompany(financialAccounts, id, ctx.companyId);
   if (!row) return errorResponse("Account not found", 404);
   return NextResponse.json(row);
 }
@@ -45,12 +40,7 @@ export async function PATCH(
   const parsed = await parseBody(request, updateSchema);
   if ("error" in parsed) return parsed.error;
 
-  const [row] = await db
-    .update(financialAccounts)
-    .set(parsed.data)
-    .where(and(eq(financialAccounts.id, id), eq(financialAccounts.companyId, ctx.companyId)))
-    .returning();
-
+  const row = await updateForCompany(financialAccounts, id, ctx.companyId, parsed.data);
   if (!row) return errorResponse("Account not found", 404);
   return NextResponse.json(row);
 }
@@ -65,11 +55,7 @@ export async function DELETE(
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db
-    .delete(financialAccounts)
-    .where(and(eq(financialAccounts.id, id), eq(financialAccounts.companyId, ctx.companyId)))
-    .returning();
-
+  const row = await deleteForCompany(financialAccounts, id, ctx.companyId);
   if (!row) return errorResponse("Account not found", 404);
   return NextResponse.json({ deleted: true });
 }

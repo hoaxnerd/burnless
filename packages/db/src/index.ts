@@ -4,6 +4,7 @@ import * as schema from "./schema";
 
 export * from "./schema";
 export { schema };
+export * from "./queries";
 
 const connectionString =
   process.env.DATABASE_URL ?? "postgresql://localhost:5432/burnless";

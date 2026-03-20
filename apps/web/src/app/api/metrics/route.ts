@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, scenarios, forecastLines, financialAccounts, revenueStreams, headcountPlans, transactions } from "@burnless/db";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { getScenarioForCompany, getScenarioData } from "@burnless/db";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
@@ -17,8 +16,6 @@ import {
   type MonthlySeries,
   addSeries,
   subtractSeries,
-  monthKey,
-  emptySeries,
 } from "@burnless/engine";
 
 /**
@@ -37,23 +34,16 @@ export async function GET(request: Request) {
 
   if (!scenarioId) return errorResponse("scenarioId required", 400);
 
-  const [scenario] = await db.select().from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
+  const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const periodStart = new Date(startDateStr + "-01");
   const periodEnd = new Date(endDateStr + "-28");
 
-  // Fetch all data
-  const [fLines, accounts, revStreams, hcPlans] = await Promise.all([
-    db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId)),
-    db.select().from(financialAccounts).where(eq(financialAccounts.companyId, ctx.companyId)),
-    db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId)),
-    db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId)),
-  ]);
+  const data = await getScenarioData(scenarioId, ctx.companyId);
 
   // Compute forecasts
-  const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
+  const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
     id: fl.id,
     accountId: fl.accountId,
     method: fl.method,
@@ -65,7 +55,7 @@ export async function GET(request: Request) {
   const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
 
   // Revenue from streams
-  const revInputs: RevenueStreamInput[] = revStreams.map((rs) => ({
+  const revInputs: RevenueStreamInput[] = data.revenueStreams.map((rs) => ({
     id: rs.id,
     name: rs.name,
     type: rs.type,
@@ -74,7 +64,7 @@ export async function GET(request: Request) {
   const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
 
   // Subscription details for SaaS metrics
-  const subscriptionStreams = revStreams.filter((rs) => rs.type === "subscription");
+  const subscriptionStreams = data.revenueStreams.filter((rs) => rs.type === "subscription");
   const subscriptionDetails = subscriptionStreams.flatMap((rs) =>
     computeSubscriptionDetail(
       (rs.parameters ?? {}) as unknown as SubscriptionParams,
@@ -84,7 +74,7 @@ export async function GET(request: Request) {
   );
 
   // Headcount
-  const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({
+  const hcInputs: HeadcountPlanInput[] = data.headcountPlans.map((hp) => ({
     id: hp.id,
     departmentId: hp.departmentId,
     title: hp.title,
@@ -97,7 +87,7 @@ export async function GET(request: Request) {
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
   // Aggregate by category
-  const accountMap = new Map(accounts.map((a) => [a.id, a]));
+  const accountMap = new Map(data.accounts.map((a) => [a.id, a]));
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();

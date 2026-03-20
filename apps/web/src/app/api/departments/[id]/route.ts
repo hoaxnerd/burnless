@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, departments } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { departments, updateForCompany, deleteForCompany } from "@burnless/db";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
@@ -22,9 +21,7 @@ export async function PATCH(
   const parsed = await parseBody(request, updateSchema);
   if ("error" in parsed) return parsed.error;
 
-  const [row] = await db.update(departments).set(parsed.data)
-    .where(and(eq(departments.id, id), eq(departments.companyId, ctx.companyId))).returning();
-
+  const row = await updateForCompany(departments, id, ctx.companyId, parsed.data);
   if (!row) return errorResponse("Department not found", 404);
   return NextResponse.json(row);
 }
@@ -39,9 +36,7 @@ export async function DELETE(
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(departments)
-    .where(and(eq(departments.id, id), eq(departments.companyId, ctx.companyId))).returning();
-
+  const row = await deleteForCompany(departments, id, ctx.companyId);
   if (!row) return errorResponse("Department not found", 404);
   return NextResponse.json({ deleted: true });
 }

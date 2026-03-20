@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { auth } from "./auth";
-import { db } from "@burnless/db";
-import { companyMembers, companies } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { db, companies, getCompanyForUser } from "@burnless/db";
+import { eq } from "drizzle-orm";
 
 /** Standard JSON error response. */
 export function errorResponse(message: string, status: number) {
@@ -19,13 +17,7 @@ export async function getAuthUser() {
 
 /** Get a user's first company (for MVP, users have one company). */
 export async function getUserCompany(userId: string) {
-  const memberships = await db
-    .select({ companyId: companyMembers.companyId, role: companyMembers.role })
-    .from(companyMembers)
-    .where(eq(companyMembers.userId, userId))
-    .limit(1);
-  const first = memberships[0];
-  return first ?? null;
+  return getCompanyForUser(userId);
 }
 
 /** Require auth + company context. Returns 401/403 or {userId, companyId, role}. */
@@ -34,12 +26,16 @@ export async function requireCompanyAccess() {
   const userId = user?.id;
   if (!userId) return { error: errorResponse("Unauthorized", 401) } as const;
 
-  const membership = await getUserCompany(userId);
+  const membership = await getCompanyForUser(userId);
   if (!membership) return { error: errorResponse("No company found", 403) } as const;
 
-  // Set Sentry user context for server-side error tracking
-  Sentry.setUser({ id: userId, email: user.email ?? undefined });
-  Sentry.setTag("companyId", membership.companyId);
+  // Set Sentry user context (dynamic import avoids breaking webpack dev mode)
+  import("@sentry/nextjs")
+    .then((Sentry) => {
+      Sentry.setUser({ id: userId, email: user.email ?? undefined });
+      Sentry.setTag("companyId", membership.companyId);
+    })
+    .catch(() => {});
 
   return {
     userId,

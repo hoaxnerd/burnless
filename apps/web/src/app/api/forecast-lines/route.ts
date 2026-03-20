@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, forecastLines, forecastValues, scenarios } from "@burnless/db";
+import { db, forecastLines, getScenarioForCompany } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
@@ -22,11 +22,7 @@ export async function GET(request: Request) {
   const scenarioId = url.searchParams.get("scenarioId");
   if (!scenarioId) return errorResponse("scenarioId required", 400);
 
-  // Verify scenario belongs to company
-  const [scenario] = await db
-    .select()
-    .from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
+  const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const { limit, cursor } = parsePaginationParams(request);
@@ -54,11 +50,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;
 
-  // Verify scenario belongs to company
-  const [scenario] = await db
-    .select()
-    .from(scenarios)
-    .where(and(eq(scenarios.id, parsed.data.scenarioId), eq(scenarios.companyId, ctx.companyId)));
+  const scenario = await getScenarioForCompany(parsed.data.scenarioId, ctx.companyId);
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const [row] = await db

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { scenarios, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
@@ -20,11 +19,7 @@ export async function GET(
   if ("error" in ctx) return ctx.error;
   const { id } = await params;
 
-  const [row] = await db
-    .select()
-    .from(scenarios)
-    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId)));
-
+  const row = await findByIdForCompany(scenarios, id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json(row);
 }
@@ -50,12 +45,7 @@ export async function PATCH(
     updates.budgetLockedAt = null;
   }
 
-  const [row] = await db
-    .update(scenarios)
-    .set(updates)
-    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId)))
-    .returning();
-
+  const row = await updateForCompany(scenarios, id, ctx.companyId, updates);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json(row);
 }
@@ -70,11 +60,7 @@ export async function DELETE(
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db
-    .delete(scenarios)
-    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId)))
-    .returning();
-
+  const row = await deleteForCompany(scenarios, id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json({ deleted: true });
 }
