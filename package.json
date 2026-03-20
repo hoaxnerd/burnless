@@ -17,5 +17,9 @@
   "packageManager": "pnpm@10.26.1",
   "devDependencies": {
     "turbo": "^2.8.20"
+  },
+  "dependencies": {
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7"
   }
 }

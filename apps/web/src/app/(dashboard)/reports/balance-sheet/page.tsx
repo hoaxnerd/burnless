@@ -23,7 +23,7 @@ export default async function BalanceSheetPage() {
           {company.name} &mdash; {scenario.name} scenario
         </p>
       </div>
-      <BalanceSheetView balanceSheet={data.balanceSheet} />
+      <BalanceSheetView balanceSheet={data.balanceSheet} companyName={company.name} scenarioName={scenario.name} />
     </div>
   );
 }

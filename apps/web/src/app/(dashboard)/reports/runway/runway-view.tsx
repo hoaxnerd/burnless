@@ -1,8 +1,10 @@
 "use client";
 
 import type { MetricValue } from "@burnless/engine";
-import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency, formatNumber } from "@/components/charts";
+import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, MetricCard } from "@/components/ui";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
+import { generateRunwaySummaryPDF, downloadPDF } from "@/lib/pdf-export";
 
 interface RunwayViewProps {
   cashPosition: MetricValue[];
@@ -10,9 +12,11 @@ interface RunwayViewProps {
   runway: MetricValue[];
   grossBurnRate: MetricValue[];
   startingCash: number;
+  companyName?: string;
+  scenarioName?: string;
 }
 
-export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash }: RunwayViewProps) {
+export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName }: RunwayViewProps) {
   const latest = cashPosition[cashPosition.length - 1];
   const latestBurn = netBurnRate[netBurnRate.length - 1];
   const latestRunway = runway[runway.length - 1];
@@ -27,9 +31,53 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     net: netBurnRate[i]?.value ?? 0,
   }));
 
+  const handleExportCSV = () => {
+    const headers = ["Month", "Cash Position", "Net Burn Rate", "Gross Burn Rate", "Runway (Months)"];
+    const rows = [headers.join(",")];
+    for (let i = 0; i < cashPosition.length; i++) {
+      rows.push([
+        cashPosition[i]!.month,
+        String(Math.round(cashPosition[i]!.value)),
+        String(Math.round(netBurnRate[i]?.value ?? 0)),
+        String(Math.round(grossBurnRate[i]?.value ?? 0)),
+        String(Math.round(runway[i]?.value ?? 0)),
+      ].join(","));
+    }
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "runway-analysis.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    const doc = generateRunwaySummaryPDF(
+      {
+        startingCash,
+        netBurnRate: latestBurn?.value ?? 0,
+        grossBurnRate: grossBurnRate[grossBurnRate.length - 1]?.value ?? 0,
+        runwayMonths: latestRunway?.value ?? 0,
+        cashPosition,
+      },
+      {
+        title: "Runway Summary",
+        companyName: companyName ?? "Company",
+        scenarioName: scenarioName ?? "Base",
+      }
+    );
+    downloadPDF(doc, "runway-summary");
+  };
+
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
+      {/* Summary cards with export */}
+      <div className="flex items-center justify-between">
+        <div />
+        <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MetricCard
           label="Starting Cash"

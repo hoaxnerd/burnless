@@ -23,7 +23,11 @@ export default async function ProfitLossPage() {
           {company.name} &mdash; {scenario.name} scenario
         </p>
       </div>
-      <ProfitLossView profitAndLoss={data.profitAndLoss} />
+      <ProfitLossView
+        profitAndLoss={data.profitAndLoss}
+        companyName={company.name}
+        scenarioName={scenario.name}
+      />
     </div>
   );
 }

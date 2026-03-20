@@ -2,16 +2,22 @@
 
 import type { CashFlowStatement } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
-import { ExportCSVButton, statementToCSVRows } from "@/components/reports/export-button";
-import { AreaChartWidget, BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
+import { statementToCSVRows } from "@/components/reports/export-button";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
+import { AreaChartWidget, BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { generateCashFlowPDF, downloadPDF } from "@/lib/pdf-export";
 
 export function CashFlowView({
   cashFlow,
   startingCash,
+  companyName,
+  scenarioName,
 }: {
   cashFlow: CashFlowStatement;
   startingCash: number;
+  companyName?: string;
+  scenarioName?: string;
 }) {
   const cf = cashFlow;
 
@@ -36,6 +42,34 @@ export function CashFlowView({
   ];
   const { headers, data: csvData } = statementToCSVRows(sections);
 
+  const handleExportCSV = () => {
+    const csvRows = [headers.join(",")];
+    for (const row of csvData) {
+      const values = headers.map((h) => {
+        const val = row[h];
+        if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+        return String(val ?? "");
+      });
+      csvRows.push(values.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cash-flow.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    const doc = generateCashFlowPDF(cf, {
+      title: "Cash Flow Statement",
+      companyName: companyName ?? "Company",
+      scenarioName: scenarioName ?? "Base",
+    });
+    downloadPDF(doc, "cash-flow");
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -57,7 +91,7 @@ export function CashFlowView({
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Cash Flow Statement</h2>
-          <ExportCSVButton data={csvData} headers={headers} filename="cash-flow" />
+          <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
         </div>
         <StatementTable
           title="Cash Flow"

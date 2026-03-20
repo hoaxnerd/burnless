@@ -2,11 +2,21 @@
 
 import type { BalanceSheet } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
-import { ExportCSVButton, statementToCSVRows } from "@/components/reports/export-button";
-import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
+import { statementToCSVRows } from "@/components/reports/export-button";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
+import { BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { generateBalanceSheetPDF, downloadPDF } from "@/lib/pdf-export";
 
-export function BalanceSheetView({ balanceSheet }: { balanceSheet: BalanceSheet }) {
+export function BalanceSheetView({
+  balanceSheet,
+  companyName,
+  scenarioName,
+}: {
+  balanceSheet: BalanceSheet;
+  companyName?: string;
+  scenarioName?: string;
+}) {
   const bs = balanceSheet;
 
   const barData = bs.assets.values.map((v, i) => ({
@@ -18,6 +28,34 @@ export function BalanceSheetView({ balanceSheet }: { balanceSheet: BalanceSheet 
 
   const sections = [bs.assets, bs.liabilities, bs.equity];
   const { headers, data: csvData } = statementToCSVRows(sections);
+
+  const handleExportCSV = () => {
+    const csvRows = [headers.join(",")];
+    for (const row of csvData) {
+      const values = headers.map((h) => {
+        const val = row[h];
+        if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+        return String(val ?? "");
+      });
+      csvRows.push(values.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "balance-sheet.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    const doc = generateBalanceSheetPDF(bs, {
+      title: "Balance Sheet",
+      companyName: companyName ?? "Company",
+      scenarioName: scenarioName ?? "Base",
+    });
+    downloadPDF(doc, "balance-sheet");
+  };
 
   return (
     <div className="space-y-6">
@@ -35,7 +73,7 @@ export function BalanceSheetView({ balanceSheet }: { balanceSheet: BalanceSheet 
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Balance Sheet</h2>
-          <ExportCSVButton data={csvData} headers={headers} filename="balance-sheet" />
+          <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
         </div>
         <StatementTable
           title="Balance Sheet"

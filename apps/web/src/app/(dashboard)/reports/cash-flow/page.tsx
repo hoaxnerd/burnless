@@ -23,7 +23,7 @@ export default async function CashFlowPage() {
           {company.name} &mdash; {scenario.name} scenario
         </p>
       </div>
-      <CashFlowView cashFlow={data.cashFlow} startingCash={data.startingCash} />
+      <CashFlowView cashFlow={data.cashFlow} startingCash={data.startingCash} companyName={company.name} scenarioName={scenario.name} />
     </div>
   );
 }

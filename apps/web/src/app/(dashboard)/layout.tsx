@@ -13,6 +13,7 @@ import {
   Sparkles,
   Settings,
   Command,
+  FolderOpen,
 } from "lucide-react";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { AiPanel } from "@/components/ai/ai-panel";
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/team", label: "Team", icon: Users },
   { href: "/scenarios", label: "Scenarios", icon: GitBranch },
   { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/data-room", label: "Data Room", icon: FolderOpen },
   { href: "/ai", label: "AI Companion", icon: Sparkles },
 ];
 

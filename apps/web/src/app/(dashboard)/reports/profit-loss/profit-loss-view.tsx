@@ -3,10 +3,20 @@
 import type { ProfitAndLoss } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { ExportCSVButton, statementToCSVRows } from "@/components/reports/export-button";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { MultiLineChart, chartColors, formatCompactCurrency, formatPercent } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { generateProfitLossPDF, downloadPDF } from "@/lib/pdf-export";
 
-export function ProfitLossView({ profitAndLoss }: { profitAndLoss: ProfitAndLoss }) {
+export function ProfitLossView({
+  profitAndLoss,
+  companyName,
+  scenarioName,
+}: {
+  profitAndLoss: ProfitAndLoss;
+  companyName?: string;
+  scenarioName?: string;
+}) {
   const pnl = profitAndLoss;
 
   // Chart data: Revenue, Expenses, Net Income over time
@@ -35,6 +45,34 @@ export function ProfitLossView({ profitAndLoss }: { profitAndLoss: ProfitAndLoss
     pnl.netIncome,
   ];
   const { headers, data: csvData } = statementToCSVRows(sections);
+
+  const handleExportCSV = () => {
+    const csvRows = [headers.join(",")];
+    for (const row of csvData) {
+      const values = headers.map((h) => {
+        const val = row[h];
+        if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+        return String(val ?? "");
+      });
+      csvRows.push(values.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "profit-and-loss.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    const doc = generateProfitLossPDF(pnl, {
+      title: "Profit & Loss Statement",
+      companyName: companyName ?? "Company",
+      scenarioName: scenarioName ?? "Base",
+    });
+    downloadPDF(doc, "profit-and-loss");
+  };
 
   return (
     <div className="space-y-6">
@@ -66,7 +104,7 @@ export function ProfitLossView({ profitAndLoss }: { profitAndLoss: ProfitAndLoss
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Income Statement</h2>
-          <ExportCSVButton data={csvData} headers={headers} filename="profit-and-loss" />
+          <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
         </div>
         <StatementTable
           title="P&L"

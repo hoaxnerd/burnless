@@ -29,6 +29,8 @@ export default async function RunwayPage() {
         runway={data.metrics.cashRunwayMonths}
         grossBurnRate={data.metrics.burnRate}
         startingCash={data.startingCash}
+        companyName={company.name}
+        scenarioName={scenario.name}
       />
     </div>
   );
