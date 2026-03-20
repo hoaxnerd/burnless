@@ -12,6 +12,7 @@ import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
+import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tool-executor";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
@@ -31,6 +32,12 @@ export async function POST(request: Request) {
     body = chatSchema.parse(await request.json());
   } catch {
     return errorResponse("Invalid request body", 400);
+  }
+
+  // Feature gate: check AI feature flags (master switch + chat toggle + data mode)
+  const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "chat");
+  if (!aiCheck.allowed) {
+    return errorResponse(aiCheck.reason!, 403);
   }
 
   // Feature gate: check AI message limit

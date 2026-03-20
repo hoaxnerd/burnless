@@ -128,6 +128,12 @@ export const aiMessageRoleEnum = pgEnum("ai_message_role", [
   "system",
 ]);
 
+export const aiDataModeEnum = pgEnum("ai_data_mode", [
+  "full",
+  "show_cached",
+  "hide_all",
+]);
+
 // ── Auth Tables (Auth.js compatible) ──────────────────────────────────────────
 
 export const users = pgTable("users", {
@@ -542,6 +548,39 @@ export const integrations = pgTable(
   ]
 );
 
+// ── AI Feature Flags ─────────────────────────────────────────────────────────
+
+export const aiFeatureFlags = pgTable(
+  "ai_feature_flags",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    masterEnabled: boolean("master_enabled").notNull().default(true),
+    dataMode: aiDataModeEnum("data_mode").notNull().default("full"),
+    features: jsonb("features")
+      .notNull()
+      .default({
+        onboarding: true,
+        chat: true,
+        insights: true,
+        uiPersonalization: true,
+        autoCategorization: true,
+      }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("ai_feature_flags_company_idx").on(table.companyId),
+  ]
+);
+
 // ── AI Conversations ──────────────────────────────────────────────────────────
 
 export const aiConversations = pgTable(
@@ -607,6 +646,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   fundingRounds: many(fundingRounds),
   metrics: many(metrics),
   integrations: many(integrations),
+  aiFeatureFlags: many(aiFeatureFlags),
   aiConversations: many(aiConversations),
 }));
 
@@ -723,6 +763,13 @@ export const metricsRelations = relations(metrics, ({ one }) => ({
 export const integrationsRelations = relations(integrations, ({ one }) => ({
   company: one(companies, {
     fields: [integrations.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const aiFeatureFlagsRelations = relations(aiFeatureFlags, ({ one }) => ({
+  company: one(companies, {
+    fields: [aiFeatureFlags.companyId],
     references: [companies.id],
   }),
 }));

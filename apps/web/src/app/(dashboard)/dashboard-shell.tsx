@@ -18,13 +18,14 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { AiPanel } from "@/components/ai/ai-panel";
+import { AiFeatureProvider, useAiFlags } from "@/components/ai/ai-feature-context";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
 import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
 import { ThemeProvider, ThemeToggle } from "@/components/ui/theme-toggle";
 import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
-const navItems = [
+const coreNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/revenue", label: "Revenue", icon: TrendingUp },
@@ -34,8 +35,9 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: FileBarChart },
   { href: "/import", label: "Import", icon: Upload },
   { href: "/data-room", label: "Data Room", icon: FolderOpen },
-  { href: "/ai", label: "AI Companion", icon: Sparkles },
 ];
+
+const aiNavItem = { href: "/ai", label: "AI Companion", icon: Sparkles };
 
 const bottomNavItems = [
   { href: "/settings", label: "Settings", icon: Settings },
@@ -46,14 +48,7 @@ export function DashboardShell({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
-
-  // Preserve scenarioId across nav links when in scenario mode
-  const scenarioId = searchParams.get("scenarioId");
-  const buildHref = (base: string) =>
-    scenarioId ? `${base}?scenarioId=${scenarioId}` : base;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -71,8 +66,46 @@ export function DashboardShell({
 
   return (
     <ThemeProvider>
+    <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={toggleAI}>
     <ScenarioProvider>
+      <DashboardContent
+        aiPanelOpen={aiPanelOpen}
+        setAiPanelOpen={setAiPanelOpen}
+      >
+        {children}
+      </DashboardContent>
+    </ScenarioProvider>
+    </KeyboardShortcutsProvider>
+    </AiFeatureProvider>
+    </ThemeProvider>
+  );
+}
+
+/** Inner component that can use useAiFlags since it sits within AiFeatureProvider. */
+function DashboardContent({
+  children,
+  aiPanelOpen,
+  setAiPanelOpen,
+}: {
+  children: React.ReactNode;
+  aiPanelOpen: boolean;
+  setAiPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { masterEnabled, getFeature } = useAiFlags();
+  const chatEnabled = getFeature("chat").enabled;
+
+  const scenarioId = searchParams.get("scenarioId");
+  const buildHref = (base: string) =>
+    scenarioId ? `${base}?scenarioId=${scenarioId}` : base;
+
+  const allNavItems = masterEnabled
+    ? [...coreNavItems, aiNavItem]
+    : coreNavItems;
+
+  return (
     <div className="min-h-screen flex flex-col">
       <ScenarioBanner />
       <div className="flex-1 flex">
@@ -90,7 +123,7 @@ export function DashboardShell({
         </div>
 
         <nav className="flex-1 p-3 space-y-1" aria-label="Sidebar">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               pathname === item.href ||
@@ -114,17 +147,19 @@ export function DashboardShell({
         </nav>
 
         <div className="px-3 pb-2 space-y-1">
-          {/* Cmd+K shortcut */}
-          <button
-            onClick={() => setAiPanelOpen(true)}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-900 transition-colors"
-          >
-            <Command className="h-4 w-4 text-surface-400" />
-            <span className="flex-1 text-left">Ask AI</span>
-            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-surface-200 bg-surface-50 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
-              <span className="text-xs">&#8984;</span>K
-            </kbd>
-          </button>
+          {/* Cmd+K shortcut — only show when chat is enabled */}
+          {chatEnabled && (
+            <button
+              onClick={() => setAiPanelOpen(true)}
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-900 transition-colors"
+            >
+              <Command className="h-4 w-4 text-surface-400" />
+              <span className="flex-1 text-left">Ask AI</span>
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-surface-200 bg-surface-50 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
+                <span className="text-xs">&#8984;</span>K
+              </kbd>
+            </button>
+          )}
 
           {bottomNavItems.map((item) => {
             const Icon = item.icon;
@@ -174,12 +209,11 @@ export function DashboardShell({
         </div>
       </main>
 
-      {/* Global AI Panel (Cmd+K) */}
-      <AiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+      {/* Global AI Panel (Cmd+K) — only render when chat is enabled */}
+      {chatEnabled && (
+        <AiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
+      )}
     </div>
     </div>
-    </ScenarioProvider>
-    </KeyboardShortcutsProvider>
-    </ThemeProvider>
   );
 }

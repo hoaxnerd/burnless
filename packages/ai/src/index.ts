@@ -17,6 +17,23 @@ export { generateInsights } from "./insights";
 // Prompts
 export { SYSTEM_PROMPT, buildSystemMessage } from "./prompts";
 
+// Feature flags
+export {
+  resolveFeatureStatus,
+  canMakeLlmCall,
+  canFeatureCallLlm,
+  DEFAULT_AI_FLAGS,
+  AI_FEATURE_LIST,
+} from "./feature-flags";
+export type {
+  AiFeatureName,
+  AiDataMode,
+  AiFeatureConfig,
+  AiFeatureFlagsState,
+  AiFeatureStatus,
+  AiFeatureMeta,
+} from "./feature-flags";
+
 // Types
 export type {
   FinancialSnapshot,

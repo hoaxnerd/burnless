@@ -14,8 +14,13 @@ import {
   Clock,
   AlertCircle,
   Upload,
+  Sparkles,
+  Power,
+  Database,
 } from "lucide-react";
 import Link from "next/link";
+import { useAiFlags } from "@/components/ai/ai-feature-context";
+import { AI_FEATURE_LIST, type AiFeatureName, type AiDataMode } from "@burnless/ai";
 
 interface IntegrationItem {
   type: string;
@@ -87,9 +92,10 @@ const integrations: IntegrationItem[] = [
 ];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "integrations" | "billing">(
-    "general"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "general" | "ai" | "integrations" | "billing"
+  >("general");
+  const { flags, updateFlags, loaded: aiLoaded } = useAiFlags();
 
   return (
     <div>
@@ -107,6 +113,7 @@ export default function SettingsPage() {
         {(
           [
             { key: "general", label: "General" },
+            { key: "ai", label: "AI Features" },
             { key: "integrations", label: "Integrations" },
             { key: "billing", label: "Billing" },
           ] as const
@@ -171,6 +178,175 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Features Tab */}
+      {activeTab === "ai" && aiLoaded && (
+        <div className="space-y-6 max-w-2xl">
+          {/* Level 1: Master Switch */}
+          <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-brand-100 dark:bg-brand-900 flex items-center justify-center">
+                  <Power className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-50">
+                    AI Master Switch
+                  </h2>
+                  <p className="text-sm text-surface-500 dark:text-surface-400">
+                    {flags.masterEnabled
+                      ? "AI features are active across the platform"
+                      : "All AI features are disabled \u2014 pure deterministic mode"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() =>
+                  updateFlags({ masterEnabled: !flags.masterEnabled })
+                }
+                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                  flags.masterEnabled
+                    ? "bg-brand-600"
+                    : "bg-surface-300 dark:bg-surface-600"
+                }`}
+                role="switch"
+                aria-checked={flags.masterEnabled}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    flags.masterEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Level 3: Data Retention Mode */}
+          {flags.masterEnabled && (
+            <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Database className="h-5 w-5 text-surface-500 dark:text-surface-400" />
+                <div>
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-50">
+                    AI Data Mode
+                  </h2>
+                  <p className="text-sm text-surface-500 dark:text-surface-400">
+                    Control how AI generates and displays data
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {(
+                  [
+                    {
+                      value: "full" as AiDataMode,
+                      label: "Full",
+                      desc: "Generate new AI content and show cached results",
+                    },
+                    {
+                      value: "show_cached" as AiDataMode,
+                      label: "Cached Only",
+                      desc: "Show previously generated AI data, no new LLM calls",
+                    },
+                    {
+                      value: "hide_all" as AiDataMode,
+                      label: "Hide All",
+                      desc: "Hide all AI-generated content entirely",
+                    },
+                  ]
+                ).map((mode) => (
+                  <label
+                    key={mode.value}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      flags.dataMode === mode.value
+                        ? "border-brand-500 bg-brand-50 dark:bg-brand-950/30 dark:border-brand-700"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-700/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="dataMode"
+                      value={mode.value}
+                      checked={flags.dataMode === mode.value}
+                      onChange={() => updateFlags({ dataMode: mode.value })}
+                      className="h-4 w-4 text-brand-600 focus:ring-brand-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-surface-900 dark:text-surface-50">
+                        {mode.label}
+                      </span>
+                      <p className="text-xs text-surface-500 dark:text-surface-400">
+                        {mode.desc}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Level 2: Per-Feature Switches */}
+          {flags.masterEnabled && (
+            <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Sparkles className="h-5 w-5 text-surface-500 dark:text-surface-400" />
+                <div>
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-50">
+                    Feature Toggles
+                  </h2>
+                  <p className="text-sm text-surface-500 dark:text-surface-400">
+                    Enable or disable individual AI capabilities
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {AI_FEATURE_LIST.map((feat) => {
+                  const isOn =
+                    flags.features[feat.name as keyof typeof flags.features];
+                  return (
+                    <div
+                      key={feat.name}
+                      className="flex items-center justify-between py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-surface-900 dark:text-surface-50">
+                          {feat.label}
+                        </p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                          {feat.description}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          updateFlags({
+                            features: {
+                              ...flags.features,
+                              [feat.name]: !isOn,
+                            },
+                          })
+                        }
+                        className={`relative inline-flex h-6 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                          isOn
+                            ? "bg-brand-600"
+                            : "bg-surface-300 dark:bg-surface-600"
+                        }`}
+                        role="switch"
+                        aria-checked={isOn}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            isOn ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

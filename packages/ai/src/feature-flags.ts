@@ -1,0 +1,137 @@
+/**
+ * AI Feature Flags — defines the 3-tier toggle system.
+ *
+ * Level 1: Master switch (company-wide on/off)
+ * Level 2: Per-feature toggles
+ * Level 3: Data retention mode (full / show_cached / hide_all)
+ */
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export type AiFeatureName =
+  | "onboarding"
+  | "chat"
+  | "insights"
+  | "uiPersonalization"
+  | "autoCategorization";
+
+export type AiDataMode = "full" | "show_cached" | "hide_all";
+
+export interface AiFeatureConfig {
+  onboarding: boolean;
+  chat: boolean;
+  insights: boolean;
+  uiPersonalization: boolean;
+  autoCategorization: boolean;
+}
+
+export interface AiFeatureFlagsState {
+  masterEnabled: boolean;
+  dataMode: AiDataMode;
+  features: AiFeatureConfig;
+}
+
+export interface AiFeatureStatus {
+  enabled: boolean;
+  canGenerate: boolean;
+  showCached: boolean;
+}
+
+// ── Defaults ────────────────────────────────────────────────────────────────
+
+export const DEFAULT_AI_FLAGS: AiFeatureFlagsState = {
+  masterEnabled: true,
+  dataMode: "full",
+  features: {
+    onboarding: true,
+    chat: true,
+    insights: true,
+    uiPersonalization: true,
+    autoCategorization: true,
+  },
+};
+
+// ── Feature metadata (for settings UI) ──────────────────────────────────────
+
+export interface AiFeatureMeta {
+  name: AiFeatureName;
+  label: string;
+  description: string;
+}
+
+export const AI_FEATURE_LIST: AiFeatureMeta[] = [
+  {
+    name: "onboarding",
+    label: "Smart Onboarding",
+    description: "AI-powered company enrichment during onboarding",
+  },
+  {
+    name: "chat",
+    label: "AI Chat Companion",
+    description: "Conversational AI for financial planning (Cmd+K)",
+  },
+  {
+    name: "insights",
+    label: "AI Insights & Analytics",
+    description: "Automated financial insights and alerts",
+  },
+  {
+    name: "uiPersonalization",
+    label: "AI UI Personalization",
+    description: "AI-driven dashboard layout and recommendations",
+  },
+  {
+    name: "autoCategorization",
+    label: "Auto-Categorization",
+    description: "AI-powered transaction categorization",
+  },
+];
+
+// ── Resolution logic ────────────────────────────────────────────────────────
+
+/**
+ * Resolve whether a specific AI feature is active given the 3-tier flags.
+ * Returns an object telling the caller what they can do.
+ */
+export function resolveFeatureStatus(
+  flags: AiFeatureFlagsState,
+  feature: AiFeatureName
+): AiFeatureStatus {
+  // Level 1: master switch
+  if (!flags.masterEnabled) {
+    return { enabled: false, canGenerate: false, showCached: false };
+  }
+
+  // Level 2: per-feature switch
+  if (!flags.features[feature]) {
+    return { enabled: false, canGenerate: false, showCached: false };
+  }
+
+  // Level 3: data mode
+  switch (flags.dataMode) {
+    case "full":
+      return { enabled: true, canGenerate: true, showCached: true };
+    case "show_cached":
+      return { enabled: true, canGenerate: false, showCached: true };
+    case "hide_all":
+      return { enabled: false, canGenerate: false, showCached: false };
+  }
+}
+
+/**
+ * Check if ANY LLM call is permitted (master on + data mode = full).
+ * Use this server-side before making API calls.
+ */
+export function canMakeLlmCall(flags: AiFeatureFlagsState): boolean {
+  return flags.masterEnabled && flags.dataMode === "full";
+}
+
+/**
+ * Check if a specific feature can make LLM calls.
+ */
+export function canFeatureCallLlm(
+  flags: AiFeatureFlagsState,
+  feature: AiFeatureName
+): boolean {
+  return canMakeLlmCall(flags) && flags.features[feature];
+}

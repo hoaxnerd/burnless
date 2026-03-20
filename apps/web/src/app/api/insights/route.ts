@@ -8,12 +8,19 @@ import { db, scenarios as scenariosTable } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { generateInsights } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
 
 export async function POST(request: Request) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+
+  // Check AI feature flags — insights need LLM access
+  const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "insights");
+  if (!aiCheck.allowed) {
+    return NextResponse.json({ insights: [], reason: aiCheck.reason });
+  }
 
   let scenarioId: string | undefined;
   try {
