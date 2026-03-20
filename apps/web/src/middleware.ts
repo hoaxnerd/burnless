@@ -40,6 +40,9 @@ export function middleware(request: NextRequest) {
   // Only rate-limit API routes
   if (!pathname.startsWith("/api/")) return NextResponse.next();
 
+  // Skip health check (monitoring services poll frequently)
+  if (pathname === "/api/health") return NextResponse.next();
+
   // Skip NextAuth session/callback internals (they have CSRF + session validation)
   if (
     pathname.startsWith("/api/auth/") &&
