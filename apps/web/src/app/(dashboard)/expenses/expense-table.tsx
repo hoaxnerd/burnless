@@ -9,18 +9,21 @@ interface ExpenseTableProps {
   lineItems: ExpenseLineItem[];
   subcategories: string[];
   onDelete?: (ids: string[]) => void;
+  onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
 
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, onDelete }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOverride }: ExpenseTableProps) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "recurring" | "anomaly">("all");
   const [sortKey, setSortKey] = useState<SortKey>("currentAmount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -268,11 +271,45 @@ export function ExpenseTable({ lineItems, subcategories, onDelete }: ExpenseTabl
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600">
-                          {item.subcategory}
-                        </span>
-                        {item.categorySource === "rule" && (
+                      <div className="relative flex items-center gap-1.5">
+                        {editingCategoryId === item.id ? (
+                          <select
+                            autoFocus
+                            defaultValue={overrides[item.id] ?? item.subcategory}
+                            onChange={(e) => {
+                              const newCat = e.target.value;
+                              setOverrides((prev) => ({ ...prev, [item.id]: newCat }));
+                              setEditingCategoryId(null);
+                              onCategoryOverride?.(item.id, newCat);
+                              // Learn: save merchant→category mapping
+                              fetch("/api/merchant-mappings", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  description: item.accountName,
+                                  accountId: item.accountId,
+                                  category: item.accountCategory,
+                                  subcategory: newCat,
+                                }),
+                              }).catch(() => {});
+                            }}
+                            onBlur={() => setEditingCategoryId(null)}
+                            className="rounded-md border border-brand-300 bg-white px-2 py-0.5 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                          >
+                            {subcategories.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingCategoryId(item.id)}
+                            className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600 hover:bg-surface-200 hover:text-surface-800 transition-colors cursor-pointer"
+                            title="Click to change category"
+                          >
+                            {overrides[item.id] ?? item.subcategory}
+                          </button>
+                        )}
+                        {item.categorySource === "rule" && !overrides[item.id] && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600"
                             title={`AI categorized (${Math.round(item.subcategoryConfidence * 100)}% confidence)`}
@@ -280,15 +317,15 @@ export function ExpenseTable({ lineItems, subcategories, onDelete }: ExpenseTabl
                             <Sparkles className="h-2.5 w-2.5" /> AI
                           </span>
                         )}
-                        {item.categorySource === "merchant_memory" && (
+                        {(item.categorySource === "merchant_memory" || overrides[item.id]) && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
-                            title="Learned from your override"
+                            title={overrides[item.id] ? "You overrode this category" : "Learned from your override"}
                           >
-                            <Sparkles className="h-2.5 w-2.5" /> Learned
+                            <Sparkles className="h-2.5 w-2.5" /> {overrides[item.id] ? "Override" : "Learned"}
                           </span>
                         )}
-                        {item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && (
+                        {item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && !overrides[item.id] && (
                           <span className="text-[9px] text-surface-400" title="Low confidence categorization">
                             ?
                           </span>
