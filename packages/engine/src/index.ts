@@ -89,3 +89,22 @@ export {
   type BudgetVsActuals,
   type BudgetLineItem,
 } from "./budget";
+
+// Integration framework
+export {
+  ProviderRegistry,
+  createDefaultRegistry,
+  type IntegrationProvider,
+  type SyncOptions,
+  type SyncResult,
+  type MappedTransaction,
+} from "./integrations";
+
+// Transaction categorization
+export {
+  categorizeTransaction,
+  categorizeTransactions,
+  DEFAULT_CATEGORIZATION_RULES,
+  type CategorizationRule,
+  type CategorizationResult,
+} from "./categorization";
