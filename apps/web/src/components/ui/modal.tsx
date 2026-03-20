@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, type ReactNode } from "react";
+import { useEffect, useCallback, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -8,20 +8,33 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Max width variant */
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+const sizeMap = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-xl",
+};
+
+export function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
     if (open) {
       document.addEventListener("keydown", handleKey);
       document.body.style.overflow = "hidden";
+      // Focus the modal content for accessibility
+      contentRef.current?.focus();
     }
     return () => {
       document.removeEventListener("keydown", handleKey);
@@ -33,10 +46,21 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/40 z-50 animate-fade-in"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* Panel */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="bg-surface-0 rounded-xl shadow-xl border border-surface-200 w-full max-w-lg max-h-[90vh] overflow-auto"
+          ref={contentRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className={`bg-surface-0 rounded-2xl shadow-xl border border-surface-200 w-full ${sizeMap[size]} max-h-[90vh] overflow-auto animate-scale-in outline-none`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
@@ -44,6 +68,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             <button
               onClick={onClose}
               className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
+              aria-label="Close dialog"
             >
               <X className="h-4 w-4" />
             </button>
