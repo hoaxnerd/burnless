@@ -75,12 +75,12 @@ export function LandingFooter() {
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
               <h3 className="text-sm font-semibold text-surface-900 mb-4">{category}</h3>
-              <ul className="space-y-1">
+              <ul className="space-y-0">
                 {links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-2"
+                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-2.5"
                     >
                       {link.label}
                     </Link>
