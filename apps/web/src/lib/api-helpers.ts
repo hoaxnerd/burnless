@@ -43,6 +43,48 @@ export async function requireCompanyAccess() {
   } as const;
 }
 
+/** Role hierarchy for RBAC checks. */
+type MemberRole = "owner" | "admin" | "editor" | "viewer";
+const ROLE_LEVEL: Record<MemberRole, number> = {
+  viewer: 0,
+  editor: 1,
+  admin: 2,
+  owner: 3,
+};
+
+/**
+ * Check that the authenticated user has at least the given role.
+ * Returns an error response if the role is insufficient.
+ */
+export function requireRole(
+  ctx: { role: string },
+  minimumRole: MemberRole
+): NextResponse | null {
+  const userLevel = ROLE_LEVEL[ctx.role as MemberRole] ?? -1;
+  const requiredLevel = ROLE_LEVEL[minimumRole];
+  if (userLevel < requiredLevel) {
+    return errorResponse(
+      `Forbidden: requires ${minimumRole} role or higher`,
+      403
+    );
+  }
+  return null;
+}
+
+/** Get the company's subscription plan. */
+export async function getCompanyPlan(
+  companyId: string
+): Promise<"free" | "pro" | "team"> {
+  const [company] = await db
+    .select({ stripePlan: companies.stripePlan })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1);
+  const plan = company?.stripePlan;
+  if (plan === "pro" || plan === "team") return plan;
+  return "free";
+}
+
 /** Parse JSON body with Zod schema. */
 export async function parseBody<T>(
   request: Request,

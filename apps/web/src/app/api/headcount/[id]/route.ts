@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, headcountPlans } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -19,6 +19,8 @@ export async function PATCH(
 ) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
   const { id } = await params;
 
   const parsed = await parseBody(request, updateSchema);
@@ -39,6 +41,8 @@ export async function DELETE(
 ) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "admin");
+  if (roleErr) return roleErr;
   const { id } = await params;
 
   const [row] = await db.delete(headcountPlans).where(eq(headcountPlans.id, id)).returning();

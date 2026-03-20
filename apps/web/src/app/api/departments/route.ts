@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, departments } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -20,6 +20,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
 
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;

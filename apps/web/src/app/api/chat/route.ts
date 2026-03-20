@@ -8,9 +8,10 @@
 import { z } from "zod";
 import { db } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
+import { canPerformAction } from "@/lib/feature-gate";
 import { executeToolCall } from "@/lib/ai-tool-executor";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
@@ -30,6 +31,29 @@ export async function POST(request: Request) {
     body = chatSchema.parse(await request.json());
   } catch {
     return errorResponse("Invalid request body", 400);
+  }
+
+  // Feature gate: check AI message limit
+  const plan = await getCompanyPlan(ctx.companyId);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthlyMessages = await db
+    .select()
+    .from(aiMessages)
+    .innerJoin(
+      aiConversations,
+      eq(aiMessages.conversationId, aiConversations.id)
+    )
+    .where(
+      and(
+        eq(aiConversations.companyId, ctx.companyId),
+        eq(aiMessages.role, "user"),
+        gte(aiMessages.createdAt, monthStart)
+      )
+    );
+  const gate = canPerformAction(plan, "ai_message", monthlyMessages.length);
+  if (!gate.allowed) {
+    return errorResponse(gate.reason!, 403);
   }
 
   // Get or create conversation

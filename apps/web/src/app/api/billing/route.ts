@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
+import { db, companies, scenarios, aiMessages, aiConversations } from "@burnless/db";
+import { eq, and, gte, count } from "drizzle-orm";
+import { getPlanLimits } from "@/lib/feature-gate";
 
 /**
  * Billing API — manages subscription state and Stripe integration.
  *
- * GET /api/billing — Returns current subscription status
+ * GET /api/billing — Returns current subscription status with real usage
  * POST /api/billing — Creates a Stripe Checkout session for upgrading
- *
- * Requires STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET env vars.
- * Until Stripe is configured, returns mock data for the free tier.
  */
 
 interface SubscriptionStatus {
@@ -24,33 +24,88 @@ interface SubscriptionStatus {
   };
 }
 
-const FREE_LIMITS = {
-  scenarios: 1,
-  aiMessages: 10,
-  exports: 3,
-};
-
-const PRO_LIMITS = {
-  scenarios: Infinity,
-  aiMessages: Infinity,
-  exports: Infinity,
-};
-
 export async function GET() {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
-  // Until Stripe is configured, return free tier status
+  const plan = await getCompanyPlan(ctx.companyId);
+  const limits = getPlanLimits(plan);
+
+  // Get real usage counts
+  const scenarioRows = await db
+    .select({ cnt: count() })
+    .from(scenarios)
+    .where(eq(scenarios.companyId, ctx.companyId));
+  const scenarioCount = scenarioRows[0]?.cnt ?? 0;
+
+  // Monthly AI messages
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const aiMessageRows = await db
+    .select({ cnt: count() })
+    .from(aiMessages)
+    .innerJoin(aiConversations, eq(aiMessages.conversationId, aiConversations.id))
+    .where(
+      and(
+        eq(aiConversations.companyId, ctx.companyId),
+        eq(aiMessages.role, "user"),
+        gte(aiMessages.createdAt, monthStart)
+      )
+    );
+  const aiMessageCount = aiMessageRows[0]?.cnt ?? 0;
+
+  // Get Stripe subscription status if configured
+  let status: SubscriptionStatus["status"] = "none";
+  let currentPeriodEnd: string | null = null;
+  let cancelAtPeriodEnd = false;
+
+  const [company] = await db
+    .select({
+      stripeCustomerId: companies.stripeCustomerId,
+      stripeSubscriptionId: companies.stripeSubscriptionId,
+    })
+    .from(companies)
+    .where(eq(companies.id, ctx.companyId))
+    .limit(1);
+
+  if (company?.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
+    try {
+      const { default: Stripe } = await import("stripe");
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const sub = await stripe.subscriptions.retrieve(
+        company.stripeSubscriptionId
+      );
+      status = sub.status as SubscriptionStatus["status"];
+      const periodEnd = (sub as unknown as { current_period_end: number }).current_period_end;
+      currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
+      cancelAtPeriodEnd = sub.cancel_at_period_end;
+    } catch {
+      // Subscription may have been deleted externally
+      status = "none";
+    }
+  } else if (plan !== "free") {
+    status = "active";
+  }
+
   const subscription: SubscriptionStatus = {
-    plan: "free",
-    status: "none",
-    currentPeriodEnd: null,
-    cancelAtPeriodEnd: false,
+    plan,
+    status,
+    currentPeriodEnd,
+    cancelAtPeriodEnd,
     seats: 1,
     usage: {
-      scenarios: { used: 0, limit: FREE_LIMITS.scenarios },
-      aiMessages: { used: 0, limit: FREE_LIMITS.aiMessages },
-      exports: { used: 0, limit: FREE_LIMITS.exports },
+      scenarios: {
+        used: scenarioCount,
+        limit: limits.maxScenarios === Infinity ? -1 : limits.maxScenarios,
+      },
+      aiMessages: {
+        used: aiMessageCount,
+        limit: limits.maxAiMessages === Infinity ? -1 : limits.maxAiMessages,
+      },
+      exports: {
+        used: 0, // Export tracking can be added later
+        limit: limits.maxExports === Infinity ? -1 : limits.maxExports,
+      },
     },
   };
 
@@ -60,6 +115,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "admin");
+  if (roleErr) return roleErr;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
@@ -77,7 +134,6 @@ export async function POST(request: Request) {
       return errorResponse("Invalid plan. Choose 'pro' or 'team'.", 400);
     }
 
-    // Dynamic import of Stripe — only loaded when needed
     const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(stripeKey);
 
