@@ -439,8 +439,19 @@ a,
   }
 
   /* Ensure charts print properly */
-  .recharts-responsive-container {
+  .recharts-responsive-container,
+  svg {
     page-break-inside: avoid;
+  }
+
+  /* Print-only elements */
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Hide slider inputs in print */
+  input[type="range"] {
+    display: none !important;
   }
 
   /* Page breaks */
