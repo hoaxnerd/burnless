@@ -277,7 +277,9 @@ export function ExpensesList({
 }
 
 function formatMonthLabel(monthKey: string): string {
-  const [year, month] = monthKey.split("-");
+  const parts = monthKey.split("-");
+  const year = parts[0] ?? "";
+  const month = parts[1] ?? "0";
   const months = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
