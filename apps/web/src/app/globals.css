@@ -363,6 +363,34 @@ body {
   top: 0;
 }
 
+/* ── Mobile & Touch ──────────────────────────────────────────────────────── */
+
+/* Touch-friendly minimum target size (44px per WCAG 2.5.8) */
+@media (pointer: coarse) {
+  button:not([class*="p-0"]),
+  a[role="button"],
+  [role="switch"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent double-tap zoom on interactive elements */
+button,
+a,
+[role="button"],
+[role="switch"] {
+  touch-action: manipulation;
+}
+
+/* Safe areas for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Honor reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

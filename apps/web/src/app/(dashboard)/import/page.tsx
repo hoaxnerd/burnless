@@ -589,7 +589,7 @@ export default function ImportPage() {
       {/* Step 3: Preview */}
       {step === "preview" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4 max-w-3xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
             <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-4">
               <p className="text-sm text-surface-500 dark:text-surface-400">
                 Ready to import
@@ -725,7 +725,7 @@ export default function ImportPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="rounded-xl bg-success-50 dark:bg-success-950 border border-success-200 dark:border-success-800 p-4 text-center">
               <p className="text-2xl font-bold text-success-700 dark:text-success-300">
                 {result.imported}
