@@ -208,6 +208,9 @@ importers:
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
+      stripe:
+        specifier: ^20.4.1
+        version: 20.4.1(@types/node@25.5.0)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -8694,6 +8697,10 @@ snapshots:
   stripe@20.4.1(@types/node@22.19.15):
     optionalDependencies:
       '@types/node': 22.19.15
+
+  stripe@20.4.1(@types/node@25.5.0):
+    optionalDependencies:
+      '@types/node': 25.5.0
 
   styled-jsx@5.1.6(@babel/core@7.29.0)(react@19.2.4):
     dependencies:

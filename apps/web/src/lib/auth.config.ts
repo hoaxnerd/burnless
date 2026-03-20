@@ -13,14 +13,9 @@ declare module "next-auth" {
       email: string;
       name: string | null;
       image: string | null;
-      emailVerified: boolean;
+      /** true when email is verified (converted from Date | null) */
+      isEmailVerified: boolean;
     };
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    emailVerified?: boolean;
   }
 }
 
@@ -75,7 +70,7 @@ export const authConfig = {
           .from(users)
           .where(eq(users.id, token.sub))
           .limit(1);
-        token.emailVerified = !!dbUser?.emailVerified;
+        (token as Record<string, unknown>).isEmailVerified = !!dbUser?.emailVerified;
       }
 
       return token;
@@ -83,7 +78,7 @@ export const authConfig = {
     session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
-        session.user.emailVerified = !!token.emailVerified;
+        session.user.isEmailVerified = !!(token as Record<string, unknown>).isEmailVerified;
       }
       return session;
     },

@@ -1,11 +1,11 @@
-import type PostHogType from "posthog-js";
+import type { PostHog } from "posthog-js";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY ?? "";
 const POSTHOG_HOST =
   process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
 
 let initialized = false;
-let posthog: PostHogType | null = null;
+let posthog: PostHog | null = null;
 
 /** Initialize PostHog. Safe to call multiple times — only runs once. */
 export async function initAnalytics() {

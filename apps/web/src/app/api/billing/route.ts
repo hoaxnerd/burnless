@@ -1,27 +1,30 @@
 import { NextResponse } from "next/server";
-import type StripeType from "stripe";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
 import { db, companies, scenarios, aiMessages, aiConversations } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
 import { env } from "@/lib/env";
-
-async function getStripe(): Promise<StripeType> {
-  const { default: Stripe } = await import("stripe");
-  return new Stripe(env.STRIPE_SECRET_KEY!);
-}
+import {
+  getPaymentProvider,
+  getProviderByType,
+  resolvePlanId,
+  isBillingEnabled,
+} from "@/lib/payment";
+import type { CurrencyCode } from "@burnless/types";
 
 /**
- * Billing API — manages subscription state and Stripe integration.
+ * Billing API — provider-agnostic subscription management.
+ *
+ * Routes through the PaymentProvider abstraction (Stripe / Razorpay).
+ * The provider is selected based on company currency.
  *
  * GET  /api/billing — Returns current subscription status with real usage
- * POST /api/billing — Creates a Stripe Checkout session for upgrading,
- *                      a Customer Portal session, or cancels at period end
+ * POST /api/billing — checkout, portal, cancel, or reactivate
  */
 
 interface SubscriptionStatus {
   plan: "free" | "pro" | "team";
-  status: "active" | "trialing" | "past_due" | "canceled" | "none";
+  status: "active" | "trialing" | "past_due" | "canceled" | "paused" | "none";
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   seats: number;
@@ -63,30 +66,32 @@ export async function GET() {
     );
   const aiMessageCount = aiMessageRows[0]?.cnt ?? 0;
 
-  // Get Stripe subscription status if configured
+  // Get subscription status via provider abstraction
   let status: SubscriptionStatus["status"] = "none";
   let currentPeriodEnd: string | null = null;
   let cancelAtPeriodEnd = false;
 
   const [company] = await db
     .select({
+      billingProvider: companies.billingProvider,
       stripeCustomerId: companies.stripeCustomerId,
       stripeSubscriptionId: companies.stripeSubscriptionId,
+      currency: companies.currency,
     })
     .from(companies)
     .where(eq(companies.id, ctx.companyId))
     .limit(1);
 
-  if (company?.stripeSubscriptionId && env.STRIPE_SECRET_KEY) {
+  if (company?.stripeSubscriptionId && isBillingEnabled()) {
     try {
-      const stripe = await getStripe();
-      const sub = await stripe.subscriptions.retrieve(
-        company.stripeSubscriptionId
-      );
-      status = sub.status as SubscriptionStatus["status"];
-      const periodEnd = (sub as unknown as { current_period_end: number }).current_period_end;
-      currentPeriodEnd = new Date(periodEnd * 1000).toISOString();
-      cancelAtPeriodEnd = sub.cancel_at_period_end;
+      const providerType = (company.billingProvider ?? "stripe") as "stripe" | "razorpay";
+      const provider = getProviderByType(providerType);
+      const sub = await provider.getSubscription(company.stripeSubscriptionId);
+      if (sub) {
+        status = sub.status;
+        currentPeriodEnd = sub.currentPeriodEnd.toISOString();
+        cancelAtPeriodEnd = sub.cancelAtPeriodEnd;
+      }
     } catch {
       // Subscription may have been deleted externally
       status = "none";
@@ -126,9 +131,9 @@ export async function POST(request: Request) {
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
 
-  if (!env.STRIPE_SECRET_KEY) {
+  if (!isBillingEnabled()) {
     return errorResponse(
-      "Stripe is not configured. Set STRIPE_SECRET_KEY to enable billing.",
+      "No billing provider configured. Set Stripe or Razorpay credentials.",
       503
     );
   }
@@ -137,54 +142,55 @@ export async function POST(request: Request) {
     const body = await request.json();
     const action: string = body.action ?? "checkout";
 
-    const stripe = await getStripe();
+    // Resolve which provider this company uses
+    const [company] = await db
+      .select({
+        billingProvider: companies.billingProvider,
+        stripeCustomerId: companies.stripeCustomerId,
+        stripeSubscriptionId: companies.stripeSubscriptionId,
+        currency: companies.currency,
+      })
+      .from(companies)
+      .where(eq(companies.id, ctx.companyId))
+      .limit(1);
+
+    const currency = (company?.currency ?? "USD") as CurrencyCode;
+    const provider = getPaymentProvider(currency);
 
     // ----------------------------------------------------------------
-    // Action: portal — open Stripe Customer Portal for self-service
+    // Action: portal — open self-service billing portal
     // ----------------------------------------------------------------
     if (action === "portal") {
-      const [company] = await db
-        .select({ stripeCustomerId: companies.stripeCustomerId })
-        .from(companies)
-        .where(eq(companies.id, ctx.companyId))
-        .limit(1);
-
       if (!company?.stripeCustomerId) {
         return errorResponse("No billing account found. Subscribe to a plan first.", 400);
       }
 
-      const portalSession = await stripe.billingPortal.sessions.create({
-        customer: company.stripeCustomerId,
-        return_url: `${env.APP_URL}/settings?tab=billing`,
-      });
+      const portal = await provider.createPortalSession(
+        company.stripeCustomerId,
+        `${env.APP_URL}/settings?tab=billing`
+      );
 
-      return NextResponse.json({ url: portalSession.url });
+      if (!portal) {
+        return errorResponse("Self-service portal not available for your billing provider.", 400);
+      }
+
+      return NextResponse.json({ url: portal.url });
     }
 
     // ----------------------------------------------------------------
     // Action: cancel — schedule cancellation at period end
     // ----------------------------------------------------------------
     if (action === "cancel") {
-      const [company] = await db
-        .select({ stripeSubscriptionId: companies.stripeSubscriptionId })
-        .from(companies)
-        .where(eq(companies.id, ctx.companyId))
-        .limit(1);
-
       if (!company?.stripeSubscriptionId) {
         return errorResponse("No active subscription to cancel.", 400);
       }
 
-      const sub = await stripe.subscriptions.update(
-        company.stripeSubscriptionId,
-        { cancel_at_period_end: true }
-      );
+      await provider.cancelSubscription(company.stripeSubscriptionId, true);
 
+      const sub = await provider.getSubscription(company.stripeSubscriptionId);
       return NextResponse.json({
-        cancelAtPeriodEnd: sub.cancel_at_period_end,
-        currentPeriodEnd: new Date(
-          (sub as unknown as { current_period_end: number }).current_period_end * 1000
-        ).toISOString(),
+        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? true,
+        currentPeriodEnd: sub?.currentPeriodEnd.toISOString() ?? null,
       });
     }
 
@@ -192,61 +198,55 @@ export async function POST(request: Request) {
     // Action: reactivate — undo scheduled cancellation
     // ----------------------------------------------------------------
     if (action === "reactivate") {
-      const [company] = await db
-        .select({ stripeSubscriptionId: companies.stripeSubscriptionId })
-        .from(companies)
-        .where(eq(companies.id, ctx.companyId))
-        .limit(1);
-
       if (!company?.stripeSubscriptionId) {
         return errorResponse("No subscription to reactivate.", 400);
       }
 
-      const sub = await stripe.subscriptions.update(
-        company.stripeSubscriptionId,
-        { cancel_at_period_end: false }
-      );
+      await provider.reactivateSubscription(company.stripeSubscriptionId);
 
-      return NextResponse.json({ cancelAtPeriodEnd: sub.cancel_at_period_end });
+      const sub = await provider.getSubscription(company.stripeSubscriptionId);
+      return NextResponse.json({ cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false });
     }
 
     // ----------------------------------------------------------------
-    // Action: checkout (default) — create Stripe Checkout session
+    // Action: checkout (default) — create checkout session
     // ----------------------------------------------------------------
     const { plan } = body;
     if (!plan || !["pro", "team"].includes(plan)) {
       return errorResponse("Invalid plan. Choose 'pro' or 'team'.", 400);
     }
 
-    const priceIds: Record<string, string | undefined> = {
-      pro: env.STRIPE_PRO_PRICE_ID,
-      team: env.STRIPE_TEAM_PRICE_ID,
-    };
-
-    const priceId = priceIds[plan];
-    if (!priceId) {
+    const planId = resolvePlanId(provider.type, plan);
+    if (!planId) {
       return errorResponse(`Price not configured for plan: ${plan}`, 503);
     }
 
-    // Attach existing Stripe customer if we have one
-    const [company] = await db
-      .select({ stripeCustomerId: companies.stripeCustomerId })
-      .from(companies)
-      .where(eq(companies.id, ctx.companyId))
-      .limit(1);
+    // Ensure company has a billing customer
+    let customerId = company?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await provider.createCustomer(
+        ctx.userId, // email lookup happens in provider
+        null,
+        currency,
+      );
+      customerId = customer.id;
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${env.APP_URL}/settings?tab=billing&billing=success`,
-      cancel_url: `${env.APP_URL}/settings?tab=billing&billing=canceled`,
-      ...(company?.stripeCustomerId
-        ? { customer: company.stripeCustomerId }
-        : {}),
-      metadata: {
-        companyId: ctx.companyId,
-        userId: ctx.userId,
-      },
+      // Persist the customer ID and provider
+      await db
+        .update(companies)
+        .set({
+          stripeCustomerId: customerId,
+          billingProvider: provider.type,
+        })
+        .where(eq(companies.id, ctx.companyId));
+    }
+
+    const session = await provider.createCheckout({
+      customerId,
+      planId,
+      successUrl: `${env.APP_URL}/settings?tab=billing&billing=success`,
+      cancelUrl: `${env.APP_URL}/settings?tab=billing&billing=canceled`,
+      currency,
     });
 
     return NextResponse.json({ url: session.url });

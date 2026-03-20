@@ -36,42 +36,4 @@ declare module "razorpay/dist/utils/razorpay-utils.js" {
   export function validateWebhookSignature(body: string, signature: string, secret: string): boolean;
 }
 
-declare module "stripe" {
-  interface WebhookEvent {
-    type: string;
-    data: { object: unknown };
-  }
-  interface Subscription {
-    id: string;
-    status: string;
-    cancel_at_period_end: boolean;
-    current_period_end: number;
-  }
-  interface Customer {
-    id: string;
-    email: string | null;
-  }
-  interface CheckoutSession {
-    url: string | null;
-  }
-  class Stripe {
-    constructor(key: string);
-    customers: {
-      create: (data: Record<string, unknown>) => Promise<Customer>;
-    };
-    subscriptions: {
-      create: (data: Record<string, unknown>) => Promise<Subscription>;
-      retrieve: (id: string) => Promise<Subscription>;
-      cancel: (id: string) => Promise<Subscription>;
-    };
-    checkout: {
-      sessions: {
-        create: (data: Record<string, unknown>) => Promise<CheckoutSession>;
-      };
-    };
-    webhooks: {
-      constructEvent: (body: string, sig: string, secret: string) => WebhookEvent;
-    };
-  }
-  export default Stripe;
-}
+// stripe: types provided by the `stripe` npm package (devDependency)
