@@ -100,7 +100,7 @@ export function CookieConsentBanner() {
                 cookies to allow.{" "}
                 <Link
                   href="/privacy#cookies"
-                  className="text-brand-600 hover:text-brand-700 underline underline-offset-2"
+                  className="text-brand-600 hover:text-brand-700 underline underline-offset-2 inline-block py-1"
                 >
                   Learn more
                 </Link>

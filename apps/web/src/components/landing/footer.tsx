@@ -50,7 +50,7 @@ export function LandingFooter() {
                 href="https://twitter.com/burnless"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-lg bg-surface-200/10 border border-surface-200/15 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:border-surface-200/30 transition-colors"
+                className="w-11 h-11 rounded-lg bg-surface-200/10 border border-surface-200/15 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:border-surface-200/30 transition-colors"
                 aria-label="Twitter"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -61,7 +61,7 @@ export function LandingFooter() {
                 href="https://linkedin.com/company/burnless"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-lg bg-surface-200/10 border border-surface-200/15 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:border-surface-200/30 transition-colors"
+                className="w-11 h-11 rounded-lg bg-surface-200/10 border border-surface-200/15 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:border-surface-200/30 transition-colors"
                 aria-label="LinkedIn"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -75,12 +75,12 @@ export function LandingFooter() {
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
               <h3 className="text-sm font-semibold text-surface-900 mb-4">{category}</h3>
-              <ul className="space-y-3">
+              <ul className="space-y-1">
                 {links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors"
+                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-2"
                     >
                       {link.label}
                     </Link>

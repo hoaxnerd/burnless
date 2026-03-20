@@ -351,13 +351,13 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium"
+                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium py-2"
                 >
                   &larr; Different email
                 </button>
                 <Link
                   href={`/reset-password?email=${encodeURIComponent(email)}`}
-                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium"
+                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium py-2"
                 >
                   Forgot password?
                 </Link>
@@ -481,11 +481,11 @@ export default function LoginPage() {
         {/* Footer */}
         <p className="mt-8 text-center text-xs text-surface-400">
           By continuing, you agree to our{" "}
-          <Link href="/terms" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
+          <Link href="/terms" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2 inline-block py-2">
             Terms
           </Link>
           {" "}and{" "}
-          <Link href="/privacy" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2">
+          <Link href="/privacy" className="text-surface-500 hover:text-brand-600 transition-colors underline underline-offset-2 inline-block py-2">
             Privacy Policy
           </Link>
         </p>

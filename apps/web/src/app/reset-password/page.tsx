@@ -97,7 +97,7 @@ function ResetPasswordContent() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 bg-surface-50" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-brand-500/[0.06] rounded-full blur-3xl" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[min(800px,100vw)] h-[600px] bg-brand-500/[0.06] rounded-full blur-3xl" />
 
       <div className="w-full max-w-[400px] px-4 relative z-10">
         <div className="text-center mb-8">

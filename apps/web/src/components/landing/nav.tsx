@@ -52,7 +52,7 @@ export function LandingNav() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 min-h-[44px] group">
             <BurnlessLogo className="h-8 w-8 transition-transform duration-300 group-hover:scale-110" />
             <span className="text-xl font-semibold text-surface-900 tracking-tight">
               Burnless
@@ -91,7 +91,7 @@ export function LandingNav() {
           {/* Mobile menu button */}
           <Link
             href="/login"
-            className="sm:hidden rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
+            className="sm:hidden rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white"
           >
             Start free
           </Link>

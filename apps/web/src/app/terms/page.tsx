@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-surface-0">
+    <div className="min-h-screen bg-surface-0 overflow-x-hidden">
       <LandingNav />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <h1 className="text-3xl sm:text-4xl font-bold text-surface-900 mb-2">
@@ -20,7 +20,7 @@ export default function TermsPage() {
           Last updated: March 21, 2026
         </p>
 
-        <div className="prose-legal space-y-8 text-surface-600 text-[15px] leading-relaxed">
+        <div className="prose-legal space-y-8 text-surface-600 text-[15px] leading-relaxed break-words">
           <section>
             <h2 className="text-lg font-semibold text-surface-900 mb-3">
               1. Acceptance of Terms

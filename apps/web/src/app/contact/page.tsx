@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-surface-0">
+    <div className="min-h-screen bg-surface-0 overflow-x-hidden">
       <LandingNav />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <h1 className="text-3xl sm:text-4xl font-bold text-surface-900 mb-2">

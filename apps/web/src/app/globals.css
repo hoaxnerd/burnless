@@ -437,7 +437,7 @@ body {
   position: absolute;
   top: -40px;
   left: 0;
-  padding: 8px 16px;
+  padding: 12px 16px;
   background: var(--color-brand-600);
   color: white;
   z-index: 100;
