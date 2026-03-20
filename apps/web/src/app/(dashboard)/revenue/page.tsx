@@ -2,6 +2,7 @@ import { getCompany, getDefaultScenario, getRevenueStreams } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey, computeSubscriptionDetail, type SubscriptionParams } from "@burnless/engine";
 import { RevenueStreamsList } from "./revenue-streams-list";
+import { AddRevenueStreamForm } from "./add-revenue-stream-form";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -78,6 +79,7 @@ export default async function RevenuePage() {
             Where your money comes from &mdash; stream by stream
           </p>
         </div>
+        <AddRevenueStreamForm scenarioId={scenario.id} />
       </div>
 
       {/* Summary cards */}

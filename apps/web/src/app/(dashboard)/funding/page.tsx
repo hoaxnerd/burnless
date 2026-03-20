@@ -2,6 +2,7 @@ import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { FundingDetails } from "./funding-details";
+import { AddFundingForm } from "./add-funding-form";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -64,6 +65,7 @@ export default async function FundingPage() {
             Capital sources, fundraising history, and cap table
           </p>
         </div>
+        <AddFundingForm />
       </div>
 
       {/* Summary cards */}

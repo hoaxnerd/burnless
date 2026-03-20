@@ -2,6 +2,7 @@ import { getCompany, getDefaultScenario, getHeadcountPlans, getDepartments } fro
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { TeamDetails } from "./team-details";
+import { AddHireForm } from "./add-hire-form";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -80,6 +81,12 @@ export default async function TeamPage() {
             {scenario && <span className="ml-2 text-surface-400">&mdash; {scenario.name}</span>}
           </p>
         </div>
+        {scenario && (
+          <AddHireForm
+            scenarioId={scenario.id}
+            departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+          />
+        )}
       </div>
 
       {/* Summary cards */}

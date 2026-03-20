@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { getCompany, getDefaultScenario, getScenarios } from "@/lib/data";
+import { getCompany, getDefaultScenario, getScenarios, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { MetricCard } from "@/components/ui";
 import { DashboardCharts } from "./dashboard-charts";
 import { AiInsightBanner } from "./ai-insight-banner";
+import { QuickActions } from "./quick-actions";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -19,9 +20,10 @@ export default async function DashboardPage() {
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <NoScenarioPrompt />;
 
-  const [data, allScenarios] = await Promise.all([
+  const [data, allScenarios, accounts] = await Promise.all([
     computeDashboardData(company.id, scenario.id),
     getScenarios(company.id),
+    getAccounts(company.id),
   ]);
   const { metrics, hasData, currentMonth } = data;
 
@@ -101,32 +103,10 @@ export default async function DashboardPage() {
       ) : (
         <>
           {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            <Link
-              href="/expenses"
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-0 px-4 py-2.5 text-sm font-medium text-surface-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
-            >
-              <span className="text-base">+</span> Add Expense
-            </Link>
-            <Link
-              href="/revenue"
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-0 px-4 py-2.5 text-sm font-medium text-surface-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
-            >
-              <span className="text-base">+</span> Add Revenue
-            </Link>
-            <Link
-              href="/scenarios"
-              className="inline-flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-0 px-4 py-2.5 text-sm font-medium text-surface-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
-            >
-              New Scenario
-            </Link>
-            <Link
-              href="/ai"
-              className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors"
-            >
-              Ask AI
-            </Link>
-          </div>
+          <QuickActions
+            scenarioId={scenario.id}
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+          />
 
           {/* Charts */}
           <DashboardCharts

@@ -1,0 +1,167 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Modal } from "@/components/ui";
+import { Plus } from "lucide-react";
+
+const ROUND_TYPES = [
+  { value: "pre_seed", label: "Pre-Seed" },
+  { value: "seed", label: "Seed" },
+  { value: "series_a", label: "Series A" },
+  { value: "series_b", label: "Series B" },
+  { value: "series_c_plus", label: "Series C+" },
+  { value: "debt", label: "Debt / Line of Credit" },
+  { value: "grant", label: "Grant" },
+] as const;
+
+export function AddFundingForm() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [type, setType] = useState<string>("seed");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [preMoneyValuation, setPreMoneyValuation] = useState("");
+  const [dilutionPercent, setDilutionPercent] = useState("");
+  const [isProjected, setIsProjected] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+
+    try {
+      const res = await fetch("/api/funding-rounds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          type,
+          amount: Number(amount),
+          date,
+          preMoneyValuation: preMoneyValuation ? Number(preMoneyValuation) : null,
+          dilutionPercent: dilutionPercent ? Number(dilutionPercent) : null,
+          isProjected,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to add funding round");
+      }
+
+      setName("");
+      setAmount("");
+      setPreMoneyValuation("");
+      setDilutionPercent("");
+      setIsProjected(false);
+      setOpen(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        Add Funding Round
+      </button>
+
+      <Modal open={open} onClose={() => setOpen(false)} title="Add Funding Round">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-surface-700 mb-1">Round Name</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Seed Round, AWS Activate Grant" required
+              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-700 mb-1">Type</label>
+            <select value={type} onChange={(e) => setType(e.target.value)}
+              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              {ROUND_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-700 mb-1">Amount ($)</label>
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+              placeholder="2000000" required min="0" step="1"
+              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-700 mb-1">Date</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
+              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+
+          {type !== "debt" && type !== "grant" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-surface-700 mb-1">
+                  Pre-Money Valuation ($) <span className="text-surface-400 font-normal">(optional)</span>
+                </label>
+                <input type="number" value={preMoneyValuation} onChange={(e) => setPreMoneyValuation(e.target.value)}
+                  placeholder="8000000" min="0" step="1"
+                  className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-700 mb-1">
+                  Dilution (%) <span className="text-surface-400 font-normal">(optional)</span>
+                </label>
+                <input type="number" value={dilutionPercent} onChange={(e) => setDilutionPercent(e.target.value)}
+                  placeholder="20" min="0" max="100" step="0.01"
+                  className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="isProjected" checked={isProjected}
+              onChange={(e) => setIsProjected(e.target.checked)}
+              className="h-4 w-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+            <label htmlFor="isProjected" className="text-sm text-surface-700">
+              This is a projected/planned round (not yet closed)
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setOpen(false)}
+              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving || !name || !amount}
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
+              {saving ? "Adding..." : "Add Round"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </>
+  );
+}

@@ -2,6 +2,7 @@ import { getCompany, getDefaultScenario, getAccounts, getForecastLines } from "@
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesList } from "./expenses-list";
+import { AddExpenseForm } from "./add-expense-form";
 
 // Expense categories with display info
 const EXPENSE_CATEGORIES = [
@@ -41,7 +42,10 @@ export default async function ExpensesPage() {
     );
   }
 
-  const data = await computeDashboardData(company.id, scenario.id);
+  const [data, accounts] = await Promise.all([
+    computeDashboardData(company.id, scenario.id),
+    getAccounts(company.id),
+  ]);
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
 
   const totalExpenseAmount = totalExpenses.get(currentMonth) ?? 0;
@@ -89,6 +93,10 @@ export default async function ExpensesPage() {
             Every dollar your company spends &mdash; tracked, categorized, and forecasted
           </p>
         </div>
+        <AddExpenseForm
+          scenarioId={scenario.id}
+          accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+        />
       </div>
 
       {/* Summary cards */}
