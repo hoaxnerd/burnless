@@ -75,16 +75,19 @@ describe("utils", () => {
   });
 
   describe("round2", () => {
-    it("rounds to 2 decimal places", () => {
-      expect(round2(1.005)).toBe(1); // known JS float: 1.005*100=100.4999...
-      expect(round2(1.015)).toBe(1.01); // known JS float: 1.015*100=101.4999...
+    it("rounds to 2 decimal places — half away from zero", () => {
+      expect(round2(1.005)).toBe(1.01);
+      expect(round2(1.015)).toBe(1.02);
+      expect(round2(2.675)).toBe(2.68);
       expect(round2(1.1249)).toBe(1.12);
       expect(round2(1.125)).toBe(1.13);
     });
 
-    it("handles negative numbers", () => {
-      expect(round2(-1.125)).toBe(-1.12);
-      expect(round2(-0.005)).toBe(-0); // known JS float: -0.005*100=-0.4999...
+    it("handles negative numbers (half away from zero)", () => {
+      expect(round2(-1.005)).toBe(-1.01);
+      expect(round2(-1.125)).toBe(-1.13);
+      expect(round2(-0.005)).toBe(-0.01);
+      expect(round2(-2.675)).toBe(-2.68);
     });
 
     it("handles zero", () => {

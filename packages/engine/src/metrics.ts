@@ -40,6 +40,18 @@ export interface MetricsInput {
   acquisitionSpend?: MonthlySeries;
   /** Number of new customers per month (if not from subscription details) */
   newCustomers?: MonthlySeries;
+  /** Monthly capital expenditures (for FCF) */
+  capex?: MonthlySeries;
+  /** Monthly operating cash flow (for FCF) — if not provided, approximated from netIncome */
+  operatingCashFlow?: MonthlySeries;
+  /** Monthly active users (for ARPU, if not in subscription details) */
+  activeUsers?: MonthlySeries;
+  /** Monthly current assets (for Working Capital) */
+  currentAssets?: MonthlySeries;
+  /** Monthly current liabilities (for Working Capital) */
+  currentLiabilities?: MonthlySeries;
+  /** Monthly retention spend (for Customer Retention Cost) */
+  retentionSpend?: MonthlySeries;
 }
 
 /** A single computed metric value. */
@@ -100,6 +112,37 @@ export interface ComputedMetrics {
   // Efficiency
   burnMultiple: MetricValue[];
   ruleOf40: MetricValue[];
+
+  // MRR Decomposition (Tier-1)
+  contractionMrr: MetricValue[];
+  downgradeMrr: MetricValue[];
+
+  // Retention (Tier-1)
+  netRevenueRetention: MetricValue[];
+  grossRevenueRetention: MetricValue[];
+
+  // Cash Flow (Tier-1)
+  freeCashFlow: MetricValue[];
+  fcfMargin: MetricValue[];
+
+  // Revenue (Tier-1)
+  ttmRevenue: MetricValue[];
+
+  // Per-user (Tier-2)
+  arpu: MetricValue[];
+
+  // Churn Analysis (Tier-2)
+  netChurnRate: MetricValue[];
+  hasNegativeChurn: MetricValue[];
+
+  // Efficiency (Tier-2)
+  burnProductivity: MetricValue[];
+
+  // Balance Sheet (Tier-2)
+  workingCapital: MetricValue[];
+
+  // Retention Cost (Tier-2)
+  customerRetentionCost: MetricValue[];
 }
 
 // ── Core metrics computation ─────────────────────────────────────────────────
@@ -222,7 +265,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     const d = subDetails.get(m);
     if (!d) return { month: m, value: 0 };
     const additions = d.newMrr + d.expansionMrr;
-    const losses = d.churnedMrr;
+    const losses = d.churnedMrr + (d.contractionMrr ?? d.downgradeMrr ?? 0);
     if (losses === 0) return { month: m, value: additions > 0 ? 999 : 0 };
     return { month: m, value: round2(additions / losses) };
   });
@@ -300,6 +343,119 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: round2(growthRate + margin) };
   });
 
+  // ── Tier-1: MRR Decomposition ──────────────────────────────────────────────
+  const contractionMrr = months.map((m) => {
+    const d = subDetails.get(m);
+    return { month: m, value: d?.contractionMrr ?? d?.downgradeMrr ?? 0 };
+  });
+  const downgradeMrr = months.map((m) => {
+    const d = subDetails.get(m);
+    return { month: m, value: d?.downgradeMrr ?? d?.contractionMrr ?? 0 };
+  });
+
+  // ── Tier-1: Net Revenue Retention (NRR) ────────────────────────────────────
+  // (Ending MRR - New MRR) / Prior Month Ending MRR × 100
+  const netRevenueRetention = months.map((m, i) => {
+    if (i === 0) return { month: m, value: 0 };
+    const currMrrVal = mrr[i]?.value ?? 0;
+    const newMrrVal = newMrr[i]?.value ?? 0;
+    const prevMrrVal = mrr[i - 1]?.value ?? 0;
+    if (prevMrrVal === 0) return { month: m, value: 0 };
+    return { month: m, value: round2(((currMrrVal - newMrrVal) / prevMrrVal) * 100) };
+  });
+
+  // ── Tier-1: Gross Revenue Retention (GRR) ──────────────────────────────────
+  // (1 - [(Churned MRR + Downgrade MRR) / Prior Month Ending MRR]) × 100
+  const grossRevenueRetention = months.map((m, i) => {
+    if (i === 0) return { month: m, value: 0 };
+    const prevMrrVal = mrr[i - 1]?.value ?? 0;
+    if (prevMrrVal === 0) return { month: m, value: 0 };
+    const churned = churnedMrr[i]?.value ?? 0;
+    const downgrade = contractionMrr[i]?.value ?? 0;
+    const grr = (1 - (churned + downgrade) / prevMrrVal) * 100;
+    return { month: m, value: round2(Math.min(100, grr)) }; // GRR never exceeds 100%
+  });
+
+  // ── Tier-1: Free Cash Flow (FCF) ──────────────────────────────────────────
+  const freeCashFlow = months.map((m) => {
+    const ocf = input.operatingCashFlow?.get(m) ?? input.netIncome.get(m) ?? 0;
+    const capexVal = input.capex?.get(m) ?? 0;
+    return { month: m, value: round2(ocf - capexVal) };
+  });
+  const fcfMargin = months.map((m, i) => {
+    const rev = input.revenue.get(m) ?? 0;
+    if (rev === 0) return { month: m, value: 0 };
+    return { month: m, value: round2(((freeCashFlow[i]?.value ?? 0) / rev) * 100) };
+  });
+
+  // ── Tier-1: TTM Revenue (trailing 12 months) ──────────────────────────────
+  const ttmRevenue = months.map((m, i) => {
+    let sum = 0;
+    const windowStart = Math.max(0, i - 11);
+    for (let j = windowStart; j <= i; j++) {
+      sum += totalRevenue[j]?.value ?? 0;
+    }
+    return { month: m, value: round2(sum) };
+  });
+
+  // ── Tier-2: ARPU (Average Revenue Per User) ───────────────────────────────
+  const arpu = months.map((m) => {
+    const d = subDetails.get(m);
+    const users = d?.activeUsers ?? input.activeUsers?.get(m) ?? 0;
+    const mrrVal = d?.mrr ?? input.revenue.get(m) ?? 0;
+    if (users === 0) return { month: m, value: 0 };
+    return { month: m, value: round2(mrrVal / users) };
+  });
+
+  // ── Tier-2: Net Churn Rate / Negative Churn Detection ─────────────────────
+  // (Churned MRR - Expansion MRR) / Prior MRR — negative = good (expansion > churn)
+  const netChurnRate = months.map((m, i) => {
+    if (i === 0) return { month: m, value: 0 };
+    const prevMrrVal = mrr[i - 1]?.value ?? 0;
+    if (prevMrrVal === 0) return { month: m, value: 0 };
+    const churned = churnedMrr[i]?.value ?? 0;
+    const expansion = expansionMrr[i]?.value ?? 0;
+    return { month: m, value: round2(((churned - expansion) / prevMrrVal) * 100) };
+  });
+  const hasNegativeChurn = netChurnRate.map((v) => ({
+    month: v.month,
+    value: v.value < 0 ? 1 : 0, // 1 = negative churn (good), 0 = positive churn
+  }));
+
+  // ── Tier-2: Burn Productivity ──────────────────────────────────────────────
+  // Change in Gross Profit (recent 6mo vs prior 6mo) / Total OpEx (prior 6mo)
+  const burnProductivity = months.map((m, i) => {
+    if (i < 11) return { month: m, value: 0 }; // need 12 months
+    let recentGP = 0;
+    let priorGP = 0;
+    let priorOpEx = 0;
+    for (let j = i - 5; j <= i; j++) {
+      recentGP += grossProfit[j]?.value ?? 0;
+    }
+    for (let j = i - 11; j <= i - 6; j++) {
+      priorGP += grossProfit[j]?.value ?? 0;
+      priorOpEx += input.operatingExpenses.get(months[j]!) ?? 0;
+    }
+    if (priorOpEx === 0) return { month: m, value: 0 };
+    return { month: m, value: round2((recentGP - priorGP) / priorOpEx) };
+  });
+
+  // ── Tier-2: Working Capital ────────────────────────────────────────────────
+  const workingCapital = months.map((m) => {
+    const assets = input.currentAssets?.get(m) ?? 0;
+    const liabilities = input.currentLiabilities?.get(m) ?? 0;
+    return { month: m, value: round2(assets - liabilities) };
+  });
+
+  // ── Tier-2: Customer Retention Cost ────────────────────────────────────────
+  const customerRetentionCost = months.map((m) => {
+    const spend = input.retentionSpend?.get(m) ?? 0;
+    const d = subDetails.get(m);
+    const customers = d?.customers ?? 0;
+    if (customers === 0) return { month: m, value: 0 };
+    return { month: m, value: round2(spend / customers) };
+  });
+
   return {
     mrr,
     arr,
@@ -336,6 +492,19 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     revenuePerEmployee,
     burnMultiple,
     ruleOf40,
+    contractionMrr,
+    downgradeMrr,
+    netRevenueRetention,
+    grossRevenueRetention,
+    freeCashFlow,
+    fcfMargin,
+    ttmRevenue,
+    arpu,
+    netChurnRate,
+    hasNegativeChurn,
+    burnProductivity,
+    workingCapital,
+    customerRetentionCost,
   };
 }
 

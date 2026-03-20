@@ -290,6 +290,112 @@ describe("metrics — edge cases", () => {
     });
   });
 
+  describe("LTV with gross margin", () => {
+    it("includes gross margin in LTV calculation", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 100,
+          newCustomers: 10,
+          churnedCustomers: 5,
+          mrr: 10000,
+          newMrr: 1000,
+          expansionMrr: 200,
+          churnedMrr: 500,
+          netNewMrr: 700,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        cogs: new Map([["2026-01", 2000]]),
+        subscriptionDetails: subDetails,
+      });
+      const metrics = computeAllMetrics(input);
+      // ARPA = 10000/100 = 100
+      // Gross Margin = (10000 - 2000)/10000 = 80%
+      // Revenue Churn Rate = 500/(10000+500)*100 ≈ 4.76%
+      // LTV = (100 * 0.80) / 0.0476 ≈ 1680.67
+      expect(metrics.ltv[0]?.value).toBeCloseTo(1680.67, 0);
+    });
+
+    it("returns 0 LTV when no revenue churn", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 100,
+          newCustomers: 10,
+          churnedCustomers: 0,
+          mrr: 10000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 1000,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        subscriptionDetails: subDetails,
+      });
+      const metrics = computeAllMetrics(input);
+      // No revenue churn → LTV = 0 (infinite)
+      expect(metrics.ltv[0]?.value).toBe(0);
+    });
+  });
+
+  describe("CAC Payback with gross margin", () => {
+    it("includes gross margin in CAC Payback calculation", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 110,
+          newCustomers: 10,
+          churnedCustomers: 0,
+          mrr: 11000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 1000,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 11000]]),
+        cogs: new Map([["2026-01", 2200]]),
+        subscriptionDetails: subDetails,
+        acquisitionSpend: new Map([["2026-01", 5000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      // ARPA = 11000/110 = 100
+      // Gross Margin = (11000 - 2200)/11000 = 80%
+      // CAC = 5000 / 10 = 500
+      // CAC Payback = 500 / (100 * 0.80) = 500 / 80 = 6.25 months
+      expect(metrics.cacPaybackMonths[0]?.value).toBe(6.25);
+    });
+
+    it("returns 0 CAC Payback when no gross margin", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 100,
+          newCustomers: 10,
+          churnedCustomers: 0,
+          mrr: 10000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 1000,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        cogs: new Map([["2026-01", 10000]]), // 0% margin
+        subscriptionDetails: subDetails,
+        acquisitionSpend: new Map([["2026-01", 5000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      expect(metrics.cacPaybackMonths[0]?.value).toBe(0);
+    });
+  });
+
   it("computes Rule of 40", () => {
     const input = makeBasicInput({
       revenue: new Map([["2026-01", 50000], ["2026-02", 60000]]),

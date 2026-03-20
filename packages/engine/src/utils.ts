@@ -1,7 +1,10 @@
 /**
  * Financial calculation utilities — date helpers, money math, period generation.
  * All monetary values are represented as numbers (cents or dollars depending on context).
+ * Internal arithmetic uses Decimal.js for precision; output is always plain numbers.
  */
+
+import { D, dRound2, dSum } from "./decimal";
 
 /** Generate an array of first-of-month dates between start and end (inclusive). */
 export function monthRange(start: Date, end: Date): Date[] {
@@ -30,9 +33,9 @@ export function parseMonthKey(key: string): Date {
   return new Date(y, m - 1, 1);
 }
 
-/** Round to 2 decimal places (standard financial rounding). */
+/** Round to 2 decimal places (round half away from zero — standard financial rounding). */
 export function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+  return dRound2(n);
 }
 
 /** Check if a date falls within a month (inclusive of start, exclusive of end). */
@@ -72,9 +75,9 @@ export function proratedFraction(
   return activeDays / daysInMonth;
 }
 
-/** Sum an array of numbers. */
+/** Sum an array of numbers using Decimal for precision. */
 export function sum(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0);
+  return dSum(values);
 }
 
 /** A monthly time series: month key -> value. */
@@ -89,29 +92,29 @@ export function emptySeries(start: Date, end: Date): MonthlySeries {
   return series;
 }
 
-/** Add two series together (union of keys). */
+/** Add two series together (union of keys). Uses Decimal to prevent float drift. */
 export function addSeries(a: MonthlySeries, b: MonthlySeries): MonthlySeries {
   const result = new Map(a);
   for (const [k, v] of b) {
-    result.set(k, (result.get(k) ?? 0) + v);
+    result.set(k, D(result.get(k) ?? 0).plus(v).toNumber());
   }
   return result;
 }
 
-/** Subtract series b from series a. */
+/** Subtract series b from series a. Uses Decimal to prevent float drift. */
 export function subtractSeries(a: MonthlySeries, b: MonthlySeries): MonthlySeries {
   const result = new Map(a);
   for (const [k, v] of b) {
-    result.set(k, (result.get(k) ?? 0) - v);
+    result.set(k, D(result.get(k) ?? 0).minus(v).toNumber());
   }
   return result;
 }
 
-/** Multiply every value in a series by a scalar. */
+/** Multiply every value in a series by a scalar. Uses Decimal to prevent float drift. */
 export function scaleSeries(s: MonthlySeries, factor: number): MonthlySeries {
   const result = new Map<string, number>();
   for (const [k, v] of s) {
-    result.set(k, v * factor);
+    result.set(k, D(v).mul(factor).toNumber());
   }
   return result;
 }

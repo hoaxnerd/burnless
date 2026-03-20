@@ -128,8 +128,9 @@ function computeMonthValue(
   method: ForecastMethod,
   params: Record<string, unknown>,
   monthsElapsed: number,
-  monthKey: string,
-  resolvedLines?: Map<string, MonthlySeries>
+  currentMonthKey: string,
+  resolvedLines?: Map<string, MonthlySeries>,
+  allMonthKeys?: string[]
 ): number {
   switch (method) {
     case "fixed": {
@@ -154,16 +155,23 @@ function computeMonthValue(
       if (!resolvedLines) return 0;
       const sourceSeries = resolvedLines.get(p.sourceLineId);
       if (!sourceSeries) return 0;
-      const sourceValue = sourceSeries.get(monthKey) ?? 0;
+      const sourceValue = sourceSeries.get(currentMonthKey) ?? 0;
       return sourceValue * p.percentage;
     }
 
     case "custom_formula": {
       const p = params as unknown as CustomFormulaParams;
-      return evaluateSimpleExpression(p.expression, {
-        ...p.variables,
-        month: monthsElapsed,
-      });
+      const ctx: FormulaContext = {
+        variables: {
+          ...p.variables,
+          month: monthsElapsed,
+        },
+        resolvedSeries: resolvedLines,
+        currentMonthKey,
+        allMonthKeys,
+      };
+      const result = evaluateFormula(p.expression, ctx);
+      return result.value;
     }
 
     default:
@@ -277,133 +285,5 @@ export function aggregateByAccount(
   return byAccount;
 }
 
-// ── Safe expression evaluator (recursive-descent parser) ─────────────────────
-
-/**
- * Evaluate a simple mathematical expression with named variables.
- * Supports: +, -, *, /, parentheses, numbers, and variable names.
- * Uses a safe recursive-descent parser — no eval() or new Function().
- */
-export function evaluateSimpleExpression(
-  expr: string,
-  vars: Record<string, number> = {}
-): number {
-  if (!expr || !expr.trim()) return 0;
-
-  // Replace variable names with values
-  let resolved = expr;
-  for (const [name, value] of Object.entries(vars)) {
-    resolved = resolved.replace(new RegExp(`\\b${escapeRegex(name)}\\b`, "g"), String(value));
-  }
-
-  // Validate: only allow numbers, operators, parentheses, whitespace, dots
-  if (!/^[\d\s+\-*/().]+$/.test(resolved)) {
-    return 0; // invalid expression — contains disallowed characters
-  }
-
-  try {
-    const parser = new ExprParser(resolved.trim());
-    const result = parser.parse();
-    return typeof result === "number" && isFinite(result) ? result : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Recursive-descent parser for arithmetic expressions. */
-class ExprParser {
-  private pos = 0;
-
-  constructor(private readonly expr: string) {}
-
-  /** Parse the full expression, error if trailing characters remain. */
-  parse(): number {
-    const result = this.parseAddSub();
-    this.skipWs();
-    if (this.pos < this.expr.length) {
-      throw new Error(`Unexpected character at position ${this.pos}`);
-    }
-    return result;
-  }
-
-  /** Addition / subtraction (lowest precedence). */
-  private parseAddSub(): number {
-    let left = this.parseMulDiv();
-    this.skipWs();
-    while (this.pos < this.expr.length && (this.peek() === "+" || this.peek() === "-")) {
-      const op = this.advance();
-      const right = this.parseMulDiv();
-      left = op === "+" ? left + right : left - right;
-      this.skipWs();
-    }
-    return left;
-  }
-
-  /** Multiplication / division. */
-  private parseMulDiv(): number {
-    let left = this.parseUnary();
-    this.skipWs();
-    while (this.pos < this.expr.length && (this.peek() === "*" || this.peek() === "/")) {
-      const op = this.advance();
-      const right = this.parseUnary();
-      left = op === "*" ? left * right : left / right;
-      this.skipWs();
-    }
-    return left;
-  }
-
-  /** Unary minus / plus, parentheses, numbers (highest precedence). */
-  private parseUnary(): number {
-    this.skipWs();
-    if (this.peek() === "-") {
-      this.advance();
-      return -this.parseUnary();
-    }
-    if (this.peek() === "+") {
-      this.advance();
-      return this.parseUnary();
-    }
-    return this.parseAtom();
-  }
-
-  /** Parenthesized expression or number literal. */
-  private parseAtom(): number {
-    this.skipWs();
-    if (this.peek() === "(") {
-      this.advance();
-      const val = this.parseAddSub();
-      this.skipWs();
-      if (this.peek() !== ")") throw new Error("Missing closing parenthesis");
-      this.advance();
-      return val;
-    }
-    return this.parseNumber();
-  }
-
-  /** Parse a numeric literal (integer or decimal). */
-  private parseNumber(): number {
-    this.skipWs();
-    const start = this.pos;
-    while (this.pos < this.expr.length && /[\d.]/.test(this.expr[this.pos]!)) {
-      this.pos++;
-    }
-    if (this.pos === start) throw new Error(`Expected number at position ${this.pos}`);
-    return parseFloat(this.expr.slice(start, this.pos));
-  }
-
-  private skipWs(): void {
-    while (this.pos < this.expr.length && this.expr[this.pos] === " ") this.pos++;
-  }
-
-  private peek(): string {
-    return this.expr[this.pos] ?? "";
-  }
-
-  private advance(): string {
-    return this.expr[this.pos++] ?? "";
-  }
-}
+// Formula evaluation is now handled by ./formula.ts (mathjs-based sandboxed evaluator).
+// The evaluateSimpleExpression function is re-exported at the top of this file.

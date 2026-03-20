@@ -155,6 +155,129 @@ describe("forecasting", () => {
     });
   });
 
+  describe("chained percentage_of dependencies (A→B→C)", () => {
+    it("resolves a three-level chain", () => {
+      const lines: ForecastLineInput[] = [
+        {
+          id: "base",
+          accountId: "a1",
+          method: "fixed",
+          parameters: { amount: 10000 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "level1",
+          accountId: "a2",
+          method: "percentage_of",
+          parameters: { sourceLineId: "base", percentage: 0.5 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "level2",
+          accountId: "a3",
+          method: "percentage_of",
+          parameters: { sourceLineId: "level1", percentage: 0.2 },
+          startDate: start,
+          endDate: null,
+        },
+      ];
+      const results = computeAllForecastLines(lines, start, end);
+      // base = 10000, level1 = 5000, level2 = 1000
+      expect(results.get("base")!.get("2026-01")).toBe(10000);
+      expect(results.get("level1")!.get("2026-01")).toBe(5000);
+      expect(results.get("level2")!.get("2026-01")).toBe(1000);
+    });
+
+    it("resolves lines regardless of input order", () => {
+      const lines: ForecastLineInput[] = [
+        // Deliberately put the deepest dependent first
+        {
+          id: "level2",
+          accountId: "a3",
+          method: "percentage_of",
+          parameters: { sourceLineId: "level1", percentage: 0.3 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "level1",
+          accountId: "a2",
+          method: "percentage_of",
+          parameters: { sourceLineId: "base", percentage: 0.5 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "base",
+          accountId: "a1",
+          method: "fixed",
+          parameters: { amount: 20000 },
+          startDate: start,
+          endDate: null,
+        },
+      ];
+      const results = computeAllForecastLines(lines, start, end);
+      // base = 20000, level1 = 10000, level2 = 3000
+      expect(results.get("level2")!.get("2026-01")).toBe(3000);
+    });
+  });
+
+  describe("circular dependency detection", () => {
+    it("throws on circular percentage_of references", () => {
+      const lines: ForecastLineInput[] = [
+        {
+          id: "a",
+          accountId: "a1",
+          method: "percentage_of",
+          parameters: { sourceLineId: "b", percentage: 0.5 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "b",
+          accountId: "a2",
+          method: "percentage_of",
+          parameters: { sourceLineId: "a", percentage: 0.3 },
+          startDate: start,
+          endDate: null,
+        },
+      ];
+      expect(() => computeAllForecastLines(lines, start, end)).toThrow(/[Cc]ircular/);
+    });
+
+    it("throws on three-node cycle", () => {
+      const lines: ForecastLineInput[] = [
+        {
+          id: "x",
+          accountId: "a1",
+          method: "percentage_of",
+          parameters: { sourceLineId: "z", percentage: 0.1 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "y",
+          accountId: "a2",
+          method: "percentage_of",
+          parameters: { sourceLineId: "x", percentage: 0.1 },
+          startDate: start,
+          endDate: null,
+        },
+        {
+          id: "z",
+          accountId: "a3",
+          method: "percentage_of",
+          parameters: { sourceLineId: "y", percentage: 0.1 },
+          startDate: start,
+          endDate: null,
+        },
+      ];
+      expect(() => computeAllForecastLines(lines, start, end)).toThrow(/[Cc]ircular/);
+    });
+  });
+
   describe("evaluateSimpleExpression", () => {
     it("evaluates basic math", () => {
       expect(evaluateSimpleExpression("2 + 3")).toBe(5);
@@ -168,6 +291,41 @@ describe("forecasting", () => {
     it("returns 0 for invalid expressions", () => {
       expect(evaluateSimpleExpression("alert('xss')")).toBe(0);
       expect(evaluateSimpleExpression("")).toBe(0);
+    });
+
+    it("handles operator precedence correctly", () => {
+      expect(evaluateSimpleExpression("2 + 3 * 4")).toBe(14);
+      expect(evaluateSimpleExpression("(2 + 3) * 4")).toBe(20);
+    });
+
+    it("handles unary minus", () => {
+      expect(evaluateSimpleExpression("-5 + 3")).toBe(-2);
+      expect(evaluateSimpleExpression("-(2 + 3)")).toBe(-5);
+    });
+
+    it("handles division", () => {
+      expect(evaluateSimpleExpression("10 / 4")).toBe(2.5);
+      expect(evaluateSimpleExpression("1 / 0")).toBe(0); // Infinity → 0
+    });
+
+    it("rejects code injection attempts", () => {
+      expect(evaluateSimpleExpression("process.exit()")).toBe(0);
+      expect(evaluateSimpleExpression("require('fs')")).toBe(0);
+      expect(evaluateSimpleExpression("globalThis")).toBe(0);
+      expect(evaluateSimpleExpression("constructor")).toBe(0);
+      expect(evaluateSimpleExpression("__proto__")).toBe(0);
+      expect(evaluateSimpleExpression("this")).toBe(0);
+      expect(evaluateSimpleExpression("import('fs')")).toBe(0);
+    });
+
+    it("handles nested parentheses", () => {
+      expect(evaluateSimpleExpression("((2 + 3) * (4 - 1))")).toBe(15);
+      expect(evaluateSimpleExpression("(((1 + 2)))")).toBe(3);
+    });
+
+    it("handles decimal numbers", () => {
+      expect(evaluateSimpleExpression("1.5 * 2")).toBe(3);
+      expect(evaluateSimpleExpression("0.1 + 0.2")).toBeCloseTo(0.3, 10);
     });
   });
 });

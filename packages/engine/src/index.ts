@@ -24,13 +24,21 @@ export {
   CircularDependencyError,
 } from "./dag";
 
+// Formula evaluator (mathjs-based, sandboxed)
+export {
+  evaluateFormula,
+  evaluateSimpleExpression,
+  validateFormula,
+  type FormulaContext,
+  type FormulaResult,
+} from "./formula";
+
 // Forecasting
 export {
   computeForecastLine,
   computeAllForecastLines,
   buildForecastDependencyGraph,
   aggregateByAccount,
-  evaluateSimpleExpression,
   type ForecastLineInput,
   type FixedParams,
   type GrowthRateParams,

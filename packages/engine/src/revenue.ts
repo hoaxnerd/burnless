@@ -6,6 +6,8 @@
  * - one_time: non-recurring revenue (product sales, setup fees)
  * - usage_based: consumption-based pricing
  * - services: time-based billing (consulting, professional services)
+ *
+ * All intermediate arithmetic uses Decimal.js for precision.
  */
 
 import {
@@ -15,6 +17,7 @@ import {
   round2,
   addSeries,
 } from "./utils";
+import { D, dMul, dPow, dRound2 } from "./decimal";
 
 // ── Revenue stream parameter types ───────────────────────────────────────────
 
@@ -85,8 +88,15 @@ export interface SubscriptionDetail {
   mrr: number;
   newMrr: number;
   expansionMrr: number;
+  /** MRR lost from full cancellations only */
   churnedMrr: number;
+  /** MRR lost from downgrades (lower plan, fewer seats) — not full cancellation */
+  contractionMrr?: number;
+  /** Alias for contractionMrr — MRR reduction without full cancellation */
+  downgradeMrr?: number;
   netNewMrr: number;
+  /** Number of active users (distinct from accounts/customers) — for ARPU */
+  activeUsers?: number;
 }
 
 // ── Core revenue functions ───────────────────────────────────────────────────
@@ -150,39 +160,41 @@ export function computeSubscriptionDetail(
   const months = monthRange(periodStart, periodEnd);
   const details: SubscriptionDetail[] = [];
 
-  let customers = params.startingCustomers;
-  let pricePerCustomer = params.monthlyPrice;
+  // Use Decimal for the accumulating state to prevent compounding drift
+  let customers = D(params.startingCustomers);
+  let pricePerCustomer = D(params.monthlyPrice);
 
   for (let i = 0; i < months.length; i++) {
     const key = monthKey(months[i]!);
 
     // Churn happens on existing customers
-    const churnedCustomers = round2(customers * params.monthlyChurnRate);
-    const newCustomers = params.newCustomersPerMonth;
+    const churnedCustomers = customers.mul(params.monthlyChurnRate);
+    const newCustomers = D(params.newCustomersPerMonth);
 
-    // MRR components
-    const existingMrr = round2((customers - churnedCustomers) * pricePerCustomer);
-    const expansionMrr = round2(existingMrr * (params.expansionRate ?? 0));
-    const newMrr = round2(newCustomers * pricePerCustomer);
-    const churnedMrr = round2(churnedCustomers * pricePerCustomer);
-    const netNewMrr = round2(newMrr + expansionMrr - churnedMrr);
-    const totalMrr = round2(existingMrr + expansionMrr + newMrr);
+    // MRR components — all in Decimal
+    const retainedCustomers = customers.minus(churnedCustomers);
+    const existingMrr = retainedCustomers.mul(pricePerCustomer);
+    const expansionMrr = existingMrr.mul(params.expansionRate ?? 0);
+    const newMrr = newCustomers.mul(pricePerCustomer);
+    const churnedMrr = churnedCustomers.mul(pricePerCustomer);
+    const netNewMrr = newMrr.plus(expansionMrr).minus(churnedMrr);
+    const totalMrr = existingMrr.plus(expansionMrr).plus(newMrr);
 
     details.push({
       month: key,
-      customers: round2(customers - churnedCustomers + newCustomers),
-      newCustomers,
-      churnedCustomers: round2(churnedCustomers),
-      mrr: totalMrr,
-      newMrr,
-      expansionMrr,
-      churnedMrr,
-      netNewMrr,
+      customers: dRound2(retainedCustomers.plus(newCustomers)),
+      newCustomers: params.newCustomersPerMonth,
+      churnedCustomers: dRound2(churnedCustomers),
+      mrr: dRound2(totalMrr),
+      newMrr: dRound2(newMrr),
+      expansionMrr: dRound2(expansionMrr),
+      churnedMrr: dRound2(churnedMrr),
+      netNewMrr: dRound2(netNewMrr),
     });
 
-    // Update for next month
-    customers = customers - churnedCustomers + newCustomers;
-    pricePerCustomer *= 1 + (params.priceGrowthRate ?? 0);
+    // Update for next month — keep in Decimal for precision across iterations
+    customers = customers.minus(churnedCustomers).plus(newCustomers);
+    pricePerCustomer = pricePerCustomer.mul(D(1).plus(params.priceGrowthRate ?? 0));
   }
 
   return details;
@@ -212,8 +224,8 @@ function computeOneTimeRevenue(
   const series: MonthlySeries = new Map();
 
   for (let i = 0; i < months.length; i++) {
-    const units = params.unitsPerMonth * Math.pow(1 + (params.unitGrowthRate ?? 0), i);
-    series.set(monthKey(months[i]!), round2(units * params.pricePerUnit));
+    const units = dMul(params.unitsPerMonth, dPow(D(1).plus(params.unitGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(units.mul(params.pricePerUnit)));
   }
 
   return series;
@@ -228,9 +240,9 @@ function computeUsageRevenue(
   const series: MonthlySeries = new Map();
 
   for (let i = 0; i < months.length; i++) {
-    const users = params.activeUsers * Math.pow(1 + (params.userGrowthRate ?? 0), i);
-    const usage = params.avgUsagePerUser * Math.pow(1 + (params.usageGrowthRate ?? 0), i);
-    series.set(monthKey(months[i]!), round2(users * usage * params.pricePerUnit));
+    const users = D(params.activeUsers).mul(dPow(D(1).plus(params.userGrowthRate ?? 0), i));
+    const usage = D(params.avgUsagePerUser).mul(dPow(D(1).plus(params.usageGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(users.mul(usage).mul(params.pricePerUnit)));
   }
 
   return series;
@@ -245,9 +257,9 @@ function computeServicesRevenue(
   const series: MonthlySeries = new Map();
 
   for (let i = 0; i < months.length; i++) {
-    const hours = params.hoursPerMonth * Math.pow(1 + (params.hoursGrowthRate ?? 0), i);
-    const rate = params.hourlyRate * Math.pow(1 + (params.rateIncreaseRate ?? 0) / 12, i);
-    series.set(monthKey(months[i]!), round2(hours * rate));
+    const hours = D(params.hoursPerMonth).mul(dPow(D(1).plus(params.hoursGrowthRate ?? 0), i));
+    const rate = D(params.hourlyRate).mul(dPow(D(1).plus(D(params.rateIncreaseRate ?? 0).div(12)), i));
+    series.set(monthKey(months[i]!), dRound2(hours.mul(rate)));
   }
 
   return series;
