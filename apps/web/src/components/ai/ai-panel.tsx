@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { X, Send, Bot, User, Loader2, Wrench, Sparkles, Copy, Check } from "lucide-react";
+import { X, Send, Bot, User, Loader2, Wrench, Sparkles, Copy, Check, Pin, PinOff } from "lucide-react";
+import { usePinnedInsights } from "./use-pinned-insights";
 import { getPageContext } from "./page-context";
 
 interface Message {
@@ -26,6 +27,7 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const { pin, isPinned } = usePinnedInsights();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -246,9 +248,9 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
                     <span className="whitespace-pre-wrap">{msg.content}</span>
                     {msg.isStreaming && <span className="inline-block ml-0.5 animate-pulse">|</span>}
                   </div>
-                  {/* Copy button for assistant messages */}
+                  {/* Copy & Pin buttons for assistant messages */}
                   {msg.role === "assistant" && !msg.isStreaming && msg.content && (
-                    <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleCopy(msg.content, i)}
                         className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
@@ -257,6 +259,17 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
                           <><Check className="h-2.5 w-2.5" /> Copied</>
                         ) : (
                           <><Copy className="h-2.5 w-2.5" /> Copy</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => pin(msg.content, pageContext.pageName)}
+                        disabled={isPinned(msg.content)}
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isPinned(msg.content) ? (
+                          <><PinOff className="h-2.5 w-2.5" /> Pinned</>
+                        ) : (
+                          <><Pin className="h-2.5 w-2.5" /> Pin to Dashboard</>
                         )}
                       </button>
                     </div>

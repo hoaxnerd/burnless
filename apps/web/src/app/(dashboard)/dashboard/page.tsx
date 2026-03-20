@@ -13,6 +13,7 @@ import { HeroKpiCard } from "./hero-kpi-card";
 import { DashboardCharts } from "./dashboard-charts";
 import { AiInsightBanner } from "./ai-insight-banner";
 import { QuickActions } from "./quick-actions";
+import { PinnedInsights } from "./pinned-insights";
 import { DashboardEmptyState } from "./empty-state";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -197,6 +198,11 @@ export default async function DashboardPage({
             mrrData={metrics.mrr}
             hasSaaS={metrics.mrr.some((m) => m.value > 0)}
           />
+
+          {/* Pinned AI Insights */}
+          <div className="mt-6 sm:mt-8">
+            <PinnedInsights />
+          </div>
 
           {/* Bottom section: Scenarios + Key Metrics */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
