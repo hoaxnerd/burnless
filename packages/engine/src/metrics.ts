@@ -11,11 +11,14 @@
  * - Profitability: Gross Margin, EBITDA, Net Income
  * - Growth: Revenue Growth, Customer Growth, Revenue Per Employee
  * - Efficiency: Burn Multiple, Burn Productivity
+ *
+ * All intermediate arithmetic uses Decimal.js for precision.
  */
 
 import type { SubscriptionDetail } from "./revenue";
 import { DependencyGraph, CircularDependencyError } from "./dag";
 import { type MonthlySeries, round2, seriesToArray } from "./utils";
+import { D, Decimal, dDiv, dRound2, dMax } from "./decimal";
 
 // ── Input types ──────────────────────────────────────────────────────────────
 
@@ -156,11 +159,11 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     month: m,
     value: subDetails.get(m)?.mrr ?? input.revenue.get(m) ?? 0,
   }));
-  const arr = mrr.map((v) => ({ month: v.month, value: round2(v.value * 12) }));
+  const arr = mrr.map((v) => ({ month: v.month, value: dRound2(D(v.value).mul(12)) }));
   const totalRevenue = seriesToArray(input.revenue);
   const revenueRunRate = totalRevenue.map((v) => ({
     month: v.month,
-    value: round2(v.value * 12),
+    value: dRound2(D(v.value).mul(12)),
   }));
 
   // MRR components
@@ -197,90 +200,95 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
 
   // Profitability (computed early — needed by LTV and CAC Payback)
   const grossProfit = months.map((m) => {
-    const rev = input.revenue.get(m) ?? 0;
-    const cog = input.cogs.get(m) ?? 0;
-    return { month: m, value: round2(rev - cog) };
+    const rev = D(input.revenue.get(m) ?? 0);
+    const cog = D(input.cogs.get(m) ?? 0);
+    return { month: m, value: dRound2(rev.minus(cog)) };
   });
 
   const grossMarginPercent = months.map((m, i) => {
-    const rev = input.revenue.get(m) ?? 0;
-    if (rev === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(((grossProfit[i]?.value ?? 0) / rev) * 100) };
+    const rev = D(input.revenue.get(m) ?? 0);
+    if (rev.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(D(grossProfit[i]?.value ?? 0).div(rev).mul(100)) };
   });
 
-  // SaaS metrics
+  // SaaS metrics — all using Decimal
   const customerChurnRate = months.map((m) => {
     const d = subDetails.get(m);
     if (!d || d.customers === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((d.churnedCustomers / (d.customers + d.churnedCustomers)) * 100) };
+    return {
+      month: m,
+      value: dRound2(dDiv(d.churnedCustomers, D(d.customers).plus(d.churnedCustomers)).mul(100)),
+    };
   });
 
   const revenueChurnRate = months.map((m) => {
     const d = subDetails.get(m);
     if (!d || d.mrr === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((d.churnedMrr / (d.mrr + d.churnedMrr)) * 100) };
+    return {
+      month: m,
+      value: dRound2(dDiv(d.churnedMrr, D(d.mrr).plus(d.churnedMrr)).mul(100)),
+    };
   });
 
   // ARPA = MRR / customers
   const arpa = months.map((m) => {
     const d = subDetails.get(m);
     if (!d || d.customers === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(d.mrr / d.customers) };
+    return { month: m, value: dRound2(dDiv(d.mrr, d.customers)) };
   });
 
   // LTV = (ARPA × Gross Margin%) / Revenue Churn Rate
   const ltv = months.map((m, i) => {
-    const arpaVal = arpa[i]?.value ?? 0;
-    const gmFraction = (grossMarginPercent[i]?.value ?? 0) / 100;
-    const revChurnFraction = (revenueChurnRate[i]?.value ?? 0) / 100;
-    if (revChurnFraction === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((arpaVal * gmFraction) / revChurnFraction) };
+    const arpaVal = D(arpa[i]?.value ?? 0);
+    const gmFraction = D(grossMarginPercent[i]?.value ?? 0).div(100);
+    const revChurnFraction = D(revenueChurnRate[i]?.value ?? 0).div(100);
+    if (revChurnFraction.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(arpaVal.mul(gmFraction).div(revChurnFraction)) };
   });
 
-  // CAC
+  // CAC = acquisition spend / new customers
   const cac = months.map((m) => {
-    const spend = input.acquisitionSpend?.get(m) ?? 0;
-    const newCust = subDetails.get(m)?.newCustomers ?? input.newCustomers?.get(m) ?? 0;
-    if (newCust === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(spend / newCust) };
+    const spend = D(input.acquisitionSpend?.get(m) ?? 0);
+    const newCust = D(subDetails.get(m)?.newCustomers ?? input.newCustomers?.get(m) ?? 0);
+    if (newCust.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(spend.div(newCust)) };
   });
 
   const ltvCacRatio = months.map((m, i) => {
-    const cacVal = cac[i]?.value ?? 0;
-    if (cacVal === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((ltv[i]?.value ?? 0) / cacVal) };
+    const cacVal = D(cac[i]?.value ?? 0);
+    if (cacVal.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(D(ltv[i]?.value ?? 0).div(cacVal)) };
   });
 
   // CAC Payback = CAC / (ARPA × Gross Margin%)
   const cacPaybackMonths = months.map((m, i) => {
-    const arpaVal = arpa[i]?.value ?? 0;
-    const gmFraction = (grossMarginPercent[i]?.value ?? 0) / 100;
-    const monthlyGrossPerCustomer = arpaVal * gmFraction;
-    if (monthlyGrossPerCustomer === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((cac[i]?.value ?? 0) / monthlyGrossPerCustomer) };
+    const arpaVal = D(arpa[i]?.value ?? 0);
+    const gmFraction = D(grossMarginPercent[i]?.value ?? 0).div(100);
+    const monthlyGrossPerCustomer = arpaVal.mul(gmFraction);
+    if (monthlyGrossPerCustomer.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(D(cac[i]?.value ?? 0).div(monthlyGrossPerCustomer)) };
   });
 
   // SaaS Quick Ratio = (New MRR + Expansion MRR) / (Churned MRR + Contraction MRR)
   const saasQuickRatio = months.map((m) => {
     const d = subDetails.get(m);
     if (!d) return { month: m, value: 0 };
-    const additions = d.newMrr + d.expansionMrr;
-    const losses = d.churnedMrr + (d.contractionMrr ?? d.downgradeMrr ?? 0);
-    if (losses === 0) return { month: m, value: additions > 0 ? 999 : 0 };
-    return { month: m, value: round2(additions / losses) };
+    const additions = D(d.newMrr).plus(d.expansionMrr);
+    const losses = D(d.churnedMrr).plus(d.contractionMrr ?? d.downgradeMrr ?? 0);
+    if (losses.isZero()) return { month: m, value: additions.gt(0) ? 999 : 0 };
+    return { month: m, value: dRound2(additions.div(losses)) };
   });
 
-  // Magic Number = Net New ARR (QoQ) / Previous Quarter's S&M Spend
-  // Simplified: monthly approximation
+  // Magic Number = Net New ARR (MoM) / Previous Month's S&M Spend
   const magicNumber = months.map((m, i) => {
     if (i === 0) return { month: m, value: 0 };
-    const currMrr = mrr[i]?.value ?? 0;
-    const prevMrr = mrr[i - 1]?.value ?? 0;
-    const netNewArr = (currMrr - prevMrr) * 12;
+    const currMrr = D(mrr[i]?.value ?? 0);
+    const prevMrr = D(mrr[i - 1]?.value ?? 0);
+    const netNewArr = currMrr.minus(prevMrr).mul(12);
     const prevMonth = months[i - 1] ?? m;
-    const prevSpend = input.acquisitionSpend?.get(prevMonth) ?? 0;
-    if (prevSpend === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(netNewArr / prevSpend) };
+    const prevSpend = D(input.acquisitionSpend?.get(prevMonth) ?? 0);
+    if (prevSpend.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(netNewArr.div(prevSpend)) };
   });
 
   // Cash metrics
@@ -291,56 +299,56 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   }));
 
   const netBurnRate = months.map((m) => {
-    const rev = input.revenue.get(m) ?? 0;
-    const exp = input.totalExpenses.get(m) ?? 0;
-    const net = exp - rev;
-    return { month: m, value: round2(Math.max(0, net)) }; // 0 if profitable
+    const rev = D(input.revenue.get(m) ?? 0);
+    const exp = D(input.totalExpenses.get(m) ?? 0);
+    const net = exp.minus(rev);
+    return { month: m, value: dRound2(dMax(0, net)) };
   });
 
   const cashPos = seriesToArray(input.cashPosition);
 
   const cashRunwayMonths = months.map((m, i) => {
-    const cash = input.cashPosition.get(m) ?? 0;
-    const burn = netBurnRate[i]?.value ?? 0;
-    if (burn <= 0) return { month: m, value: 999 };
-    return { month: m, value: round2(cash / burn) };
+    const cash = D(input.cashPosition.get(m) ?? 0);
+    const burn = D(netBurnRate[i]?.value ?? 0);
+    if (burn.lte(0)) return { month: m, value: 999 };
+    return { month: m, value: dRound2(cash.div(burn)) };
   });
 
-  // Operating income (grossProfit and grossMarginPercent already computed above)
+  // Operating income
   const operatingIncome = months.map((m) => {
-    const gp = grossProfit.find((g) => g.month === m)?.value ?? 0;
-    const opex = input.operatingExpenses.get(m) ?? 0;
-    return { month: m, value: round2(gp - opex) };
+    const gp = D(grossProfit.find((g) => g.month === m)?.value ?? 0);
+    const opex = D(input.operatingExpenses.get(m) ?? 0);
+    return { month: m, value: dRound2(gp.minus(opex)) };
   });
 
   const netIncomeValues = seriesToArray(input.netIncome);
-  const ebitda = operatingIncome; // simplified for startups (no D&A tracked separately)
+  const ebitda = operatingIncome;
 
   // Growth rates (month-over-month)
   const revenueGrowthRate = computeGrowthRate(totalRevenue);
   const mrrGrowthRate = computeGrowthRate(mrr);
   const customerGrowthRate = computeGrowthRate(totalCustomers);
 
-  // Revenue per employee
+  // Revenue per employee (annualized)
   const revenuePerEmployee = months.map((m) => {
-    const rev = input.revenue.get(m) ?? 0;
-    const hc = input.headcount.get(m) ?? 0;
-    if (hc === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((rev * 12) / hc) }; // annualized
+    const rev = D(input.revenue.get(m) ?? 0);
+    const hc = D(input.headcount.get(m) ?? 0);
+    if (hc.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(rev.mul(12).div(hc)) };
   });
 
   // Efficiency
   const burnMultiple = months.map((m, i) => {
-    const burn = netBurnRate[i]?.value ?? 0;
-    const netNew = netNewMrr[i]?.value ?? 0;
-    if (netNew <= 0) return { month: m, value: 0 };
-    return { month: m, value: round2(burn / netNew) };
+    const burn = D(netBurnRate[i]?.value ?? 0);
+    const netNew = D(netNewMrr[i]?.value ?? 0);
+    if (netNew.lte(0)) return { month: m, value: 0 };
+    return { month: m, value: dRound2(burn.div(netNew)) };
   });
 
   const ruleOf40 = months.map((m, i) => {
-    const growthRate = revenueGrowthRate[i]?.value ?? 0;
-    const margin = grossMarginPercent[i]?.value ?? 0;
-    return { month: m, value: round2(growthRate + margin) };
+    const growthRate = D(revenueGrowthRate[i]?.value ?? 0);
+    const margin = D(grossMarginPercent[i]?.value ?? 0);
+    return { month: m, value: dRound2(growthRate.plus(margin)) };
   });
 
   // ── Tier-1: MRR Decomposition ──────────────────────────────────────────────
@@ -354,106 +362,102 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // ── Tier-1: Net Revenue Retention (NRR) ────────────────────────────────────
-  // (Ending MRR - New MRR) / Prior Month Ending MRR × 100
   const netRevenueRetention = months.map((m, i) => {
     if (i === 0) return { month: m, value: 0 };
-    const currMrrVal = mrr[i]?.value ?? 0;
-    const newMrrVal = newMrr[i]?.value ?? 0;
-    const prevMrrVal = mrr[i - 1]?.value ?? 0;
-    if (prevMrrVal === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(((currMrrVal - newMrrVal) / prevMrrVal) * 100) };
+    const currMrrVal = D(mrr[i]?.value ?? 0);
+    const newMrrVal = D(newMrr[i]?.value ?? 0);
+    const prevMrrVal = D(mrr[i - 1]?.value ?? 0);
+    if (prevMrrVal.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(currMrrVal.minus(newMrrVal).div(prevMrrVal).mul(100)) };
   });
 
   // ── Tier-1: Gross Revenue Retention (GRR) ──────────────────────────────────
-  // (1 - [(Churned MRR + Downgrade MRR) / Prior Month Ending MRR]) × 100
   const grossRevenueRetention = months.map((m, i) => {
     if (i === 0) return { month: m, value: 0 };
-    const prevMrrVal = mrr[i - 1]?.value ?? 0;
-    if (prevMrrVal === 0) return { month: m, value: 0 };
-    const churned = churnedMrr[i]?.value ?? 0;
-    const downgrade = contractionMrr[i]?.value ?? 0;
-    const grr = (1 - (churned + downgrade) / prevMrrVal) * 100;
-    return { month: m, value: round2(Math.min(100, grr)) }; // GRR never exceeds 100%
+    const prevMrrVal = D(mrr[i - 1]?.value ?? 0);
+    if (prevMrrVal.isZero()) return { month: m, value: 0 };
+    const churned = D(churnedMrr[i]?.value ?? 0);
+    const downgrade = D(contractionMrr[i]?.value ?? 0);
+    const grr = D(1).minus(churned.plus(downgrade).div(prevMrrVal)).mul(100);
+    return { month: m, value: dRound2(Decimal.min(D(100), grr)) };
   });
 
   // ── Tier-1: Free Cash Flow (FCF) ──────────────────────────────────────────
   const freeCashFlow = months.map((m) => {
-    const ocf = input.operatingCashFlow?.get(m) ?? input.netIncome.get(m) ?? 0;
-    const capexVal = input.capex?.get(m) ?? 0;
-    return { month: m, value: round2(ocf - capexVal) };
+    const ocf = D(input.operatingCashFlow?.get(m) ?? input.netIncome.get(m) ?? 0);
+    const capexVal = D(input.capex?.get(m) ?? 0);
+    return { month: m, value: dRound2(ocf.minus(capexVal)) };
   });
   const fcfMargin = months.map((m, i) => {
-    const rev = input.revenue.get(m) ?? 0;
-    if (rev === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(((freeCashFlow[i]?.value ?? 0) / rev) * 100) };
+    const rev = D(input.revenue.get(m) ?? 0);
+    if (rev.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(D(freeCashFlow[i]?.value ?? 0).div(rev).mul(100)) };
   });
 
   // ── Tier-1: TTM Revenue (trailing 12 months) ──────────────────────────────
   const ttmRevenue = months.map((m, i) => {
-    let sum = 0;
+    let sum = D(0);
     const windowStart = Math.max(0, i - 11);
     for (let j = windowStart; j <= i; j++) {
-      sum += totalRevenue[j]?.value ?? 0;
+      sum = sum.plus(totalRevenue[j]?.value ?? 0);
     }
-    return { month: m, value: round2(sum) };
+    return { month: m, value: dRound2(sum) };
   });
 
   // ── Tier-2: ARPU (Average Revenue Per User) ───────────────────────────────
   const arpu = months.map((m) => {
     const d = subDetails.get(m);
-    const users = d?.activeUsers ?? input.activeUsers?.get(m) ?? 0;
-    const mrrVal = d?.mrr ?? input.revenue.get(m) ?? 0;
-    if (users === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(mrrVal / users) };
+    const users = D(d?.activeUsers ?? input.activeUsers?.get(m) ?? 0);
+    const mrrVal = D(d?.mrr ?? input.revenue.get(m) ?? 0);
+    if (users.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(mrrVal.div(users)) };
   });
 
   // ── Tier-2: Net Churn Rate / Negative Churn Detection ─────────────────────
-  // (Churned MRR - Expansion MRR) / Prior MRR — negative = good (expansion > churn)
   const netChurnRate = months.map((m, i) => {
     if (i === 0) return { month: m, value: 0 };
-    const prevMrrVal = mrr[i - 1]?.value ?? 0;
-    if (prevMrrVal === 0) return { month: m, value: 0 };
-    const churned = churnedMrr[i]?.value ?? 0;
-    const expansion = expansionMrr[i]?.value ?? 0;
-    return { month: m, value: round2(((churned - expansion) / prevMrrVal) * 100) };
+    const prevMrrVal = D(mrr[i - 1]?.value ?? 0);
+    if (prevMrrVal.isZero()) return { month: m, value: 0 };
+    const churned = D(churnedMrr[i]?.value ?? 0);
+    const expansion = D(expansionMrr[i]?.value ?? 0);
+    return { month: m, value: dRound2(churned.minus(expansion).div(prevMrrVal).mul(100)) };
   });
   const hasNegativeChurn = netChurnRate.map((v) => ({
     month: v.month,
-    value: v.value < 0 ? 1 : 0, // 1 = negative churn (good), 0 = positive churn
+    value: v.value < 0 ? 1 : 0,
   }));
 
   // ── Tier-2: Burn Productivity ──────────────────────────────────────────────
-  // Change in Gross Profit (recent 6mo vs prior 6mo) / Total OpEx (prior 6mo)
   const burnProductivity = months.map((m, i) => {
-    if (i < 11) return { month: m, value: 0 }; // need 12 months
-    let recentGP = 0;
-    let priorGP = 0;
-    let priorOpEx = 0;
+    if (i < 11) return { month: m, value: 0 };
+    let recentGP = D(0);
+    let priorGP = D(0);
+    let priorOpEx = D(0);
     for (let j = i - 5; j <= i; j++) {
-      recentGP += grossProfit[j]?.value ?? 0;
+      recentGP = recentGP.plus(grossProfit[j]?.value ?? 0);
     }
     for (let j = i - 11; j <= i - 6; j++) {
-      priorGP += grossProfit[j]?.value ?? 0;
-      priorOpEx += input.operatingExpenses.get(months[j]!) ?? 0;
+      priorGP = priorGP.plus(grossProfit[j]?.value ?? 0);
+      priorOpEx = priorOpEx.plus(input.operatingExpenses.get(months[j]!) ?? 0);
     }
-    if (priorOpEx === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((recentGP - priorGP) / priorOpEx) };
+    if (priorOpEx.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(recentGP.minus(priorGP).div(priorOpEx)) };
   });
 
   // ── Tier-2: Working Capital ────────────────────────────────────────────────
   const workingCapital = months.map((m) => {
-    const assets = input.currentAssets?.get(m) ?? 0;
-    const liabilities = input.currentLiabilities?.get(m) ?? 0;
-    return { month: m, value: round2(assets - liabilities) };
+    const assets = D(input.currentAssets?.get(m) ?? 0);
+    const liabilities = D(input.currentLiabilities?.get(m) ?? 0);
+    return { month: m, value: dRound2(assets.minus(liabilities)) };
   });
 
   // ── Tier-2: Customer Retention Cost ────────────────────────────────────────
   const customerRetentionCost = months.map((m) => {
-    const spend = input.retentionSpend?.get(m) ?? 0;
+    const spend = D(input.retentionSpend?.get(m) ?? 0);
     const d = subDetails.get(m);
-    const customers = d?.customers ?? 0;
-    if (customers === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(spend / customers) };
+    const customers = D(d?.customers ?? 0);
+    if (customers.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(spend.div(customers)) };
   });
 
   return {
@@ -531,8 +535,8 @@ function computeGrowthRate(values: MetricValue[]): MetricValue[] {
     if (i === 0 || !prev || prev.value === 0) {
       return { month: v.month, value: 0 };
     }
-    const growth = ((v.value - prev.value) / prev.value) * 100;
-    return { month: v.month, value: round2(growth) };
+    const growth = D(v.value).minus(prev.value).div(prev.value).mul(100);
+    return { month: v.month, value: dRound2(growth) };
   });
 }
 
@@ -589,8 +593,6 @@ export function computeCustomMetrics(
     graph.addNode(def.id);
 
     for (const depId of def.dependsOn) {
-      // Only add graph edges for dependencies on OTHER custom metrics
-      // Built-in metrics are always available (no ordering needed)
       if (customIds.has(depId)) {
         graph.addDependency(def.id, depId);
       } else if (!builtInMap.has(depId)) {
@@ -611,7 +613,6 @@ export function computeCustomMetrics(
     const def = defMap.get(id);
     if (!def) continue;
 
-    // Gather dependencies
     const deps = new Map<string, MetricValue[]>();
     for (const depId of def.dependsOn) {
       const values = resolved.get(depId) ?? builtInMap.get(depId);

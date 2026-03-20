@@ -33,7 +33,7 @@ const ALLOWED_FUNCTIONS = new Set([
 // ── Create a restricted mathjs instance ───────────────────────────────────────
 
 function createSandboxedMath(): MathJsInstance {
-  const math = create(all, {
+  const math = create(all!, {
     number: "number",
   });
 
