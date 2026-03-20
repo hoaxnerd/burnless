@@ -1,7 +1,12 @@
 /**
  * Server-side dashboard computation — shared pipeline for computing all financial
  * data from a scenario. Used by overview, reports, and metrics pages.
+ *
+ * Uses React's cache() for request-level deduplication — multiple components
+ * calling computeDashboardData with the same args in a single request
+ * only trigger one computation.
  */
+import { cache } from "react";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -55,7 +60,12 @@ export interface DashboardData {
   currentMonth: string;
 }
 
-export async function computeDashboardData(
+/**
+ * Cached dashboard computation — deduplicates within the same server request.
+ * If multiple server components call this with the same (companyId, scenarioId),
+ * the computation runs only once per request.
+ */
+export const computeDashboardData = cache(async function computeDashboardData(
   companyId: string,
   scenarioId: string,
   year?: number
@@ -224,4 +234,4 @@ export async function computeDashboardData(
     periodEnd,
     currentMonth,
   };
-}
+});

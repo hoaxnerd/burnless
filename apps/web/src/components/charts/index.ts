@@ -10,3 +10,4 @@ export {
   formatMonth,
   formatMonthYear,
 } from "./chart-theme";
+export { withLazyChart, ChartSkeleton } from "./lazy-chart";
