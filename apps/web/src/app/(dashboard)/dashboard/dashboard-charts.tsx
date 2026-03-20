@@ -7,7 +7,6 @@ import {
   chartColors,
   formatCompactCurrency,
 } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
 
 interface MetricPoint {
   month: string;
@@ -21,6 +20,36 @@ interface DashboardChartsProps {
   runwayData: MetricPoint[];
   mrrData: MetricPoint[];
   hasSaaS: boolean;
+}
+
+function DashboardChartCard({
+  title,
+  subtitle,
+  children,
+  stagger = 0,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  stagger?: number;
+}) {
+  return (
+    <div
+      className={`
+        rounded-2xl bg-surface-0 border border-surface-200
+        p-5 sm:p-6
+        hover:border-surface-300 hover:shadow-md
+        transition-all duration-300
+        animate-slide-up stagger-${stagger}
+      `}
+    >
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-surface-900">{title}</h3>
+        <p className="mt-0.5 text-xs text-surface-400">{subtitle}</p>
+      </div>
+      {children}
+    </div>
+  );
 }
 
 export function DashboardCharts({
@@ -38,15 +67,21 @@ export function DashboardCharts({
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cash Runway Chart (actual + projected) */}
-        <ChartCard title="Cash Runway" subtitle="Cash position over time">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <DashboardChartCard
+          title="Cash Position"
+          subtitle="Cash balance over time"
+          stagger={1}
+        >
           <AreaChartWidget data={cashData} color={chartColors.success} />
-        </ChartCard>
+        </DashboardChartCard>
 
-        {/* Revenue vs Expenses */}
-        <ChartCard title="Revenue vs Expenses" subtitle="Monthly comparison">
+        <DashboardChartCard
+          title="Revenue vs Expenses"
+          subtitle="Monthly comparison"
+          stagger={2}
+        >
           <BarChartWidget
             data={revenueVsExpenses}
             bars={[
@@ -54,12 +89,15 @@ export function DashboardCharts({
               { dataKey: "expenses", label: "Expenses", color: chartColors.danger },
             ]}
           />
-        </ChartCard>
+        </DashboardChartCard>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Burn Rate & Runway */}
-        <ChartCard title="Burn Rate & Runway" subtitle="Net burn and months of runway">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <DashboardChartCard
+          title="Burn Rate & Runway"
+          subtitle="Net burn and months of runway"
+          stagger={3}
+        >
           <MultiLineChart
             data={burnRunwayCombined}
             lines={[
@@ -68,17 +106,24 @@ export function DashboardCharts({
             ]}
             formatValue={formatCompactCurrency}
           />
-        </ChartCard>
+        </DashboardChartCard>
 
-        {/* MRR or Revenue trend */}
         {hasSaaS ? (
-          <ChartCard title="MRR" subtitle="Monthly recurring revenue">
+          <DashboardChartCard
+            title="MRR"
+            subtitle="Monthly recurring revenue"
+            stagger={4}
+          >
             <AreaChartWidget data={mrrData} color="#7c3aed" />
-          </ChartCard>
+          </DashboardChartCard>
         ) : (
-          <ChartCard title="Revenue Trend" subtitle="Total monthly revenue">
+          <DashboardChartCard
+            title="Revenue Trend"
+            subtitle="Total monthly revenue"
+            stagger={4}
+          >
             <AreaChartWidget data={cashData} color={chartColors.brand} />
-          </ChartCard>
+          </DashboardChartCard>
         )}
       </div>
     </div>

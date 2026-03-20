@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, TrendingUp, ArrowRight } from "lucide-react";
+import { AlertTriangle, TrendingUp, ArrowRight, Sparkles, ShieldAlert, Info } from "lucide-react";
 import Link from "next/link";
 
 interface AiInsightBannerProps {
@@ -11,37 +11,54 @@ interface AiInsightBannerProps {
 }
 
 export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsightBannerProps) {
-  // Generate contextual insight based on current financials
   const insight = generateInsight(runway, burnRate, mrrGrowth, cash);
   if (!insight) return null;
 
-  const borderColor = insight.severity === "critical"
-    ? "border-red-300 bg-red-50"
-    : insight.severity === "warning"
-    ? "border-amber-300 bg-amber-50"
-    : "border-brand-200 bg-brand-50";
-
-  const iconColor = insight.severity === "critical"
-    ? "text-red-500"
-    : insight.severity === "warning"
-    ? "text-amber-500"
-    : "text-brand-600";
-
-  const Icon = insight.severity === "critical" || insight.severity === "warning"
-    ? AlertTriangle
-    : TrendingUp;
+  const styles = severityStyles[insight.severity];
+  const Icon = styles.icon;
 
   return (
-    <div className={`rounded-xl border ${borderColor} p-4 mb-6`}>
-      <div className="flex items-start gap-3">
-        <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-surface-900">{insight.title}</p>
-          <p className="text-xs text-surface-600 mt-0.5">{insight.message}</p>
+    <div
+      className={`
+        relative overflow-hidden rounded-2xl border p-4 sm:p-5 mb-6
+        ${styles.border} ${styles.bg}
+        animate-slide-up
+      `}
+    >
+      {/* Ambient glow */}
+      <div className={`absolute inset-0 ${styles.glow} opacity-30 pointer-events-none`} />
+
+      <div className="relative flex items-start gap-3 sm:gap-4">
+        {/* Icon badge */}
+        <div className={`flex-shrink-0 rounded-xl p-2 ${styles.iconBg}`}>
+          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${styles.iconColor}`} />
         </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <Sparkles className="h-3 w-3 text-brand-400 flex-shrink-0" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-surface-400">
+              AI Insight
+            </span>
+          </div>
+          <p className="text-sm font-semibold text-surface-900 leading-snug">
+            {insight.title}
+          </p>
+          <p className="text-xs text-surface-500 mt-1 leading-relaxed">
+            {insight.message}
+          </p>
+        </div>
+
+        {/* CTA */}
         <Link
           href="/ai"
-          className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+          className={`
+            flex-shrink-0 inline-flex items-center gap-1.5
+            rounded-lg px-3 py-1.5 text-xs font-medium
+            ${styles.ctaBg} ${styles.ctaText}
+            hover:opacity-90 transition-opacity
+          `}
         >
           Explore <ArrowRight className="h-3 w-3" />
         </Link>
@@ -50,38 +67,101 @@ export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsight
   );
 }
 
+/* ── Severity visual config ───────────────────────────────────────────────── */
+
+const severityStyles = {
+  critical: {
+    icon: ShieldAlert,
+    border: "border-danger-500/30",
+    bg: "bg-danger-50",
+    glow: "bg-gradient-to-r from-danger-500/10 via-transparent to-transparent",
+    iconBg: "bg-danger-500/10",
+    iconColor: "text-danger-500",
+    ctaBg: "bg-danger-500/10",
+    ctaText: "text-danger-600",
+  },
+  warning: {
+    icon: AlertTriangle,
+    border: "border-warning-500/30",
+    bg: "bg-warning-50",
+    glow: "bg-gradient-to-r from-warning-500/10 via-transparent to-transparent",
+    iconBg: "bg-warning-500/10",
+    iconColor: "text-warning-500",
+    ctaBg: "bg-warning-500/10",
+    ctaText: "text-warning-600",
+  },
+  info: {
+    icon: TrendingUp,
+    border: "border-brand-500/20",
+    bg: "bg-brand-50/50",
+    glow: "bg-gradient-to-r from-brand-500/5 via-transparent to-transparent",
+    iconBg: "bg-brand-500/10",
+    iconColor: "text-brand-500",
+    ctaBg: "bg-brand-500/10",
+    ctaText: "text-brand-600",
+  },
+  neutral: {
+    icon: Info,
+    border: "border-surface-200",
+    bg: "bg-surface-50",
+    glow: "bg-gradient-to-r from-surface-500/5 via-transparent to-transparent",
+    iconBg: "bg-surface-200",
+    iconColor: "text-surface-500",
+    ctaBg: "bg-surface-200",
+    ctaText: "text-surface-600",
+  },
+} as const;
+
+type Severity = keyof typeof severityStyles;
+
+/* ── Insight generation ───────────────────────────────────────────────────── */
+
 function generateInsight(
   runway: number,
   burnRate: number,
   mrrGrowth: number,
-  cash: number
-): { title: string; message: string; severity: "critical" | "warning" | "info" } | null {
+  cash: number,
+): { title: string; message: string; severity: Severity } | null {
   if (runway <= 3 && runway > 0) {
     return {
-      title: `Critical: ${Math.round(runway)} months of runway remaining`,
-      message: `At $${(burnRate / 1000).toFixed(0)}k/mo burn rate, you need to either reduce costs or raise capital immediately.`,
+      title: `${Math.round(runway)} months of runway remaining`,
+      message: `At $${(burnRate / 1000).toFixed(0)}k/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
       severity: "critical",
     };
   }
   if (runway <= 6 && runway > 0) {
     return {
-      title: `Runway at ${Math.round(runway)} months`,
-      message: `Consider starting fundraising conversations now. At current burn, cash will be depleted by ${getExhaustionDate(runway)}.`,
+      title: `Runway at ${Math.round(runway)} months — start fundraising conversations`,
+      message: `At current burn rate, cash will be depleted by ${getExhaustionDate(runway)}. Typical fundraise takes 3-6 months.`,
       severity: "warning",
+    };
+  }
+  if (mrrGrowth > 10) {
+    return {
+      title: `Revenue surging ${mrrGrowth.toFixed(1)}% month-over-month`,
+      message: `Exceptional growth trajectory. At this rate, you'll double revenue in ${Math.ceil(72 / mrrGrowth)} months.`,
+      severity: "info",
     };
   }
   if (mrrGrowth > 5) {
     return {
-      title: `Revenue growing ${mrrGrowth.toFixed(1)}% month-over-month`,
-      message: `Strong growth trajectory. At this rate, you're on track for significant ARR milestones.`,
+      title: `Healthy ${mrrGrowth.toFixed(1)}% MoM revenue growth`,
+      message: `Strong and sustainable growth. You're in the top quartile for early-stage startups.`,
       severity: "info",
+    };
+  }
+  if (burnRate > 0 && cash > 0 && runway >= 12) {
+    return {
+      title: `${Math.round(runway)} months of runway — solid position`,
+      message: `With $${(cash / 1000).toFixed(0)}k in the bank at $${(burnRate / 1000).toFixed(0)}k/mo burn, you have room to focus on growth.`,
+      severity: "neutral",
     };
   }
   if (burnRate > 0 && cash > 0) {
     return {
-      title: `${Math.round(runway)} months of runway at $${(burnRate / 1000).toFixed(0)}k/mo burn`,
+      title: `${Math.round(runway)} months runway at $${(burnRate / 1000).toFixed(0)}k/mo burn`,
       message: `Your financial position is stable. Focus on growth and efficiency.`,
-      severity: "info",
+      severity: "neutral",
     };
   }
   return null;

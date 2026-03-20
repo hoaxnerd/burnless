@@ -1,17 +1,40 @@
 import Link from "next/link";
-import { getCompany, getActiveScenario, getScenarios, getAccounts } from "@/lib/data";
+import {
+  getCompany,
+  getActiveScenario,
+  getScenarios,
+  getAccounts,
+  getRevenueStreams,
+  getFundingRounds,
+} from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
-import { MetricCard } from "@/components/ui";
+import { HeroKpiCard } from "./hero-kpi-card";
 import { DashboardCharts } from "./dashboard-charts";
 import { AiInsightBanner } from "./ai-insight-banner";
 import { QuickActions } from "./quick-actions";
+import { DashboardEmptyState } from "./empty-state";
+
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
   return `$${value.toFixed(0)}`;
 }
+
+function pctChange(current: number, previous: number): string | null {
+  if (previous === 0) return null;
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+/** Extract last N values from a MetricValue array for sparklines */
+function sparkline(data: Array<{ month: string; value: number }>, n = 8): number[] {
+  return data.slice(-n).map((d) => d.value);
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────────── */
 
 export default async function DashboardPage({
   searchParams,
@@ -25,27 +48,30 @@ export default async function DashboardPage({
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
-  const [data, allScenarios, accounts] = await Promise.all([
+  const [data, allScenarios, accounts, revenueStreams, fundingRounds] = await Promise.all([
     computeDashboardData(company.id, scenario.id),
     getScenarios(company.id),
     getAccounts(company.id),
+    getRevenueStreams(scenario.id),
+    getFundingRounds(company.id),
   ]);
+
   const { metrics, hasData, currentMonth } = data;
 
-  const currentMrr = metrics.mrr.find((m) => m.month === currentMonth)?.value ?? 0;
+  /* ── Current values ─────────────────────────────────────────────── */
+  const currentCash = metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? data.startingCash;
   const currentBurn = metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
   const currentRunway = metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value ?? 0;
-  const currentCash = metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? data.startingCash;
+  const currentMrr = metrics.mrr.find((m) => m.month === currentMonth)?.value ?? 0;
 
+  /* ── Previous month values (for MoM change) ────────────────────── */
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const prevMrr = metrics.mrr.find((m) => m.month === prevMonth)?.value ?? 0;
-  const mrrGrowth = prevMrr > 0 ? (((currentMrr - prevMrr) / prevMrr) * 100).toFixed(1) : null;
-  const prevBurn = metrics.netBurnRate.find((m) => m.month === prevMonth)?.value ?? 0;
-  const burnChange = prevBurn > 0 ? (((currentBurn - prevBurn) / prevBurn) * 100).toFixed(1) : null;
   const prevCash = metrics.cashPosition.find((m) => m.month === prevMonth)?.value ?? data.startingCash;
-  const cashChange = prevCash > 0 ? (((currentCash - prevCash) / prevCash) * 100).toFixed(1) : null;
+  const prevBurn = metrics.netBurnRate.find((m) => m.month === prevMonth)?.value ?? 0;
+  const prevMrr = metrics.mrr.find((m) => m.month === prevMonth)?.value ?? 0;
 
+  /* ── Chart data ─────────────────────────────────────────────────── */
   const revenueArr = seriesToArray(data.totalRevenue);
   const expensesArr = seriesToArray(data.totalExpenses);
   const revenueVsExpenses = revenueArr.map((r, i) => ({
@@ -54,7 +80,12 @@ export default async function DashboardPage({
     expenses: expensesArr[i]?.value ?? 0,
   }));
 
-  const cashData = metrics.cashPosition;
+  /* ── Context flags for empty state & quick actions ──────────────── */
+  const hasExpenses = data.totalExpenses.size > 0 && Array.from(data.totalExpenses.values()).some((v) => v > 0);
+  const hasRevenue = revenueStreams.length > 0;
+  const hasFunding = fundingRounds.length > 0;
+
+  /* ── Pinned secondary metrics ───────────────────────────────────── */
   const pinnedScenarios = allScenarios.filter((s) => !s.isDefault).slice(0, 4);
 
   return (
@@ -64,59 +95,100 @@ export default async function DashboardPage({
         <AiInsightBanner
           runway={currentRunway}
           burnRate={currentBurn}
-          mrrGrowth={mrrGrowth ? Number(mrrGrowth) : 0}
+          mrrGrowth={prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0}
           cash={currentCash}
         />
       )}
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-surface-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-surface-500">
+      {/* Header */}
+      <div className="mb-6 sm:mb-8 animate-slide-up">
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Dashboard</h1>
+        <p className="mt-1 text-sm text-surface-400">
           {company.name} &mdash; Financial command center
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <MetricCard
-          label="Cash Balance"
+      {/* Hero KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <HeroKpiCard
+          variant="cash"
+          label="Cash Position"
           value={hasData ? formatCurrency(currentCash) : "$0"}
-          change={cashChange ? `${Number(cashChange) >= 0 ? "+" : ""}${cashChange}%` : undefined}
-          description={hasData ? "Current cash position" : "Add funding to see cash"}
+          change={hasData ? pctChange(currentCash, prevCash) ?? undefined : undefined}
+          changeLabel="vs last month"
+          description={!hasData ? "Add funding to see cash" : undefined}
+          sparkData={hasData ? sparkline(metrics.cashPosition) : undefined}
+          stagger={0}
         />
-        <MetricCard
+        <HeroKpiCard
+          variant="burn"
           label="Monthly Burn"
           value={hasData ? formatCurrency(currentBurn) : "$0"}
-          change={burnChange ? `${Number(burnChange) >= 0 ? "+" : ""}${burnChange}% MoM` : undefined}
-          description={hasData ? "Net burn rate" : "Add expenses to calculate"}
+          change={hasData ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
+          changeLabel="vs last month"
+          description={!hasData ? "Add expenses to calculate" : undefined}
+          sparkData={hasData ? sparkline(metrics.netBurnRate) : undefined}
+          stagger={1}
         />
-        <MetricCard
+        <HeroKpiCard
+          variant="runway"
           label="Runway"
-          value={hasData ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- months"}
+          value={
+            hasData
+              ? currentRunway >= 999
+                ? "\u221e"
+                : `${Math.round(currentRunway)} mo`
+              : "-- mo"
+          }
           description={hasData ? "At current burn rate" : "Based on cash and burn"}
+          sparkData={
+            hasData
+              ? sparkline(
+                  metrics.cashRunwayMonths.map((m) => ({
+                    ...m,
+                    value: Math.min(m.value, 100),
+                  }))
+                )
+              : undefined
+          }
+          stagger={2}
         />
-        <MetricCard
+        <HeroKpiCard
+          variant="revenue"
           label="MRR"
           value={hasData ? formatCurrency(currentMrr) : "$0"}
-          change={mrrGrowth ? `${Number(mrrGrowth) >= 0 ? "+" : ""}${mrrGrowth}% MoM` : undefined}
-          description={hasData ? "Monthly recurring revenue" : "Add revenue streams"}
+          change={hasData && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
+          changeLabel={hasData && prevMrr > 0 ? "MoM growth" : undefined}
+          description={!hasData ? "Add revenue streams" : undefined}
+          sparkData={hasData ? sparkline(metrics.mrr) : undefined}
+          stagger={3}
         />
       </div>
 
       {!hasData ? (
-        <EmptyState />
+        <DashboardEmptyState
+          hasExpenses={hasExpenses}
+          hasRevenue={hasRevenue}
+          hasFunding={hasFunding}
+        />
       ) : (
         <>
           {/* Quick Actions */}
           <QuickActions
             scenarioId={scenario.id}
             accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+            context={{
+              hasRevenue,
+              hasMultipleScenarios: allScenarios.length > 1,
+              burnRate: currentBurn,
+              runway: currentRunway,
+            }}
           />
 
           {/* Charts */}
           <DashboardCharts
             revenueVsExpenses={revenueVsExpenses}
-            cashData={cashData}
+            cashData={metrics.cashPosition}
             burnData={metrics.netBurnRate}
             runwayData={metrics.cashRunwayMonths.map((m) => ({
               ...m,
@@ -126,27 +198,33 @@ export default async function DashboardPage({
             hasSaaS={metrics.mrr.some((m) => m.value > 0)}
           />
 
-          {/* Pinned Scenarios & Key Metrics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Bottom section: Scenarios + Key Metrics */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
             {/* Pinned Scenarios */}
             {pinnedScenarios.length > 0 && (
-              <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
+              <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-surface-900">Scenarios</h2>
-                  <Link href="/scenarios" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+                  <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
+                  <Link
+                    href="/scenarios"
+                    className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
+                  >
                     View all
                   </Link>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {pinnedScenarios.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between py-2 border-b border-surface-100 last:border-0">
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
+                    >
                       <div>
                         <p className="text-sm font-medium text-surface-900">{s.name}</p>
-                        <span className="text-xs text-surface-500">{s.type}</span>
+                        <span className="text-xs text-surface-400 capitalize">{s.type}</span>
                       </div>
                       <Link
-                        href={`/scenarios`}
-                        className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                        href="/scenarios"
+                        className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
                       >
                         View
                       </Link>
@@ -157,15 +235,34 @@ export default async function DashboardPage({
             )}
 
             {/* Key Metrics */}
-            <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-              <h2 className="text-lg font-semibold text-surface-900 mb-4">Key Metrics</h2>
-              <div className="space-y-3">
+            <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6">
+              <h2 className="text-sm font-semibold text-surface-900 mb-4">Key Metrics</h2>
+              <div className="space-y-1">
                 <MetricRow label="ARR" value={formatCurrency(currentMrr * 12)} />
-                <MetricRow label="Gross Margin" value={`${metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0}%`} />
-                <MetricRow label="Headcount" value={`${Math.round(data.headcountSeries.get(currentMonth) ?? 0)}`} />
-                <MetricRow label="Rev/Employee" value={formatCurrency(metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0)} />
-                <MetricRow label="EBITDA" value={formatCurrency(metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0)} />
-                <MetricRow label="Rule of 40" value={`${metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0}`} />
+                <MetricRow
+                  label="Gross Margin"
+                  value={`${(metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0).toFixed(1)}%`}
+                />
+                <MetricRow
+                  label="Headcount"
+                  value={`${Math.round(data.headcountSeries.get(currentMonth) ?? 0)}`}
+                />
+                <MetricRow
+                  label="Rev/Employee"
+                  value={formatCurrency(
+                    metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0
+                  )}
+                />
+                <MetricRow
+                  label="EBITDA"
+                  value={formatCurrency(
+                    metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0
+                  )}
+                />
+                <MetricRow
+                  label="Rule of 40"
+                  value={`${(metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0).toFixed(0)}`}
+                />
               </div>
             </div>
           </div>
@@ -175,46 +272,33 @@ export default async function DashboardPage({
   );
 }
 
+/* ── Supporting Components ────────────────────────────────────────────────── */
+
 function MetricRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-sm text-surface-600">{label}</span>
-      <span className="text-sm font-semibold text-surface-900">{value}</span>
+    <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3">
+      <span className="text-sm text-surface-500">{label}</span>
+      <span className="text-sm font-semibold text-surface-900 tabular-nums">{value}</span>
     </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-      <h2 className="text-lg font-semibold text-surface-900 mb-4">Get started</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ActionCard title="Add expenses" description="Track where your money goes" action="Add expenses" href="/expenses" />
-        <ActionCard title="Add revenue" description="Model your revenue streams" action="Add revenue" href="/revenue" />
-        <ActionCard title="Talk to AI" description="Let AI build your financial model" action="Start chatting" href="/ai" />
-      </div>
-    </div>
-  );
-}
-
-function ActionCard({ title, description, action, href }: {
-  title: string; description: string; action: string; href: string;
-}) {
-  return (
-    <Link href={href} className="rounded-lg border border-surface-200 p-4 hover:border-brand-300 hover:bg-brand-50/50 transition-colors">
-      <h3 className="text-sm font-semibold text-surface-900">{title}</h3>
-      <p className="mt-1 text-xs text-surface-500">{description}</p>
-      <span className="mt-3 inline-block text-xs font-medium text-brand-600">{action} &rarr;</span>
-    </Link>
   );
 }
 
 function SetupPrompt() {
   return (
-    <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-      <h3 className="text-lg font-semibold text-surface-900 mb-2">Welcome to Burnless</h3>
-      <p className="text-sm text-surface-500 mb-6">Complete onboarding to set up your company.</p>
-      <Link href="/onboarding" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors">
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-12 text-center animate-scale-in">
+      <div className="inline-flex items-center justify-center rounded-2xl bg-brand-500/10 p-4 mb-5">
+        <svg className="h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-surface-900 mb-2">Welcome to Burnless</h3>
+      <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
+        Your AI-powered financial companion. Complete onboarding to set up your company.
+      </p>
+      <Link
+        href="/onboarding"
+        className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg"
+      >
         Get started
       </Link>
     </div>
@@ -223,10 +307,20 @@ function SetupPrompt() {
 
 function NoScenarioPrompt() {
   return (
-    <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-      <h3 className="text-lg font-semibold text-surface-900 mb-2">Create Your First Scenario</h3>
-      <p className="text-sm text-surface-500 mb-6">Start modeling your business financials.</p>
-      <Link href="/scenarios/new" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors">
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-12 text-center animate-scale-in">
+      <div className="inline-flex items-center justify-center rounded-2xl bg-brand-500/10 p-4 mb-5">
+        <svg className="h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-surface-900 mb-2">Create Your First Scenario</h3>
+      <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
+        A scenario is your financial model. Start with a base case and explore alternatives.
+      </p>
+      <Link
+        href="/scenarios/new"
+        className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg"
+      >
         Create scenario
       </Link>
     </div>
