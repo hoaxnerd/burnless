@@ -6,6 +6,25 @@ import { checkRateLimit, RATE_LIMITS } from "./lib/rate-limit";
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
+ * Allowed origins for CSRF protection.
+ * In production, this should be set via NEXT_PUBLIC_APP_URL or ALLOWED_ORIGINS env var.
+ */
+function getAllowedOrigins(): Set<string> {
+  const origins = new Set<string>();
+  if (process.env.NEXT_PUBLIC_APP_URL) origins.add(new URL(process.env.NEXT_PUBLIC_APP_URL).origin);
+  if (process.env.ALLOWED_ORIGINS) {
+    process.env.ALLOWED_ORIGINS.split(",").forEach((o) => origins.add(o.trim()));
+  }
+  // Always allow localhost in development
+  if (process.env.NODE_ENV !== "production") {
+    origins.add("http://localhost:3000");
+    origins.add("http://localhost:3001");
+    origins.add("http://127.0.0.1:3000");
+  }
+  return origins;
+}
+
+/**
  * Next.js middleware for tiered rate limiting.
  *
  * Tiers:
@@ -28,6 +47,22 @@ export function middleware(request: NextRequest) {
 
   // Skip webhooks (they have their own signature verification)
   if (pathname.startsWith("/api/webhooks/")) return NextResponse.next();
+
+  // CSRF protection: verify Origin header on mutation requests
+  if (MUTATION_METHODS.has(request.method)) {
+    const origin = request.headers.get("origin");
+    const referer = request.headers.get("referer");
+    const source = origin ?? (referer ? new URL(referer).origin : null);
+    const allowed = getAllowedOrigins();
+
+    // If we have allowed origins configured and the request has an origin, verify it
+    if (allowed.size > 0 && source && !allowed.has(source)) {
+      return NextResponse.json(
+        { error: "Forbidden: invalid origin" },
+        { status: 403 }
+      );
+    }
+  }
 
   // Use forwarded IP or fallback
   const ip =
@@ -74,8 +109,11 @@ function resolveRateLimitTier(pathname: string, method: string) {
     return RATE_LIMITS.auth!;
   }
 
-  // AI chat — cost-controlled tier
+  // AI endpoints — cost-controlled tier (LLM calls are expensive)
   if (pathname.startsWith("/api/chat")) return RATE_LIMITS.chat!;
+  if (pathname.startsWith("/api/insights")) return RATE_LIMITS.ai!;
+  if (pathname.startsWith("/api/scenarios/ai-generate")) return RATE_LIMITS.ai!;
+  if (pathname.startsWith("/api/onboarding/enrich")) return RATE_LIMITS.ai!;
 
   // Import — heavy processing tier
   if (pathname.startsWith("/api/import")) return RATE_LIMITS.import!;
@@ -88,6 +126,9 @@ function resolveRateLimitTier(pathname: string, method: string) {
 function resolveTierKey(pathname: string, method: string): string {
   if (pathname.startsWith("/api/auth/")) return "auth";
   if (pathname.startsWith("/api/chat")) return "chat";
+  if (pathname.startsWith("/api/insights")) return "ai";
+  if (pathname.startsWith("/api/scenarios/ai-generate")) return "ai";
+  if (pathname.startsWith("/api/onboarding/enrich")) return "ai";
   if (pathname.startsWith("/api/import")) return "import";
   if (MUTATION_METHODS.has(method)) return "mutation";
   return "read";

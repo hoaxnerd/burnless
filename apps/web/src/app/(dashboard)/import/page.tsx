@@ -223,7 +223,8 @@ export default function ImportPage() {
     try {
       const res = await fetch("/api/imports");
       if (res.ok) {
-        setHistory(await res.json());
+        const json = await res.json();
+        setHistory(json.data ?? json);
       }
     } catch {
       // silent

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, transactions } from "@burnless/db";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, gt } from "drizzle-orm";
 import { requireCompanyAccess, parseBody, errorResponse } from "@/lib/api-helpers";
+import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 const createSchema = z.object({
   accountId: z.string(),
@@ -22,19 +23,22 @@ export async function GET(request: Request) {
   const accountId = url.searchParams.get("accountId");
   const startDate = url.searchParams.get("startDate");
   const endDate = url.searchParams.get("endDate");
+  const { limit, cursor } = parsePaginationParams(request);
 
   const conditions = [eq(transactions.companyId, ctx.companyId)];
   if (accountId) conditions.push(eq(transactions.accountId, accountId));
   if (startDate) conditions.push(gte(transactions.date, new Date(startDate)));
   if (endDate) conditions.push(lte(transactions.date, new Date(endDate)));
+  if (cursor) conditions.push(gt(transactions.id, cursor));
 
   const rows = await db
     .select()
     .from(transactions)
     .where(and(...conditions))
-    .orderBy(transactions.date);
+    .orderBy(transactions.id)
+    .limit(limit + 1);
 
-  return NextResponse.json(rows);
+  return NextResponse.json(paginatedResponse(rows, limit));
 }
 
 export async function POST(request: Request) {

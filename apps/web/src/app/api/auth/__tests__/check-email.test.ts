@@ -58,44 +58,46 @@ describe("POST /api/auth/check-email", () => {
     expect(data.exists).toBe(false);
   });
 
-  it("returns 400 for invalid email format", async () => {
+  // Anti-enumeration: invalid inputs return 200 with exists:false
+  // to prevent attackers from distinguishing invalid from nonexistent
+  it("returns 200 with exists:false for invalid email (anti-enumeration)", async () => {
     const res = await POST(jsonRequest({ email: "not-an-email" }));
     const data = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(data.error).toBe("Invalid email");
+    expect(res.status).toBe(200);
+    expect(data.exists).toBe(false);
   });
 
-  it("returns 400 for missing email field", async () => {
+  it("returns 200 with exists:false for missing email field", async () => {
     const res = await POST(jsonRequest({}));
     const data = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(data.error).toBe("Invalid email");
+    expect(res.status).toBe(200);
+    expect(data.exists).toBe(false);
   });
 
-  it("returns 400 for empty string email", async () => {
+  it("returns 200 with exists:false for empty string email", async () => {
     const res = await POST(jsonRequest({ email: "" }));
     const data = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(data.error).toBe("Invalid email");
+    expect(res.status).toBe(200);
+    expect(data.exists).toBe(false);
   });
 
-  it("returns 400 for non-string email", async () => {
+  it("returns 200 with exists:false for non-string email", async () => {
     const res = await POST(jsonRequest({ email: 12345 }));
     const data = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(data.error).toBe("Invalid email");
+    expect(res.status).toBe(200);
+    expect(data.exists).toBe(false);
   });
 
-  it("returns 400 for null body", async () => {
+  it("returns 200 with exists:false for null body", async () => {
     const res = await POST(jsonRequest(null));
     const data = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(data.error).toBe("Invalid email");
+    expect(res.status).toBe(200);
+    expect(data.exists).toBe(false);
   });
 
   it("queries database with the provided email", async () => {

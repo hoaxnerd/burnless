@@ -85,6 +85,8 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   mutation: { maxRequests: 30, windowMs: 60_000 },
   /** AI chat: 20 req/min per user */
   chat: { maxRequests: 20, windowMs: 60_000 },
+  /** AI generation (insights, scenario AI, onboarding enrich): 10 req/min */
+  ai: { maxRequests: 10, windowMs: 60_000 },
   /** Import: 5 req/min per user */
   import: { maxRequests: 5, windowMs: 60_000 },
   /** Auth (register, check-email): 5 req/min per IP — brute force protection */
