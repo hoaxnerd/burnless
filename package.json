@@ -5,6 +5,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
+    "test": "turbo test",
     "type-check": "turbo type-check",
     "db:generate": "turbo db:generate --filter=@burnless/db",
     "db:migrate": "turbo db:migrate --filter=@burnless/db",
