@@ -79,12 +79,16 @@ export function checkRateLimit(
 
 // Pre-defined rate limit configs
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
-  /** General API: 100 req/min per user */
-  api: { maxRequests: 100, windowMs: 60_000 },
+  /** Read API: 100 req/min per IP */
+  read: { maxRequests: 100, windowMs: 60_000 },
+  /** Mutation API (POST/PUT/PATCH/DELETE): 30 req/min per IP */
+  mutation: { maxRequests: 30, windowMs: 60_000 },
   /** AI chat: 20 req/min per user */
   chat: { maxRequests: 20, windowMs: 60_000 },
   /** Import: 5 req/min per user */
   import: { maxRequests: 5, windowMs: 60_000 },
-  /** Auth: 10 req/min per IP */
-  auth: { maxRequests: 10, windowMs: 60_000 },
+  /** Auth (register, check-email): 5 req/min per IP — brute force protection */
+  auth: { maxRequests: 5, windowMs: 60_000 },
+  /** Legacy alias */
+  api: { maxRequests: 100, windowMs: 60_000 },
 };

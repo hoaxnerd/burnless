@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "./lib/rate-limit";
 
+/** HTTP methods that represent mutations */
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 /**
- * Next.js middleware for rate limiting API routes.
- * Runs on the edge before route handlers.
+ * Next.js middleware for tiered rate limiting.
+ *
+ * Tiers:
+ *   auth       — 5 req/min  (brute force protection)
+ *   chat       — 20 req/min (AI cost control)
+ *   import     — 5 req/min  (heavy processing)
+ *   mutation   — 30 req/min (POST/PUT/PATCH/DELETE)
+ *   read       — 100 req/min (GET)
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -12,16 +21,13 @@ export function middleware(request: NextRequest) {
   // Only rate-limit API routes
   if (!pathname.startsWith("/api/")) return NextResponse.next();
 
-  // Skip auth callback routes (NextAuth internal)
-  if (pathname.startsWith("/api/auth/")) return NextResponse.next();
+  // Skip NextAuth session/callback internals (they have CSRF + session validation)
+  if (pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/auth/register") && !pathname.startsWith("/api/auth/check-email")) {
+    return NextResponse.next();
+  }
 
   // Skip webhooks (they have their own signature verification)
   if (pathname.startsWith("/api/webhooks/")) return NextResponse.next();
-
-  // Determine rate limit tier
-  let config = RATE_LIMITS.api!;
-  if (pathname.startsWith("/api/chat")) config = RATE_LIMITS.chat!;
-  else if (pathname.startsWith("/api/import")) config = RATE_LIMITS.import!;
 
   // Use forwarded IP or fallback
   const ip =
@@ -29,30 +35,62 @@ export function middleware(request: NextRequest) {
     request.headers.get("x-real-ip") ??
     "unknown";
 
-  const key = `${ip}:${pathname.split("/").slice(0, 4).join("/")}`;
+  // Determine rate limit tier
+  const config = resolveRateLimitTier(pathname, request.method);
+  const tierKey = resolveTierKey(pathname, request.method);
+
+  // Key groups by IP + tier + path group (prevents one endpoint from consuming another's budget)
+  const pathGroup = pathname.split("/").slice(0, 4).join("/");
+  const key = `${ip}:${tierKey}:${pathGroup}`;
+
   const result = checkRateLimit(key, config);
 
   if (!result.allowed) {
+    const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
-          "Retry-After": String(
-            Math.ceil((result.resetAt - Date.now()) / 1000)
-          ),
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(config.maxRequests),
           "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(result.resetAt / 1000)),
         },
-      }
+      },
     );
   }
 
   const response = NextResponse.next();
-  response.headers.set(
-    "X-RateLimit-Remaining",
-    String(result.remaining)
-  );
+  response.headers.set("X-RateLimit-Limit", String(config.maxRequests));
+  response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+  response.headers.set("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
   return response;
+}
+
+function resolveRateLimitTier(pathname: string, method: string) {
+  // Auth endpoints — strictest tier (brute force protection)
+  if (pathname.startsWith("/api/auth/register") || pathname.startsWith("/api/auth/check-email")) {
+    return RATE_LIMITS.auth!;
+  }
+
+  // AI chat — cost-controlled tier
+  if (pathname.startsWith("/api/chat")) return RATE_LIMITS.chat!;
+
+  // Import — heavy processing tier
+  if (pathname.startsWith("/api/import")) return RATE_LIMITS.import!;
+
+  // Mutations vs reads
+  if (MUTATION_METHODS.has(method)) return RATE_LIMITS.mutation!;
+  return RATE_LIMITS.read!;
+}
+
+function resolveTierKey(pathname: string, method: string): string {
+  if (pathname.startsWith("/api/auth/")) return "auth";
+  if (pathname.startsWith("/api/chat")) return "chat";
+  if (pathname.startsWith("/api/import")) return "import";
+  if (MUTATION_METHODS.has(method)) return "mutation";
+  return "read";
 }
 
 export const config = {

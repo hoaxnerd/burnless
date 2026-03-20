@@ -78,8 +78,12 @@ describe("rate-limit", () => {
   });
 
   describe("RATE_LIMITS presets", () => {
-    it("has api config: 100 req/min", () => {
-      expect(RATE_LIMITS.api).toEqual({ maxRequests: 100, windowMs: 60000 });
+    it("has read config: 100 req/min", () => {
+      expect(RATE_LIMITS.read).toEqual({ maxRequests: 100, windowMs: 60000 });
+    });
+
+    it("has mutation config: 30 req/min", () => {
+      expect(RATE_LIMITS.mutation).toEqual({ maxRequests: 30, windowMs: 60000 });
     });
 
     it("has chat config: 20 req/min", () => {
@@ -90,8 +94,12 @@ describe("rate-limit", () => {
       expect(RATE_LIMITS.import).toEqual({ maxRequests: 5, windowMs: 60000 });
     });
 
-    it("has auth config: 10 req/min", () => {
-      expect(RATE_LIMITS.auth).toEqual({ maxRequests: 10, windowMs: 60000 });
+    it("has auth config: 5 req/min (brute force protection)", () => {
+      expect(RATE_LIMITS.auth).toEqual({ maxRequests: 5, windowMs: 60000 });
+    });
+
+    it("has api legacy alias: 100 req/min", () => {
+      expect(RATE_LIMITS.api).toEqual({ maxRequests: 100, windowMs: 60000 });
     });
   });
 });
