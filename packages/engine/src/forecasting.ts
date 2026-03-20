@@ -18,6 +18,7 @@ import {
   round2,
   isActiveInMonth,
 } from "./utils";
+import { D, dPow, dRound2 } from "./decimal";
 import {
   evaluateFormula,
   evaluateSimpleExpression as _evaluateSimpleExpression,
@@ -140,14 +141,14 @@ function computeMonthValue(
 
     case "growth_rate": {
       const p = params as unknown as GrowthRateParams;
-      return p.baseAmount * Math.pow(1 + p.monthlyGrowthRate, monthsElapsed);
+      return D(p.baseAmount).mul(dPow(D(1).plus(p.monthlyGrowthRate), monthsElapsed)).toNumber();
     }
 
     case "per_unit": {
       const p = params as unknown as PerUnitParams;
-      const units = p.units * Math.pow(1 + (p.unitGrowthRate ?? 0), monthsElapsed);
-      const price = p.pricePerUnit * Math.pow(1 + (p.priceGrowthRate ?? 0), monthsElapsed);
-      return units * price;
+      const units = D(p.units).mul(dPow(D(1).plus(p.unitGrowthRate ?? 0), monthsElapsed));
+      const price = D(p.pricePerUnit).mul(dPow(D(1).plus(p.priceGrowthRate ?? 0), monthsElapsed));
+      return units.mul(price).toNumber();
     }
 
     case "percentage_of": {
@@ -156,7 +157,7 @@ function computeMonthValue(
       const sourceSeries = resolvedLines.get(p.sourceLineId);
       if (!sourceSeries) return 0;
       const sourceValue = sourceSeries.get(currentMonthKey) ?? 0;
-      return sourceValue * p.percentage;
+      return D(sourceValue).mul(p.percentage).toNumber();
     }
 
     case "custom_formula": {
@@ -275,7 +276,7 @@ export function aggregateByAccount(
     const existing = byAccount.get(line.accountId);
     if (existing) {
       for (const [k, v] of values) {
-        existing.set(k, (existing.get(k) ?? 0) + v);
+        existing.set(k, D(existing.get(k) ?? 0).plus(v).toNumber());
       }
     } else {
       byAccount.set(line.accountId, new Map(values));

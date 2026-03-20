@@ -1,5 +1,9 @@
 // @burnless/engine — Pure TypeScript financial calculation library
 // No database dependencies. Takes typed inputs, returns typed outputs.
+// All monetary arithmetic uses Decimal.js internally for precision.
+
+// Decimal utilities (for consumers who need precise arithmetic)
+export { D, dRound2, dSum, dMul, dDiv, dAdd, dSub, dPow, Decimal } from "./decimal";
 
 // Utilities
 export {

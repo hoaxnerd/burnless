@@ -18,6 +18,7 @@ import {
   proratedFraction,
   addSeries,
 } from "./utils";
+import { D, dRound2 } from "./decimal";
 
 // ── Headcount calculation results ────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ export function computeHeadcountPlanCost(
   const benefits: MonthlySeries = new Map();
   const headcount: MonthlySeries = new Map();
 
-  const monthlySalary = plan.salary / 12;
+  const monthlySalary = D(plan.salary).div(12);
 
   for (const month of months) {
     const key = monthKey(month);
@@ -73,12 +74,12 @@ export function computeHeadcountPlanCost(
     }
 
     const proration = proratedFraction(month, plan.startDate, plan.endDate);
-    const salaryAmount = round2(monthlySalary * plan.count * proration);
-    const benefitsAmount = round2(salaryAmount * plan.benefitsRate);
+    const salaryAmount = dRound2(monthlySalary.mul(plan.count).mul(proration));
+    const benefitsAmount = dRound2(D(salaryAmount).mul(plan.benefitsRate));
 
     salary.set(key, salaryAmount);
     benefits.set(key, benefitsAmount);
-    headcount.set(key, round2(plan.count * proration));
+    headcount.set(key, dRound2(D(plan.count).mul(proration)));
   }
 
   return { salary, benefits, headcount };

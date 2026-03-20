@@ -13,6 +13,7 @@ import {
   subtractSeries,
   seriesToArray,
 } from "./utils";
+import { D, dRound2 } from "./decimal";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,11 +207,11 @@ function computeMargin(
   ).sort();
 
   for (const key of sortedKeys) {
-    const num = numerator.get(key) ?? 0;
-    const den = denominator.get(key) ?? 0;
+    const num = D(numerator.get(key) ?? 0);
+    const den = D(denominator.get(key) ?? 0);
     result.push({
       month: key,
-      value: den !== 0 ? round2((num / den) * 100) : 0,
+      value: den.isZero() ? 0 : dRound2(num.div(den).mul(100)),
     });
   }
 
@@ -222,12 +223,12 @@ function cumulativeSeries(
   startingBalance: number
 ): MonthlySeries {
   const result: MonthlySeries = new Map();
-  let running = startingBalance;
+  let running = D(startingBalance);
 
   const sortedKeys = Array.from(changes.keys()).sort();
   for (const key of sortedKeys) {
-    running += changes.get(key) ?? 0;
-    result.set(key, round2(running));
+    running = running.plus(changes.get(key) ?? 0);
+    result.set(key, dRound2(running));
   }
 
   return result;

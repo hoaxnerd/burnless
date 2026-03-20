@@ -7,6 +7,7 @@
  */
 
 import { type MonthlySeries, round2, seriesToArray } from "./utils";
+import { D, dRound2, dAbs } from "./decimal";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,20 +63,21 @@ export function computeBudgetVsActuals(
     const favorable: { month: string; value: boolean }[] = [];
 
     for (const month of allMonths) {
-      const bVal = account.budgetValues.get(month) ?? 0;
-      const aVal = account.actualValues.get(month) ?? 0;
-      const diff = round2(aVal - bVal);
+      const bVal = D(account.budgetValues.get(month) ?? 0);
+      const aVal = D(account.actualValues.get(month) ?? 0);
+      const diff = aVal.minus(bVal);
+      const diffRounded = dRound2(diff);
 
       // For revenue: actual > budget is favorable
       // For expenses: actual < budget is favorable
-      const isFavorable = account.isRevenue ? diff > 0 : diff < 0;
+      const isFavorable = account.isRevenue ? diff.gt(0) : diff.lt(0);
 
-      budget.push({ month, value: round2(bVal) });
-      actual.push({ month, value: round2(aVal) });
-      variance.push({ month, value: diff });
+      budget.push({ month, value: dRound2(bVal) });
+      actual.push({ month, value: dRound2(aVal) });
+      variance.push({ month, value: diffRounded });
       variancePercent.push({
         month,
-        value: bVal !== 0 ? round2((diff / Math.abs(bVal)) * 100) : 0,
+        value: !bVal.isZero() ? dRound2(diff.div(dAbs(bVal)).mul(100)) : 0,
       });
       favorable.push({ month, value: isFavorable });
 
@@ -83,11 +85,11 @@ export function computeBudgetVsActuals(
       const sign = account.isRevenue ? 1 : -1;
       totalBudgetSeries.set(
         month,
-        (totalBudgetSeries.get(month) ?? 0) + bVal * sign
+        D(totalBudgetSeries.get(month) ?? 0).plus(bVal.mul(sign)).toNumber()
       );
       totalActualSeries.set(
         month,
-        (totalActualSeries.get(month) ?? 0) + aVal * sign
+        D(totalActualSeries.get(month) ?? 0).plus(aVal.mul(sign)).toNumber()
       );
     }
 
@@ -108,7 +110,7 @@ export function computeBudgetVsActuals(
   const totalActual = seriesToArray(totalActualSeries);
   const totalVariance = totalBudget.map((b, i) => ({
     month: b.month,
-    value: round2((totalActual[i]?.value ?? 0) - b.value),
+    value: dRound2(D(totalActual[i]?.value ?? 0).minus(b.value)),
   }));
 
   return { lineItems, totalBudget, totalActual, totalVariance };
