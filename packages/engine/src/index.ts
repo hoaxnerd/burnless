@@ -18,10 +18,17 @@ export {
   type MonthlySeries,
 } from "./utils";
 
+// Dependency graph
+export {
+  DependencyGraph,
+  CircularDependencyError,
+} from "./dag";
+
 // Forecasting
 export {
   computeForecastLine,
   computeAllForecastLines,
+  buildForecastDependencyGraph,
   aggregateByAccount,
   evaluateSimpleExpression,
   type ForecastLineInput,
@@ -69,9 +76,11 @@ export {
 // Metrics calculator
 export {
   computeAllMetrics,
+  computeCustomMetrics,
   type MetricsInput,
   type MetricValue,
   type ComputedMetrics,
+  type CustomMetricDefinition,
 } from "./metrics";
 
 // Scenario comparison

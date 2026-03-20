@@ -14,6 +14,7 @@
  */
 
 import type { SubscriptionDetail } from "./revenue";
+import { DependencyGraph, CircularDependencyError } from "./dag";
 import { type MonthlySeries, round2, seriesToArray } from "./utils";
 
 // ── Input types ──────────────────────────────────────────────────────────────
@@ -151,6 +152,19 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     value: subDetails.get(m)?.churnedCustomers ?? 0,
   }));
 
+  // Profitability (computed early — needed by LTV and CAC Payback)
+  const grossProfit = months.map((m) => {
+    const rev = input.revenue.get(m) ?? 0;
+    const cog = input.cogs.get(m) ?? 0;
+    return { month: m, value: round2(rev - cog) };
+  });
+
+  const grossMarginPercent = months.map((m, i) => {
+    const rev = input.revenue.get(m) ?? 0;
+    if (rev === 0) return { month: m, value: 0 };
+    return { month: m, value: round2(((grossProfit[i]?.value ?? 0) / rev) * 100) };
+  });
+
   // SaaS metrics
   const customerChurnRate = months.map((m) => {
     const d = subDetails.get(m);
@@ -164,18 +178,20 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: round2((d.churnedMrr / (d.mrr + d.churnedMrr)) * 100) };
   });
 
-  // LTV = ARPA / monthly churn rate
+  // ARPA = MRR / customers
   const arpa = months.map((m) => {
     const d = subDetails.get(m);
     if (!d || d.customers === 0) return { month: m, value: 0 };
     return { month: m, value: round2(d.mrr / d.customers) };
   });
 
+  // LTV = (ARPA × Gross Margin%) / Revenue Churn Rate
   const ltv = months.map((m, i) => {
     const arpaVal = arpa[i]?.value ?? 0;
-    const churnPct = (customerChurnRate[i]?.value ?? 0) / 100;
-    if (churnPct === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(arpaVal / churnPct) };
+    const gmFraction = (grossMarginPercent[i]?.value ?? 0) / 100;
+    const revChurnFraction = (revenueChurnRate[i]?.value ?? 0) / 100;
+    if (revChurnFraction === 0) return { month: m, value: 0 };
+    return { month: m, value: round2((arpaVal * gmFraction) / revChurnFraction) };
   });
 
   // CAC
@@ -192,10 +208,13 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: round2((ltv[i]?.value ?? 0) / cacVal) };
   });
 
+  // CAC Payback = CAC / (ARPA × Gross Margin%)
   const cacPaybackMonths = months.map((m, i) => {
     const arpaVal = arpa[i]?.value ?? 0;
-    if (arpaVal === 0) return { month: m, value: 0 };
-    return { month: m, value: round2((cac[i]?.value ?? 0) / arpaVal) };
+    const gmFraction = (grossMarginPercent[i]?.value ?? 0) / 100;
+    const monthlyGrossPerCustomer = arpaVal * gmFraction;
+    if (monthlyGrossPerCustomer === 0) return { month: m, value: 0 };
+    return { month: m, value: round2((cac[i]?.value ?? 0) / monthlyGrossPerCustomer) };
   });
 
   // SaaS Quick Ratio = (New MRR + Expansion MRR) / (Churned MRR + Contraction MRR)
@@ -244,19 +263,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: round2(cash / burn) };
   });
 
-  // Profitability
-  const grossProfit = months.map((m) => {
-    const rev = input.revenue.get(m) ?? 0;
-    const cog = input.cogs.get(m) ?? 0;
-    return { month: m, value: round2(rev - cog) };
-  });
-
-  const grossMarginPercent = months.map((m, i) => {
-    const rev = input.revenue.get(m) ?? 0;
-    if (rev === 0) return { month: m, value: 0 };
-    return { month: m, value: round2(((grossProfit[i]?.value ?? 0) / rev) * 100) };
-  });
-
+  // Operating income (grossProfit and grossMarginPercent already computed above)
   const operatingIncome = months.map((m) => {
     const gp = grossProfit.find((g) => g.month === m)?.value ?? 0;
     const opex = input.operatingExpenses.get(m) ?? 0;
@@ -358,4 +365,92 @@ function computeGrowthRate(values: MetricValue[]): MetricValue[] {
     const growth = ((v.value - prev.value) / prev.value) * 100;
     return { month: v.month, value: round2(growth) };
   });
+}
+
+// ── Custom metric definitions (user-created formulas) ────────────────────────
+
+/** A user-defined custom metric with a formula referencing other metrics. */
+export interface CustomMetricDefinition {
+  /** Unique identifier for this metric */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** IDs of metrics this formula depends on (keys in ComputedMetrics or other custom metric IDs) */
+  dependsOn: string[];
+  /**
+   * Compute function: receives the resolved metric values for each dependency,
+   * plus the months array, and returns the computed values for this metric.
+   */
+  compute: (
+    deps: Map<string, MetricValue[]>,
+    months: string[]
+  ) => MetricValue[];
+}
+
+/**
+ * Compute custom metrics in dependency order using a DAG.
+ *
+ * Takes the already-computed built-in metrics and a set of user-defined custom
+ * metric definitions. Returns a map of custom metric ID → MetricValue[].
+ *
+ * Throws CircularDependencyError if custom metrics form a cycle.
+ */
+export function computeCustomMetrics(
+  builtInMetrics: ComputedMetrics,
+  customDefinitions: CustomMetricDefinition[],
+  months: string[]
+): Map<string, MetricValue[]> {
+  if (customDefinitions.length === 0) return new Map();
+
+  // Index built-in metrics by name
+  const builtInMap = new Map<string, MetricValue[]>();
+  for (const [key, values] of Object.entries(builtInMetrics)) {
+    if (Array.isArray(values)) {
+      builtInMap.set(key, values as MetricValue[]);
+    }
+  }
+
+  // Build dependency graph for custom metrics
+  const graph = new DependencyGraph();
+  const customIds = new Set(customDefinitions.map((d) => d.id));
+  const defMap = new Map<string, CustomMetricDefinition>();
+
+  for (const def of customDefinitions) {
+    defMap.set(def.id, def);
+    graph.addNode(def.id);
+
+    for (const depId of def.dependsOn) {
+      // Only add graph edges for dependencies on OTHER custom metrics
+      // Built-in metrics are always available (no ordering needed)
+      if (customIds.has(depId)) {
+        graph.addDependency(def.id, depId);
+      } else if (!builtInMap.has(depId)) {
+        throw new Error(
+          `Custom metric "${def.id}" depends on unknown metric "${depId}"`
+        );
+      }
+    }
+  }
+
+  // Topological sort — throws CircularDependencyError on cycles
+  const order = graph.topologicalSort();
+
+  // Compute in order
+  const resolved = new Map<string, MetricValue[]>();
+
+  for (const id of order) {
+    const def = defMap.get(id);
+    if (!def) continue;
+
+    // Gather dependencies
+    const deps = new Map<string, MetricValue[]>();
+    for (const depId of def.dependsOn) {
+      const values = resolved.get(depId) ?? builtInMap.get(depId);
+      if (values) deps.set(depId, values);
+    }
+
+    resolved.set(id, def.compute(deps, months));
+  }
+
+  return resolved;
 }

@@ -10,6 +10,7 @@
  */
 
 import type { ForecastMethod } from "@burnless/types";
+import { DependencyGraph, CircularDependencyError } from "./dag";
 import {
   type MonthlySeries,
   monthRange,
@@ -17,6 +18,14 @@ import {
   round2,
   isActiveInMonth,
 } from "./utils";
+import {
+  evaluateFormula,
+  evaluateSimpleExpression as _evaluateSimpleExpression,
+  type FormulaContext,
+} from "./formula";
+
+// Re-export the mathjs-based evaluateSimpleExpression for backward compatibility
+export { evaluateSimpleExpression } from "./formula";
 
 // ── Parameter types for each forecast method ─────────────────────────────────
 
@@ -73,10 +82,11 @@ export function computeForecastLine(
   line: ForecastLineInput,
   periodStart: Date,
   periodEnd: Date,
-  /** Resolved values from other lines, needed for percentage_of method */
+  /** Resolved values from other lines, needed for percentage_of and custom_formula methods */
   resolvedLines?: Map<string, MonthlySeries>
 ): MonthlySeries {
   const months = monthRange(periodStart, periodEnd);
+  const allMonthKeys = months.map(monthKey);
   const series: MonthlySeries = new Map();
 
   for (let i = 0; i < months.length; i++) {
@@ -105,7 +115,8 @@ export function computeForecastLine(
       line.parameters,
       monthsElapsed,
       key,
-      resolvedLines
+      resolvedLines,
+      allMonthKeys
     );
     series.set(key, round2(value));
   }
@@ -161,29 +172,37 @@ function computeMonthValue(
 }
 
 /**
- * Compute all forecast lines for a scenario, handling dependencies (percentage_of).
+ * Compute all forecast lines for a scenario, handling dependencies.
+ * Uses a dependency DAG to resolve arbitrarily deep chains and detect cycles.
+ *
+ * Dependency sources:
+ * - percentage_of: references sourceLineId
+ * - custom_formula: may reference other line IDs via variables
+ *
  * Returns a map of line ID -> monthly series.
+ * Throws CircularDependencyError if lines form a cycle.
  */
 export function computeAllForecastLines(
   lines: ForecastLineInput[],
   periodStart: Date,
   periodEnd: Date
 ): Map<string, MonthlySeries> {
-  const resolved = new Map<string, MonthlySeries>();
-
-  // First pass: compute all non-dependent lines
-  const dependent: ForecastLineInput[] = [];
+  const lineMap = new Map<string, ForecastLineInput>();
   for (const line of lines) {
-    if (line.method === "percentage_of") {
-      dependent.push(line);
-    } else {
-      resolved.set(line.id, computeForecastLine(line, periodStart, periodEnd));
-    }
+    lineMap.set(line.id, line);
   }
 
-  // Second pass: compute dependent lines (percentage_of)
-  // Simple two-pass resolves single-level dependencies
-  for (const line of dependent) {
+  // Build dependency graph
+  const graph = buildForecastDependencyGraph(lines);
+
+  // Topological sort — throws CircularDependencyError on cycles
+  const order = graph.topologicalSort();
+
+  // Compute in dependency order
+  const resolved = new Map<string, MonthlySeries>();
+  for (const id of order) {
+    const line = lineMap.get(id);
+    if (!line) continue; // node existed in graph but not in lines (shouldn't happen)
     resolved.set(
       line.id,
       computeForecastLine(line, periodStart, periodEnd, resolved)
@@ -191,6 +210,44 @@ export function computeAllForecastLines(
   }
 
   return resolved;
+}
+
+/**
+ * Build a dependency graph from forecast line definitions.
+ * Extracts dependencies from percentage_of sourceLineId and custom_formula variables.
+ */
+export function buildForecastDependencyGraph(
+  lines: ForecastLineInput[]
+): DependencyGraph {
+  const graph = new DependencyGraph();
+  const lineIds = new Set(lines.map((l) => l.id));
+
+  for (const line of lines) {
+    graph.addNode(line.id);
+
+    if (line.method === "percentage_of") {
+      const params = line.parameters as unknown as PercentageOfParams;
+      if (params.sourceLineId && lineIds.has(params.sourceLineId)) {
+        graph.addDependency(line.id, params.sourceLineId);
+      }
+    }
+
+    if (line.method === "custom_formula") {
+      const params = line.parameters as unknown as CustomFormulaParams;
+      // Variables that reference other line IDs create dependencies
+      if (params.variables) {
+        for (const varValue of Object.values(params.variables)) {
+          // If a variable name matches a line ID, it's a dependency
+          // (numeric values are constants, not references)
+          if (typeof varValue === "string" && lineIds.has(varValue)) {
+            graph.addDependency(line.id, varValue);
+          }
+        }
+      }
+    }
+  }
+
+  return graph;
 }
 
 /**
@@ -220,17 +277,19 @@ export function aggregateByAccount(
   return byAccount;
 }
 
-// ── Simple expression evaluator ──────────────────────────────────────────────
+// ── Safe expression evaluator (recursive-descent parser) ─────────────────────
 
 /**
  * Evaluate a simple mathematical expression with named variables.
  * Supports: +, -, *, /, parentheses, numbers, and variable names.
- * NOT a full-blown formula engine — just enough for custom forecast formulas.
+ * Uses a safe recursive-descent parser — no eval() or new Function().
  */
 export function evaluateSimpleExpression(
   expr: string,
   vars: Record<string, number> = {}
 ): number {
+  if (!expr || !expr.trim()) return 0;
+
   // Replace variable names with values
   let resolved = expr;
   for (const [name, value] of Object.entries(vars)) {
@@ -239,13 +298,12 @@ export function evaluateSimpleExpression(
 
   // Validate: only allow numbers, operators, parentheses, whitespace, dots
   if (!/^[\d\s+\-*/().]+$/.test(resolved)) {
-    return 0; // invalid expression
+    return 0; // invalid expression — contains disallowed characters
   }
 
   try {
-    // Use Function constructor for safe math evaluation (no access to global scope)
-    const fn = new Function(`"use strict"; return (${resolved});`);
-    const result = fn();
+    const parser = new ExprParser(resolved.trim());
+    const result = parser.parse();
     return typeof result === "number" && isFinite(result) ? result : 0;
   } catch {
     return 0;
@@ -254,4 +312,98 @@ export function evaluateSimpleExpression(
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Recursive-descent parser for arithmetic expressions. */
+class ExprParser {
+  private pos = 0;
+
+  constructor(private readonly expr: string) {}
+
+  /** Parse the full expression, error if trailing characters remain. */
+  parse(): number {
+    const result = this.parseAddSub();
+    this.skipWs();
+    if (this.pos < this.expr.length) {
+      throw new Error(`Unexpected character at position ${this.pos}`);
+    }
+    return result;
+  }
+
+  /** Addition / subtraction (lowest precedence). */
+  private parseAddSub(): number {
+    let left = this.parseMulDiv();
+    this.skipWs();
+    while (this.pos < this.expr.length && (this.peek() === "+" || this.peek() === "-")) {
+      const op = this.advance();
+      const right = this.parseMulDiv();
+      left = op === "+" ? left + right : left - right;
+      this.skipWs();
+    }
+    return left;
+  }
+
+  /** Multiplication / division. */
+  private parseMulDiv(): number {
+    let left = this.parseUnary();
+    this.skipWs();
+    while (this.pos < this.expr.length && (this.peek() === "*" || this.peek() === "/")) {
+      const op = this.advance();
+      const right = this.parseUnary();
+      left = op === "*" ? left * right : left / right;
+      this.skipWs();
+    }
+    return left;
+  }
+
+  /** Unary minus / plus, parentheses, numbers (highest precedence). */
+  private parseUnary(): number {
+    this.skipWs();
+    if (this.peek() === "-") {
+      this.advance();
+      return -this.parseUnary();
+    }
+    if (this.peek() === "+") {
+      this.advance();
+      return this.parseUnary();
+    }
+    return this.parseAtom();
+  }
+
+  /** Parenthesized expression or number literal. */
+  private parseAtom(): number {
+    this.skipWs();
+    if (this.peek() === "(") {
+      this.advance();
+      const val = this.parseAddSub();
+      this.skipWs();
+      if (this.peek() !== ")") throw new Error("Missing closing parenthesis");
+      this.advance();
+      return val;
+    }
+    return this.parseNumber();
+  }
+
+  /** Parse a numeric literal (integer or decimal). */
+  private parseNumber(): number {
+    this.skipWs();
+    const start = this.pos;
+    while (this.pos < this.expr.length && /[\d.]/.test(this.expr[this.pos]!)) {
+      this.pos++;
+    }
+    if (this.pos === start) throw new Error(`Expected number at position ${this.pos}`);
+    return parseFloat(this.expr.slice(start, this.pos));
+  }
+
+  private skipWs(): void {
+    while (this.pos < this.expr.length && this.expr[this.pos] === " ") this.pos++;
+  }
+
+  private peek(): string {
+    return this.expr[this.pos] ?? "";
+  }
+
+  private advance(): string {
+    return this.expr[this.pos++] ?? "";
+  }
 }
