@@ -85,6 +85,23 @@ export const env = {
     return !!this.STRIPE_SECRET_KEY;
   },
 
+  /** Razorpay credentials (optional — enables INR/UPI billing) */
+  RAZORPAY_KEY_ID: optional("RAZORPAY_KEY_ID"),
+  RAZORPAY_KEY_SECRET: optional("RAZORPAY_KEY_SECRET"),
+  RAZORPAY_WEBHOOK_SECRET: optional("RAZORPAY_WEBHOOK_SECRET"),
+  RAZORPAY_PRO_PLAN_ID: optional("RAZORPAY_PRO_PLAN_ID"),
+  RAZORPAY_TEAM_PLAN_ID: optional("RAZORPAY_TEAM_PLAN_ID"),
+
+  /** Whether Razorpay is configured */
+  get hasRazorpay(): boolean {
+    return !!(this.RAZORPAY_KEY_ID && this.RAZORPAY_KEY_SECRET);
+  },
+
+  /** Whether any billing provider is configured */
+  get hasBilling(): boolean {
+    return this.hasStripe || this.hasRazorpay;
+  },
+
   // ── Monitoring ─────────────────────────────────────────────────────────
   /** Sentry DSN for error monitoring (public — safe to expose in client bundles) */
   SENTRY_DSN: optional("NEXT_PUBLIC_SENTRY_DSN"),

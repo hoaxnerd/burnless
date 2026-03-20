@@ -219,6 +219,7 @@ export const companies = pgTable("companies", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
+  billingProvider: text("billing_provider"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePlan: text("stripe_plan").default("free"),

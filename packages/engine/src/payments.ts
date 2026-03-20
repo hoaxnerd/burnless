@@ -66,6 +66,12 @@ export interface PaymentProvider {
   getSubscription(id: string): Promise<PaymentSubscription | null>;
   cancelSubscription(id: string, atPeriodEnd?: boolean): Promise<void>;
 
+  /** Undo a scheduled cancellation (reactivate). */
+  reactivateSubscription(id: string): Promise<void>;
+
+  /** Open a self-service billing portal. Returns null if provider has no portal concept. */
+  createPortalSession(customerId: string, returnUrl: string): Promise<{ url: string } | null>;
+
   /** Handle a webhook event from the provider. Returns the event type and payload. */
   handleWebhook(payload: string | Buffer, signature: string): Promise<{
     type: string;
@@ -148,6 +154,20 @@ export class StripePaymentProvider implements PaymentProvider {
     } else {
       await stripe.subscriptions.cancel(id);
     }
+  }
+
+  async reactivateSubscription(id: string): Promise<void> {
+    const stripe = await this.getStripe();
+    await stripe.subscriptions.update(id, { cancel_at_period_end: false });
+  }
+
+  async createPortalSession(customerId: string, returnUrl: string): Promise<{ url: string }> {
+    const stripe = await this.getStripe();
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+    return { url: session.url };
   }
 
   async handleWebhook(payload: string | Buffer, signature: string) {
@@ -238,6 +258,17 @@ export class RazorpayPaymentProvider implements PaymentProvider {
   async cancelSubscription(id: string): Promise<void> {
     const rz = await this.getRazorpay();
     await rz.subscriptions.cancel(id);
+  }
+
+  async reactivateSubscription(id: string): Promise<void> {
+    // Razorpay does not support reactivation — cancelled subscriptions must be recreated
+    const rz = await this.getRazorpay();
+    await rz.subscriptions.resume(id);
+  }
+
+  async createPortalSession(): Promise<null> {
+    // Razorpay has no self-service portal equivalent
+    return null;
   }
 
   async handleWebhook(payload: string | Buffer, signature: string) {
