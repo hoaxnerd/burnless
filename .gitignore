@@ -30,6 +30,9 @@ npm-debug.log*
 
 # Testing
 coverage/
+e2e/test-results/
+playwright-report/
+blob-report/
 
 # Generated
 .contentlayer/
