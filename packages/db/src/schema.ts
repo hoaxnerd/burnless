@@ -621,6 +621,7 @@ export const aiFeatureFlags = pgTable(
         insights: true,
         uiPersonalization: true,
         autoCategorization: true,
+        weeklyDigest: true,
       }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
@@ -741,6 +742,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   aiFeatureFlags: many(aiFeatureFlags),
   aiConversations: many(aiConversations),
   aiInsightCache: many(aiInsightCache),
+  weeklyDigests: many(weeklyDigests),
 }));
 
 export const companyMembersRelations = relations(companyMembers, ({ one }) => ({
@@ -912,6 +914,41 @@ export const aiMessagesRelations = relations(aiMessages, ({ one }) => ({
   conversation: one(aiConversations, {
     fields: [aiMessages.conversationId],
     references: [aiConversations.id],
+  }),
+}));
+
+// ── Weekly Digests (Monday Morning CFO) ─────────────────────────────────
+
+export const weeklyDigests = pgTable(
+  "weekly_digests",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    weekStart: timestamp("week_start", { mode: "date" }).notNull(),
+    metrics: jsonb("metrics").notNull(),
+    narrative: text("narrative"),
+    deterministicSummary: text("deterministic_summary").notNull(),
+    emailSentAt: timestamp("email_sent_at", { mode: "date" }),
+    dismissedAt: timestamp("dismissed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("weekly_digests_company_idx").on(table.companyId),
+    uniqueIndex("weekly_digests_company_week_idx").on(
+      table.companyId,
+      table.weekStart
+    ),
+  ]
+);
+
+export const weeklyDigestsRelations = relations(weeklyDigests, ({ one }) => ({
+  company: one(companies, {
+    fields: [weeklyDigests.companyId],
+    references: [companies.id],
   }),
 }));
 

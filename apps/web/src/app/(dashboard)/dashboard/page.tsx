@@ -15,6 +15,7 @@ import { AiInsightBanner } from "./ai-insight-banner";
 import { QuickActions } from "./quick-actions";
 import { PinnedInsights } from "./pinned-insights";
 import { DashboardEmptyState } from "./empty-state";
+import { WeeklyDigestBanner } from "./weekly-digest-banner";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -91,6 +92,9 @@ export default async function DashboardPage({
 
   return (
     <div>
+      {/* Monday Morning CFO Digest */}
+      {hasData && <WeeklyDigestBanner />}
+
       {/* AI Insight Banner */}
       {hasData && (
         <AiInsightBanner

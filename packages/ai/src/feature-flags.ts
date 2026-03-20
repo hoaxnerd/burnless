@@ -13,7 +13,8 @@ export type AiFeatureName =
   | "chat"
   | "insights"
   | "uiPersonalization"
-  | "autoCategorization";
+  | "autoCategorization"
+  | "weeklyDigest";
 
 export type AiDataMode = "full" | "show_cached" | "hide_all";
 
@@ -23,6 +24,7 @@ export interface AiFeatureConfig {
   insights: boolean;
   uiPersonalization: boolean;
   autoCategorization: boolean;
+  weeklyDigest: boolean;
 }
 
 export interface AiFeatureFlagsState {
@@ -48,6 +50,7 @@ export const DEFAULT_AI_FLAGS: AiFeatureFlagsState = {
     insights: true,
     uiPersonalization: true,
     autoCategorization: true,
+    weeklyDigest: true,
   },
 };
 
@@ -84,6 +87,11 @@ export const AI_FEATURE_LIST: AiFeatureMeta[] = [
     name: "autoCategorization",
     label: "Auto-Categorization",
     description: "AI-powered transaction categorization",
+  },
+  {
+    name: "weeklyDigest",
+    label: "Monday Morning CFO",
+    description: "Weekly AI-generated financial digest email and in-app summary",
   },
 ];
 
