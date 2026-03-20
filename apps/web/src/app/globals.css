@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  /* Burnless color system */
-  --color-brand-50: #eef7ff;
-  --color-brand-100: #d9ecff;
-  --color-brand-200: #bcddff;
-  --color-brand-300: #8ec8ff;
-  --color-brand-400: #59a8ff;
-  --color-brand-500: #3385ff;
-  --color-brand-600: #1b64f5;
-  --color-brand-700: #144ee1;
-  --color-brand-800: #1740b6;
-  --color-brand-900: #193a8f;
-  --color-brand-950: #142557;
+  /* ── Burnless Color System ─────────────────────────────────────────────── */
 
-  --color-surface-0: #ffffff;
-  --color-surface-50: #f9fafb;
-  --color-surface-100: #f3f4f6;
+  /* Brand — Electric Blue (our signature) */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Surfaces — Light mode (never pure white/black) */
+  --color-surface-0: #fafbfc;
+  --color-surface-50: #f8f9fa;
+  --color-surface-100: #f1f3f5;
   --color-surface-200: #e5e7eb;
   --color-surface-300: #d1d5db;
   --color-surface-400: #9ca3af;
@@ -25,12 +28,36 @@
   --color-surface-700: #374151;
   --color-surface-800: #1f2937;
   --color-surface-900: #111827;
-  --color-surface-950: #030712;
+  --color-surface-950: #0a0e1a;
 
+  /* Semantic colors */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-950: #022c22;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-950: #451a03;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-950: #450a0a;
+
+  --color-info: #3b82f6;
+
+  /* Legacy aliases for existing code */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-  --color-info: #3b82f6;
 
   /* Semantic tokens — light mode defaults */
   --color-bg: var(--color-surface-0);
@@ -39,30 +66,41 @@
   --color-text-secondary: var(--color-surface-500);
   --color-border: var(--color-surface-200);
 
-  /* Typography */
+  /* ── Typography ────────────────────────────────────────────────────────── */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Spacing */
+  /* ── Border Radius ─────────────────────────────────────────────────────── */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04);
+
+  /* ── Animation ─────────────────────────────────────────────────────────── */
+  --ease-smooth: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-page: 400ms;
 }
 
-/* Dark mode — swap surface palette for dark equivalents */
+/* ── Dark Mode ─────────────────────────────────────────────────────────────── */
 .dark {
-  --color-surface-0: #0f1117;
-  --color-surface-50: #151821;
-  --color-surface-100: #1c202d;
-  --color-surface-200: #282d3e;
-  --color-surface-300: #3b4155;
-  --color-surface-400: #626a83;
+  /* Navy-dark base (not pure black) — per CRED/Mercury aesthetic */
+  --color-surface-0: #0f1729;
+  --color-surface-50: #131b30;
+  --color-surface-100: #1a2340;
+  --color-surface-200: #243050;
+  --color-surface-300: #344263;
+  --color-surface-400: #5c6b87;
   --color-surface-500: #8891a7;
   --color-surface-600: #a5adc0;
   --color-surface-700: #c4cad7;
@@ -70,24 +108,38 @@
   --color-surface-900: #eef0f5;
   --color-surface-950: #f9fafb;
 
-  --color-bg: #0f1117;
-  --color-bg-secondary: #151821;
+  --color-bg: #0f1729;
+  --color-bg-secondary: #131b30;
   --color-text-primary: #eef0f5;
   --color-text-secondary: #8891a7;
-  --color-border: #282d3e;
+  --color-border: #243050;
 
-  /* Slightly adjusted brand for dark backgrounds */
-  --color-brand-50: #142557;
-  --color-brand-100: #193a8f;
-  --color-brand-200: #1740b6;
+  /* Adjusted brand for dark backgrounds — slightly brighter */
+  --color-brand-50: #172554;
+  --color-brand-100: #1e3a8a;
+  --color-brand-200: #1d4ed8;
 
-  /* Dark shadow adjustments */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.2);
+  /* Dark semantic colors */
+  --color-success-50: rgba(16, 185, 129, 0.1);
+  --color-success-100: rgba(16, 185, 129, 0.15);
+  --color-success-950: rgba(16, 185, 129, 0.05);
+
+  --color-warning-50: rgba(245, 158, 11, 0.1);
+  --color-warning-100: rgba(245, 158, 11, 0.15);
+  --color-warning-950: rgba(245, 158, 11, 0.05);
+
+  --color-danger-50: rgba(239, 68, 68, 0.1);
+  --color-danger-100: rgba(239, 68, 68, 0.15);
+  --color-danger-950: rgba(239, 68, 68, 0.05);
+
+  /* Dark shadows — deeper, more atmospheric */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 10px 20px -3px rgb(0 0 0 / 0.35), 0 4px 8px -4px rgb(0 0 0 / 0.25);
+  --shadow-xl: 0 20px 30px -5px rgb(0 0 0 / 0.4), 0 8px 12px -6px rgb(0 0 0 / 0.3);
 }
 
-/* Dark mode: fix colors for elements using hardcoded Tailwind classes */
+/* Dark mode: fix hardcoded Tailwind class colors */
 .dark .bg-white { background-color: var(--color-surface-0); }
 .dark .bg-red-50 { background-color: rgba(220, 38, 38, 0.1); }
 .dark .bg-red-100 { background-color: rgba(220, 38, 38, 0.15); }
@@ -96,7 +148,8 @@
 .dark .border-red-200 { border-color: rgba(220, 38, 38, 0.2); }
 .dark .border-green-200 { border-color: rgba(16, 185, 129, 0.2); }
 
-/* Reset and base */
+/* ── Base Reset ────────────────────────────────────────────────────────────── */
+
 * {
   border-color: var(--color-border);
 }
@@ -107,15 +160,164 @@ body {
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
-/* Focus ring for accessibility */
+/* ── Typography Utilities ──────────────────────────────────────────────────── */
+
+/* Tabular figures for all financial numbers */
+.tabular-nums,
+[data-financial],
+.financial-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Display numbers — large financial figures */
+.display-number {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* ── Animation Keyframes ───────────────────────────────────────────────────── */
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Skeleton shimmer — replaces all spinners */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Subtle pulse for milestone celebrations */
+@keyframes celebrate {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* ── Utility Classes ───────────────────────────────────────────────────────── */
+
+/* Skeleton shimmer loading state */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-100) 25%,
+    var(--color-surface-200) 50%,
+    var(--color-surface-100) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-100) 25%,
+    var(--color-surface-200) 50%,
+    var(--color-surface-100) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Staggered animation delays for card grids */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Animate-in utility */
+.animate-fade-in {
+  animation: fadeIn var(--duration-normal) var(--ease-smooth) both;
+}
+
+.animate-slide-up {
+  animation: slideUp var(--duration-slow) var(--ease-smooth) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn var(--duration-normal) var(--ease-smooth) both;
+}
+
+.animate-celebrate {
+  animation: celebrate 0.6s var(--ease-bounce) both;
+}
+
+/* Smooth transition defaults */
+.transition-smooth {
+  transition-timing-function: var(--ease-smooth);
+  transition-duration: var(--duration-normal);
+}
+
+/* ── Accessibility ─────────────────────────────────────────────────────────── */
+
 :focus-visible {
   outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
 }
 
-/* Skip to main content link */
 .skip-link {
   position: absolute;
   top: -40px;
@@ -130,21 +332,17 @@ body {
   top: 0;
 }
 
-/* Auth page animations */
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* Honor reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  @keyframes fadeSlideIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .skeleton {
+    animation: none;
   }
 }
