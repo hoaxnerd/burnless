@@ -10,7 +10,9 @@
     "db:generate": "turbo db:generate --filter=@burnless/db",
     "db:migrate": "turbo db:migrate --filter=@burnless/db",
     "db:push": "turbo db:push --filter=@burnless/db",
-    "db:studio": "pnpm --filter @burnless/db db:studio"
+    "db:studio": "pnpm --filter @burnless/db db:studio",
+    "db:seed": "turbo db:seed --filter=@burnless/db",
+    "setup": "pnpm install && pnpm db:push"
   },
   "engines": {
     "node": ">=20"
