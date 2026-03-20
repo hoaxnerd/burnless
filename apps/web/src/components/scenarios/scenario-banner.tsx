@@ -2,9 +2,25 @@
 
 import { AlertTriangle, X } from "lucide-react";
 import { useScenario } from "./scenario-context";
+import { useEffect, useState } from "react";
 
 export function ScenarioBanner() {
-  const { isInScenarioMode, activeScenarioName, exitScenario } = useScenario();
+  const { isInScenarioMode, activeScenarioId, activeScenarioName, exitScenario } = useScenario();
+  const [resolvedName, setResolvedName] = useState(activeScenarioName);
+
+  // If we have an ID but no name (e.g., direct URL navigation), fetch it
+  useEffect(() => {
+    if (activeScenarioId && !activeScenarioName) {
+      fetch(`/api/scenarios/${activeScenarioId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.name) setResolvedName(data.name);
+        })
+        .catch(() => {});
+    } else {
+      setResolvedName(activeScenarioName);
+    }
+  }, [activeScenarioId, activeScenarioName]);
 
   if (!isInScenarioMode) return null;
 
@@ -13,7 +29,7 @@ export function ScenarioBanner() {
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4" />
         <span className="text-sm font-medium">
-          SCENARIO MODE: {activeScenarioName} &mdash; changes don&apos;t affect base data
+          SCENARIO MODE: {resolvedName ?? "Loading..."} &mdash; changes don&apos;t affect base data
         </span>
       </div>
       <button

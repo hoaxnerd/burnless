@@ -1,4 +1,4 @@
-import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
+import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { FundingDetails } from "./funding-details";
@@ -10,7 +10,12 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export default async function FundingPage() {
+export default async function FundingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenarioId?: string }>;
+}) {
+  const params = await searchParams;
   const company = await getCompany();
   if (!company) {
     return (
@@ -21,7 +26,7 @@ export default async function FundingPage() {
     );
   }
 
-  const scenario = await getDefaultScenario(company.id);
+  const scenario = await getActiveScenario(company.id, params.scenarioId);
   const [fundingRounds, data] = await Promise.all([
     getFundingRounds(company.id),
     scenario ? computeDashboardData(company.id, scenario.id) : null,

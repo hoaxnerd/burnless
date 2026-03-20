@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 interface ScenarioContextValue {
   /** ID of the active scenario, null = base/default */
@@ -9,7 +17,7 @@ interface ScenarioContextValue {
   activeScenarioName: string | null;
   /** Whether we're in scenario sandbox mode */
   isInScenarioMode: boolean;
-  /** Enter a scenario sandbox */
+  /** Enter a scenario sandbox — updates URL across all pages */
   enterScenario: (id: string, name: string) => void;
   /** Exit scenario sandbox and return to base data */
   exitScenario: () => void;
@@ -24,18 +32,41 @@ const ScenarioContext = createContext<ScenarioContextValue>({
 });
 
 export function ScenarioProvider({ children }: { children: ReactNode }) {
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlScenarioId = searchParams.get("scenarioId");
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(urlScenarioId);
   const [activeScenarioName, setActiveScenarioName] = useState<string | null>(null);
 
-  const enterScenario = useCallback((id: string, name: string) => {
-    setActiveScenarioId(id);
-    setActiveScenarioName(name);
-  }, []);
+  // Sync state when URL changes externally
+  useEffect(() => {
+    if (urlScenarioId !== activeScenarioId) {
+      setActiveScenarioId(urlScenarioId);
+      if (!urlScenarioId) setActiveScenarioName(null);
+    }
+  }, [urlScenarioId, activeScenarioId]);
+
+  const enterScenario = useCallback(
+    (id: string, name: string) => {
+      setActiveScenarioId(id);
+      setActiveScenarioName(name);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("scenarioId", id);
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [pathname, router, searchParams]
+  );
 
   const exitScenario = useCallback(() => {
     setActiveScenarioId(null);
     setActiveScenarioName(null);
-  }, []);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("scenarioId");
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, searchParams]);
 
   return (
     <ScenarioContext.Provider

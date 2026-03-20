@@ -1,4 +1,4 @@
-import { getCompany, getDefaultScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
+import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { TeamDetails } from "./team-details";
@@ -10,9 +10,14 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenarioId?: string }>;
+}) {
+  const params = await searchParams;
   const company = await getCompany();
-  const scenario = company ? await getDefaultScenario(company.id) : null;
+  const scenario = company ? await getActiveScenario(company.id, params.scenarioId) : null;
   const plans = scenario ? await getHeadcountPlans(scenario.id) : [];
   const departments = company ? await getDepartments(company.id) : [];
   const data = company && scenario ? await computeDashboardData(company.id, scenario.id) : null;

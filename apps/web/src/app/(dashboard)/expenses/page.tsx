@@ -1,4 +1,4 @@
-import { getCompany, getDefaultScenario, getAccounts, getForecastLines } from "@/lib/data";
+import { getCompany, getActiveScenario, getBudgetScenario, getAccounts, getForecastLines } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesList } from "./expenses-list";
@@ -21,7 +21,12 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenarioId?: string }>;
+}) {
+  const params = await searchParams;
   const company = await getCompany();
   if (!company) {
     return (
@@ -32,7 +37,7 @@ export default async function ExpensesPage() {
     );
   }
 
-  const scenario = await getDefaultScenario(company.id);
+  const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
@@ -83,6 +88,14 @@ export default async function ExpensesPage() {
   const expenseTimeline = seriesToArray(totalExpenses);
   const opexTimeline = seriesToArray(totalOpex);
   const cogsTimeline = seriesToArray(totalCogs);
+
+  // Budget vs actuals data
+  const budgetScenario = await getBudgetScenario(company.id);
+  let budgetTimeline: { month: string; value: number }[] | null = null;
+  if (budgetScenario && budgetScenario.id !== scenario.id) {
+    const budgetData = await computeDashboardData(company.id, budgetScenario.id);
+    budgetTimeline = seriesToArray(budgetData.totalExpenses);
+  }
 
   return (
     <div>
@@ -136,6 +149,7 @@ export default async function ExpensesPage() {
         opexTimeline={opexTimeline}
         cogsTimeline={cogsTimeline}
         scenarioId={scenario.id}
+        budgetTimeline={budgetTimeline}
       />
     </div>
   );

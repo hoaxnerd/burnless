@@ -1,4 +1,4 @@
-import { getCompany, getDefaultScenario, getRevenueStreams } from "@/lib/data";
+import { getCompany, getActiveScenario, getRevenueStreams } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey, computeSubscriptionDetail, type SubscriptionParams } from "@burnless/engine";
 import { RevenueStreamsList } from "./revenue-streams-list";
@@ -10,7 +10,12 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export default async function RevenuePage() {
+export default async function RevenuePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenarioId?: string }>;
+}) {
+  const params = await searchParams;
   const company = await getCompany();
   if (!company) {
     return (
@@ -21,7 +26,7 @@ export default async function RevenuePage() {
     );
   }
 
-  const scenario = await getDefaultScenario(company.id);
+  const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">

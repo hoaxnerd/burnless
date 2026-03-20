@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCompany, getDefaultScenario, getScenarios, getAccounts } from "@/lib/data";
+import { getCompany, getActiveScenario, getScenarios, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { MetricCard } from "@/components/ui";
@@ -13,11 +13,16 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenarioId?: string }>;
+}) {
+  const params = await searchParams;
   const company = await getCompany();
   if (!company) return <SetupPrompt />;
 
-  const scenario = await getDefaultScenario(company.id);
+  const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
   const [data, allScenarios, accounts] = await Promise.all([

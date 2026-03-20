@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   Receipt,
@@ -14,7 +14,7 @@ import {
   Settings,
   Command,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
 import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
@@ -40,7 +40,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
+  // Preserve scenarioId across nav links when in scenario mode
+  const scenarioId = searchParams.get("scenarioId");
+  const buildHref = (base: string) =>
+    scenarioId ? `${base}?scenarioId=${scenarioId}` : base;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -55,6 +61,7 @@ export default function DashboardLayout({
   }, [handleKeyDown]);
 
   return (
+    <Suspense fallback={null}>
     <ScenarioProvider>
     <div className="min-h-screen flex flex-col">
       <ScenarioBanner />
@@ -81,7 +88,7 @@ export default function DashboardLayout({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={buildHref(item.href)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-brand-50 text-brand-700"
@@ -114,7 +121,7 @@ export default function DashboardLayout({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={buildHref(item.href)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-brand-50 text-brand-700"
@@ -155,5 +162,6 @@ export default function DashboardLayout({
     </div>
     </div>
     </ScenarioProvider>
+    </Suspense>
   );
 }

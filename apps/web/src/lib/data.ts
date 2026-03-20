@@ -78,6 +78,21 @@ export async function getScenarioById(scenarioId: string) {
   return scenario ?? null;
 }
 
+/**
+ * Get the active scenario for a page: uses scenarioId from searchParams
+ * if present, otherwise falls back to the default scenario.
+ */
+export async function getActiveScenario(
+  companyId: string,
+  scenarioId?: string | null
+) {
+  if (scenarioId) {
+    const s = await getScenarioById(scenarioId);
+    if (s && s.companyId === companyId) return s;
+  }
+  return getDefaultScenario(companyId);
+}
+
 /** Get the budget scenario (isBudget=true) for a company. */
 export async function getBudgetScenario(companyId: string) {
   const [scenario] = await db
