@@ -148,8 +148,15 @@ export async function POST(request: Request) {
               encoder.encode(`data: ${JSON.stringify({ type: "tool_use", tool: chunk.toolName })}\n\n`)
             );
           } else if (chunk.type === "tool_result") {
+            // Send tool result data for inline visualizations
+            let parsedResult: Record<string, unknown> | null = null;
+            try {
+              parsedResult = chunk.toolResult ? JSON.parse(chunk.toolResult) : null;
+            } catch {
+              // non-JSON result, skip
+            }
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "tool_result", tool: chunk.toolName })}\n\n`)
+              encoder.encode(`data: ${JSON.stringify({ type: "tool_result", tool: chunk.toolName, data: parsedResult })}\n\n`)
             );
           } else if (chunk.type === "done") {
             // Save assistant response

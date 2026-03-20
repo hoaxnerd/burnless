@@ -73,6 +73,30 @@ export function CreateScenarioDialog() {
   const [creating, setCreating] = useState(false);
   const [customName, setCustomName] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+
+  const aiGenerate = async () => {
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/scenarios/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "best_worst" }),
+      });
+      if (!res.ok) throw new Error("Failed to generate scenarios");
+      const result = await res.json();
+      setOpen(false);
+      router.refresh();
+      // Navigate to the first created scenario
+      if (result.created?.[0]) {
+        router.push(`/scenarios/${result.created[0].id}`);
+      }
+    } catch {
+      // Fallback — user sees no navigation
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const createScenario = async (name: string, type: string, description: string) => {
     setCreating(true);
@@ -174,10 +198,18 @@ export function CreateScenarioDialog() {
 
             <div className="border-t border-surface-100 pt-3 flex items-center gap-3">
               <button
+                onClick={aiGenerate}
+                disabled={aiGenerating || creating}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-violet-600 px-4 py-3 text-sm font-medium text-white hover:from-brand-700 hover:to-violet-700 disabled:opacity-50 transition-all"
+              >
+                <Sparkles className="h-4 w-4" />
+                {aiGenerating ? "Generating..." : "AI Generate Best & Worst"}
+              </button>
+              <button
                 onClick={() => setShowCustom(true)}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-dashed border-surface-300 px-4 py-3 text-sm font-medium text-surface-600 hover:border-brand-400 hover:text-brand-700 transition-colors"
               >
-                <Sparkles className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 Blank Scenario
               </button>
             </div>

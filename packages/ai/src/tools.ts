@@ -286,6 +286,180 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["name"],
     },
   },
+  {
+    name: "categorize_transactions",
+    description:
+      "Analyze uncategorized or miscategorized transactions and suggest appropriate account categories based on the description, amount, and existing chart of accounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        transactions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Transaction ID" },
+              description: { type: "string", description: "Transaction description from bank/CSV" },
+              amount: { type: "number", description: "Transaction amount" },
+              date: { type: "string", description: "Transaction date (YYYY-MM-DD)" },
+            },
+            required: ["description", "amount"],
+          },
+          description: "Array of transactions to categorize",
+        },
+      },
+      required: ["transactions"],
+    },
+  },
+  {
+    name: "generate_report_narrative",
+    description:
+      "Generate a written narrative for investor reports or board updates based on the current financial data. Returns formatted markdown text ready for a board deck or investor letter.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        reportType: {
+          type: "string",
+          enum: ["board_update", "investor_letter", "monthly_summary", "fundraising_memo"],
+          description: "Type of narrative to generate",
+        },
+        period: {
+          type: "string",
+          description: "Period to cover (e.g., '2026-01' for a single month, or '2026-Q1' for a quarter)",
+        },
+        highlights: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional key highlights or milestones to include",
+        },
+        tone: {
+          type: "string",
+          enum: ["formal", "conversational", "data_driven"],
+          description: "Tone of the narrative. Defaults to 'formal'.",
+        },
+      },
+      required: ["reportType"],
+    },
+  },
+  {
+    name: "suggest_cost_cuts",
+    description:
+      "Analyze current expenses and identify optimization opportunities — areas where spend could be reduced, renegotiated, or eliminated to extend runway.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetSavingsPercent: {
+          type: "number",
+          description: "Target savings as a percentage of total expenses (e.g., 0.15 for 15%). If omitted, suggests all viable cuts.",
+        },
+        excludeCategories: {
+          type: "array",
+          items: { type: "string" },
+          description: "Account categories to exclude from cost-cut suggestions (e.g., 'revenue', 'cogs')",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Scenario to analyze. Uses current scenario if omitted.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "benchmark_metrics",
+    description:
+      "Compare the company's key metrics against industry benchmarks for their stage and business model. Shows where the company is performing above, at, or below typical startups.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        metrics: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "burn_rate", "runway", "revenue_growth", "gross_margin",
+              "ltv_cac_ratio", "churn_rate", "burn_multiple", "rule_of_40",
+              "magic_number", "net_dollar_retention", "cac_payback",
+            ],
+          },
+          description: "Which metrics to benchmark. If omitted, benchmarks all available metrics.",
+        },
+        stage: {
+          type: "string",
+          enum: ["pre_seed", "seed", "series_a", "series_b", "growth"],
+          description: "Company stage for benchmark selection. Auto-detected from company data if omitted.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "model_dilution",
+    description:
+      "Model equity dilution from a potential funding round. Shows pre/post ownership percentages, option pool impact, and effective valuation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        roundAmount: {
+          type: "number",
+          description: "Amount to raise in this round",
+        },
+        preMoneyValuation: {
+          type: "number",
+          description: "Pre-money valuation",
+        },
+        existingOwnershipPercent: {
+          type: "number",
+          description: "Founder/team current ownership as a decimal (e.g., 0.80 for 80%). Defaults to 1.0 if first round.",
+        },
+        optionPoolPercent: {
+          type: "number",
+          description: "New option pool to create as a percent of post-money (e.g., 0.10 for 10%). Defaults to 0.",
+        },
+        existingRounds: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              amount: { type: "number" },
+              ownership: { type: "number", description: "Ownership percentage acquired (decimal)" },
+            },
+          },
+          description: "Previous funding rounds for cap table context",
+        },
+      },
+      required: ["roundAmount", "preMoneyValuation"],
+    },
+  },
+  {
+    name: "forecast_revenue",
+    description:
+      "Project future revenue based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        months: {
+          type: "number",
+          description: "Number of months to forecast forward (1-36). Defaults to 12.",
+        },
+        method: {
+          type: "string",
+          enum: ["linear", "exponential", "conservative", "auto"],
+          description: "Forecasting method. 'auto' picks the best fit. Defaults to 'auto'.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Scenario to base forecast on. Uses current scenario if omitted.",
+        },
+        includeConfidenceIntervals: {
+          type: "boolean",
+          description: "Whether to include high/low confidence bands. Defaults to true.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /**

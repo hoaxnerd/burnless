@@ -5,12 +5,19 @@ import { usePathname } from "next/navigation";
 import { X, Send, Bot, User, Loader2, Wrench, Sparkles, Copy, Check, Pin, PinOff } from "lucide-react";
 import { usePinnedInsights } from "./use-pinned-insights";
 import { getPageContext } from "./page-context";
+import { InlineChart } from "./inline-chart";
+
+interface ToolResult {
+  tool: string;
+  data: Record<string, unknown>;
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
   toolCalls?: string[];
+  toolResults?: ToolResult[];
 }
 
 interface AiPanelProps {
@@ -113,6 +120,16 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
                 updated[updated.length - 1] = {
                   ...last,
                   toolCalls: [...(last.toolCalls ?? []), event.tool],
+                };
+                return updated;
+              });
+            } else if (event.type === "tool_result" && event.data) {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1]!;
+                updated[updated.length - 1] = {
+                  ...last,
+                  toolResults: [...(last.toolResults ?? []), { tool: event.tool, data: event.data }],
                 };
                 return updated;
               });
@@ -247,6 +264,10 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
                   }`}>
                     <span className="whitespace-pre-wrap">{msg.content}</span>
                     {msg.isStreaming && <span className="inline-block ml-0.5 animate-pulse">|</span>}
+                    {/* Inline data visualizations */}
+                    {msg.toolResults?.map((result, j) => (
+                      <InlineChart key={j} result={result} />
+                    ))}
                   </div>
                   {/* Copy & Pin buttons for assistant messages */}
                   {msg.role === "assistant" && !msg.isStreaming && msg.content && (
