@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles, Check } from "lucide-react";
+import { categorizeTransaction } from "@burnless/engine";
 
 const CATEGORIES = [
   { value: "operating_expense", label: "Operating Expense" },
@@ -26,7 +27,6 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
   const [name, setName] = useState("");
   const [accountId, setAccountId] = useState("");
   const [category, setCategory] = useState<string>("operating_expense");
@@ -38,6 +38,31 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
 
+  const [suggestion, setSuggestion] = useState<{ subcategory: string; category: string; confidence: number } | null>(null);
+  const [suggestionApplied, setSuggestionApplied] = useState(false);
+
+  useEffect(() => {
+    if (name.length < 3) {
+      setSuggestion(null);
+      setSuggestionApplied(false);
+      return;
+    }
+    const result = categorizeTransaction(name);
+    if (result && result.confidence >= 0.5) {
+      setSuggestion({ subcategory: result.subcategory, category: result.category, confidence: result.confidence });
+    } else {
+      setSuggestion(null);
+    }
+    setSuggestionApplied(false);
+  }, [name]);
+
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    if (suggestion.category === "cogs") setCategory("cogs");
+    else setCategory("operating_expense");
+    setSuggestionApplied(true);
+  };
+
   const expenseAccounts = accounts.filter(
     (a) => a.category === "operating_expense" || a.category === "cogs"
   );
@@ -48,24 +73,18 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     setSaving(true);
 
     try {
-      // If no account selected, create one
       let targetAccountId = accountId;
       if (!targetAccountId) {
         const acctRes = await fetch("/api/accounts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            type: "expense",
-            category,
-          }),
+          body: JSON.stringify({ name, type: "expense", category }),
         });
         if (!acctRes.ok) throw new Error("Failed to create account");
         const acct = await acctRes.json();
         targetAccountId = acct.id;
       }
 
-      // Create forecast line
       const params: Record<string, unknown> = { amount: Number(amount) };
       if (method === "growth_rate" && growthRate) {
         params.growthRate = Number(growthRate) / 100;
@@ -74,13 +93,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
       const res = await fetch("/api/forecast-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scenarioId,
-          accountId: targetAccountId,
-          method,
-          parameters: params,
-          startDate,
-        }),
+        body: JSON.stringify({ scenarioId, accountId: targetAccountId, method, parameters: params, startDate }),
       });
 
       if (!res.ok) {
@@ -88,12 +101,13 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
         throw new Error(data.error ?? "Failed to create expense");
       }
 
-      // Reset and close
       setName("");
       setAccountId("");
       setAmount("");
       setGrowthRate("");
       setMethod("fixed");
+      setSuggestion(null);
+      setSuggestionApplied(false);
       setOpen(false);
       router.refresh();
     } catch (err) {
@@ -131,6 +145,29 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
               required
               className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
+            {suggestion && !suggestionApplied && (
+              <button
+                type="button"
+                onClick={applySuggestion}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs text-brand-700 hover:bg-brand-100 transition-colors w-full"
+              >
+                <Sparkles className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">
+                  Auto-detected: <strong>{suggestion.subcategory}</strong>
+                </span>
+                <span className="ml-auto text-[10px] text-brand-500 tabular-nums flex-shrink-0">
+                  {(suggestion.confidence * 100).toFixed(0)}% confident
+                </span>
+              </button>
+            )}
+            {suggestionApplied && suggestion && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 w-full">
+                <Check className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">
+                  Categorized as <strong>{suggestion.subcategory}</strong>
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
