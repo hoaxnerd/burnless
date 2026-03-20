@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 import path from "path";
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+const analyze = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const nextConfig: NextConfig = {
   // Point to monorepo root so Next.js doesn't infer /Users/X/ from a parent lockfile
@@ -27,6 +32,9 @@ const nextConfig: NextConfig = {
     "@burnless/engine",
   ],
   serverExternalPackages: ["plaid", "razorpay", "stripe", "openai", "@anthropic-ai/sdk"],
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
   eslint: {
     // Lint separately via `pnpm lint` — don't block builds on eslint-plugin compat issues
     ignoreDuringBuilds: true,
@@ -43,4 +51,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default analyze(nextConfig);

@@ -1,6 +1,12 @@
-export { AreaChartWidget } from "./area-chart";
-export { BarChartWidget, VarianceBarChart } from "./bar-chart";
-export { MultiLineChart } from "./multi-line-chart";
+// Lazy-loaded chart components — recharts is only fetched when a chart renders
+export {
+  LazyAreaChartWidget as AreaChartWidget,
+  LazyBarChartWidget as BarChartWidget,
+  LazyVarianceBarChart as VarianceBarChart,
+  LazyMultiLineChart as MultiLineChart,
+} from "./lazy-exports";
+
+// Theme utilities — no recharts dependency, safe to import anywhere
 export {
   chartColors,
   chartDefaults,

@@ -80,7 +80,7 @@ export function LandingFooter() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-2.5"
+                      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-3"
                     >
                       {link.label}
                     </Link>

@@ -82,7 +82,7 @@ export function LandingNav() {
             <Link
               href="/login"
               onClick={() => trackEvent("landing_nav_signup_clicked")}
-              className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-400 transition-colors shadow-md shadow-brand-500/25"
+              className="rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-400 transition-colors shadow-md shadow-brand-500/25"
             >
               Start free
             </Link>
