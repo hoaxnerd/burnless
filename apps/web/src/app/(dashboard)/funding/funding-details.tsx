@@ -1,5 +1,8 @@
 "use client";
 
+import { useState, useMemo } from "react";
+import { DollarSign, Calculator, TrendingUp, Clock } from "lucide-react";
+
 interface FundingRound {
   id: string;
   name: string;
@@ -35,6 +38,25 @@ const roundTypeLabels: Record<string, string> = {
   grant: "Grant",
 };
 
+const roundTypeColors: Record<string, string> = {
+  pre_seed: "bg-violet-100 text-violet-700",
+  seed: "bg-brand-100 text-brand-700",
+  series_a: "bg-sky-100 text-sky-700",
+  series_b: "bg-emerald-100 text-emerald-700",
+  series_c_plus: "bg-amber-100 text-amber-700",
+  debt: "bg-surface-200 text-surface-600",
+  grant: "bg-success-100 text-success-700",
+};
+
+const segmentColors = [
+  "#3b82f6", // brand
+  "#8b5cf6", // violet
+  "#0ea5e9", // sky
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // red
+];
+
 export function FundingDetails({
   rounds,
   foundersOwnership,
@@ -45,178 +67,401 @@ export function FundingDetails({
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
+  // Dilution calculator state
+  const [calcRaiseAmount, setCalcRaiseAmount] = useState(2_000_000);
+  const [calcPreMoney, setCalcPreMoney] = useState(8_000_000);
+
+  const calcDilution = useMemo(() => {
+    const postMoney = calcPreMoney + calcRaiseAmount;
+    if (postMoney <= 0) return { dilution: 0, postMoney: 0, newOwnership: foundersOwnership };
+    const dilution = (calcRaiseAmount / postMoney) * 100;
+    const newOwnership = foundersOwnership * (1 - dilution / 100);
+    return { dilution, postMoney, newOwnership };
+  }, [calcRaiseAmount, calcPreMoney, foundersOwnership]);
+
   // Build cap table segments
-  const capTableSegments: Array<{ label: string; percent: number; color: string }> = [];
-  capTableSegments.push({ label: "Founders", percent: foundersOwnership, color: "bg-brand-500" });
+  const capTableSegments = useMemo(() => {
+    const segments: Array<{ label: string; percent: number; color: string }> = [];
+    segments.push({ label: "Founders", percent: foundersOwnership, color: segmentColors[0]! });
 
-  let remaining = 100 - foundersOwnership;
-  const investorColors = ["bg-violet-500", "bg-sky-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500"];
-  completedRounds.forEach((round, i) => {
-    const dilution = round.dilutionPercent ?? 0;
-    if (dilution > 0) {
-      capTableSegments.push({
-        label: round.name,
-        percent: dilution,
-        color: investorColors[i % investorColors.length]!,
-      });
+    completedRounds.forEach((round, i) => {
+      const dilution = round.dilutionPercent ?? 0;
+      if (dilution > 0) {
+        segments.push({
+          label: round.name,
+          percent: dilution,
+          color: segmentColors[(i + 1) % segmentColors.length]!,
+        });
+      }
+    });
+
+    const usedPercent = segments.reduce((sum, s) => sum + s.percent, 0);
+    if (usedPercent < 100) {
+      segments.push({ label: "Option Pool", percent: 100 - usedPercent, color: "#d1d5db" });
     }
-  });
 
-  // Add ESOP pool if there's remaining allocation
-  const usedPercent = capTableSegments.reduce((sum, s) => sum + s.percent, 0);
-  if (usedPercent < 100) {
-    capTableSegments.push({ label: "Option Pool", percent: 100 - usedPercent, color: "bg-surface-300" });
+    return segments;
+  }, [foundersOwnership, completedRounds]);
+
+  // SVG Donut chart math
+  const donutSize = 200;
+  const donutCenter = donutSize / 2;
+  const donutRadius = 75;
+  const donutStroke = 28;
+
+  function donutSegmentPath(startAngle: number, endAngle: number) {
+    const start = polarToCartesian(donutCenter, donutCenter, donutRadius, endAngle);
+    const end = polarToCartesian(donutCenter, donutCenter, donutRadius, startAngle);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${start.x} ${start.y} A ${donutRadius} ${donutRadius} 0 ${largeArc} 0 ${end.x} ${end.y}`;
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Funding Rounds */}
-      <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-200">
-          <h2 className="text-lg font-semibold text-surface-900">Funding Rounds</h2>
-        </div>
+  function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
 
-        {rounds.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="text-4xl mb-4">🏦</div>
+  if (rounds.length === 0) {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-16 text-center">
+          <div className="mx-auto max-w-md">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 border border-brand-100">
+              <DollarSign className="h-7 w-7 text-brand-500" />
+            </div>
             <h3 className="text-lg font-semibold text-surface-900 mb-2">No funding rounds yet</h3>
-            <p className="text-sm text-surface-500 mb-4">
+            <p className="text-sm text-surface-500 mb-6 leading-relaxed">
               Track your fundraising history — amounts, valuations, dilution, and investors.
             </p>
             <p className="text-xs text-surface-400">
-              Use the AI companion or API: <code className="text-brand-600">POST /api/funding-rounds</code> (via scenarios)
+              Use the &quot;Add Funding Round&quot; button above or the AI companion to get started.
             </p>
           </div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-surface-200 bg-surface-50">
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Round</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Type</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Amount</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Pre-Money</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Dilution</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {completedRounds.map((round) => (
-                <tr key={round.id} className="border-b border-surface-100 hover:bg-surface-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-surface-900">{round.name}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-surface-600">{roundTypeLabels[round.type] ?? round.type}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm font-semibold text-surface-900">{formatCurrency(round.amount)}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm text-surface-600">
-                      {round.preMoneyValuation ? formatCurrency(round.preMoneyValuation) : "—"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm text-surface-600">
-                      {round.dilutionPercent ? `${round.dilutionPercent.toFixed(0)}%` : "—"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-surface-500">
-                      {new Date(round.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {projectedRounds.map((round) => (
-                <tr key={round.id} className="border-b border-surface-100 bg-surface-50/50">
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-surface-600 flex items-center gap-1.5">
-                      <span className="text-xs">🔮</span>
-                      {round.name}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-surface-500 italic">{roundTypeLabels[round.type] ?? round.type}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm font-medium text-surface-500 italic">{formatCurrency(round.amount)}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm text-surface-400 italic">
-                      {round.preMoneyValuation ? formatCurrency(round.preMoneyValuation) : "—"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-sm text-surface-400 italic">
-                      {round.dilutionPercent ? `${round.dilutionPercent.toFixed(0)}%` : "—"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-surface-400 italic">
-                      {new Date(round.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        </div>
+
+        {/* Still show dilution calculator even with no rounds */}
+        <DilutionCalculator
+          foundersOwnership={100}
+          calcRaiseAmount={calcRaiseAmount}
+          setCalcRaiseAmount={setCalcRaiseAmount}
+          calcPreMoney={calcPreMoney}
+          setCalcPreMoney={setCalcPreMoney}
+          calcDilution={{ dilution: (calcRaiseAmount / (calcPreMoney + calcRaiseAmount)) * 100, postMoney: calcPreMoney + calcRaiseAmount, newOwnership: 100 * (1 - calcRaiseAmount / (calcPreMoney + calcRaiseAmount)) }}
+        />
       </div>
+    );
+  }
 
-      {/* Cap Table */}
-      {rounds.length > 0 && (
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <h2 className="text-lg font-semibold text-surface-900 mb-4">Cap Table</h2>
+  return (
+    <div className="space-y-8">
+      {/* Cap Table + Donut */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Donut chart */}
+        <div className="lg:col-span-2 rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <h2 className="text-base font-semibold text-surface-900 mb-4">Ownership</h2>
 
-          {/* Visual bar */}
-          <div className="flex rounded-lg overflow-hidden h-8 mb-4">
-            {capTableSegments.map((seg, i) => (
-              <div
-                key={i}
-                className={`${seg.color} flex items-center justify-center text-white text-xs font-medium`}
-                style={{ width: `${Math.max(seg.percent, 2)}%` }}
-                title={`${seg.label}: ${seg.percent.toFixed(1)}%`}
-              >
-                {seg.percent >= 8 && `${seg.percent.toFixed(0)}%`}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <svg width={donutSize} height={donutSize}>
+                {(() => {
+                  let cumAngle = 0;
+                  return capTableSegments.map((seg, i) => {
+                    const angle = (seg.percent / 100) * 360;
+                    // Avoid rendering a zero-width segment
+                    if (angle < 0.5) {
+                      cumAngle += angle;
+                      return null;
+                    }
+                    const startAngle = cumAngle;
+                    cumAngle += angle;
+                    const endAngle = cumAngle;
+                    return (
+                      <path
+                        key={i}
+                        d={donutSegmentPath(startAngle, endAngle - 0.5)}
+                        fill="none"
+                        stroke={seg.color}
+                        strokeWidth={donutStroke}
+                        strokeLinecap="round"
+                      />
+                    );
+                  });
+                })()}
+              </svg>
+              {/* Center label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold tabular-nums text-surface-900">
+                  {foundersOwnership.toFixed(0)}%
+                </span>
+                <span className="text-[10px] text-surface-400 uppercase tracking-wider">
+                  Founders
+                </span>
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap gap-4">
+          <div className="space-y-2">
             {capTableSegments.map((seg, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-sm ${seg.color}`} />
-                <span className="text-xs text-surface-600">
-                  {seg.label}: {seg.percent.toFixed(1)}%
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: seg.color }}
+                  />
+                  <span className="text-xs text-surface-600">{seg.label}</span>
+                </div>
+                <span className="text-xs tabular-nums font-medium text-surface-900">
+                  {seg.percent.toFixed(1)}%
                 </span>
               </div>
             ))}
           </div>
         </div>
-      )}
 
-      {/* AI Fundraising insight */}
+        {/* Funding rounds */}
+        <div className="lg:col-span-3 rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-surface-100">
+            <h2 className="text-base font-semibold text-surface-900">Funding Rounds</h2>
+            <p className="text-xs text-surface-400 mt-0.5">
+              {completedRounds.length} closed{projectedRounds.length > 0 ? `, ${projectedRounds.length} projected` : ""}
+            </p>
+          </div>
+
+          <div className="divide-y divide-surface-100">
+            {completedRounds.map((round) => (
+              <div key={round.id} className="px-6 py-4 hover:bg-surface-50/50 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-surface-900">{round.name}</span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${roundTypeColors[round.type] ?? "bg-surface-100 text-surface-600"}`}>
+                        {roundTypeLabels[round.type] ?? round.type}
+                      </span>
+                    </div>
+                    <p className="text-xs text-surface-400">
+                      {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold tabular-nums text-surface-900">
+                      {formatCurrency(round.amount)}
+                    </p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      {round.preMoneyValuation && (
+                        <span className="text-[10px] text-surface-400">
+                          {formatCurrency(round.preMoneyValuation)} pre
+                        </span>
+                      )}
+                      {round.dilutionPercent && (
+                        <span className="text-[10px] text-surface-400">
+                          {round.dilutionPercent.toFixed(1)}% dilution
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {projectedRounds.map((round) => (
+              <div key={round.id} className="px-6 py-4 bg-surface-50/30">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-3 w-3 text-surface-400" />
+                      <span className="text-sm font-medium text-surface-500">{round.name}</span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${roundTypeColors[round.type] ?? "bg-surface-100 text-surface-600"} opacity-60`}>
+                        {roundTypeLabels[round.type] ?? round.type}
+                      </span>
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-warning-100 text-warning-700">
+                        Projected
+                      </span>
+                    </div>
+                    <p className="text-xs text-surface-400">
+                      {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium tabular-nums text-surface-500 italic">
+                      {formatCurrency(round.amount)}
+                    </p>
+                    {round.dilutionPercent && (
+                      <span className="text-[10px] text-surface-400 italic">
+                        ~{round.dilutionPercent.toFixed(0)}% dilution
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Dilution Calculator */}
+      <DilutionCalculator
+        foundersOwnership={foundersOwnership}
+        calcRaiseAmount={calcRaiseAmount}
+        setCalcRaiseAmount={setCalcRaiseAmount}
+        calcPreMoney={calcPreMoney}
+        setCalcPreMoney={setCalcPreMoney}
+        calcDilution={calcDilution}
+      />
+
+      {/* AI Fundraising Insight */}
       {currentRunway > 0 && currentRunway < 18 && (
-        <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
           <div className="flex items-start gap-3">
-            <span className="text-lg">💡</span>
+            <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-brand-600" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-surface-900">Fundraising Readiness</p>
-              <p className="text-xs text-surface-600 mt-0.5">
-                With {Math.round(currentRunway)} months of runway at {formatCurrency(currentBurn)}/mo burn,
+              <p className="text-sm font-semibold text-surface-900">Fundraising Readiness</p>
+              <p className="text-xs text-surface-600 mt-1 leading-relaxed">
+                With <span className="font-semibold">{Math.round(currentRunway)} months</span> of runway at{" "}
+                <span className="font-semibold tabular-nums">{formatCurrency(currentBurn)}/mo</span> burn,
                 {currentRunway <= 6
-                  ? " you should be actively fundraising now."
+                  ? " you should be actively fundraising now. Most rounds take 3-6 months."
                   : currentRunway <= 12
                   ? " consider starting fundraising conversations in the next few months."
                   : " you have time to focus on growth before your next raise."}
-                {" "}Ask the AI companion for a fundraising readiness assessment.
+                {" "}Ask the AI companion for a detailed fundraising readiness assessment.
               </p>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Interactive dilution calculator */
+function DilutionCalculator({
+  foundersOwnership,
+  calcRaiseAmount,
+  setCalcRaiseAmount,
+  calcPreMoney,
+  setCalcPreMoney,
+  calcDilution,
+}: {
+  foundersOwnership: number;
+  calcRaiseAmount: number;
+  setCalcRaiseAmount: (v: number) => void;
+  calcPreMoney: number;
+  setCalcPreMoney: (v: number) => void;
+  calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+}) {
+  return (
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+      <div className="px-6 py-5 border-b border-surface-100">
+        <div className="flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-surface-400" />
+          <h2 className="text-base font-semibold text-surface-900">Dilution Calculator</h2>
+        </div>
+        <p className="text-xs text-surface-400 mt-0.5">
+          Model how a new raise affects ownership
+        </p>
+      </div>
+
+      <div className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-xs font-medium text-surface-500 mb-1.5">
+              Raise Amount
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400">
+                $
+              </span>
+              <input
+                type="number"
+                value={calcRaiseAmount}
+                onChange={(e) => setCalcRaiseAmount(Number(e.target.value))}
+                min="0"
+                step="100000"
+                className="w-full rounded-xl border border-surface-200 bg-surface-0 pl-7 pr-3 py-2.5 text-sm tabular-nums text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="20000000"
+              step="250000"
+              value={calcRaiseAmount}
+              onChange={(e) => setCalcRaiseAmount(Number(e.target.value))}
+              className="w-full mt-2 accent-brand-500"
+            />
+            <div className="flex justify-between text-[10px] text-surface-400 mt-0.5">
+              <span>$0</span>
+              <span>$20M</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-surface-500 mb-1.5">
+              Pre-Money Valuation
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400">
+                $
+              </span>
+              <input
+                type="number"
+                value={calcPreMoney}
+                onChange={(e) => setCalcPreMoney(Number(e.target.value))}
+                min="0"
+                step="500000"
+                className="w-full rounded-xl border border-surface-200 bg-surface-0 pl-7 pr-3 py-2.5 text-sm tabular-nums text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100000000"
+              step="500000"
+              value={calcPreMoney}
+              onChange={(e) => setCalcPreMoney(Number(e.target.value))}
+              className="w-full mt-2 accent-brand-500"
+            />
+            <div className="flex justify-between text-[10px] text-surface-400 mt-0.5">
+              <span>$0</span>
+              <span>$100M</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
+            <p className="text-[10px] font-medium text-surface-400 uppercase tracking-wider mb-1">
+              Dilution
+            </p>
+            <p className="text-xl font-bold tabular-nums text-danger-600">
+              {calcDilution.dilution.toFixed(1)}%
+            </p>
+          </div>
+          <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
+            <p className="text-[10px] font-medium text-surface-400 uppercase tracking-wider mb-1">
+              Post-Money
+            </p>
+            <p className="text-xl font-bold tabular-nums text-surface-900">
+              {formatCurrency(calcDilution.postMoney)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
+            <p className="text-[10px] font-medium text-surface-400 uppercase tracking-wider mb-1">
+              New Founder %
+            </p>
+            <p className="text-xl font-bold tabular-nums text-brand-600">
+              {calcDilution.newOwnership.toFixed(1)}%
+            </p>
+            <p className="text-[10px] text-surface-400 mt-0.5">
+              was {foundersOwnership.toFixed(1)}%
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

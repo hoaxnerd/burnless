@@ -57,9 +57,9 @@ export default async function FundingPage({
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 sm:mb-12 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Funding</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-surface-900">Funding</h1>
           <p className="mt-1 text-sm text-surface-500">
             Capital sources, fundraising history, and cap table
           </p>
@@ -68,27 +68,27 @@ export default async function FundingPage({
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Total Raised</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{formatCurrency(totalRaised)}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Total Raised</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalRaised)}</p>
           <p className="mt-1 text-xs text-surface-400">{completedRounds.length} round{completedRounds.length !== 1 ? "s" : ""} completed</p>
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Current Cash</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{formatCurrency(currentCash)}</p>
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Current Cash</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(currentCash)}</p>
           <p className="mt-1 text-xs text-surface-400">Available capital</p>
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Runway</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Runway</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">
             {currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`}
           </p>
           <p className="mt-1 text-xs text-surface-400">At {formatCurrency(currentBurn)}/mo burn</p>
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Founder Ownership</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{foundersOwnership.toFixed(0)}%</p>
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Founder Ownership</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{foundersOwnership.toFixed(0)}%</p>
           <p className="mt-1 text-xs text-surface-400">After {totalDilution.toFixed(0)}% dilution</p>
         </div>
       </div>

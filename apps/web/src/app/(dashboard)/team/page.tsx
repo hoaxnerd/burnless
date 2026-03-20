@@ -78,9 +78,9 @@ export default async function TeamPage({
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 sm:mb-12 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Team</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-surface-900">Team</h1>
           <p className="mt-1 text-sm text-surface-500">
             Headcount planning, costs, and hiring timeline
             {scenario && <span className="ml-2 text-surface-400">&mdash; {scenario.name}</span>}
@@ -95,29 +95,29 @@ export default async function TeamPage({
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Total Headcount</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{totalHeadcount}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Total Headcount</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{totalHeadcount}</p>
           {plannedHires.length > 0 && (
             <p className="mt-1 text-xs text-surface-400">+{plannedHires.reduce((s, h) => s + h.count, 0)} planned</p>
           )}
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Monthly People Cost</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{formatCurrency(totalMonthlyCost)}</p>
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Monthly People Cost</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalMonthlyCost)}</p>
           <p className="mt-1 text-xs text-surface-400">
             {costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits"}
           </p>
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Revenue / Employee</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{formatCurrency(revPerEmployee)}<span className="text-base font-normal text-surface-400">/mo</span></p>
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Revenue / Employee</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(revPerEmployee)}<span className="text-base font-normal text-surface-400">/mo</span></p>
           <p className="mt-1 text-xs text-surface-400">Efficiency metric</p>
         </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-sm font-medium text-surface-500">Departments</p>
-          <p className="mt-2 text-3xl font-bold text-surface-900">{deptGroups.size}</p>
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Departments</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{deptGroups.size}</p>
           <p className="mt-1 text-xs text-surface-400">{departments.length} total defined</p>
         </div>
       </div>

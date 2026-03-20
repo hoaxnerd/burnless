@@ -1,5 +1,8 @@
 "use client";
 
+import { useState, useMemo } from "react";
+import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
+
 interface TeamMember {
   id: string;
   title: string;
@@ -38,22 +41,66 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
+const deptColors = [
+  { bar: "bg-brand-500", dot: "bg-brand-500", text: "text-brand-600" },
+  { bar: "bg-violet-500", dot: "bg-violet-500", text: "text-violet-600" },
+  { bar: "bg-sky-500", dot: "bg-sky-500", text: "text-sky-600" },
+  { bar: "bg-emerald-500", dot: "bg-emerald-500", text: "text-emerald-600" },
+  { bar: "bg-amber-500", dot: "bg-amber-500", text: "text-amber-600" },
+  { bar: "bg-rose-500", dot: "bg-rose-500", text: "text-rose-600" },
+];
+
 export function TeamDetails({
   departmentBreakdown,
   plannedHires,
   totalMonthlyCost,
 }: TeamDetailsProps) {
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+
+  const maxDeptCost = useMemo(
+    () => Math.max(...departmentBreakdown.map((d) => d.monthlyCost), 1),
+    [departmentBreakdown],
+  );
+
+  // Group planned hires by quarter
+  const hiringTimeline = useMemo(() => {
+    const quarters = new Map<string, { hires: PlannedHire[]; totalMonthlyImpact: number }>();
+    for (const hire of plannedHires) {
+      const d = new Date(hire.startDate);
+      const q = `Q${Math.ceil((d.getMonth() + 1) / 3)} ${d.getFullYear()}`;
+      if (!quarters.has(q)) quarters.set(q, { hires: [], totalMonthlyImpact: 0 });
+      const entry = quarters.get(q)!;
+      entry.hires.push(hire);
+      entry.totalMonthlyImpact += (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+    }
+    return Array.from(quarters.entries()).map(([quarter, data]) => ({
+      quarter,
+      ...data,
+    }));
+  }, [plannedHires]);
+
+  function toggleDept(dept: string) {
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(dept)) next.delete(dept);
+      else next.add(dept);
+      return next;
+    });
+  }
+
   if (departmentBreakdown.length === 0 && plannedHires.length === 0) {
     return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-16 text-center">
         <div className="mx-auto max-w-md">
-          <div className="text-4xl mb-4">👥</div>
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 border border-brand-100">
+            <Users className="h-7 w-7 text-brand-500" />
+          </div>
           <h3 className="text-lg font-semibold text-surface-900 mb-2">No team members yet</h3>
-          <p className="text-sm text-surface-500 mb-6">
+          <p className="text-sm text-surface-500 mb-6 leading-relaxed">
             Add your current team and planned hires to see how headcount affects your burn rate and runway.
           </p>
           <p className="text-xs text-surface-400">
-            Use the AI companion or API: <code className="text-brand-600">POST /api/headcount</code>
+            Use the &quot;Add Team Member&quot; button above or the AI companion to get started.
           </p>
         </div>
       </div>
@@ -61,133 +108,220 @@ export function TeamDetails({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Current Team by Department */}
-      <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-200">
-          <h2 className="text-lg font-semibold text-surface-900">Current Team</h2>
-        </div>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-surface-200 bg-surface-50">
-              <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Role</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Department</th>
-              <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Count</th>
-              <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Annual Salary</th>
-              <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Total Monthly</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departmentBreakdown.map((dept) => (
-              <>
-                {/* Department header */}
-                <tr key={`dept-${dept.department}`} className="bg-surface-50/50">
-                  <td colSpan={3} className="px-6 py-2">
-                    <span className="text-xs font-semibold text-surface-700 uppercase tracking-wide">
-                      {dept.department} ({dept.headcount})
-                    </span>
-                  </td>
-                  <td className="px-6 py-2 text-right">
-                    <span className="text-xs font-medium text-surface-500">{formatCurrency(dept.monthlyCost)}/mo</span>
-                  </td>
-                  <td className="px-6 py-2 text-right">
-                    <span className="text-xs text-surface-400">
-                      {totalMonthlyCost > 0 ? `${(dept.monthlyCost / totalMonthlyCost * 100).toFixed(0)}%` : ""}
-                    </span>
-                  </td>
-                </tr>
-                {/* Members */}
-                {dept.members.map((member) => {
-                  const totalCost = (member.salary * member.count * (1 + member.benefitsRate)) / 12;
-                  return (
-                    <tr key={member.id} className="border-b border-surface-100 hover:bg-surface-50 transition-colors">
-                      <td className="px-6 py-3 pl-10">
-                        <span className="text-sm text-surface-900">{member.title}</span>
-                      </td>
-                      <td className="px-6 py-3">
-                        <span className="text-sm text-surface-500">{dept.department}</span>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <span className="text-sm text-surface-600">{member.count}</span>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <span className="text-sm text-surface-600">{formatCurrency(member.salary)}</span>
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <span className="text-sm font-medium text-surface-900">{formatCurrency(totalCost)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Planned Hires */}
-      {plannedHires.length > 0 && (
-        <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-surface-200">
-            <h2 className="text-lg font-semibold text-surface-900">Planned Hires</h2>
+    <div className="space-y-8">
+      {/* Department Cost Distribution */}
+      {departmentBreakdown.length > 0 && (
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-surface-100">
+            <h2 className="text-base font-semibold text-surface-900">Cost by Department</h2>
+            <p className="text-xs text-surface-400 mt-0.5">Monthly people cost distribution</p>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-surface-200 bg-surface-50">
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Role</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Department</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Salary</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Monthly Impact</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Start Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plannedHires.map((hire) => {
-                const monthlyImpact = (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+          <div className="p-6 space-y-4">
+            {departmentBreakdown
+              .sort((a, b) => b.monthlyCost - a.monthlyCost)
+              .map((dept, i) => {
+                const color = deptColors[i % deptColors.length]!;
+                const pct = totalMonthlyCost > 0 ? (dept.monthlyCost / totalMonthlyCost) * 100 : 0;
+                const barWidth = (dept.monthlyCost / maxDeptCost) * 100;
+                const isExpanded = expandedDepts.has(dept.department);
+
                 return (
-                  <tr key={hire.id} className="border-b border-surface-100 hover:bg-surface-50 transition-colors">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-amber-400"></span>
-                        <span className="text-sm font-medium text-surface-900">{hire.title}</span>
+                  <div key={dept.department}>
+                    <button
+                      onClick={() => toggleDept(dept.department)}
+                      className="w-full text-left group"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-surface-400" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-surface-400" />
+                          )}
+                          <span className="text-sm font-medium text-surface-900 group-hover:text-brand-600 transition-colors">
+                            {dept.department}
+                          </span>
+                          <span className="text-xs text-surface-400">
+                            {dept.headcount} {dept.headcount === 1 ? "person" : "people"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs tabular-nums text-surface-500">
+                            {pct.toFixed(0)}%
+                          </span>
+                          <span className="text-sm font-semibold tabular-nums text-surface-900">
+                            {formatCurrency(dept.monthlyCost)}
+                            <span className="text-xs font-normal text-surface-400">/mo</span>
+                          </span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className="text-sm text-surface-600">{hire.department}</span>
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <span className="text-sm text-surface-600">{formatCurrency(hire.salary)}</span>
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <span className="text-sm font-medium text-red-600">+{formatCurrency(monthlyImpact)}/mo</span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className="text-sm text-surface-500">
-                        {new Date(hire.startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                      </span>
-                    </td>
-                  </tr>
+                      {/* Progress bar */}
+                      <div className="h-2 rounded-full bg-surface-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${color.bar} transition-all duration-500`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    </button>
+
+                    {/* Expanded member list */}
+                    {isExpanded && (
+                      <div className="mt-3 ml-5 space-y-1.5 animate-fade-in">
+                        {dept.members.map((member) => {
+                          const monthlyCost =
+                            (member.salary * member.count * (1 + member.benefitsRate)) / 12;
+                          return (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className={`h-2 w-2 rounded-full ${color.dot}`} />
+                                <span className="text-sm text-surface-700">{member.title}</span>
+                                {member.count > 1 && (
+                                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+                                    ×{member.count}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4 text-right">
+                                <span className="text-xs tabular-nums text-surface-400">
+                                  {formatCurrency(member.salary)}/yr
+                                </span>
+                                <span className="text-sm tabular-nums font-medium text-surface-700">
+                                  {formatCurrency(monthlyCost)}/mo
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+          </div>
         </div>
       )}
 
-      {/* AI Headcount Impact */}
+      {/* Hiring Timeline */}
+      {hiringTimeline.length > 0 && (
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-surface-100">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-surface-400" />
+              <h2 className="text-base font-semibold text-surface-900">Hiring Timeline</h2>
+            </div>
+            <p className="text-xs text-surface-400 mt-0.5">
+              Planned hires by quarter with cumulative burn impact
+            </p>
+          </div>
+
+          <div className="p-6">
+            {/* Cumulative impact bar */}
+            <div className="mb-6 rounded-xl bg-surface-50 border border-surface-100 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-danger-500" />
+                  <span className="text-sm font-medium text-surface-700">Total Hiring Impact</span>
+                </div>
+                <span className="text-sm font-semibold tabular-nums text-danger-600">
+                  +{formatCurrency(
+                    plannedHires.reduce(
+                      (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
+                      0,
+                    ),
+                  )}
+                  /mo
+                </span>
+              </div>
+              <p className="text-xs text-surface-400 mt-1">
+                {plannedHires.reduce((s, h) => s + h.count, 0)} new{" "}
+                {plannedHires.reduce((s, h) => s + h.count, 0) === 1 ? "hire" : "hires"} across{" "}
+                {hiringTimeline.length} {hiringTimeline.length === 1 ? "quarter" : "quarters"}
+              </p>
+            </div>
+
+            {/* Timeline */}
+            <div className="relative">
+              {/* Vertical line */}
+              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-surface-200" />
+
+              <div className="space-y-6">
+                {hiringTimeline.map((q, qi) => (
+                  <div key={q.quarter} className="relative pl-10">
+                    {/* Timeline dot */}
+                    <div className="absolute left-2 top-1 h-3.5 w-3.5 rounded-full border-2 border-brand-500 bg-surface-0" />
+
+                    <div className="rounded-xl border border-surface-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 bg-surface-50">
+                        <span className="text-sm font-semibold text-surface-900">{q.quarter}</span>
+                        <span className="text-xs tabular-nums font-medium text-danger-600">
+                          +{formatCurrency(q.totalMonthlyImpact)}/mo
+                        </span>
+                      </div>
+                      <div className="divide-y divide-surface-100">
+                        {q.hires.map((hire) => {
+                          const impact =
+                            (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+                          return (
+                            <div
+                              key={hire.id}
+                              className="flex items-center justify-between px-4 py-2.5"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                <span className="text-sm text-surface-700">{hire.title}</span>
+                                <span className="text-xs text-surface-400">{hire.department}</span>
+                                {hire.count > 1 && (
+                                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+                                    ×{hire.count}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs tabular-nums text-surface-400">
+                                  {formatCurrency(hire.salary)}/yr
+                                </span>
+                                <span className="text-sm tabular-nums font-medium text-surface-700">
+                                  +{formatCurrency(impact)}/mo
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Headcount Insight */}
       {plannedHires.length > 0 && (
-        <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
           <div className="flex items-start gap-3">
-            <span className="text-lg">💡</span>
+            <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-brand-600" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-surface-900">Hiring Impact</p>
-              <p className="text-xs text-surface-600 mt-0.5">
+              <p className="text-sm font-semibold text-surface-900">Hiring Impact Analysis</p>
+              <p className="text-xs text-surface-600 mt-1 leading-relaxed">
                 {plannedHires.length} planned hire{plannedHires.length !== 1 ? "s" : ""} will add{" "}
-                {formatCurrency(plannedHires.reduce(
-                  (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
-                  0
-                ))}/mo to your burn rate.
-                Ask the AI companion to model the impact on runway and suggest optimal hiring timing.
+                <span className="font-semibold tabular-nums">
+                  {formatCurrency(
+                    plannedHires.reduce(
+                      (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
+                      0,
+                    ),
+                  )}
+                  /mo
+                </span>{" "}
+                to your burn rate. Ask the AI companion to model the impact on runway
+                and suggest optimal hiring timing.
               </p>
             </div>
           </div>
