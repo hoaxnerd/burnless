@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   }> = [];
 
   for (let i = 0; i < txInput.length; i++) {
-    const tx = txInput[i];
+    const tx = txInput[i]!;
 
     // Validate account ownership
     if (!validAccountIdSet.has(tx.accountId)) {

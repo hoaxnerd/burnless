@@ -1,7 +1,8 @@
+import { Suspense } from "react";
 import { getCompany, getScenarios } from "@/lib/data";
 import { ComparisonView } from "./comparison-view";
 
-export default async function ScenarioComparePage({
+async function CompareContent({
   searchParams,
 }: {
   searchParams: Promise<{ ids?: string }>;
@@ -18,6 +19,19 @@ export default async function ScenarioComparePage({
   }));
 
   return (
+    <ComparisonView
+      scenarios={scenarioOptions}
+      initialIds={selectedIds}
+    />
+  );
+}
+
+export default async function ScenarioComparePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ids?: string }>;
+}) {
+  return (
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-surface-900">
@@ -28,10 +42,9 @@ export default async function ScenarioComparePage({
         </p>
       </div>
 
-      <ComparisonView
-        scenarios={scenarioOptions}
-        initialIds={selectedIds}
-      />
+      <Suspense fallback={<div className="text-sm text-surface-500">Loading comparison...</div>}>
+        <CompareContent searchParams={searchParams} />
+      </Suspense>
     </div>
   );
 }

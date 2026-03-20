@@ -104,7 +104,7 @@ export default function ImportPage() {
         transformHeader: (h: string) => h.trim(),
         complete: (results) => {
           if (results.errors.length > 0 && results.data.length === 0) {
-            setError(`Parse error: ${results.errors[0].message}`);
+            setError(`Parse error: ${results.errors[0]?.message ?? "Unknown error"}`);
             return;
           }
 
