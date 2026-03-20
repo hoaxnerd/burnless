@@ -13,6 +13,8 @@ const config = [
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-console": ["warn", { allow: ["warn", "error"] }],
+      // Disabled: eslint-plugin-react's display-name rule is incompatible with ESLint 10
+      "react/display-name": "off",
     },
   },
 ];
