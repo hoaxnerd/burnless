@@ -1,30 +1,9 @@
 import Link from "next/link";
-import {
-  getCompany,
-  getDefaultScenario,
-  getAccounts,
-  getForecastLines,
-  getRevenueStreams,
-  getHeadcountPlans,
-  getFundingRounds,
-} from "@/lib/data";
-import {
-  computeAllForecastLines,
-  aggregateByAccount,
-  computeTotalRevenue,
-  computeSubscriptionDetail,
-  computeAllHeadcountCosts,
-  computeAllMetrics,
-  type ForecastLineInput,
-  type RevenueStreamInput,
-  type HeadcountPlanInput,
-  type SubscriptionParams,
-  type MetricsInput,
-  type MonthlySeries,
-  addSeries,
-  subtractSeries,
-  monthKey,
-} from "@burnless/engine";
+import { getCompany, getDefaultScenario } from "@/lib/data";
+import { computeDashboardData } from "@/lib/compute-dashboard";
+import { seriesToArray, monthKey } from "@burnless/engine";
+import { MetricCard } from "@/components/ui";
+import { OverviewCharts } from "./overview-charts";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -39,116 +18,43 @@ export default async function OverviewPage() {
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <NoScenarioPrompt />;
 
-  // Fetch all data for the scenario
-  const [accounts, fLines, revStreams, hcPlans, funding] = await Promise.all([
-    getAccounts(company.id),
-    getForecastLines(scenario.id),
-    getRevenueStreams(scenario.id),
-    getHeadcountPlans(scenario.id),
-    getFundingRounds(company.id),
-  ]);
+  const data = await computeDashboardData(company.id, scenario.id);
+  const { metrics, hasData, currentMonth } = data;
 
-  // Define period (current year)
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), 0, 1);
-  const periodEnd = new Date(now.getFullYear(), 11, 1);
-  const currentMonth = monthKey(new Date(now.getFullYear(), now.getMonth(), 1));
-
-  // Compute forecasts
-  const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
-    id: fl.id,
-    accountId: fl.accountId,
-    method: fl.method,
-    parameters: (fl.parameters ?? {}) as Record<string, unknown>,
-    startDate: fl.startDate,
-    endDate: fl.endDate,
-  }));
-  const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
-  const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
-
-  // Revenue
-  const revInputs: RevenueStreamInput[] = revStreams.map((rs) => ({
-    id: rs.id,
-    name: rs.name,
-    type: rs.type,
-    parameters: (rs.parameters ?? {}) as Record<string, unknown>,
-  }));
-  const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
-
-  // Subscription details
-  const subStreams = revStreams.filter((rs) => rs.type === "subscription");
-  const subDetails = subStreams.flatMap((rs) =>
-    computeSubscriptionDetail(
-      (rs.parameters ?? {}) as unknown as SubscriptionParams,
-      periodStart,
-      periodEnd
-    )
-  );
-
-  // Headcount
-  const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({
-    id: hp.id,
-    departmentId: hp.departmentId,
-    title: hp.title,
-    count: hp.count,
-    salary: Number(hp.salary),
-    startDate: hp.startDate,
-    endDate: hp.endDate,
-    benefitsRate: Number(hp.benefitsRate),
-  }));
-  const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
-
-  // Aggregate by category
-  const accountMap = new Map(accounts.map((a) => [a.id, a]));
-  let totalRevenue = new Map(revenueValues);
-  let totalCogs: MonthlySeries = new Map();
-  let totalOpex: MonthlySeries = new Map();
-
-  for (const [accountId, values] of accountForecasts) {
-    const account = accountMap.get(accountId);
-    if (!account) continue;
-    if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, values);
-    else if (account.category === "cogs") totalCogs = addSeries(totalCogs, values);
-    else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
-  }
-  totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
-  const totalExpenses = addSeries(totalCogs, totalOpex);
-  const netIncome = subtractSeries(totalRevenue, totalExpenses);
-
-  // Cash position
-  const startingCash = funding.reduce((sum, r) => sum + Number(r.amount), 0);
-  const cashPosition: MonthlySeries = new Map();
-  let runningCash = startingCash;
-  for (const m of Array.from(netIncome.keys()).sort()) {
-    runningCash += netIncome.get(m) ?? 0;
-    cashPosition.set(m, runningCash);
-  }
-
-  // Compute metrics
-  const metricsInput: MetricsInput = {
-    revenue: totalRevenue,
-    subscriptionDetails: subDetails,
-    totalExpenses,
-    cogs: totalCogs,
-    operatingExpenses: totalOpex,
-    cashPosition,
-    netIncome,
-    headcount: headcountCosts.headcount,
-  };
-  const metrics = computeAllMetrics(metricsInput);
-
-  // Get current month values
+  // Current month values
   const currentMrr = metrics.mrr.find((m) => m.month === currentMonth)?.value ?? 0;
   const currentBurn = metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
   const currentRunway = metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value ?? 0;
-  const currentCash = metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? startingCash;
+  const currentCash = metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? data.startingCash;
 
   // MoM growth
+  const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const prevMrr = metrics.mrr.find((m) => m.month === prevMonth)?.value ?? 0;
   const mrrGrowth = prevMrr > 0 ? (((currentMrr - prevMrr) / prevMrr) * 100).toFixed(1) : null;
 
-  const hasData = fLines.length > 0 || revStreams.length > 0 || hcPlans.length > 0;
+  const prevBurn = metrics.netBurnRate.find((m) => m.month === prevMonth)?.value ?? 0;
+  const burnChange = prevBurn > 0 ? (((currentBurn - prevBurn) / prevBurn) * 100).toFixed(1) : null;
+
+  // Chart data
+  const revenueData = metrics.totalRevenue;
+  const cashData = metrics.cashPosition;
+  const mrrData = metrics.mrr;
+  const burnRateData = metrics.netBurnRate;
+  const runwayData = metrics.cashRunwayMonths.map((m) => ({
+    ...m,
+    value: Math.min(m.value, 100), // cap for chart readability
+  }));
+
+  const revenueArr = seriesToArray(data.totalRevenue);
+  const expensesArr = seriesToArray(data.totalExpenses);
+  const revenueVsExpenses = revenueArr.map((r, i) => ({
+    month: r.month,
+    revenue: r.value,
+    expenses: expensesArr[i]?.value ?? 0,
+  }));
+
+  const hasSaaS = metrics.mrr.some((m) => m.value > 0);
 
   return (
     <div>
@@ -159,7 +65,7 @@ export default async function OverviewPage() {
         </p>
       </div>
 
-      {/* Metric cards */}
+      {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <MetricCard
           label="Cash Balance"
@@ -169,11 +75,12 @@ export default async function OverviewPage() {
         <MetricCard
           label="Monthly Burn"
           value={hasData ? formatCurrency(currentBurn) : "$0"}
+          change={burnChange ? `${Number(burnChange) >= 0 ? "+" : ""}${burnChange}% MoM` : undefined}
           description={hasData ? "Net burn rate" : "Add expenses to calculate"}
         />
         <MetricCard
           label="Runway"
-          value={hasData ? (currentRunway >= 999 ? "∞" : `${Math.round(currentRunway)} months`) : "-- months"}
+          value={hasData ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- months"}
           description={hasData ? "At current burn rate" : "Based on cash and burn rate"}
         />
         <MetricCard
@@ -184,7 +91,6 @@ export default async function OverviewPage() {
         />
       </div>
 
-      {/* Quick actions or summary */}
       {!hasData ? (
         <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
           <h2 className="text-lg font-semibold text-surface-900 mb-4">Get started</h2>
@@ -195,50 +101,49 @@ export default async function OverviewPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Key metrics summary */}
-          <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-            <h2 className="text-lg font-semibold text-surface-900 mb-4">Key Metrics</h2>
-            <div className="space-y-3">
-              <MetricRow label="ARR" value={formatCurrency(currentMrr * 12)} />
-              <MetricRow label="Gross Margin" value={`${metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0}%`} />
-              <MetricRow label="Headcount" value={`${Math.round(headcountCosts.headcount.get(currentMonth) ?? 0)}`} />
-              <MetricRow label="Rev/Employee" value={formatCurrency(metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0)} />
-            </div>
-          </div>
+        <>
+          {/* Interactive charts */}
+          <OverviewCharts
+            revenueData={revenueData}
+            expensesData={seriesToArray(data.totalExpenses)}
+            cashData={cashData}
+            mrrData={mrrData}
+            burnRateData={burnRateData}
+            runwayData={runwayData}
+            revenueVsExpenses={revenueVsExpenses}
+            hasSaaS={hasSaaS}
+          />
 
-          {/* SaaS metrics (if applicable) */}
-          {subDetails.length > 0 && (
+          {/* Key metrics tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-              <h2 className="text-lg font-semibold text-surface-900 mb-4">SaaS Metrics</h2>
+              <h2 className="text-lg font-semibold text-surface-900 mb-4">Key Metrics</h2>
               <div className="space-y-3">
-                <MetricRow label="Customers" value={`${metrics.totalCustomers.find((m) => m.month === currentMonth)?.value ?? 0}`} />
-                <MetricRow label="ARPA" value={formatCurrency(metrics.arpa.find((m) => m.month === currentMonth)?.value ?? 0)} />
-                <MetricRow label="Churn Rate" value={`${metrics.customerChurnRate.find((m) => m.month === currentMonth)?.value ?? 0}%`} />
-                <MetricRow label="LTV" value={formatCurrency(metrics.ltv.find((m) => m.month === currentMonth)?.value ?? 0)} />
-                <MetricRow label="Quick Ratio" value={`${metrics.saasQuickRatio.find((m) => m.month === currentMonth)?.value ?? 0}x`} />
+                <MetricRow label="ARR" value={formatCurrency(currentMrr * 12)} />
+                <MetricRow label="Gross Margin" value={`${metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0}%`} />
+                <MetricRow label="Headcount" value={`${Math.round(data.headcountSeries.get(currentMonth) ?? 0)}`} />
+                <MetricRow label="Rev/Employee" value={formatCurrency(metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0)} />
+                <MetricRow label="EBITDA" value={formatCurrency(metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0)} />
+                <MetricRow label="Rule of 40" value={`${metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0}`} />
               </div>
             </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
-function MetricCard({ label, value, change, description }: {
-  label: string; value: string; change?: string; description: string;
-}) {
-  return (
-    <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-      <p className="text-sm font-medium text-surface-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-surface-900">{value}</p>
-      {change && (
-        <p className={`mt-1 text-xs font-medium ${change.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-          {change}
-        </p>
+            {hasSaaS && (
+              <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
+                <h2 className="text-lg font-semibold text-surface-900 mb-4">SaaS Metrics</h2>
+                <div className="space-y-3">
+                  <MetricRow label="Customers" value={`${metrics.totalCustomers.find((m) => m.month === currentMonth)?.value ?? 0}`} />
+                  <MetricRow label="ARPA" value={formatCurrency(metrics.arpa.find((m) => m.month === currentMonth)?.value ?? 0)} />
+                  <MetricRow label="Churn Rate" value={`${metrics.customerChurnRate.find((m) => m.month === currentMonth)?.value ?? 0}%`} />
+                  <MetricRow label="LTV" value={formatCurrency(metrics.ltv.find((m) => m.month === currentMonth)?.value ?? 0)} />
+                  <MetricRow label="Quick Ratio" value={`${metrics.saasQuickRatio.find((m) => m.month === currentMonth)?.value ?? 0}x`} />
+                  <MetricRow label="Burn Multiple" value={`${metrics.burnMultiple.find((m) => m.month === currentMonth)?.value ?? 0}x`} />
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
-      <p className="mt-1 text-xs text-surface-400">{description}</p>
     </div>
   );
 }

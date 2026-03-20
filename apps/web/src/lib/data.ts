@@ -71,3 +71,24 @@ export async function getDepartments(companyId: string) {
 export async function getFundingRounds(companyId: string) {
   return db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId));
 }
+
+/** Get a scenario by ID. */
+export async function getScenarioById(scenarioId: string) {
+  const [scenario] = await db.select().from(scenarios).where(eq(scenarios.id, scenarioId));
+  return scenario ?? null;
+}
+
+/** Get the budget scenario (isBudget=true) for a company. */
+export async function getBudgetScenario(companyId: string) {
+  const [scenario] = await db
+    .select()
+    .from(scenarios)
+    .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true)))
+    .limit(1);
+  return scenario ?? null;
+}
+
+/** Get transactions for a company. */
+export async function getTransactions(companyId: string) {
+  return db.select().from(transactions).where(eq(transactions.companyId, companyId));
+}
