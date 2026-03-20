@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, companies } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { env } from "@/lib/env";
 
 /**
  * Webhook handler for integration providers.
@@ -19,7 +20,7 @@ export async function POST(
   switch (provider) {
     case "stripe": {
       const sig = request.headers.get("stripe-signature");
-      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      const endpointSecret = env.STRIPE_WEBHOOK_SECRET;
 
       if (!endpointSecret) {
         return NextResponse.json(
@@ -37,7 +38,7 @@ export async function POST(
 
       try {
         const { default: Stripe } = await import("stripe");
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+        const stripe = new Stripe(env.STRIPE_SECRET_KEY!);
         const event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
 
         // Route events to handlers

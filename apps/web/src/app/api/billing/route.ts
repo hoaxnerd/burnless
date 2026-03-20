@@ -3,6 +3,7 @@ import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from
 import { db, companies, scenarios, aiMessages, aiConversations } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
+import { env } from "@/lib/env";
 
 /**
  * Billing API — manages subscription state and Stripe integration.
@@ -68,10 +69,10 @@ export async function GET() {
     .where(eq(companies.id, ctx.companyId))
     .limit(1);
 
-  if (company?.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
+  if (company?.stripeSubscriptionId && env.STRIPE_SECRET_KEY) {
     try {
       const { default: Stripe } = await import("stripe");
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const stripe = new Stripe(env.STRIPE_SECRET_KEY);
       const sub = await stripe.subscriptions.retrieve(
         company.stripeSubscriptionId
       );
@@ -118,8 +119,7 @@ export async function POST(request: Request) {
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
 
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
+  if (!env.STRIPE_SECRET_KEY) {
     return errorResponse(
       "Stripe is not configured. Set STRIPE_SECRET_KEY to enable billing.",
       503
@@ -135,11 +135,11 @@ export async function POST(request: Request) {
     }
 
     const { default: Stripe } = await import("stripe");
-    const stripe = new Stripe(stripeKey);
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
-    const priceIds: Record<string, string> = {
-      pro: process.env.STRIPE_PRO_PRICE_ID || "",
-      team: process.env.STRIPE_TEAM_PRICE_ID || "",
+    const priceIds: Record<string, string | undefined> = {
+      pro: env.STRIPE_PRO_PRICE_ID,
+      team: env.STRIPE_TEAM_PRICE_ID,
     };
 
     const priceId = priceIds[plan];
@@ -150,8 +150,8 @@ export async function POST(request: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings?billing=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/settings?billing=canceled`,
+      success_url: `${env.APP_URL}/settings?billing=success`,
+      cancel_url: `${env.APP_URL}/settings?billing=canceled`,
       metadata: {
         companyId: ctx.companyId,
         userId: ctx.userId,
