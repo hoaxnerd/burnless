@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, transactions, financialAccounts } from "@burnless/db";
+import { db, transactions, financialAccounts, importBatches } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { categorizeTransaction } from "@burnless/engine";
 import crypto from "crypto";
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -19,6 +20,8 @@ const importTransactionSchema = z.object({
 const importSchema = z.object({
   transactions: z.array(importTransactionSchema).min(1).max(5000),
   dryRun: z.boolean().optional().default(false),
+  fileName: z.string().optional().default("import.csv"),
+  columnMapping: z.record(z.string()).optional(),
 });
 
 type ImportTransaction = z.infer<typeof importTransactionSchema>;
@@ -31,7 +34,6 @@ function generateExternalId(tx: ImportTransaction): string {
   return `import:${hash}`;
 }
 
-/** Split an array into chunks of the given size. */
 function chunk<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, importSchema);
   if ("error" in parsed) return parsed.error;
 
-  const { transactions: txInput, dryRun } = parsed.data;
+  const { transactions: txInput, dryRun, fileName, columnMapping } = parsed.data;
 
   // 1. Validate all referenced accountIds belong to this company
   const uniqueAccountIds = [...new Set(txInput.map((t) => t.accountId))];
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
 
   const validAccountIdSet = new Set(validAccounts.map((a) => a.id));
 
-  // 2. Build records and collect per-row errors
+  // 2. Build records and collect per-row errors, run AI categorization
   const errors: Array<{ index: number; message: string }> = [];
   const prepared: Array<{
     index: number;
@@ -79,19 +81,20 @@ export async function POST(request: Request) {
     description: string | null;
     source: "import";
     externalId: string;
+    importBatchId: string | null;
     metadata: Record<string, unknown> | null;
+    suggestedCategory?: string;
+    categoryConfidence?: number;
   }> = [];
 
   for (let i = 0; i < txInput.length; i++) {
     const tx = txInput[i]!;
 
-    // Validate account ownership
     if (!validAccountIdSet.has(tx.accountId)) {
       errors.push({ index: i, message: `Account ${tx.accountId} not found or not accessible` });
       continue;
     }
 
-    // Validate date
     const parsedDate = new Date(tx.date);
     if (isNaN(parsedDate.getTime())) {
       errors.push({ index: i, message: `Invalid date: ${tx.date}` });
@@ -99,6 +102,17 @@ export async function POST(request: Request) {
     }
 
     const externalId = tx.externalId || generateExternalId(tx);
+
+    // AI categorization
+    let suggestedCategory: string | undefined;
+    let categoryConfidence: number | undefined;
+    if (tx.description) {
+      const result = categorizeTransaction(tx.description);
+      if (result) {
+        suggestedCategory = result.subcategory;
+        categoryConfidence = result.confidence;
+      }
+    }
 
     prepared.push({
       index: i,
@@ -109,16 +123,23 @@ export async function POST(request: Request) {
       description: tx.description ?? null,
       source: "import" as const,
       externalId,
-      metadata: tx.metadata ?? null,
+      importBatchId: null, // Set during actual import
+      metadata: {
+        ...(tx.metadata ?? {}),
+        ...(suggestedCategory
+          ? { aiCategory: suggestedCategory, aiCategoryConfidence: categoryConfidence }
+          : {}),
+      },
+      suggestedCategory,
+      categoryConfidence,
     });
   }
 
-  // 3. Check for duplicates — find existing externalIds for this company
+  // 3. Check for duplicates
   const allExternalIds = prepared.map((p) => p.externalId);
   const existingDuplicates = new Set<string>();
 
   if (allExternalIds.length > 0) {
-    // Check in chunks to avoid overly large IN clauses
     const idChunks = chunk(allExternalIds, 500);
     for (const idChunk of idChunks) {
       const existing = await db
@@ -136,7 +157,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Also detect in-batch duplicates (keep first occurrence)
   const seenInBatch = new Set<string>();
   const toInsert: typeof prepared = [];
   let skipped = 0;
@@ -150,9 +170,14 @@ export async function POST(request: Request) {
     toInsert.push(row);
   }
 
-  // 4. Dry run — return preview without inserting
+  // 4. Dry run — return preview with AI categorization
   if (dryRun) {
-    const preview = toInsert.map(({ index, ...rest }) => rest);
+    const preview = prepared.map(({ index, suggestedCategory, categoryConfidence, importBatchId, ...rest }) => ({
+      ...rest,
+      isDuplicate: existingDuplicates.has(rest.externalId) || false,
+      suggestedCategory,
+      categoryConfidence,
+    }));
     return NextResponse.json({
       imported: toInsert.length,
       skipped,
@@ -161,16 +186,55 @@ export async function POST(request: Request) {
     });
   }
 
-  // 5. Batch insert (chunks of 100)
-  const insertChunks = chunk(toInsert, 100);
-  for (const batch of insertChunks) {
-    const values = batch.map(({ index, ...rest }) => rest);
-    await db.insert(transactions).values(values);
-  }
+  // 5. Create import batch record
+  const [batch] = await db
+    .insert(importBatches)
+    .values({
+      companyId: ctx.companyId,
+      fileName,
+      status: "processing",
+      totalRows: txInput.length,
+      accountId: uniqueAccountIds[0] ?? null,
+      columnMapping: columnMapping ?? null,
+    })
+    .returning();
 
-  return NextResponse.json({
-    imported: toInsert.length,
-    skipped,
-    errors,
-  });
+  // 6. Batch insert with batchId
+  try {
+    const insertChunks = chunk(toInsert, 100);
+    for (const batchChunk of insertChunks) {
+      const values = batchChunk.map(({ index, suggestedCategory, categoryConfidence, ...rest }) => ({
+        ...rest,
+        importBatchId: batch!.id,
+      }));
+      await db.insert(transactions).values(values);
+    }
+
+    // Update batch to completed
+    await db
+      .update(importBatches)
+      .set({
+        status: "completed",
+        importedCount: toInsert.length,
+        skippedCount: skipped,
+        errorCount: errors.length,
+        errors: errors.length > 0 ? errors : null,
+      })
+      .where(eq(importBatches.id, batch!.id));
+
+    return NextResponse.json({
+      imported: toInsert.length,
+      skipped,
+      errors,
+      batchId: batch!.id,
+    });
+  } catch (e) {
+    // Mark batch as failed
+    await db
+      .update(importBatches)
+      .set({ status: "failed", errors: [{ message: String(e) }] })
+      .where(eq(importBatches.id, batch!.id));
+
+    return errorResponse("Import failed", 500);
+  }
 }

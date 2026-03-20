@@ -307,6 +307,7 @@ export const transactions = pgTable(
     description: text("description"),
     source: transactionSourceEnum("source").notNull().default("manual"),
     externalId: text("external_id"),
+    importBatchId: text("import_batch_id"),
     metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
@@ -321,6 +322,48 @@ export const transactions = pgTable(
       table.companyId,
       table.externalId
     ),
+    index("transactions_batch_idx").on(table.importBatchId),
+  ]
+);
+
+// ── Import Batches ───────────────────────────────────────────────────────────
+
+export const importBatchStatusEnum = pgEnum("import_batch_status", [
+  "pending",
+  "processing",
+  "completed",
+  "rolled_back",
+  "failed",
+]);
+
+export const importBatches = pgTable(
+  "import_batches",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    status: importBatchStatusEnum("status").notNull().default("pending"),
+    totalRows: integer("total_rows").notNull().default(0),
+    importedCount: integer("imported_count").notNull().default(0),
+    skippedCount: integer("skipped_count").notNull().default(0),
+    errorCount: integer("error_count").notNull().default(0),
+    accountId: text("account_id").references(() => financialAccounts.id),
+    columnMapping: jsonb("column_mapping"),
+    errors: jsonb("errors"),
+    metadata: jsonb("metadata"),
+    rolledBackAt: timestamp("rolled_back_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("import_batches_company_idx").on(table.companyId),
   ]
 );
 
@@ -646,6 +689,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   fundingRounds: many(fundingRounds),
   metrics: many(metrics),
   integrations: many(integrations),
+  importBatches: many(importBatches),
   aiFeatureFlags: many(aiFeatureFlags),
   aiConversations: many(aiConversations),
 }));
@@ -686,7 +730,26 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.accountId],
     references: [financialAccounts.id],
   }),
+  importBatch: one(importBatches, {
+    fields: [transactions.importBatchId],
+    references: [importBatches.id],
+  }),
 }));
+
+export const importBatchesRelations = relations(
+  importBatches,
+  ({ one, many }) => ({
+    company: one(companies, {
+      fields: [importBatches.companyId],
+      references: [companies.id],
+    }),
+    account: one(financialAccounts, {
+      fields: [importBatches.accountId],
+      references: [financialAccounts.id],
+    }),
+    transactions: many(transactions),
+  })
+);
 
 export const scenariosRelations = relations(scenarios, ({ one, many }) => ({
   company: one(companies, {
