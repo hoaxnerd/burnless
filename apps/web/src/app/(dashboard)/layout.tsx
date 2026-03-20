@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { DashboardShell } from "./dashboard-shell";
+import { SentryUserContext } from "@/components/sentry-user-context";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function DashboardLayout({
 
   return (
     <Suspense fallback={null}>
+      <SentryUserContext userId={session?.user?.id} email={session?.user?.email} />
       <DashboardShell user={user}>{children}</DashboardShell>
     </Suspense>
   );

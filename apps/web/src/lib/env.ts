@@ -85,6 +85,10 @@ export const env = {
     return !!this.STRIPE_SECRET_KEY;
   },
 
+  // ── Monitoring ─────────────────────────────────────────────────────────
+  /** Sentry DSN for error monitoring (public — safe to expose in client bundles) */
+  SENTRY_DSN: optional("NEXT_PUBLIC_SENTRY_DSN"),
+
   // ── App ─────────────────────────────────────────────────────────────────
   /** Public app URL — used for Stripe redirects, emails, etc. */
   get APP_URL(): string {

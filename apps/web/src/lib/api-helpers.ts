@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { auth } from "./auth";
 import { db } from "@burnless/db";
 import { companyMembers, companies } from "@burnless/db";
@@ -35,6 +36,10 @@ export async function requireCompanyAccess() {
 
   const membership = await getUserCompany(userId);
   if (!membership) return { error: errorResponse("No company found", 403) } as const;
+
+  // Set Sentry user context for server-side error tracking
+  Sentry.setUser({ id: userId, email: user.email ?? undefined });
+  Sentry.setTag("companyId", membership.companyId);
 
   return {
     userId,
