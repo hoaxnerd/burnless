@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 function BurnlessLogo({ className = "" }: { className?: string }) {
   return (
@@ -73,12 +74,14 @@ export function LandingNav() {
             </a>
             <Link
               href="/login"
+              onClick={() => trackEvent("landing_nav_login_clicked")}
               className="text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors"
             >
               Log in
             </Link>
             <Link
               href="/login"
+              onClick={() => trackEvent("landing_nav_signup_clicked")}
               className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-400 transition-colors shadow-md shadow-brand-500/25"
             >
               Start free

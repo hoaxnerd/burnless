@@ -11,6 +11,7 @@ import {
   Sparkles,
   SkipForward,
 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ export default function OnboardingPage() {
 
     setStep("enriching");
     setGreeting("Analyzing...");
+    trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
 
     try {
       const res = await fetch("/api/onboarding/enrich", {
@@ -185,10 +187,12 @@ export default function OnboardingPage() {
   };
 
   const skipToForm = () => {
+    trackEvent("onboarding_skip_enrichment", { from_step: step });
     setStep("review");
   };
 
   const skipOnboarding = () => {
+    trackEvent("onboarding_skip_all", { from_step: step });
     router.push("/dashboard");
   };
 
@@ -215,6 +219,7 @@ export default function OnboardingPage() {
 
     setStep("creating");
     setCreateError(null);
+    trackEvent("onboarding_company_create_started");
 
     try {
       const res = await fetch("/api/onboarding", {
@@ -237,9 +242,11 @@ export default function OnboardingPage() {
       }
 
       setStep("done");
+      trackEvent("onboarding_completed");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
+      trackEvent("onboarding_company_create_error", { error: message });
       setCreateError(message);
       setStep("review");
       submittingRef.current = false;

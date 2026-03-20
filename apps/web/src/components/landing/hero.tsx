@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Shield, Lock, Globe } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 function MeshGradient() {
   return (
@@ -216,6 +217,7 @@ export function HeroSection() {
           >
             <Link
               href="/login"
+              onClick={() => trackEvent("landing_hero_cta_clicked")}
               className="rounded-xl bg-brand-500 px-8 py-3.5 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5"
             >
               See your runway →

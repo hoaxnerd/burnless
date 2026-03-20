@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { CookieConsentBanner } from "@/components/cookie-consent";
+import { AnalyticsProvider } from "@/components/analytics-provider";
 
 export const metadata: Metadata = {
   title: "Burnless — AI Financial Planning for Startups",
@@ -50,6 +52,9 @@ export default function RootLayout({
           Skip to main content
         </a>
         <div id="main-content">{children}</div>
+        <Suspense fallback={null}>
+          <AnalyticsProvider />
+        </Suspense>
         <CookieConsentBanner />
       </body>
     </html>

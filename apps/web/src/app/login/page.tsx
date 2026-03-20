@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { trackEvent, identifyUser } from "@/lib/analytics";
 
 type AuthStep = "email" | "signin" | "signup";
 
@@ -45,6 +46,7 @@ export default function LoginPage() {
       }
 
       const { exists } = await res.json();
+      trackEvent("auth_email_submitted", { account_exists: exists });
       setStep(exists ? "signin" : "signup");
     } catch {
       setError("Unable to connect. Please check your internet.");
@@ -65,9 +67,12 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
+      trackEvent("auth_signin_error", { method: "credentials" });
       setError("Wrong password. Please try again.");
       setIsLoading(false);
     } else {
+      trackEvent("auth_signin_success", { method: "credentials" });
+      identifyUser(email);
       window.location.href = "/dashboard";
     }
   }
@@ -99,13 +104,17 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
+        trackEvent("auth_signup_partial", { step: "auto_signin_failed" });
         setError("Account created! Please sign in.");
         setStep("signin");
         setIsLoading(false);
       } else {
+        trackEvent("auth_signup_success", { method: "credentials" });
+        identifyUser(email, { name: name || undefined });
         window.location.href = "/onboarding";
       }
     } catch {
+      trackEvent("auth_signup_error", { method: "credentials" });
       setError("Something went wrong. Please try again.");
       setIsLoading(false);
     }
@@ -250,9 +259,10 @@ export default function LoginPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    signIn("google", { callbackUrl: "/dashboard" })
-                  }
+                  onClick={() => {
+                    trackEvent("auth_oauth_clicked", { provider: "google" });
+                    signIn("google", { callbackUrl: "/dashboard" });
+                  }}
                   className="flex items-center justify-center gap-2 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm font-medium text-surface-700 hover:bg-surface-50 hover:border-surface-400 transition-all"
                 >
                   <svg className="h-4.5 w-4.5" viewBox="0 0 24 24">
@@ -277,9 +287,10 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    signIn("github", { callbackUrl: "/dashboard" })
-                  }
+                  onClick={() => {
+                    trackEvent("auth_oauth_clicked", { provider: "github" });
+                    signIn("github", { callbackUrl: "/dashboard" });
+                  }}
                   className="flex items-center justify-center gap-2 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm font-medium text-surface-700 hover:bg-surface-50 hover:border-surface-400 transition-all"
                 >
                   <svg

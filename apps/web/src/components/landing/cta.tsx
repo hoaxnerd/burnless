@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useInView } from "./use-in-view";
+import { trackEvent } from "@/lib/analytics";
 
 export function CTASection() {
   const { ref, inView } = useInView();
@@ -36,6 +37,7 @@ export function CTASection() {
         <div className="mt-10">
           <Link
             href="/login"
+            onClick={() => trackEvent("landing_cta_signup_clicked")}
             className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-8 py-4 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5 group"
           >
             Start planning free
