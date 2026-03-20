@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, transactions, fundingRounds } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   const lineIds = fLines.map((l) => l.id);
   const allValues = lineIds.length > 0
     ? await db.select().from(forecastValues).where(
-        eq(forecastValues.forecastLineId, fLines[0]!.id) // TODO: use inArray for multi
+        inArray(forecastValues.forecastLineId, lineIds)
       )
     : [];
 

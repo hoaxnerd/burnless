@@ -1,17 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Wire up to signIn()
-    setTimeout(() => setIsLoading(false), 1000);
+    setError("");
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
+      setIsLoading(false);
+    } else {
+      window.location.href = "/dashboard";
+    }
   }
 
   return (
@@ -36,6 +51,7 @@ export default function LoginPage() {
           <div className="space-y-3 mb-6">
             <button
               type="button"
+              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
               className="w-full flex items-center justify-center gap-3 rounded-lg border border-surface-300 bg-surface-0 px-4 py-2.5 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -60,6 +76,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
+              onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
               className="w-full flex items-center justify-center gap-3 rounded-lg border border-surface-300 bg-surface-0 px-4 py-2.5 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -81,7 +98,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Email form */}
+          {error && (
+            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Email/password form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
@@ -100,12 +123,30 @@ export default function LoginPage() {
                 className="w-full rounded-lg border border-surface-300 bg-surface-0 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-surface-700 mb-1.5"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min. 8 characters"
+                required
+                minLength={8}
+                className="w-full rounded-lg border border-surface-300 bg-surface-0 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+            </div>
             <button
               type="submit"
               disabled={isLoading}
               className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
             >
-              {isLoading ? "Signing in..." : "Continue with email"}
+              {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </form>
         </div>
