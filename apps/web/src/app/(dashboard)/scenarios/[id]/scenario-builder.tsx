@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,6 +12,13 @@ import {
   Users,
   Clock,
   AlertTriangle,
+  Undo2,
+  Redo2,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -53,6 +60,71 @@ const defaultParams: WhatIfParams = {
   burnGrowthRate: 3,
 };
 
+const paramLabels: Record<keyof WhatIfParams, string> = {
+  cashOnHand: "Cash on Hand",
+  monthlyBurn: "Monthly Burn",
+  burnGrowthRate: "Burn Growth Rate",
+  monthlyRevenue: "Monthly Revenue",
+  revenueGrowthRate: "Revenue Growth Rate",
+  headcount: "Headcount",
+  monthlyHireCost: "Avg Cost per Hire",
+};
+
+const paramFormats: Record<keyof WhatIfParams, (v: number) => string> = {
+  cashOnHand: formatCurrency,
+  monthlyBurn: formatCurrency,
+  burnGrowthRate: (v) => `${v}%/mo`,
+  monthlyRevenue: formatCurrency,
+  revenueGrowthRate: (v) => `${v}%/mo`,
+  headcount: (v) => `${v} people`,
+  monthlyHireCost: formatCurrency,
+};
+
+/* ── Undo/Redo Hook ──────────────────────────────────────────────────────── */
+
+function useUndoRedo<T>(initial: T) {
+  const [state, setState] = useState(initial);
+  const historyRef = useRef<T[]>([initial]);
+  const indexRef = useRef(0);
+
+  const set = useCallback((next: T | ((prev: T) => T)) => {
+    setState((prev) => {
+      const nextVal = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
+      // Truncate future history
+      historyRef.current = historyRef.current.slice(0, indexRef.current + 1);
+      historyRef.current.push(nextVal);
+      // Cap history at 50 entries
+      if (historyRef.current.length > 50) {
+        historyRef.current.shift();
+      } else {
+        indexRef.current++;
+      }
+      return nextVal;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    if (indexRef.current > 0) {
+      indexRef.current--;
+      setState(historyRef.current[indexRef.current]);
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    if (indexRef.current < historyRef.current.length - 1) {
+      indexRef.current++;
+      setState(historyRef.current[indexRef.current]);
+    }
+  }, []);
+
+  const canUndo = indexRef.current > 0;
+  const canRedo = indexRef.current < historyRef.current.length - 1;
+
+  return { state, set, undo, redo, canUndo, canRedo };
+}
+
+/* ── Projection Logic ──────────────────────────────────────────────────── */
+
 function projectCashFlow(params: WhatIfParams, months: number) {
   const series: { month: number; label: string; cash: number; revenue: number; burn: number; netBurn: number }[] = [];
   let cash = params.cashOnHand;
@@ -77,7 +149,6 @@ function projectCashFlow(params: WhatIfParams, months: number) {
   }
 
   if (runwayMonth === null && cash > 0) {
-    // Estimate runway if cash doesn't hit zero in projection window
     let tempCash = params.cashOnHand;
     let tempRev = params.monthlyRevenue;
     let tempBurn = params.monthlyBurn + params.headcount * params.monthlyHireCost;
@@ -101,6 +172,8 @@ function formatCurrency(value: number): string {
   return `$${Math.round(value)}`;
 }
 
+/* ── Main Component ──────────────────────────────────────────────────────── */
+
 export function ScenarioBuilder({
   scenario,
   forecastLineCount,
@@ -111,17 +184,56 @@ export function ScenarioBuilder({
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
   const isActive = activeScenarioId === scenario.id;
 
-  const [params, setParams] = useState<WhatIfParams>(() => ({
+  const {
+    state: params,
+    set: setParams,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useUndoRedo<WhatIfParams>({
     ...defaultParams,
     cashOnHand: totalFunding || defaultParams.cashOnHand,
-  }));
+  });
+
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
 
   const updateParam = useCallback(
     <K extends keyof WhatIfParams>(key: K, value: WhatIfParams[K]) => {
       setParams((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    [setParams],
   );
+
+  const resetToDefaults = useCallback(() => {
+    setParams({
+      ...defaultParams,
+      cashOnHand: totalFunding || defaultParams.cashOnHand,
+    });
+  }, [totalFunding, setParams]);
+
+  // Listen for Cmd+Z / Cmd+Shift+Z
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    },
+    [undo, redo],
+  );
+
+  // Register keyboard listener
+  useState(() => {
+    if (typeof window !== "undefined") {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  });
 
   const projectionMonths = 24;
   const { series, runwayMonth } = useMemo(
@@ -135,7 +247,7 @@ export function ScenarioBuilder({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link
             href="/scenarios"
@@ -145,7 +257,7 @@ export function ScenarioBuilder({
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-surface-900">{scenario.name}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">{scenario.name}</h1>
               <span className="rounded-full bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-600">
                 {scenario.type}
               </span>
@@ -166,6 +278,34 @@ export function ScenarioBuilder({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Undo/Redo buttons */}
+          <div className="flex items-center rounded-xl border border-surface-200 overflow-hidden">
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-2 text-surface-500 hover:bg-surface-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Undo (Cmd+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <div className="w-px h-5 bg-surface-200" />
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-2 text-surface-500 hover:bg-surface-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Redo (Cmd+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            onClick={resetToDefaults}
+            className="flex items-center gap-1.5 rounded-xl border border-surface-200 px-3 py-2 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
+            title="Reset to defaults"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </button>
           {isActive ? (
             <button
               onClick={exitScenario}
@@ -177,7 +317,7 @@ export function ScenarioBuilder({
           ) : (
             <button
               onClick={() => enterScenario(scenario.id, scenario.name)}
-              className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors shadow-sm shadow-brand-600/20"
             >
               <Play className="h-4 w-4" />
               Enter Sandbox
@@ -188,32 +328,16 @@ export function ScenarioBuilder({
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard
-          icon={Settings2}
-          label="Forecast Lines"
-          value={String(forecastLineCount)}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Revenue Streams"
-          value={String(revenueStreamCount)}
-        />
-        <StatCard
-          icon={Users}
-          label="Headcount Plans"
-          value={String(headcountPlanCount)}
-        />
-        <StatCard
-          icon={DollarSign}
-          label="Total Funding"
-          value={formatCurrency(totalFunding)}
-        />
+        <StatCard icon={Settings2} label="Forecast Lines" value={String(forecastLineCount)} />
+        <StatCard icon={TrendingUp} label="Revenue Streams" value={String(revenueStreamCount)} />
+        <StatCard icon={Users} label="Headcount Plans" value={String(headcountPlanCount)} />
+        <StatCard icon={DollarSign} label="Total Funding" value={formatCurrency(totalFunding)} />
       </div>
 
       {/* What-If Builder */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sliders Panel */}
-        <div className="lg:col-span-1 rounded-xl bg-surface-0 border border-surface-200 p-6 space-y-6">
+        <div className="lg:col-span-1 rounded-2xl bg-surface-0 border border-surface-200 p-6 space-y-6">
           <div className="flex items-center gap-2 mb-2">
             <Settings2 className="h-4 w-4 text-brand-600" />
             <h2 className="text-sm font-semibold text-surface-900">What-If Parameters</h2>
@@ -222,63 +346,49 @@ export function ScenarioBuilder({
           <SliderInput
             label="Cash on Hand"
             value={params.cashOnHand}
-            min={0}
-            max={5000000}
-            step={25000}
+            min={0} max={5000000} step={25000}
             format={formatCurrency}
             onChange={(v) => updateParam("cashOnHand", v)}
           />
           <SliderInput
             label="Monthly Burn"
             value={params.monthlyBurn}
-            min={0}
-            max={500000}
-            step={5000}
+            min={0} max={500000} step={5000}
             format={formatCurrency}
             onChange={(v) => updateParam("monthlyBurn", v)}
           />
           <SliderInput
             label="Burn Growth Rate"
             value={params.burnGrowthRate}
-            min={0}
-            max={20}
-            step={0.5}
+            min={0} max={20} step={0.5}
             format={(v) => `${v}%`}
             onChange={(v) => updateParam("burnGrowthRate", v)}
           />
           <SliderInput
             label="Monthly Revenue"
             value={params.monthlyRevenue}
-            min={0}
-            max={500000}
-            step={1000}
+            min={0} max={500000} step={1000}
             format={formatCurrency}
             onChange={(v) => updateParam("monthlyRevenue", v)}
           />
           <SliderInput
             label="Revenue Growth Rate"
             value={params.revenueGrowthRate}
-            min={0}
-            max={50}
-            step={1}
+            min={0} max={50} step={1}
             format={(v) => `${v}%/mo`}
             onChange={(v) => updateParam("revenueGrowthRate", v)}
           />
           <SliderInput
             label="Headcount"
             value={params.headcount}
-            min={1}
-            max={100}
-            step={1}
+            min={1} max={100} step={1}
             format={(v) => `${v} people`}
             onChange={(v) => updateParam("headcount", v)}
           />
           <SliderInput
             label="Avg Cost per Hire"
             value={params.monthlyHireCost}
-            min={3000}
-            max={25000}
-            step={500}
+            min={3000} max={25000} step={500}
             format={formatCurrency}
             onChange={(v) => updateParam("monthlyHireCost", v)}
           />
@@ -377,11 +487,117 @@ export function ScenarioBuilder({
           </ChartCard>
         </div>
       </div>
+
+      {/* Assumptions Panel */}
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+        <button
+          onClick={() => setAssumptionsOpen(!assumptionsOpen)}
+          className="w-full flex items-center justify-between p-5 hover:bg-surface-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Settings2 className="h-4 w-4 text-surface-500" />
+            <div className="text-left">
+              <h3 className="text-sm font-semibold text-surface-900">Assumptions</h3>
+              <p className="text-xs text-surface-500 mt-0.5">
+                {Object.keys(params).length} parameters defining this scenario
+              </p>
+            </div>
+          </div>
+          {assumptionsOpen ? (
+            <ChevronUp className="h-4 w-4 text-surface-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-surface-400" />
+          )}
+        </button>
+
+        {assumptionsOpen && (
+          <div className="border-t border-surface-200 divide-y divide-surface-100">
+            {(Object.keys(paramLabels) as Array<keyof WhatIfParams>).map((key) => (
+              <AssumptionRow
+                key={key}
+                label={paramLabels[key]}
+                value={params[key]}
+                format={paramFormats[key]}
+                onChange={(v) => updateParam(key, v)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ── Sub-components ──────────────────────────────────────────────────────────── */
+/* ── Sub-components ──────────────────────────────────────────────────────── */
+
+function AssumptionRow({
+  label,
+  value,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+
+  const startEdit = () => {
+    setEditValue(String(value));
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    const parsed = Number(editValue);
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+    }
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3 hover:bg-surface-50 transition-colors group">
+      <span className="text-sm text-surface-600">{label}</span>
+      <div className="flex items-center gap-2">
+        {editing ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              autoFocus
+              className="w-24 rounded-lg border border-brand-500 bg-surface-0 px-2 py-1 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            />
+            <button
+              onClick={commitEdit}
+              className="rounded-md p-1 text-success-600 hover:bg-success-50 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <span className="text-sm font-semibold text-surface-900 tabular-nums">
+              {format(value)}
+            </span>
+            <button
+              onClick={startEdit}
+              className="opacity-0 group-hover:opacity-100 rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function StatCard({
   icon: Icon,
@@ -428,9 +644,7 @@ function KpiCard({
   };
 
   return (
-    <div
-      className={`rounded-xl border border-surface-200 border-l-4 ${colorMap[color]} p-4`}
-    >
+    <div className={`rounded-xl border border-surface-200 border-l-4 ${colorMap[color]} p-4`}>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className={`h-3.5 w-3.5 ${textColor[color]}`} />
         <p className="text-xs text-surface-500">{label}</p>
@@ -510,7 +724,6 @@ function RunwayChart({
   const zeroY = scaleY(0);
   const points = series.map((s, i) => `${scaleX(i)},${scaleY(s.cash)}`).join(" ");
 
-  // Gradient fill area
   const areaPath = `M${scaleX(0)},${zeroY} ${series.map((s, i) => `L${scaleX(i)},${scaleY(s.cash)}`).join(" ")} L${scaleX(series.length - 1)},${zeroY} Z`;
 
   return (
@@ -524,44 +737,24 @@ function RunwayChart({
       {/* Zero line */}
       {minCash < 0 && (
         <line
-          x1={padding.left}
-          y1={zeroY}
-          x2={width - padding.right}
-          y2={zeroY}
-          stroke="var(--color-surface-300)"
-          strokeDasharray="4,4"
-          strokeWidth="1"
+          x1={padding.left} y1={zeroY} x2={width - padding.right} y2={zeroY}
+          stroke="var(--color-surface-300)" strokeDasharray="4,4" strokeWidth="1"
         />
       )}
       {/* Area fill */}
       <path d={areaPath} fill="url(#cashGradient)" />
       {/* Line */}
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#10b981"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
+      <polyline points={points} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />
       {/* Runway marker */}
       {runwayMonth !== null && runwayMonth < series.length && (
         <>
           <line
-            x1={scaleX(runwayMonth)}
-            y1={padding.top}
-            x2={scaleX(runwayMonth)}
-            y2={height - padding.bottom}
-            stroke="#ef4444"
-            strokeDasharray="4,4"
-            strokeWidth="1.5"
+            x1={scaleX(runwayMonth)} y1={padding.top} x2={scaleX(runwayMonth)} y2={height - padding.bottom}
+            stroke="#ef4444" strokeDasharray="4,4" strokeWidth="1.5"
           />
           <text
-            x={scaleX(runwayMonth)}
-            y={padding.top - 5}
-            textAnchor="middle"
-            fill="#ef4444"
-            fontSize="10"
-            fontWeight="600"
+            x={scaleX(runwayMonth)} y={padding.top - 5} textAnchor="middle"
+            fill="#ef4444" fontSize="10" fontWeight="600"
           >
             Cash = $0
           </text>
@@ -571,33 +764,17 @@ function RunwayChart({
       {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
         const v = minCash + pct * range;
         return (
-          <text
-            key={pct}
-            x={padding.left - 6}
-            y={scaleY(v) + 3}
-            textAnchor="end"
-            fill="var(--color-surface-400)"
-            fontSize="9"
-          >
+          <text key={pct} x={padding.left - 6} y={scaleY(v) + 3} textAnchor="end" fill="var(--color-surface-400)" fontSize="9">
             {formatCurrency(v)}
           </text>
         );
       })}
       {/* X-axis labels */}
-      {series
-        .filter((_, i) => i % 3 === 0)
-        .map((s, idx) => (
-          <text
-            key={idx}
-            x={scaleX(s.month)}
-            y={height - 8}
-            textAnchor="middle"
-            fill="var(--color-surface-400)"
-            fontSize="9"
-          >
-            {s.label}
-          </text>
-        ))}
+      {series.filter((_, i) => i % 3 === 0).map((s, idx) => (
+        <text key={idx} x={scaleX(s.month)} y={height - 8} textAnchor="middle" fill="var(--color-surface-400)" fontSize="9">
+          {s.label}
+        </text>
+      ))}
     </svg>
   );
 }
@@ -626,35 +803,18 @@ function RevenueBurnChart({
         const x = padding.left + i * barGroupW;
         return (
           <g key={i}>
-            {/* Revenue bar */}
             <rect
-              x={x + barGroupW * 0.1}
-              y={scaleY(s.revenue)}
-              width={barW}
-              height={chartH + padding.top - scaleY(s.revenue)}
-              rx={2}
-              fill="#3b82f6"
-              opacity={0.8}
+              x={x + barGroupW * 0.1} y={scaleY(s.revenue)}
+              width={barW} height={chartH + padding.top - scaleY(s.revenue)}
+              rx={2} fill="#3b82f6" opacity={0.8}
             />
-            {/* Burn bar */}
             <rect
-              x={x + barGroupW * 0.1 + barW + 2}
-              y={scaleY(s.burn)}
-              width={barW}
-              height={chartH + padding.top - scaleY(s.burn)}
-              rx={2}
-              fill="#ef4444"
-              opacity={0.6}
+              x={x + barGroupW * 0.1 + barW + 2} y={scaleY(s.burn)}
+              width={barW} height={chartH + padding.top - scaleY(s.burn)}
+              rx={2} fill="#ef4444" opacity={0.6}
             />
-            {/* X label */}
             {i % 3 === 0 && (
-              <text
-                x={x + barGroupW / 2}
-                y={height - 8}
-                textAnchor="middle"
-                fill="var(--color-surface-400)"
-                fontSize="9"
-              >
+              <text x={x + barGroupW / 2} y={height - 8} textAnchor="middle" fill="var(--color-surface-400)" fontSize="9">
                 {s.label}
               </text>
             )}
@@ -665,23 +825,16 @@ function RevenueBurnChart({
       {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
         const v = pct * maxVal;
         return (
-          <text
-            key={pct}
-            x={padding.left - 6}
-            y={scaleY(v) + 3}
-            textAnchor="end"
-            fill="var(--color-surface-400)"
-            fontSize="9"
-          >
+          <text key={pct} x={padding.left - 6} y={scaleY(v) + 3} textAnchor="end" fill="var(--color-surface-400)" fontSize="9">
             {formatCurrency(v)}
           </text>
         );
       })}
-      {/* Legend */}
-      <rect x={width - 140} y={6} width={8} height={8} rx={2} fill="#3b82f6" opacity={0.8} />
-      <text x={width - 128} y={14} fill="var(--color-surface-500)" fontSize="9">Revenue</text>
-      <rect x={width - 70} y={6} width={8} height={8} rx={2} fill="#ef4444" opacity={0.6} />
-      <text x={width - 58} y={14} fill="var(--color-surface-500)" fontSize="9">Burn</text>
+      {/* Inline legend */}
+      <circle cx={width - 130} cy={10} r={4} fill="#3b82f6" opacity={0.8} />
+      <text x={width - 122} y={14} fill="var(--color-surface-500)" fontSize="9">Revenue</text>
+      <circle cx={width - 64} cy={10} r={4} fill="#ef4444" opacity={0.6} />
+      <text x={width - 56} y={14} fill="var(--color-surface-500)" fontSize="9">Burn</text>
     </svg>
   );
 }
