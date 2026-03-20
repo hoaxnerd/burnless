@@ -659,6 +659,45 @@ export const aiConversations = pgTable(
   ]
 );
 
+// ── AI Insight Cache ─────────────────────────────────────────────────────────
+
+export const aiInsightCacheTypeEnum = pgEnum("ai_insight_cache_type", [
+  "dashboard",
+  "revenue",
+  "expense",
+  "scenario",
+  "general",
+]);
+
+export const aiInsightCache = pgTable(
+  "ai_insight_cache",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    type: aiInsightCacheTypeEnum("type").notNull(),
+    key: text("key").notNull(),
+    content: jsonb("content").notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("ai_insight_cache_company_idx").on(table.companyId),
+    uniqueIndex("ai_insight_cache_company_key_idx").on(
+      table.companyId,
+      table.type,
+      table.key
+    ),
+  ]
+);
+
 export const aiMessages = pgTable(
   "ai_messages",
   {
@@ -701,6 +740,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   importBatches: many(importBatches),
   aiFeatureFlags: many(aiFeatureFlags),
   aiConversations: many(aiConversations),
+  aiInsightCache: many(aiInsightCache),
 }));
 
 export const companyMembersRelations = relations(companyMembers, ({ one }) => ({
@@ -860,6 +900,13 @@ export const aiConversationsRelations = relations(
     messages: many(aiMessages),
   })
 );
+
+export const aiInsightCacheRelations = relations(aiInsightCache, ({ one }) => ({
+  company: one(companies, {
+    fields: [aiInsightCache.companyId],
+    references: [companies.id],
+  }),
+}));
 
 export const aiMessagesRelations = relations(aiMessages, ({ one }) => ({
   conversation: one(aiConversations, {

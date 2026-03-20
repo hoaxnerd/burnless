@@ -2,6 +2,7 @@
 
 import { AlertTriangle, TrendingUp, ArrowRight, Sparkles, ShieldAlert, Info } from "lucide-react";
 import Link from "next/link";
+import { AiGate } from "@/components/ai/ai-gate";
 
 interface AiInsightBannerProps {
   runway: number;
@@ -18,6 +19,7 @@ export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsight
   const Icon = styles.icon;
 
   return (
+    <AiGate feature="insights" hideWhenOff>
     <div
       className={`
         relative overflow-hidden rounded-2xl border p-4 sm:p-5 mb-6
@@ -64,6 +66,7 @@ export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsight
         </Link>
       </div>
     </div>
+    </AiGate>
   );
 }
 

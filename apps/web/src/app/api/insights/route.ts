@@ -1,16 +1,56 @@
 /**
+ * GET  /api/insights — Retrieve cached AI insights (works in show_cached mode).
  * POST /api/insights — Generate AI-powered insights for the current financial state.
- * Returns proactive alerts, variance analysis, and recommendations.
+ *
+ * POST caches results for later retrieval via GET.
  */
 
 import { NextResponse } from "next/server";
-import { db, scenarios as scenariosTable } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import { generateInsights } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
-import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed, getAiFlags } from "@/lib/ai-feature-flags";
+import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
+
+// ── GET: serve cached insights ─────────────────────────────────────────────
+
+export async function GET() {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx.error;
+
+  const flags = await getAiFlags(ctx.companyId);
+  const status = resolveFeatureStatus(flags, "insights");
+
+  if (!status.enabled && !status.showCached) {
+    return NextResponse.json({ insights: [], reason: "AI insights are disabled" });
+  }
+
+  const cached = await db
+    .select()
+    .from(aiInsightCache)
+    .where(
+      and(
+        eq(aiInsightCache.companyId, ctx.companyId),
+        eq(aiInsightCache.type, "dashboard")
+      )
+    )
+    .limit(1);
+
+  if (!cached[0]) {
+    return NextResponse.json({ insights: [], cached: true });
+  }
+
+  return NextResponse.json({
+    insights: cached[0].content,
+    cached: true,
+    cachedAt: cached[0].updatedAt,
+  });
+}
+
+// ── POST: generate + cache insights ────────────────────────────────────────
 
 export async function POST(request: Request) {
   const ctx = await requireCompanyAccess();
@@ -19,6 +59,12 @@ export async function POST(request: Request) {
   // Check AI feature flags — insights need LLM access
   const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "insights");
   if (!aiCheck.allowed) {
+    // If in show_cached mode, fall back to cached results
+    const flags = await getAiFlags(ctx.companyId);
+    const status = resolveFeatureStatus(flags, "insights");
+    if (status.showCached) {
+      return GET();
+    }
     return NextResponse.json({ insights: [], reason: aiCheck.reason });
   }
 
@@ -49,6 +95,25 @@ export async function POST(request: Request) {
   });
 
   const insights = generateInsights(snapshot);
+
+  // Cache the generated insights for show_cached mode
+  const cacheKey = `scenario:${scenario.id}`;
+  await db
+    .insert(aiInsightCache)
+    .values({
+      companyId: ctx.companyId,
+      type: "dashboard",
+      key: cacheKey,
+      content: insights,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+    })
+    .onConflictDoUpdate({
+      target: [aiInsightCache.companyId, aiInsightCache.type, aiInsightCache.key],
+      set: {
+        content: insights,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
 
   return NextResponse.json({
     insights,
