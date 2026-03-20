@@ -336,13 +336,21 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <button
-                type="button"
-                onClick={handleBack}
-                className="mt-5 w-full text-center text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium"
-              >
-                &larr; Use a different email
-              </button>
+              <div className="mt-5 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium"
+                >
+                  &larr; Different email
+                </button>
+                <Link
+                  href={`/reset-password?email=${encodeURIComponent(email)}`}
+                  className="text-sm text-surface-500 hover:text-brand-600 transition-colors font-medium"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
           )}
 

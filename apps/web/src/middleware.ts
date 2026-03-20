@@ -41,7 +41,13 @@ export function middleware(request: NextRequest) {
   if (!pathname.startsWith("/api/")) return NextResponse.next();
 
   // Skip NextAuth session/callback internals (they have CSRF + session validation)
-  if (pathname.startsWith("/api/auth/") && !pathname.startsWith("/api/auth/register") && !pathname.startsWith("/api/auth/check-email")) {
+  if (
+    pathname.startsWith("/api/auth/") &&
+    !pathname.startsWith("/api/auth/register") &&
+    !pathname.startsWith("/api/auth/check-email") &&
+    !pathname.startsWith("/api/auth/forgot-password") &&
+    !pathname.startsWith("/api/auth/reset-password")
+  ) {
     return NextResponse.next();
   }
 
@@ -105,7 +111,12 @@ export function middleware(request: NextRequest) {
 
 function resolveRateLimitTier(pathname: string, method: string) {
   // Auth endpoints — strictest tier (brute force protection)
-  if (pathname.startsWith("/api/auth/register") || pathname.startsWith("/api/auth/check-email")) {
+  if (
+    pathname.startsWith("/api/auth/register") ||
+    pathname.startsWith("/api/auth/check-email") ||
+    pathname.startsWith("/api/auth/forgot-password") ||
+    pathname.startsWith("/api/auth/reset-password")
+  ) {
     return RATE_LIMITS.auth!;
   }
 
