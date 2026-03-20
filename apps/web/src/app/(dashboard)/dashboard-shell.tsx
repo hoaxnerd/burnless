@@ -31,6 +31,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ToastProvider } from "@/components/ui/toast";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { LocaleProvider } from "@/components/locale/locale-context";
+import { useProactiveAlerts } from "@/components/ai/use-proactive-alerts";
 
 const coreNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -117,6 +118,9 @@ function DashboardContent({
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Proactive financial alerts — shown as toast notifications once per session
+  useProactiveAlerts();
 
   // Close mobile sidebar on navigation
   useEffect(() => {
