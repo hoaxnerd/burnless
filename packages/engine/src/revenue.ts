@@ -94,6 +94,8 @@ export interface SubscriptionDetail {
   contractionMrr?: number;
   /** Alias for contractionMrr — MRR reduction without full cancellation */
   downgradeMrr?: number;
+  /** MRR from previously churned customers returning */
+  reactivationMrr?: number;
   netNewMrr: number;
   /** Number of active users (distinct from accounts/customers) — for ARPU */
   activeUsers?: number;

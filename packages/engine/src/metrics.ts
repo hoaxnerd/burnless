@@ -53,6 +53,8 @@ export interface MetricsInput {
   currentAssets?: MonthlySeries;
   /** Monthly current liabilities (for Working Capital) */
   currentLiabilities?: MonthlySeries;
+  /** Monthly depreciation & amortization (for EBITDA) */
+  depreciationAmortization?: MonthlySeries;
   /** Monthly retention spend (for Customer Retention Cost) */
   retentionSpend?: MonthlySeries;
 }
@@ -119,6 +121,7 @@ export interface ComputedMetrics {
   // MRR Decomposition (Tier-1)
   contractionMrr: MetricValue[];
   downgradeMrr: MetricValue[];
+  reactivationMrr: MetricValue[];
 
   // Retention (Tier-1)
   netRevenueRetention: MetricValue[];
@@ -280,15 +283,29 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // Magic Number = Net New ARR (MoM) / Previous Month's S&M Spend
+  // Magic Number = Net New ARR (QoQ) / Previous Quarter S&M Spend
+  // Uses rolling 3-month windows when enough data, falls back to monthly
   const magicNumber = months.map((m, i) => {
-    if (i === 0) return { month: m, value: 0 };
+    if (i < 3) {
+      // Not enough for quarterly — fall back to monthly approximation
+      if (i === 0) return { month: m, value: 0 };
+      const currMrr = D(mrr[i]?.value ?? 0);
+      const prevMrr = D(mrr[i - 1]?.value ?? 0);
+      const netNewArr = currMrr.minus(prevMrr).mul(12);
+      const prevSpend = D(input.acquisitionSpend?.get(months[i - 1]!) ?? 0);
+      if (prevSpend.isZero()) return { month: m, value: 0 };
+      return { month: m, value: dRound2(netNewArr.div(prevSpend)) };
+    }
+    // Quarterly: net new ARR over 3 months / prior quarter S&M spend
     const currMrr = D(mrr[i]?.value ?? 0);
-    const prevMrr = D(mrr[i - 1]?.value ?? 0);
-    const netNewArr = currMrr.minus(prevMrr).mul(12);
-    const prevMonth = months[i - 1] ?? m;
-    const prevSpend = D(input.acquisitionSpend?.get(prevMonth) ?? 0);
-    if (prevSpend.isZero()) return { month: m, value: 0 };
-    return { month: m, value: dRound2(netNewArr.div(prevSpend)) };
+    const qtrAgoMrr = D(mrr[i - 3]?.value ?? 0);
+    const netNewArr = currMrr.minus(qtrAgoMrr).mul(4); // annualize quarterly change
+    let priorQtrSpend = D(0);
+    for (let j = Math.max(0, i - 3); j < i; j++) {
+      priorQtrSpend = priorQtrSpend.plus(input.acquisitionSpend?.get(months[j]!) ?? 0);
+    }
+    if (priorQtrSpend.isZero()) return { month: m, value: 0 };
+    return { month: m, value: dRound2(netNewArr.div(priorQtrSpend)) };
   });
 
   // Cash metrics
@@ -322,7 +339,13 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   const netIncomeValues = seriesToArray(input.netIncome);
-  const ebitda = operatingIncome;
+
+  // EBITDA = Operating Income + Depreciation & Amortization
+  const ebitda = months.map((m, i) => {
+    const opInc = operatingIncome[i]?.value ?? 0;
+    const da = input.depreciationAmortization?.get(m) ?? 0;
+    return { month: m, value: round2(opInc + da) };
+  });
 
   // Growth rates (month-over-month)
   const revenueGrowthRate = computeGrowthRate(totalRevenue);
@@ -360,6 +383,12 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     const d = subDetails.get(m);
     return { month: m, value: d?.downgradeMrr ?? d?.contractionMrr ?? 0 };
   });
+
+  // Reactivation MRR — MRR from previously churned customers returning
+  const reactivationMrr = months.map((m) => ({
+    month: m,
+    value: subDetails.get(m)?.reactivationMrr ?? 0,
+  }));
 
   // ── Tier-1: Net Revenue Retention (NRR) ────────────────────────────────────
   const netRevenueRetention = months.map((m, i) => {
@@ -498,6 +527,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     ruleOf40,
     contractionMrr,
     downgradeMrr,
+    reactivationMrr,
     netRevenueRetention,
     grossRevenueRetention,
     freeCashFlow,
