@@ -30,6 +30,7 @@ import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ToastProvider } from "@/components/ui/toast";
 import { CommandPalette } from "@/components/ui/command-palette";
+import { LocaleProvider } from "@/components/locale/locale-context";
 
 const coreNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -74,6 +75,7 @@ export function DashboardShell({
   return (
     <ThemeProvider>
     <ToastProvider>
+    <LocaleProvider>
     <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={toggleAI}>
     <ScenarioProvider>
@@ -88,6 +90,7 @@ export function DashboardShell({
     </ScenarioProvider>
     </KeyboardShortcutsProvider>
     </AiFeatureProvider>
+    </LocaleProvider>
     </ToastProvider>
     </ThemeProvider>
   );

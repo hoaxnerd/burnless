@@ -1,5 +1,208 @@
 // Core entity types for Burnless financial planning
 
+// ── Currency & Locale ────────────────────────────────────────────────────────
+
+/** ISO 4217 currency codes we actively support. */
+export type CurrencyCode = "USD" | "EUR" | "GBP" | "INR" | "CAD" | "AUD" | "SGD" | "AED" | "JPY" | "BRL";
+
+/** Currency metadata for display and formatting. */
+export interface CurrencyConfig {
+  code: CurrencyCode;
+  symbol: string;
+  name: string;
+  /** Number of decimal places (0 for JPY, 2 for most). */
+  decimals: number;
+  /** Default locale for this currency (used when user has no preference). */
+  defaultLocale: string;
+}
+
+/** All supported currencies with their metadata. */
+export const CURRENCIES: Record<CurrencyCode, CurrencyConfig> = {
+  USD: { code: "USD", symbol: "$", name: "US Dollar", decimals: 2, defaultLocale: "en-US" },
+  EUR: { code: "EUR", symbol: "€", name: "Euro", decimals: 2, defaultLocale: "de-DE" },
+  GBP: { code: "GBP", symbol: "£", name: "British Pound", decimals: 2, defaultLocale: "en-GB" },
+  INR: { code: "INR", symbol: "₹", name: "Indian Rupee", decimals: 2, defaultLocale: "en-IN" },
+  CAD: { code: "CAD", symbol: "CA$", name: "Canadian Dollar", decimals: 2, defaultLocale: "en-CA" },
+  AUD: { code: "AUD", symbol: "A$", name: "Australian Dollar", decimals: 2, defaultLocale: "en-AU" },
+  SGD: { code: "SGD", symbol: "S$", name: "Singapore Dollar", decimals: 2, defaultLocale: "en-SG" },
+  AED: { code: "AED", symbol: "د.إ", name: "UAE Dirham", decimals: 2, defaultLocale: "ar-AE" },
+  JPY: { code: "JPY", symbol: "¥", name: "Japanese Yen", decimals: 0, defaultLocale: "ja-JP" },
+  BRL: { code: "BRL", symbol: "R$", name: "Brazilian Real", decimals: 2, defaultLocale: "pt-BR" },
+};
+
+/** Supported data residency regions. */
+export type DataRegion = "us-east" | "eu-west" | "ap-south";
+
+export const DATA_REGIONS: Record<DataRegion, { name: string; location: string }> = {
+  "us-east": { name: "US East", location: "Virginia, USA" },
+  "eu-west": { name: "EU West", location: "Frankfurt, Germany" },
+  "ap-south": { name: "Asia Pacific", location: "Mumbai, India" },
+};
+
+/** Locale formatting preferences stored per-company. */
+export interface LocaleSettings {
+  /** BCP 47 locale tag for number/date formatting (e.g., "en-US", "en-IN"). */
+  locale: string;
+  /** Reporting currency ISO code. */
+  currency: CurrencyCode;
+  /** Timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). */
+  timezone: string;
+  /** Data residency region. */
+  region: DataRegion;
+}
+
+/** Default locale settings. */
+export const DEFAULT_LOCALE_SETTINGS: LocaleSettings = {
+  locale: "en-US",
+  currency: "USD",
+  timezone: "America/New_York",
+  region: "us-east",
+};
+
+// ── Formatting Utilities (isomorphic — works in Node + browser) ─────────────
+
+/**
+ * Format a monetary amount using Intl.NumberFormat with the given currency and locale.
+ * This is the single source of truth for currency formatting across the entire app.
+ */
+export function formatCurrency(
+  amount: number,
+  currency: CurrencyCode = "USD",
+  locale?: string,
+  options?: { compact?: boolean; decimals?: number }
+): string {
+  const resolvedLocale = locale || CURRENCIES[currency]?.defaultLocale || "en-US";
+  const currencyConfig = CURRENCIES[currency];
+
+  if (options?.compact) {
+    return formatCompactAmount(amount, currency, resolvedLocale);
+  }
+
+  return new Intl.NumberFormat(resolvedLocale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: options?.decimals ?? 0,
+    maximumFractionDigits: options?.decimals ?? (currencyConfig?.decimals ?? 2),
+  }).format(amount);
+}
+
+/**
+ * Format a monetary amount in compact notation (e.g., "$1.2M", "₹10L", "€500k").
+ * Respects Indian numbering system for INR.
+ */
+export function formatCompactAmount(
+  amount: number,
+  currency: CurrencyCode = "USD",
+  locale?: string
+): string {
+  const config = CURRENCIES[currency];
+  const symbol = config?.symbol ?? currency;
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  const resolvedLocale = locale || config?.defaultLocale || "en-US";
+
+  // Indian numbering: lakhs and crores
+  if (resolvedLocale === "en-IN" || currency === "INR") {
+    if (abs >= 1_00_00_000) return `${sign}${symbol}${(abs / 1_00_00_000).toFixed(1)}Cr`;
+    if (abs >= 1_00_000) return `${sign}${symbol}${(abs / 1_00_000).toFixed(1)}L`;
+    if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(0)}k`;
+    return `${sign}${symbol}${abs.toFixed(0)}`;
+  }
+
+  // Western numbering: millions and thousands
+  if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(0)}k`;
+  return `${sign}${symbol}${abs.toFixed(0)}`;
+}
+
+/**
+ * Format a number (non-currency) respecting locale.
+ */
+export function formatNumber(
+  value: number,
+  locale: string = "en-US",
+  options?: { decimals?: number; compact?: boolean }
+): string {
+  if (options?.compact) {
+    const abs = Math.abs(value);
+    const sign = value < 0 ? "-" : "";
+    // Indian numbering for Indian locales
+    if (locale === "en-IN") {
+      if (abs >= 1_00_00_000) return `${sign}${(abs / 1_00_00_000).toFixed(1)}Cr`;
+      if (abs >= 1_00_000) return `${sign}${(abs / 1_00_000).toFixed(1)}L`;
+      if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}k`;
+      return `${sign}${abs.toFixed(0)}`;
+    }
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}k`;
+    return `${sign}${abs.toFixed(0)}`;
+  }
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: options?.decimals ?? 0,
+    maximumFractionDigits: options?.decimals ?? 0,
+  }).format(value);
+}
+
+/**
+ * Format a date respecting locale and timezone.
+ */
+export function formatDate(
+  date: Date | string,
+  locale: string = "en-US",
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString(locale, options ?? { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * Format a month key (YYYY-MM) to a locale-aware short month display.
+ */
+export function formatMonthKey(
+  monthKey: string,
+  locale: string = "en-US",
+  options?: { includeYear?: boolean }
+): string {
+  const parts = monthKey.split("-");
+  const year = Number(parts[0] ?? 2000);
+  const month = Number(parts[1] ?? 1);
+  const date = new Date(year, month - 1);
+  const fmt: Intl.DateTimeFormatOptions = options?.includeYear
+    ? { month: "short", year: "2-digit" }
+    : { month: "short" };
+  return date.toLocaleDateString(locale, fmt);
+}
+
+/**
+ * Format a percentage value.
+ */
+export function formatPercent(
+  value: number,
+  locale: string = "en-US",
+  decimals: number = 1
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value / 100);
+}
+
+/**
+ * Get the currency symbol for a given currency code.
+ */
+export function getCurrencySymbol(currency: CurrencyCode): string {
+  return CURRENCIES[currency]?.symbol ?? currency;
+}
+
+/**
+ * Check if a string is a valid CurrencyCode.
+ */
+export function isValidCurrency(code: string): code is CurrencyCode {
+  return code in CURRENCIES;
+}
+
 // ── Auth & Users ──────────────────────────────────────────────────────────────
 
 export interface User {
@@ -37,7 +240,10 @@ export interface Company {
   industry: string | null;
   foundedDate: Date | null;
   fiscalYearEnd: number; // month (1-12)
-  currency: string; // ISO 4217
+  currency: CurrencyCode; // ISO 4217
+  locale: string; // BCP 47 locale tag
+  timezone: string; // IANA timezone
+  region: DataRegion; // data residency region
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;

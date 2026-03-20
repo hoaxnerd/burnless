@@ -15,6 +15,13 @@
       "when": 1774026890254,
       "tag": "0001_past_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774034109239,
+      "tag": "0002_mighty_sumo",
+      "breakpoints": true
     }
   ]
 }

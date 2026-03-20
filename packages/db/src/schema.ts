@@ -196,6 +196,12 @@ export const verificationTokens = pgTable(
 
 // ── Business Entities ─────────────────────────────────────────────────────────
 
+export const dataRegionEnum = pgEnum("data_region", [
+  "us-east",
+  "eu-west",
+  "ap-south",
+]);
+
 export const companies = pgTable("companies", {
   id: text("id")
     .primaryKey()
@@ -207,6 +213,9 @@ export const companies = pgTable("companies", {
   foundedDate: timestamp("founded_date", { mode: "date" }),
   fiscalYearEnd: integer("fiscal_year_end").notNull().default(12),
   currency: text("currency").notNull().default("USD"),
+  locale: text("locale").notNull().default("en-US"),
+  timezone: text("timezone").notNull().default("America/New_York"),
+  region: dataRegionEnum("region").notNull().default("us-east"),
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),

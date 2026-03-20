@@ -1,6 +1,16 @@
 /**
  * Shared chart theme — consistent colors, typography, and styling for all Recharts visuals.
+ * Formatting functions are locale-aware via @burnless/types.
  */
+
+import {
+  formatCurrency as fmtCurrency,
+  formatCompactAmount,
+  formatMonthKey,
+  formatPercent as fmtPercent,
+  formatNumber as fmtNumber,
+  type CurrencyCode,
+} from "@burnless/types";
 
 export const chartColors = {
   brand: "#2563eb", // brand-600
@@ -38,34 +48,49 @@ export const chartDefaults = {
   animationEasing: "ease-out" as const,
 } as const;
 
-export function formatCompactCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
+/**
+ * Format a monetary value in compact form (e.g., "$1.2M", "₹10L").
+ * Falls back to USD/en-US when no currency/locale provided.
+ */
+export function formatCompactCurrency(
+  value: number,
+  currency: CurrencyCode = "USD",
+  locale?: string
+): string {
+  return formatCompactAmount(value, currency, locale);
 }
 
-export function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
+/**
+ * Format a monetary value in full form using Intl.NumberFormat.
+ */
+export function formatFullCurrency(
+  value: number,
+  currency: CurrencyCode = "USD",
+  locale?: string
+): string {
+  return fmtCurrency(value, currency, locale);
 }
 
-export function formatNumber(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}k`;
-  return value.toFixed(0);
+export function formatPercent(value: number, locale?: string): string {
+  return fmtPercent(value, locale);
+}
+
+export function formatNumber(
+  value: number,
+  locale?: string,
+  options?: { compact?: boolean }
+): string {
+  return fmtNumber(value, locale, { compact: options?.compact ?? true });
 }
 
 /** Format month key (YYYY-MM) to short display (Jan, Feb, etc.) */
-export function formatMonth(monthKey: string): string {
-  const [year, month] = monthKey.split("-");
-  const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString("en-US", { month: "short" });
+export function formatMonth(monthKey: string, locale?: string): string {
+  return formatMonthKey(monthKey, locale);
 }
 
 /** Format month key to longer display (Jan 2026) */
-export function formatMonthYear(monthKey: string): string {
-  const [year, month] = monthKey.split("-");
-  const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+export function formatMonthYear(monthKey: string, locale?: string): string {
+  return formatMonthKey(monthKey, locale, { includeYear: true });
 }
 
 /** Tooltip styling — CRED-tier with backdrop blur effect */

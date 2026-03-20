@@ -5,6 +5,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatCurrency, formatCompactAmount, formatMonthKey, type CurrencyCode } from "@burnless/types";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,33 +21,22 @@ interface PDFReportOptions {
   companyName: string;
   scenarioName: string;
   generatedAt?: Date;
+  currency?: CurrencyCode;
+  locale?: string;
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 
-function fmtCurrency(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`;
-  return `${sign}$${abs.toFixed(0)}`;
+function fmtCurrency(value: number, currency: CurrencyCode = "USD", locale?: string): string {
+  return formatCompactAmount(value, currency, locale);
 }
 
-function fmtFullCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+function fmtFullCurrency(value: number, currency: CurrencyCode = "USD", locale?: string): string {
+  return formatCurrency(value, currency, locale);
 }
 
-function fmtMonthHeader(monthKey: string): string {
-  const parts = monthKey.split("-");
-  const year = parts[0] ?? "";
-  const month = parts[1] ?? "0";
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[parseInt(month, 10) - 1]} '${year.slice(2)}`;
+function fmtMonthHeader(monthKey: string, locale?: string): string {
+  return formatMonthKey(monthKey, locale, { includeYear: true });
 }
 
 // ── PDF Header ──────────────────────────────────────────────────────────────
@@ -74,7 +64,7 @@ function addPDFHeader(doc: jsPDF, opts: PDFReportOptions) {
   doc.setTextColor(100, 116, 139);
   const subtitle = opts.subtitle ?? `${opts.scenarioName} scenario`;
   doc.text(subtitle, 20, 38);
-  doc.text(`Generated ${date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 38, { align: "right" });
+  doc.text(`Generated ${date.toLocaleDateString(opts.locale ?? "en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 38, { align: "right" });
 
   // Divider
   doc.setDrawColor(226, 232, 240); // surface-200
@@ -100,12 +90,16 @@ function renderStatementTable(
   doc: jsPDF,
   rows: Array<{ item: StatementLineItem; isSummary?: boolean; isSubtotal?: boolean }>,
   startY: number,
-  sectionTitle?: string
+  sectionTitle?: string,
+  currencyLocale?: { currency?: CurrencyCode; locale?: string }
 ): number {
   if (rows.length === 0) return startY;
 
+  const currency = currencyLocale?.currency ?? "USD";
+  const locale = currencyLocale?.locale;
+
   const months = rows[0]?.item.values.map((v) => v.month) ?? [];
-  const headers = [sectionTitle ?? "", ...months.map(fmtMonthHeader)];
+  const headers = [sectionTitle ?? "", ...months.map((m) => fmtMonthHeader(m, locale))];
 
   const body: Array<Array<{ content: string; styles?: Record<string, unknown> }>> = [];
 
@@ -119,7 +113,7 @@ function renderStatementTable(
         },
       },
       ...row.item.values.map((v) => ({
-        content: fmtFullCurrency(v.value),
+        content: fmtFullCurrency(v.value, currency, locale),
         styles: {
           halign: "right" as const,
           fontStyle: row.isSummary ? "bold" as const : "normal" as const,
@@ -138,7 +132,7 @@ function renderStatementTable(
             styles: { textColor: [148, 163, 184], fontSize: 7 },
           },
           ...child.values.map((v) => ({
-            content: fmtFullCurrency(v.value),
+            content: fmtFullCurrency(v.value, currency, locale),
             styles: {
               halign: "right" as const,
               textColor: v.value < 0 ? [220, 38, 38] : [148, 163, 184],
@@ -208,7 +202,8 @@ export function generateProfitLossPDF(
       { item: profitAndLoss.netIncome, isSummary: true },
     ],
     52,
-    "Income Statement"
+    "Income Statement",
+    { currency: opts.currency, locale: opts.locale }
   );
 
   addPDFFooter(doc);
@@ -244,7 +239,8 @@ export function generateCashFlowPDF(
       { item: endingCashItem, isSummary: true },
     ],
     52,
-    "Cash Flow"
+    "Cash Flow",
+    { currency: opts.currency, locale: opts.locale }
   );
 
   addPDFFooter(doc);
@@ -271,7 +267,8 @@ export function generateBalanceSheetPDF(
       { item: balanceSheet.equity, isSummary: true },
     ],
     52,
-    "Balance Sheet"
+    "Balance Sheet",
+    { currency: opts.currency, locale: opts.locale }
   );
 
   addPDFFooter(doc);
@@ -294,11 +291,14 @@ export function generateRunwaySummaryPDF(
 
   let y = 60;
 
+  const currency = opts.currency ?? "USD";
+  const locale = opts.locale;
+
   // Key metrics cards
   const metrics = [
-    { label: "Starting Cash", value: fmtCurrency(data.startingCash) },
-    { label: "Monthly Burn (Net)", value: fmtCurrency(data.netBurnRate) },
-    { label: "Monthly Burn (Gross)", value: fmtCurrency(data.grossBurnRate) },
+    { label: "Starting Cash", value: fmtCurrency(data.startingCash, currency, locale) },
+    { label: "Monthly Burn (Net)", value: fmtCurrency(data.netBurnRate, currency, locale) },
+    { label: "Monthly Burn (Gross)", value: fmtCurrency(data.grossBurnRate, currency, locale) },
     { label: "Runway", value: data.runwayMonths > 36 ? "36+ months" : `${data.runwayMonths} months` },
   ];
 
@@ -320,8 +320,8 @@ export function generateRunwaySummaryPDF(
       startY: y,
       head: [["Month", "Cash Position"]],
       body: data.cashPosition.map((cp) => [
-        fmtMonthHeader(cp.month),
-        fmtFullCurrency(cp.value),
+        fmtMonthHeader(cp.month, locale),
+        fmtFullCurrency(cp.value, currency, locale),
       ]),
       styles: {
         fontSize: 8,
@@ -382,10 +382,15 @@ export function generateInvestorDataRoomPDF(
     startingCash: number;
     netBurnRate: number;
     runwayMonths: number;
+    currency?: CurrencyCode;
+    locale?: string;
   }
 ): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const currency = data.currency ?? "USD";
+  const locale = data.locale;
+  const clOpts = { currency: data.currency, locale: data.locale };
 
   // ── Cover page / Header ────────────────────────────────────────────────
   addPDFHeader(doc, {
@@ -393,6 +398,8 @@ export function generateInvestorDataRoomPDF(
     subtitle: "Financial Summary & Projections",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
+    currency,
+    locale,
   });
 
   // Key metrics summary
@@ -435,6 +442,8 @@ export function generateInvestorDataRoomPDF(
     title: "Profit & Loss Statement",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
+    currency,
+    locale,
   });
 
   renderStatementTable(
@@ -448,7 +457,8 @@ export function generateInvestorDataRoomPDF(
       { item: data.profitAndLoss.netIncome, isSummary: true },
     ],
     52,
-    "Income Statement"
+    "Income Statement",
+    clOpts
   );
 
   // ── Cash Flow page ─────────────────────────────────────────────────────
@@ -457,6 +467,8 @@ export function generateInvestorDataRoomPDF(
     title: "Cash Flow Statement",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
+    currency,
+    locale,
   });
 
   const endingCashItem: StatementLineItem = {
@@ -474,7 +486,8 @@ export function generateInvestorDataRoomPDF(
       { item: endingCashItem, isSummary: true },
     ],
     52,
-    "Cash Flow"
+    "Cash Flow",
+    clOpts
   );
 
   // ── Balance Sheet page ─────────────────────────────────────────────────
@@ -483,6 +496,8 @@ export function generateInvestorDataRoomPDF(
     title: "Balance Sheet",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
+    currency,
+    locale,
   });
 
   renderStatementTable(
@@ -493,7 +508,8 @@ export function generateInvestorDataRoomPDF(
       { item: data.balanceSheet.equity, isSummary: true },
     ],
     52,
-    "Balance Sheet"
+    "Balance Sheet",
+    clOpts
   );
 
   addPDFFooter(doc);

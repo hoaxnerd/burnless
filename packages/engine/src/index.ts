@@ -108,3 +108,30 @@ export {
   type CategorizationRule,
   type CategorizationResult,
 } from "./categorization";
+
+// Payment providers (Stripe + Razorpay)
+export {
+  StripePaymentProvider,
+  RazorpayPaymentProvider,
+  resolvePaymentProvider,
+  type PaymentProvider,
+  type PaymentProviderType,
+  type PaymentCustomer,
+  type PaymentPlan,
+  type PaymentSubscription,
+  type CreateCheckoutOptions,
+  type CheckoutSession,
+} from "./payments";
+
+// Bank connectors (Plaid + Account Aggregator)
+export {
+  PlaidBankConnector,
+  AccountAggregatorConnector,
+  resolveBankConnector,
+  type BankConnector,
+  type BankConnectorType,
+  type BankAccount,
+  type BankTransaction,
+  type BankSyncResult,
+  type LinkTokenOptions,
+} from "./bank-connectors";

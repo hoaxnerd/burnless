@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, type InputHTMLAttributes, forwardRef } from "react";
+import { formatNumber as fmtNum } from "@burnless/types";
 
 /* ── FormField — input with inline validation and error hints ────────────── */
 
@@ -84,7 +85,10 @@ interface CurrencyInputProps {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  /** Currency symbol to display (e.g., "$", "₹", "€"). */
   currency?: string;
+  /** BCP 47 locale for number formatting (e.g., "en-US", "en-IN"). */
+  locale?: string;
   hint?: string;
   error?: string;
   min?: number;
@@ -97,17 +101,18 @@ export function CurrencyInput({
   value,
   onChange,
   currency = "$",
+  locale = "en-US",
   hint,
   error,
   min,
   max,
   id,
 }: CurrencyInputProps) {
-  const [displayValue, setDisplayValue] = useState(() => formatCurrency(value));
+  const [displayValue, setDisplayValue] = useState(() => formatCurrencyDisplay(value));
   const [focused, setFocused] = useState(false);
 
-  function formatCurrency(num: number): string {
-    return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  function formatCurrencyDisplay(num: number): string {
+    return fmtNum(num, locale);
   }
 
   function parseCurrency(str: string): number {
@@ -126,7 +131,7 @@ export function CurrencyInput({
     const parsed = parseCurrency(displayValue);
     const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, parsed));
     onChange(clamped);
-    setDisplayValue(formatCurrency(clamped));
+    setDisplayValue(formatCurrencyDisplay(clamped));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,7 +153,7 @@ export function CurrencyInput({
           id={fieldId}
           type="text"
           inputMode="numeric"
-          value={focused ? displayValue : formatCurrency(value)}
+          value={focused ? displayValue : formatCurrencyDisplay(value)}
           onChange={handleChange}
           onFocus={handleFocus}
           onBlur={handleBlur}

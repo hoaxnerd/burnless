@@ -10,6 +10,7 @@ import {
   type ProfitAndLoss,
   seriesToArray,
 } from "@burnless/engine";
+import { formatCurrency, formatNumber, type CurrencyCode, isValidCurrency } from "@burnless/types";
 import type { FinancialSnapshot } from "./types";
 
 interface ContextInput {
@@ -19,6 +20,7 @@ interface ContextInput {
     businessModel: string;
     industry: string | null;
     currency: string;
+    locale?: string;
   };
   scenario: {
     id: string;
@@ -104,11 +106,16 @@ export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
 /** Format the financial snapshot into a concise system prompt. */
 export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
   const { company, keyMetrics, period } = snapshot;
-  const currency = company.currency || "USD";
+  const currency = (isValidCurrency(company.currency) ? company.currency : "USD") as CurrencyCode;
+  const locale = company.locale;
 
   const fmt = (val: number | null, decimals = 0) => {
     if (val === null) return "N/A";
-    return val.toLocaleString("en-US", { maximumFractionDigits: decimals });
+    return formatNumber(val, locale, { decimals });
+  };
+  const fmtCur = (val: number | null) => {
+    if (val === null) return "N/A";
+    return formatCurrency(val, currency, locale);
   };
   const fmtPct = (val: number | null) => {
     if (val === null) return "N/A";
@@ -124,26 +131,26 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     `**Currency:** ${currency}`,
     ``,
     `## Key Metrics (Latest Month)`,
-    `- MRR: ${currency} ${fmt(keyMetrics.mrr)}`,
-    `- ARR: ${currency} ${fmt(keyMetrics.arr)}`,
-    `- Cash Position: ${currency} ${fmt(keyMetrics.cashPosition)}`,
-    `- Monthly Burn Rate: ${currency} ${fmt(keyMetrics.burnRate)}`,
-    `- Net Burn: ${currency} ${fmt(keyMetrics.netBurn)}`,
+    `- MRR: ${fmtCur(keyMetrics.mrr)}`,
+    `- ARR: ${fmtCur(keyMetrics.arr)}`,
+    `- Cash Position: ${fmtCur(keyMetrics.cashPosition)}`,
+    `- Monthly Burn Rate: ${fmtCur(keyMetrics.burnRate)}`,
+    `- Net Burn: ${fmtCur(keyMetrics.netBurn)}`,
     `- Runway: ${keyMetrics.runway !== null ? `${fmt(keyMetrics.runway, 1)} months` : "N/A"}`,
     `- Revenue Growth: ${fmtPct(keyMetrics.revenueGrowth)}`,
     `- Gross Margin: ${fmtPct(keyMetrics.grossMargin)}`,
     `- Headcount: ${fmt(keyMetrics.headcount)}`,
-    `- LTV: ${currency} ${fmt(keyMetrics.ltv)}`,
-    `- CAC: ${currency} ${fmt(keyMetrics.cac)}`,
+    `- LTV: ${fmtCur(keyMetrics.ltv)}`,
+    `- CAC: ${fmtCur(keyMetrics.cac)}`,
     `- LTV:CAC Ratio: ${keyMetrics.ltvCacRatio !== null ? fmt(keyMetrics.ltvCacRatio, 1) + "x" : "N/A"}`,
     `- Churn Rate: ${fmtPct(keyMetrics.churnRate)}`,
     ``,
     `## P&L Summary (Period Total)`,
-    `- Total Revenue: ${currency} ${fmt(snapshot.profitAndLoss.totalRevenue)}`,
-    `- COGS: ${currency} ${fmt(snapshot.profitAndLoss.totalCogs)}`,
-    `- Gross Profit: ${currency} ${fmt(snapshot.profitAndLoss.grossProfit)}`,
-    `- OpEx: ${currency} ${fmt(snapshot.profitAndLoss.totalOpex)}`,
-    `- Net Income: ${currency} ${fmt(snapshot.profitAndLoss.netIncome)}`,
+    `- Total Revenue: ${formatCurrency(snapshot.profitAndLoss.totalRevenue, currency, locale)}`,
+    `- COGS: ${formatCurrency(snapshot.profitAndLoss.totalCogs, currency, locale)}`,
+    `- Gross Profit: ${formatCurrency(snapshot.profitAndLoss.grossProfit, currency, locale)}`,
+    `- OpEx: ${formatCurrency(snapshot.profitAndLoss.totalOpex, currency, locale)}`,
+    `- Net Income: ${formatCurrency(snapshot.profitAndLoss.netIncome, currency, locale)}`,
   ];
 
   // Monthly trends (last 6 months or available)
@@ -152,7 +159,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(``);
     lines.push(`## Monthly Revenue Trend`);
     for (const { month, amount } of recentRevenue) {
-      lines.push(`- ${month}: ${currency} ${fmt(amount)}`);
+      lines.push(`- ${month}: ${formatCurrency(amount, currency, locale)}`);
     }
   }
 
@@ -161,7 +168,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(``);
     lines.push(`## Monthly Cash Position`);
     for (const { month, amount } of recentCash) {
-      lines.push(`- ${month}: ${currency} ${fmt(amount)}`);
+      lines.push(`- ${month}: ${formatCurrency(amount, currency, locale)}`);
     }
   }
 
@@ -170,7 +177,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(``);
     lines.push(`## Funding Rounds`);
     for (const round of snapshot.fundingRounds) {
-      lines.push(`- ${round.name} (${round.type}): ${currency} ${fmt(round.amount)} on ${round.date}${round.isProjected ? " [projected]" : ""}`);
+      lines.push(`- ${round.name} (${round.type}): ${formatCurrency(round.amount, currency, locale)} on ${round.date}${round.isProjected ? " [projected]" : ""}`);
     }
   }
 

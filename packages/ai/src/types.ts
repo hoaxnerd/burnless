@@ -15,6 +15,7 @@ export interface FinancialSnapshot {
     businessModel: string;
     industry: string | null;
     currency: string;
+    locale?: string;
   };
   scenario: {
     id: string;

@@ -33,6 +33,9 @@ const updateSchema = z.object({
     .optional(),
   industry: z.string().max(200).nullable().optional(),
   currency: z.string().min(3).max(3).optional(),
+  locale: z.string().min(2).max(10).optional(),
+  timezone: z.string().min(1).max(100).optional(),
+  region: z.enum(["us-east", "eu-west", "ap-south"]).optional(),
   fiscalYearEnd: z.number().min(1).max(12).optional(),
 });
 
@@ -46,13 +49,16 @@ export async function PATCH(request: Request) {
   if ("error" in parsed) return parsed.error;
 
   const updates: Record<string, unknown> = {};
-  const { name, stage, businessModel, industry, currency, fiscalYearEnd } = parsed.data;
+  const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd } = parsed.data;
 
   if (name !== undefined) updates.name = name;
   if (stage !== undefined) updates.stage = stage;
   if (businessModel !== undefined) updates.businessModel = businessModel;
   if (industry !== undefined) updates.industry = industry;
   if (currency !== undefined) updates.currency = currency;
+  if (locale !== undefined) updates.locale = locale;
+  if (timezone !== undefined) updates.timezone = timezone;
+  if (region !== undefined) updates.region = region;
   if (fiscalYearEnd !== undefined) updates.fiscalYearEnd = fiscalYearEnd;
 
   if (Object.keys(updates).length === 0) {
