@@ -1,24 +1,20 @@
 /**
- * Core chat handler — orchestrates Claude API calls with financial context
+ * Core chat handler — orchestrates LLM calls with financial context
  * and tool use. Supports both streaming and non-streaming modes.
+ *
+ * Provider-agnostic: works with Anthropic, OpenAI, or any registered provider.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { ChatMessage, StreamChunk, ToolCallResult } from "./types";
-import { financialTools } from "./tools";
+import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
-
-const MODEL = "claude-sonnet-4-20250514";
-const MAX_TOKENS = 4096;
-
-let client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic();
-  }
-  return client;
-}
+import {
+  getProvider,
+  type LlmProvider,
+  type LlmMessage,
+  type ContentBlock,
+  type CompletionRequest,
+} from "./providers";
 
 interface ChatOptions {
   messages: ChatMessage[];
@@ -31,130 +27,127 @@ export async function chat(options: ChatOptions): Promise<{
   response: string;
   toolResults: ToolCallResult[];
 }> {
-  const anthropic = getClient();
-  const systemMessage = buildSystemMessage(options.financialContext);
+  const provider = getProvider();
+  if (!provider) {
+    return {
+      response: "AI is not configured. Please set an API key to enable the AI companion.",
+      toolResults: [],
+    };
+  }
 
-  const apiMessages: Anthropic.MessageParam[] = options.messages.map((m) => ({
+  const system = buildSystemMessage(options.financialContext);
+  const tools = getFinancialTools();
+
+  const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
 
   const toolResults: ToolCallResult[] = [];
-  let currentMessages = [...apiMessages];
 
   // Loop to handle multi-turn tool use
   while (true) {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: systemMessage,
-      messages: currentMessages,
-      tools: options.onToolCall ? financialTools : undefined,
+    const response = await provider.complete({
+      messages,
+      system,
+      tools: options.onToolCall ? tools : undefined,
     });
 
-    // Check if we need to handle tool calls
-    if (response.stop_reason === "tool_use" && options.onToolCall) {
-      // Collect all tool use blocks
+    // Handle tool calls
+    if (response.stopReason === "tool_use" && options.onToolCall) {
       const toolUseBlocks = response.content.filter(
-        (b): b is Anthropic.ContentBlockParam & { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } =>
-          b.type === "tool_use"
+        (b): b is ContentBlock & { type: "tool_use" } => b.type === "tool_use"
       );
 
-      // Add assistant's response to messages
-      currentMessages.push({ role: "assistant", content: response.content });
+      // Add assistant response to messages
+      messages.push({ role: "assistant", content: response.content });
 
-      // Execute tools and build tool_result content blocks
-      const toolResultBlocks: Array<{ type: "tool_result"; tool_use_id: string; content: string }> = [];
+      // Execute tools and build results
+      const resultBlocks: ContentBlock[] = [];
       for (const toolUse of toolUseBlocks) {
-        const result = await options.onToolCall(toolUse.name, toolUse.input as Record<string, unknown>);
+        const result = await options.onToolCall(toolUse.name, toolUse.input);
         toolResults.push({
           tool: toolUse.name,
-          input: toolUse.input as Record<string, unknown>,
+          input: toolUse.input,
           result,
         });
-        toolResultBlocks.push({
+        resultBlocks.push({
           type: "tool_result",
-          tool_use_id: toolUse.id,
+          toolUseId: toolUse.id,
           content: result,
         });
       }
 
-      currentMessages.push({ role: "user", content: toolResultBlocks });
+      messages.push({ role: "user", content: resultBlocks });
       continue;
     }
 
     // Extract text response
-    const textBlocks = response.content.filter(
-      (b): b is Anthropic.TextBlock => b.type === "text"
-    );
-    const responseText = textBlocks.map((b) => b.text).join("");
+    const text = response.content
+      .filter((b): b is ContentBlock & { type: "text" } => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
-    return { response: responseText, toolResults };
+    return { response: text, toolResults };
   }
 }
 
 /** Streaming chat — yields chunks as they arrive. */
 export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamChunk> {
-  const anthropic = getClient();
-  const systemMessage = buildSystemMessage(options.financialContext);
+  const provider = getProvider();
+  if (!provider) {
+    yield { type: "text", content: "AI is not configured. Please set an API key to enable the AI companion." };
+    yield { type: "done" };
+    return;
+  }
 
-  const apiMessages: Anthropic.MessageParam[] = options.messages.map((m) => ({
+  const system = buildSystemMessage(options.financialContext);
+  const tools = getFinancialTools();
+
+  const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
 
-  let currentMessages = [...apiMessages];
-
   while (true) {
-    const stream = anthropic.messages.stream({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: systemMessage,
-      messages: currentMessages,
-      tools: options.onToolCall ? financialTools : undefined,
+    const events = provider.stream({
+      messages,
+      system,
+      tools: options.onToolCall ? tools : undefined,
     });
 
-    let accumulatedContent: Anthropic.ContentBlock[] = [];
-    let stopReason: string | null = null;
+    let lastResponse: { content: ContentBlock[]; stopReason: string } | null = null;
 
-    for await (const event of stream) {
-      if (event.type === "content_block_delta") {
-        const delta = event.delta;
-        if ("text" in delta) {
-          yield { type: "text", content: delta.text };
-        }
-      } else if (event.type === "message_stop") {
-        // Get the final message
-        const finalMessage = await stream.finalMessage();
-        accumulatedContent = finalMessage.content;
-        stopReason = finalMessage.stop_reason;
+    for await (const event of events) {
+      if (event.type === "text_delta") {
+        yield { type: "text", content: event.text };
+      } else if (event.type === "tool_use") {
+        yield { type: "tool_use", toolName: event.name, toolInput: event.input };
+      } else if (event.type === "done") {
+        lastResponse = event.response;
       }
     }
 
-    // Handle tool use
-    if (stopReason === "tool_use" && options.onToolCall) {
-      const toolUseBlocks = accumulatedContent.filter(
-        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+    // Handle tool use loop
+    if (lastResponse?.stopReason === "tool_use" && options.onToolCall) {
+      const toolUseBlocks = lastResponse.content.filter(
+        (b): b is ContentBlock & { type: "tool_use" } => b.type === "tool_use"
       );
 
-      currentMessages.push({ role: "assistant", content: accumulatedContent });
+      messages.push({ role: "assistant", content: lastResponse.content });
 
-      const toolResultBlocks: Array<{ type: "tool_result"; tool_use_id: string; content: string }> = [];
+      const resultBlocks: ContentBlock[] = [];
       for (const toolUse of toolUseBlocks) {
-        yield { type: "tool_use", toolName: toolUse.name, toolInput: toolUse.input as Record<string, unknown> };
-
-        const result = await options.onToolCall(toolUse.name, toolUse.input as Record<string, unknown>);
-
+        const result = await options.onToolCall(toolUse.name, toolUse.input);
         yield { type: "tool_result", toolName: toolUse.name, toolResult: result };
-
-        toolResultBlocks.push({
+        resultBlocks.push({
           type: "tool_result",
-          tool_use_id: toolUse.id,
+          toolUseId: toolUse.id,
           content: result,
         });
       }
 
-      currentMessages.push({ role: "user", content: toolResultBlocks });
+      messages.push({ role: "user", content: resultBlocks });
       continue;
     }
 

@@ -1,22 +1,21 @@
 /**
  * AI Tool definitions — functions the AI assistant can call to interact
- * with the financial engine. Each tool has a name, description, JSON schema
- * for input validation, and an execute function.
+ * with the financial engine.
  *
- * Tool execution is handled server-side via the API layer, not here.
- * This module defines the tool schemas for the Claude API.
+ * Uses provider-agnostic ToolDefinition format. Each provider implementation
+ * maps these to its own SDK format internally.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { ToolDefinition } from "./providers";
 
-/** Tool definitions for Claude's tool_use feature. */
-export const financialTools: Anthropic.Tool[] = [
+/** Tool definitions for the AI assistant's function-calling capability. */
+const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "create_scenario",
     description:
       "Create a new financial scenario (e.g., best case, worst case, custom what-if). Returns the new scenario ID.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         name: {
           type: "string",
@@ -39,8 +38,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "create_forecast_line",
     description:
       "Add a forecast line to a scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account).",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         scenarioId: {
           type: "string",
@@ -75,8 +74,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "add_headcount",
     description:
       "Add a headcount plan entry — plan to hire a role with salary and start date. Automatically creates personnel cost forecasts.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         scenarioId: {
           type: "string",
@@ -118,8 +117,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "add_revenue_stream",
     description:
       "Add a revenue stream to model income — supports subscription (SaaS MRR), one-time, usage-based, and services revenue.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         scenarioId: {
           type: "string",
@@ -146,8 +145,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "compare_scenarios",
     description:
       "Compare two financial scenarios side-by-side, showing differences in revenue, expenses, cash, and key metrics.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         baseScenarioId: {
           type: "string",
@@ -165,8 +164,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "compute_metrics",
     description:
       "Compute all financial metrics for a scenario over a time period. Returns MRR, ARR, burn rate, runway, growth rates, SaaS metrics, etc.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         scenarioId: {
           type: "string",
@@ -188,8 +187,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "generate_financial_statements",
     description:
       "Generate P&L (Profit & Loss), Cash Flow Statement, and Balance Sheet for a scenario.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         scenarioId: {
           type: "string",
@@ -211,8 +210,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "add_funding_round",
     description:
       "Add a funding round (actual or projected) — models cash injection from investors, debt, or grants.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         name: {
           type: "string",
@@ -251,8 +250,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "create_account",
     description:
       "Create a new financial account in the chart of accounts — for tracking a specific revenue or expense category.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         name: {
           type: "string",
@@ -276,8 +275,8 @@ export const financialTools: Anthropic.Tool[] = [
     name: "create_department",
     description:
       "Create a new department for organizing headcount plans.",
-    input_schema: {
-      type: "object" as const,
+    inputSchema: {
+      type: "object",
       properties: {
         name: {
           type: "string",
@@ -288,3 +287,17 @@ export const financialTools: Anthropic.Tool[] = [
     },
   },
 ];
+
+/**
+ * Get tool definitions in provider-agnostic format.
+ * Each provider maps these to its own SDK format internally.
+ */
+export function getFinancialTools(): ToolDefinition[] {
+  return FINANCIAL_TOOLS;
+}
+
+/**
+ * @deprecated Use getFinancialTools() instead. Kept for backward compatibility.
+ * Will be removed in the next major version.
+ */
+export const financialTools = FINANCIAL_TOOLS;

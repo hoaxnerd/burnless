@@ -1,15 +1,16 @@
 /**
  * POST /api/onboarding/enrich — AI-powered company enrichment from website URL.
  *
- * Takes a website URL, uses Claude to analyze the company, and streams back
- * enriched data fields. Each field arrives as it's discovered, allowing the
- * UI to progressively fill in the onboarding form.
+ * Takes a website URL, uses the configured LLM provider to analyze the company,
+ * and streams back enriched data fields. Each field arrives as it's discovered,
+ * allowing the UI to progressively fill in the onboarding form.
  *
- * Falls back gracefully if the website can't be reached or AI is disabled.
+ * Provider-agnostic: works with any registered AI provider.
+ * Falls back gracefully if the provider isn't configured or AI is disabled.
  */
 
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
+import { getProvider } from "@burnless/ai";
 import { getAuthUser, errorResponse } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
@@ -100,18 +101,16 @@ export async function POST(request: Request) {
           });
         }
 
-        // Step 2: Use Claude to analyze the company
+        // Step 2: Use AI to analyze the company
         send({ type: "status", message: "Learning about your company..." });
 
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          // No API key — return empty enrichment
+        const provider = getProvider();
+        if (!provider) {
+          // No AI provider configured — return empty enrichment
           send({ type: "done", result: null });
           controller.close();
           return;
         }
-
-        const anthropic = new Anthropic({ apiKey });
 
         const prompt = websiteContent
           ? `Analyze this company website and extract structured information.
@@ -154,15 +153,10 @@ Respond ONLY with valid JSON:
 
 Only include fields you can reasonably infer from the domain name.`;
 
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1024,
-          messages: [{ role: "user", content: prompt }],
-        });
+        const text = await provider.generateText(prompt);
 
         // Parse the response
-        const textContent = response.content.find((c) => c.type === "text");
-        if (!textContent || textContent.type !== "text") {
+        if (!text) {
           send({ type: "done", result: null });
           controller.close();
           return;
@@ -170,7 +164,7 @@ Only include fields you can reasonably infer from the domain name.`;
 
         try {
           // Extract JSON from the response (may be wrapped in markdown)
-          const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (!jsonMatch) throw new Error("No JSON found");
 
           const result: EnrichmentResult = JSON.parse(jsonMatch[0]);

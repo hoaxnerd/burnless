@@ -13,6 +13,7 @@
     "@burnless/types": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^22.19.15",
     "typescript": "^5.7.0"
   }
 }

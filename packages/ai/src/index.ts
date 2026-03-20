@@ -1,6 +1,6 @@
 // @burnless/ai — AI companion for financial planning
-// Depends on @burnless/engine for calculations and @burnless/types for interfaces.
-// Uses the Anthropic SDK for Claude API integration.
+// Provider-agnostic: supports Anthropic, OpenAI, OpenRouter, and more.
+// Configure via AI_PROVIDER + AI_MODEL + AI_API_KEY env vars.
 
 // Chat
 export { chat, chatStream } from "./chat";
@@ -9,13 +9,32 @@ export { chat, chatStream } from "./chat";
 export { buildFinancialSnapshot, formatContextForPrompt } from "./context";
 
 // Tool definitions
-export { financialTools } from "./tools";
+export { getFinancialTools, financialTools } from "./tools";
 
 // Insights
 export { generateInsights } from "./insights";
 
 // Prompts
 export { SYSTEM_PROMPT, buildSystemMessage } from "./prompts";
+
+// Provider system
+export {
+  createProvider,
+  getProvider,
+  resetProvider,
+  LlmProvider,
+  AnthropicProvider,
+} from "./providers";
+export type {
+  ProviderConfig,
+  CompletionRequest,
+  LlmResponse,
+  StreamEvent,
+  ContentBlock,
+  ToolDefinition,
+  LlmMessage,
+  StopReason,
+} from "./providers";
 
 // Feature flags
 export {
