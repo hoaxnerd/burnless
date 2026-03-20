@@ -3,6 +3,7 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { FundingDetails } from "./funding-details";
 import { AddFundingForm } from "./add-funding-form";
+import { SetupPrompt } from "@/components/ui/empty-state";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -17,14 +18,7 @@ export default async function FundingPage({
 }) {
   const params = await searchParams;
   const company = await getCompany();
-  if (!company) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
-        <p className="text-sm text-surface-500">Complete onboarding to track funding.</p>
-      </div>
-    );
-  }
+  if (!company) return <SetupPrompt context="tracking funding" />;
 
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   const [fundingRounds, data] = await Promise.all([

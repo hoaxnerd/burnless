@@ -4,6 +4,7 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
+import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 
 export default async function ExpensesPage({
   searchParams,
@@ -12,24 +13,10 @@ export default async function ExpensesPage({
 }) {
   const params = await searchParams;
   const company = await getCompany();
-  if (!company) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
-        <p className="text-sm text-surface-500">Complete onboarding to start tracking expenses.</p>
-      </div>
-    );
-  }
+  if (!company) return <SetupPrompt context="tracking expenses" />;
 
   const scenario = await getActiveScenario(company.id, params.scenarioId);
-  if (!scenario) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">Create a scenario first</h3>
-        <p className="text-sm text-surface-500">You need a financial scenario to track expenses.</p>
-      </div>
-    );
-  }
+  if (!scenario) return <ScenarioPrompt context="track expenses" />;
 
   const [data, accounts, expenseDetails] = await Promise.all([
     computeDashboardData(company.id, scenario.id),

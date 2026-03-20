@@ -1,12 +1,13 @@
 import { getCompany, getDefaultScenario, getFundingRounds, getScenarios } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { DataRoomView } from "./data-room-view";
+import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 
 export default async function DataRoomPage() {
   const company = await getCompany();
-  if (!company) return <p>Set up your company first.</p>;
+  if (!company) return <SetupPrompt context="building your data room" />;
   const scenario = await getDefaultScenario(company.id);
-  if (!scenario) return <p>Create a scenario first.</p>;
+  if (!scenario) return <ScenarioPrompt context="generate investor-ready reports" />;
 
   const [data, fundingRounds, scenarios] = await Promise.all([
     computeDashboardData(company.id, scenario.id),

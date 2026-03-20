@@ -28,6 +28,8 @@ import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
 import { ThemeProvider, ThemeToggle } from "@/components/ui/theme-toggle";
 import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { ToastProvider } from "@/components/ui/toast";
+import { CommandPalette } from "@/components/ui/command-palette";
 
 const coreNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -53,11 +55,12 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
       e.preventDefault();
-      setAiPanelOpen((prev) => !prev);
+      setCommandPaletteOpen((prev) => !prev);
     }
   }, []);
 
@@ -70,18 +73,22 @@ export function DashboardShell({
 
   return (
     <ThemeProvider>
+    <ToastProvider>
     <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={toggleAI}>
     <ScenarioProvider>
       <DashboardContent
         aiPanelOpen={aiPanelOpen}
         setAiPanelOpen={setAiPanelOpen}
+        commandPaletteOpen={commandPaletteOpen}
+        setCommandPaletteOpen={setCommandPaletteOpen}
       >
         {children}
       </DashboardContent>
     </ScenarioProvider>
     </KeyboardShortcutsProvider>
     </AiFeatureProvider>
+    </ToastProvider>
     </ThemeProvider>
   );
 }
@@ -91,10 +98,14 @@ function DashboardContent({
   children,
   aiPanelOpen,
   setAiPanelOpen,
+  commandPaletteOpen,
+  setCommandPaletteOpen,
 }: {
   children: React.ReactNode;
   aiPanelOpen: boolean;
   setAiPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -219,24 +230,22 @@ function DashboardContent({
           </nav>
 
           <div className="px-3 pb-2 space-y-1">
-            {/* Cmd+K shortcut — only show when chat is enabled */}
-            {chatEnabled && (
-              <button
-                onClick={() => setAiPanelOpen(true)}
-                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-900 transition-colors ${sidebarCollapsed ? "justify-center px-2" : ""}`}
-                title={sidebarCollapsed ? "Ask AI (⌘K)" : undefined}
-              >
-                <Command className="h-4 w-4 text-surface-400 flex-shrink-0" />
-                {!sidebarCollapsed && (
-                  <>
-                    <span className="flex-1 text-left">Ask AI</span>
-                    <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-surface-200 bg-surface-50 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
-                      <span className="text-xs">&#8984;</span>K
-                    </kbd>
-                  </>
-                )}
-              </button>
-            )}
+            {/* Command palette trigger */}
+            <button
+              onClick={() => setCommandPaletteOpen(true)}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-900 transition-colors ${sidebarCollapsed ? "justify-center px-2" : ""}`}
+              title={sidebarCollapsed ? "Search (⌘K)" : undefined}
+            >
+              <Command className="h-4 w-4 text-surface-400 flex-shrink-0" />
+              {!sidebarCollapsed && (
+                <>
+                  <span className="flex-1 text-left">Search</span>
+                  <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-surface-200 bg-surface-50 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
+                    <span className="text-xs">&#8984;</span>K
+                  </kbd>
+                </>
+              )}
+            </button>
 
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
@@ -289,7 +298,14 @@ function DashboardContent({
           </div>
         </main>
 
-        {/* Global AI Panel (Cmd+K) — only render when chat is enabled */}
+        {/* Command Palette (Cmd+K) */}
+        <CommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          onToggleAI={chatEnabled ? () => setAiPanelOpen(true) : undefined}
+        />
+
+        {/* Global AI Panel */}
         {chatEnabled && (
           <AiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
         )}

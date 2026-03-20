@@ -3,6 +3,7 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey, computeSubscriptionDetail, type SubscriptionParams } from "@burnless/engine";
 import { RevenueStreamsList } from "./revenue-streams-list";
 import { AddRevenueStreamForm } from "./add-revenue-stream-form";
+import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -17,24 +18,10 @@ export default async function RevenuePage({
 }) {
   const params = await searchParams;
   const company = await getCompany();
-  if (!company) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
-        <p className="text-sm text-surface-500">Complete onboarding to start modeling revenue.</p>
-      </div>
-    );
-  }
+  if (!company) return <SetupPrompt context="modeling revenue" />;
 
   const scenario = await getActiveScenario(company.id, params.scenarioId);
-  if (!scenario) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">Create a scenario first</h3>
-        <p className="text-sm text-surface-500">You need a financial scenario to model revenue.</p>
-      </div>
-    );
-  }
+  if (!scenario) return <ScenarioPrompt context="model revenue" />;
 
   const [data, streams] = await Promise.all([
     computeDashboardData(company.id, scenario.id),
