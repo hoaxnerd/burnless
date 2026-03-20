@@ -15,11 +15,14 @@ import {
   type ContentBlock,
   type CompletionRequest,
 } from "./providers";
+import { getProviderForFeature } from "./routing";
 
 interface ChatOptions {
   messages: ChatMessage[];
   financialContext: string;
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
+  /** AI feature name for model routing. Defaults to "chat". */
+  feature?: string;
 }
 
 /** Non-streaming chat — sends message and returns complete response. */
@@ -27,7 +30,7 @@ export async function chat(options: ChatOptions): Promise<{
   response: string;
   toolResults: ToolCallResult[];
 }> {
-  const provider = getProvider();
+  const provider = getProviderForFeature(options.feature ?? "chat") ?? getProvider();
   if (!provider) {
     return {
       response: "AI is not configured. Please set an API key to enable the AI companion.",
@@ -94,7 +97,7 @@ export async function chat(options: ChatOptions): Promise<{
 
 /** Streaming chat — yields chunks as they arrive. */
 export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamChunk> {
-  const provider = getProvider();
+  const provider = getProviderForFeature(options.feature ?? "chat") ?? getProvider();
   if (!provider) {
     yield { type: "text", content: "AI is not configured. Please set an API key to enable the AI companion." };
     yield { type: "done" };

@@ -85,6 +85,11 @@ export interface StreamError {
 
 export type StreamEvent = StreamTextDelta | StreamToolUse | StreamDone | StreamError;
 
+// ── Model tiers ─────────────────────────────────────────────────────────────
+
+/** Model tier — determines which model class to use for a given task. */
+export type ModelTier = "fast" | "standard" | "deep";
+
 // ── Provider config ─────────────────────────────────────────────────────────
 
 export interface ProviderConfig {
@@ -94,6 +99,21 @@ export interface ProviderConfig {
   maxTokens?: number;
   /** Extra provider-specific options (e.g., organization ID for OpenAI) */
   extra?: Record<string, unknown>;
+}
+
+// ── Usage tracking ──────────────────────────────────────────────────────────
+
+export interface UsageRecord {
+  feature: string;
+  tier: ModelTier;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Estimated cost in USD (microdollars for precision) */
+  estimatedCostMicros: number;
+  durationMs: number;
+  timestamp: Date;
 }
 
 // ── Request ─────────────────────────────────────────────────────────────────

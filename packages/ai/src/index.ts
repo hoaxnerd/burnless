@@ -20,8 +20,11 @@ export { SYSTEM_PROMPT, buildSystemMessage } from "./prompts";
 // Provider system
 export {
   createProvider,
+  createProviderForTier,
   getProvider,
   resetProvider,
+  resolveModelForTier,
+  getFallbackTiers,
   LlmProvider,
   AnthropicProvider,
 } from "./providers";
@@ -34,7 +37,20 @@ export type {
   ToolDefinition,
   LlmMessage,
   StopReason,
+  ModelTier,
+  UsageRecord,
 } from "./providers";
+
+// Model routing
+export {
+  getProviderForFeature,
+  getProviderForTier,
+  getFeatureTier,
+  getFeatureTierMap,
+  completeWithFallback,
+  estimateCostMicros,
+  onUsage,
+} from "./routing";
 
 // Feature flags
 export {

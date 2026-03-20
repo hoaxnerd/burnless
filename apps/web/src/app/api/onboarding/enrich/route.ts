@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { getProvider } from "@burnless/ai";
+import { getProviderForFeature } from "@burnless/ai";
 import { getAuthUser, errorResponse } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         // Step 2: Use AI to analyze the company
         send({ type: "status", message: "Learning about your company..." });
 
-        const provider = getProvider();
+        const provider = getProviderForFeature("onboarding_enrich");
         if (!provider) {
           // No AI provider configured — return empty enrichment
           send({ type: "done", result: null });
