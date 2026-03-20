@@ -94,6 +94,7 @@ export default function OnboardingPage() {
   const [enrichedCount, setEnrichedCount] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (step === "website") {
@@ -204,6 +205,10 @@ export default function OnboardingPage() {
       return;
     }
 
+    // Prevent double-submit — ref survives across renders
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     setStep("creating");
     setCreateError(null);
 
@@ -233,6 +238,7 @@ export default function OnboardingPage() {
         err instanceof Error ? err.message : "Something went wrong";
       setCreateError(message);
       setStep("review");
+      submittingRef.current = false;
     }
   };
 

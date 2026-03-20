@@ -17,7 +17,8 @@ import {
   forecastLines,
   revenueStreams,
 } from "@burnless/db";
-import { getAuthUser, errorResponse } from "@/lib/api-helpers";
+import { eq, and } from "drizzle-orm";
+import { getAuthUser, getUserCompany, errorResponse } from "@/lib/api-helpers";
 
 const onboardingSchema = z.object({
   company_name: z.string().min(1, "Company name is required"),
@@ -83,6 +84,31 @@ export async function POST(request: Request) {
       return errorResponse(first?.message || "Please check your answers and try again", 400);
     }
     return errorResponse("Something doesn't look right — please try again", 400);
+  }
+
+  // Idempotency: if user already has a company, return it instead of creating a duplicate
+  const existingMembership = await getUserCompany(userId);
+  if (existingMembership) {
+    // Find their default scenario
+    const [defaultScenario] = await db
+      .select({ id: scenarios.id })
+      .from(scenarios)
+      .where(
+        and(
+          eq(scenarios.companyId, existingMembership.companyId),
+          eq(scenarios.isDefault, true)
+        )
+      )
+      .limit(1);
+
+    return NextResponse.json(
+      {
+        companyId: existingMembership.companyId,
+        scenarioId: defaultScenario?.id ?? null,
+        existing: true,
+      },
+      { status: 200 }
+    );
   }
 
   const stage = parseStage(body.stage);
