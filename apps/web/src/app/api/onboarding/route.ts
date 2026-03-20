@@ -1,6 +1,8 @@
 /**
  * POST /api/onboarding — Creates a company, base scenario, and initial
  * financial structure from the conversational onboarding data.
+ *
+ * Wrapped in a transaction so partial failures don't leave orphaned records.
  */
 
 import { NextResponse } from "next/server";
@@ -18,13 +20,13 @@ import {
 import { getAuthUser, errorResponse } from "@/lib/api-helpers";
 
 const onboardingSchema = z.object({
-  company_name: z.string().min(1),
-  stage: z.string(),
-  business_model: z.string(),
-  monthly_revenue: z.string().optional(),
-  team_size: z.string().optional(),
-  funding: z.string().optional(),
-  main_expenses: z.string().optional(),
+  company_name: z.string().min(1, "Company name is required"),
+  stage: z.string().default("Pre-seed"),
+  business_model: z.string().default("SaaS"),
+  monthly_revenue: z.string().optional().default("$0"),
+  team_size: z.string().optional().default("1"),
+  funding: z.string().optional().default("$0"),
+  main_expenses: z.string().optional().default("General operations"),
 });
 
 // Map user-friendly stage names to enum values
@@ -52,7 +54,7 @@ function parseBusinessModel(input: string): "saas" | "marketplace" | "ecommerce"
 function parseMoneyAmount(input: string): number {
   if (!input) return 0;
   const lower = input.toLowerCase().replace(/[,$\s]/g, "");
-  if (lower.includes("0") && lower.length === 1) return 0;
+  if (lower === "0") return 0;
   const match = lower.match(/(\d+\.?\d*)\s*(m|k|million|thousand)?/);
   if (!match) return 0;
   let amount = parseFloat(match[1]!);
@@ -69,133 +71,146 @@ function parseTeamSize(input: string): number {
 
 export async function POST(request: Request) {
   const user = await getAuthUser();
-  if (!user?.id) return errorResponse("Unauthorized", 401);
+  if (!user?.id) return errorResponse("Please sign in to continue", 401);
+  const userId = user.id;
 
   let body: z.infer<typeof onboardingSchema>;
   try {
     body = onboardingSchema.parse(await request.json());
-  } catch {
-    return errorResponse("Invalid onboarding data", 400);
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      const first = e.errors[0];
+      return errorResponse(first?.message || "Please check your answers and try again", 400);
+    }
+    return errorResponse("Something doesn't look right — please try again", 400);
   }
 
   const stage = parseStage(body.stage);
   const businessModel = parseBusinessModel(body.business_model);
   const monthlyRevenue = parseMoneyAmount(body.monthly_revenue ?? "0");
   const teamSize = parseTeamSize(body.team_size ?? "1");
-  const totalFunding = parseMoneyAmount(body.funding ?? "0");
 
-  // Create company
-  const [company] = await db
-    .insert(companies)
-    .values({
-      name: body.company_name,
-      stage,
-      businessModel,
-      ownerId: user.id,
-    })
-    .returning();
+  try {
+    const result = await db.transaction(async (tx) => {
+      // Create company
+      const [company] = await tx
+        .insert(companies)
+        .values({
+          name: body.company_name,
+          stage,
+          businessModel,
+          ownerId: userId,
+        })
+        .returning();
 
-  if (!company) return errorResponse("Failed to create company", 500);
+      if (!company) throw new Error("Could not create your company — please try again");
 
-  // Add user as owner
-  await db.insert(companyMembers).values({
-    companyId: company.id,
-    userId: user.id,
-    role: "owner",
-  });
-
-  // Create base scenario
-  const [scenario] = await db
-    .insert(scenarios)
-    .values({
-      companyId: company.id,
-      name: "Base Plan",
-      type: "base",
-      isDefault: true,
-      description: `Initial financial model for ${body.company_name}`,
-    })
-    .returning();
-
-  if (!scenario) return errorResponse("Failed to create scenario", 500);
-
-  // Create default financial accounts
-  const defaultAccounts = [
-    { name: "Revenue", type: "income" as const, category: "revenue" as const, isSystem: true },
-    { name: "Cost of Goods Sold", type: "expense" as const, category: "cogs" as const, isSystem: true },
-    { name: "Salaries & Payroll", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
-    { name: "Cloud Infrastructure", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
-    { name: "Marketing", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
-    { name: "Office & Admin", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
-    { name: "Software & Tools", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
-    { name: "Cash & Bank", type: "asset" as const, category: "asset" as const, isSystem: true },
-    { name: "Equity", type: "equity" as const, category: "equity" as const, isSystem: true },
-  ];
-
-  const createdAccounts = await db
-    .insert(financialAccounts)
-    .values(
-      defaultAccounts.map((a) => ({
+      // Add user as owner
+      await tx.insert(companyMembers).values({
         companyId: company.id,
-        name: a.name,
-        type: a.type,
-        category: a.category,
-        isSystem: a.isSystem,
-      }))
-    )
-    .returning();
-
-  // Create default departments
-  const defaultDepts = ["Engineering", "Sales", "Marketing", "Operations", "General & Admin"];
-  await db.insert(departments).values(
-    defaultDepts.map((name) => ({ companyId: company.id, name }))
-  );
-
-  // Create initial revenue stream if user has revenue
-  if (monthlyRevenue > 0) {
-    const revenueType = businessModel === "saas" ? "subscription" : businessModel === "services" ? "services" : "one_time";
-    await db.insert(revenueStreams).values({
-      scenarioId: scenario.id,
-      name: `${body.company_name} Revenue`,
-      type: revenueType,
-      parameters: revenueType === "subscription"
-        ? { monthlyPrice: monthlyRevenue, startingCustomers: 1, monthlyGrowthRate: 5 }
-        : { amount: monthlyRevenue },
-    });
-  }
-
-  // Create initial forecast lines based on user's expense info
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), 0, 1);
-  const periodEnd = new Date(now.getFullYear(), 11, 31);
-
-  // Estimate expense allocation based on team size
-  const avgSalary = teamSize > 0 ? Math.round((monthlyRevenue * 0.4) / teamSize) || 5000 : 5000;
-  const expenseAccounts = createdAccounts.filter(
-    (a) => a.category === "operating_expense"
-  );
-
-  // Create some basic forecast lines for operating expenses
-  for (const account of expenseAccounts) {
-    let monthlyAmount = 0;
-    if (account.name === "Cloud Infrastructure") monthlyAmount = Math.max(500, Math.round(monthlyRevenue * 0.1));
-    else if (account.name === "Marketing") monthlyAmount = Math.max(1000, Math.round(monthlyRevenue * 0.15));
-    else if (account.name === "Office & Admin") monthlyAmount = Math.max(500, teamSize * 200);
-    else if (account.name === "Software & Tools") monthlyAmount = Math.max(200, teamSize * 100);
-
-    if (monthlyAmount > 0) {
-      await db.insert(forecastLines).values({
-        scenarioId: scenario.id,
-        accountId: account.id,
-        method: "fixed",
-        parameters: { amount: monthlyAmount },
-        startDate: periodStart,
-        endDate: periodEnd,
+        userId,
+        role: "owner",
       });
-    }
-  }
 
-  return NextResponse.json(
-    { companyId: company.id, scenarioId: scenario.id },
-    { status: 201 }
-  );
+      // Create base scenario
+      const [scenario] = await tx
+        .insert(scenarios)
+        .values({
+          companyId: company.id,
+          name: "Base Plan",
+          type: "base",
+          isDefault: true,
+          description: `Initial financial model for ${body.company_name}`,
+        })
+        .returning();
+
+      if (!scenario) throw new Error("Could not set up your financial model — please try again");
+
+      // Create default financial accounts
+      const defaultAccounts = [
+        { name: "Revenue", type: "income" as const, category: "revenue" as const, isSystem: true },
+        { name: "Cost of Goods Sold", type: "expense" as const, category: "cogs" as const, isSystem: true },
+        { name: "Salaries & Payroll", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
+        { name: "Cloud Infrastructure", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
+        { name: "Marketing", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
+        { name: "Office & Admin", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
+        { name: "Software & Tools", type: "expense" as const, category: "operating_expense" as const, isSystem: false },
+        { name: "Cash & Bank", type: "asset" as const, category: "asset" as const, isSystem: true },
+        { name: "Equity", type: "equity" as const, category: "equity" as const, isSystem: true },
+      ];
+
+      const createdAccounts = await tx
+        .insert(financialAccounts)
+        .values(
+          defaultAccounts.map((a) => ({
+            companyId: company.id,
+            name: a.name,
+            type: a.type,
+            category: a.category,
+            isSystem: a.isSystem,
+          }))
+        )
+        .returning();
+
+      // Create default departments
+      const defaultDepts = ["Engineering", "Sales", "Marketing", "Operations", "General & Admin"];
+      await tx.insert(departments).values(
+        defaultDepts.map((name) => ({ companyId: company.id, name }))
+      );
+
+      // Create initial revenue stream if user has revenue
+      if (monthlyRevenue > 0) {
+        const revenueType = businessModel === "saas" ? "subscription" : businessModel === "services" ? "services" : "one_time";
+        await tx.insert(revenueStreams).values({
+          scenarioId: scenario.id,
+          name: `${body.company_name} Revenue`,
+          type: revenueType,
+          parameters: revenueType === "subscription"
+            ? { monthlyPrice: monthlyRevenue, startingCustomers: 1, monthlyGrowthRate: 5 }
+            : { amount: monthlyRevenue },
+        });
+      }
+
+      // Create initial forecast lines based on user's expense info
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), 0, 1);
+      const periodEnd = new Date(now.getFullYear(), 11, 31);
+
+      const expenseAccounts = createdAccounts.filter(
+        (a) => a.category === "operating_expense"
+      );
+
+      const forecastValues = [];
+      for (const account of expenseAccounts) {
+        let monthlyAmount = 0;
+        if (account.name === "Cloud Infrastructure") monthlyAmount = Math.max(500, Math.round(monthlyRevenue * 0.1));
+        else if (account.name === "Marketing") monthlyAmount = Math.max(1000, Math.round(monthlyRevenue * 0.15));
+        else if (account.name === "Office & Admin") monthlyAmount = Math.max(500, teamSize * 200);
+        else if (account.name === "Software & Tools") monthlyAmount = Math.max(200, teamSize * 100);
+
+        if (monthlyAmount > 0) {
+          forecastValues.push({
+            scenarioId: scenario.id,
+            accountId: account.id,
+            method: "fixed" as const,
+            parameters: { amount: monthlyAmount },
+            startDate: periodStart,
+            endDate: periodEnd,
+          });
+        }
+      }
+
+      if (forecastValues.length > 0) {
+        await tx.insert(forecastLines).values(forecastValues);
+      }
+
+      return { companyId: company.id, scenarioId: scenario.id };
+    });
+
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong setting up your company";
+    console.error("[onboarding] Error:", message);
+    return errorResponse(message, 500);
+  }
 }
