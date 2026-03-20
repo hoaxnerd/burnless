@@ -19,6 +19,9 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
 import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
+import { ThemeProvider, ThemeToggle } from "@/components/ui/theme-toggle";
+import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -62,14 +65,18 @@ export default function DashboardLayout({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  const toggleAI = useCallback(() => setAiPanelOpen((prev) => !prev), []);
+
   return (
     <Suspense fallback={null}>
+    <ThemeProvider>
+    <KeyboardShortcutsProvider onToggleAI={toggleAI}>
     <ScenarioProvider>
     <div className="min-h-screen flex flex-col">
       <ScenarioBanner />
       <div className="flex-1 flex">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-surface-200 bg-surface-0 flex flex-col flex-shrink-0">
+      <aside className="w-64 border-r border-surface-200 bg-surface-0 flex flex-col flex-shrink-0" role="navigation" aria-label="Main navigation">
         <div className="p-4 border-b border-surface-200">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center">
@@ -81,7 +88,7 @@ export default function DashboardLayout({
           </Link>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1" aria-label="Sidebar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -96,6 +103,7 @@ export default function DashboardLayout({
                     ? "bg-brand-50 text-brand-700"
                     : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
                 }`}
+                aria-current={isActive ? "page" : undefined}
               >
                 <Icon className={`h-4 w-4 ${isActive ? "text-brand-600" : "text-surface-400"}`} />
                 {item.label}
@@ -129,6 +137,7 @@ export default function DashboardLayout({
                     ? "bg-brand-50 text-brand-700"
                     : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
                 }`}
+                aria-current={isActive ? "page" : undefined}
               >
                 <Icon className={`h-4 w-4 ${isActive ? "text-brand-600" : "text-surface-400"}`} />
                 {item.label}
@@ -150,13 +159,18 @@ export default function DashboardLayout({
                 user@startup.com
               </p>
             </div>
+            <ThemeToggle />
           </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 bg-surface-50 overflow-auto">
-        <div className="p-8">{children}</div>
+      <main className="flex-1 bg-surface-50 overflow-auto" id="main-content" role="main">
+        <div className="p-8">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </div>
       </main>
 
       {/* Global AI Panel (Cmd+K) */}
@@ -164,6 +178,8 @@ export default function DashboardLayout({
     </div>
     </div>
     </ScenarioProvider>
+    </KeyboardShortcutsProvider>
+    </ThemeProvider>
     </Suspense>
   );
 }

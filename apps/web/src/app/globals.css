@@ -32,7 +32,7 @@
   --color-danger: #ef4444;
   --color-info: #3b82f6;
 
-  /* Semantic tokens */
+  /* Semantic tokens — light mode defaults */
   --color-bg: var(--color-surface-0);
   --color-bg-secondary: var(--color-surface-50);
   --color-text-primary: var(--color-surface-900);
@@ -55,6 +55,47 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
+/* Dark mode — swap surface palette for dark equivalents */
+.dark {
+  --color-surface-0: #0f1117;
+  --color-surface-50: #151821;
+  --color-surface-100: #1c202d;
+  --color-surface-200: #282d3e;
+  --color-surface-300: #3b4155;
+  --color-surface-400: #626a83;
+  --color-surface-500: #8891a7;
+  --color-surface-600: #a5adc0;
+  --color-surface-700: #c4cad7;
+  --color-surface-800: #dde1ea;
+  --color-surface-900: #eef0f5;
+  --color-surface-950: #f9fafb;
+
+  --color-bg: #0f1117;
+  --color-bg-secondary: #151821;
+  --color-text-primary: #eef0f5;
+  --color-text-secondary: #8891a7;
+  --color-border: #282d3e;
+
+  /* Slightly adjusted brand for dark backgrounds */
+  --color-brand-50: #142557;
+  --color-brand-100: #193a8f;
+  --color-brand-200: #1740b6;
+
+  /* Dark shadow adjustments */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.2);
+}
+
+/* Dark mode: fix colors for elements using hardcoded Tailwind classes */
+.dark .bg-white { background-color: var(--color-surface-0); }
+.dark .bg-red-50 { background-color: rgba(220, 38, 38, 0.1); }
+.dark .bg-red-100 { background-color: rgba(220, 38, 38, 0.15); }
+.dark .bg-green-50 { background-color: rgba(16, 185, 129, 0.1); }
+.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.15); }
+.dark .border-red-200 { border-color: rgba(220, 38, 38, 0.2); }
+.dark .border-green-200 { border-color: rgba(16, 185, 129, 0.2); }
+
 /* Reset and base */
 * {
   border-color: var(--color-border);
@@ -66,4 +107,25 @@ body {
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  padding: 8px 16px;
+  background: var(--color-brand-600);
+  color: white;
+  z-index: 100;
+  transition: top 0.1s;
+}
+.skip-link:focus {
+  top: 0;
 }
