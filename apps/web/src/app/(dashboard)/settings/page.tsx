@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   BookOpen,
   FileSpreadsheet,
@@ -17,27 +17,30 @@ import {
   Shield,
   Lock,
   Eye,
+  Save,
+  Loader2,
+  AlertCircle,
+  Unplug,
 } from "lucide-react";
 import Link from "next/link";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { AI_FEATURE_LIST, type AiDataMode } from "@burnless/ai";
+import { Button } from "@/components/ui";
 
-interface IntegrationItem {
+interface IntegrationDef {
   type: string;
   name: string;
   description: string;
   icon: React.ReactNode;
-  status: "available" | "coming_soon" | "connected";
   href?: string;
 }
 
-const integrations: IntegrationItem[] = [
+const INTEGRATION_DEFS: IntegrationDef[] = [
   {
     type: "csv_import",
     name: "CSV Import",
     description: "Import transactions from bank statements and spreadsheets",
     icon: <FileSpreadsheet className="h-5 w-5" />,
-    status: "available",
     href: "/import",
   },
   {
@@ -45,50 +48,74 @@ const integrations: IntegrationItem[] = [
     name: "QuickBooks",
     description: "Sync your QuickBooks accounting data automatically",
     icon: <BookOpen className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "xero",
     name: "Xero",
     description: "Connect your Xero accounting for real-time sync",
     icon: <BookOpen className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "freshbooks",
     name: "FreshBooks",
     description: "Import invoices and expenses from FreshBooks",
     icon: <BookOpen className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "plaid",
     name: "Plaid",
     description: "Connect bank accounts directly for transaction import",
     icon: <Landmark className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "mercury",
     name: "Mercury",
     description: "Sync your Mercury banking transactions automatically",
     icon: <Building2 className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "gusto",
     name: "Gusto",
     description: "Import payroll data and employee costs from Gusto",
     icon: <DollarSign className="h-5 w-5" />,
-    status: "coming_soon",
   },
   {
     type: "stripe",
     name: "Stripe",
     description: "Sync revenue and payment data from Stripe",
     icon: <CreditCard className="h-5 w-5" />,
-    status: "coming_soon",
   },
+];
+
+interface ConnectedIntegration {
+  id: string;
+  type: string;
+  status: string;
+  lastSyncAt: string | null;
+}
+
+interface CompanyProfile {
+  name: string;
+  stage: string;
+  currency: string;
+  industry: string | null;
+  businessModel: string;
+}
+
+const STAGE_OPTIONS = [
+  { value: "pre_seed", label: "Pre-seed" },
+  { value: "seed", label: "Seed" },
+  { value: "series_a", label: "Series A" },
+  { value: "series_b", label: "Series B" },
+  { value: "series_c_plus", label: "Series C+" },
+  { value: "bootstrapped", label: "Bootstrapped" },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: "USD", label: "USD ($)" },
+  { value: "EUR", label: "EUR (\u20AC)" },
+  { value: "GBP", label: "GBP (\u00A3)" },
+  { value: "INR", label: "INR (\u20B9)" },
 ];
 
 const tabs = [
@@ -103,6 +130,98 @@ export default function SettingsPage() {
     "general" | "ai" | "integrations" | "billing"
   >("general");
   const { flags, updateFlags, loaded: aiLoaded } = useAiFlags();
+
+  // Company profile state
+  const [company, setCompany] = useState<CompanyProfile>({
+    name: "",
+    stage: "pre_seed",
+    currency: "USD",
+    industry: null,
+    businessModel: "saas",
+  });
+  const [companyLoaded, setCompanyLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Integrations state
+  const [connectedIntegrations, setConnectedIntegrations] = useState<ConnectedIntegration[]>([]);
+  const [integrationsLoaded, setIntegrationsLoaded] = useState(false);
+
+  // Load company profile
+  useEffect(() => {
+    fetch("/api/company")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) {
+          setCompany({
+            name: data.name || "",
+            stage: data.stage || "pre_seed",
+            currency: data.currency || "USD",
+            industry: data.industry,
+            businessModel: data.businessModel || "saas",
+          });
+        }
+        setCompanyLoaded(true);
+      })
+      .catch(() => setCompanyLoaded(true));
+  }, []);
+
+  // Load integrations
+  const loadIntegrations = useCallback(() => {
+    fetch("/api/integrations")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        setConnectedIntegrations(data);
+        setIntegrationsLoaded(true);
+      })
+      .catch(() => setIntegrationsLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    loadIntegrations();
+  }, [loadIntegrations]);
+
+  // Save company profile
+  const saveCompany = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/company", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(company),
+      });
+      if (res.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      } else {
+        const data = await res.json();
+        setSaveError(data.error || "Failed to save");
+      }
+    } catch {
+      setSaveError("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Disconnect integration
+  const disconnectIntegration = async (id: string) => {
+    const res = await fetch(`/api/integrations/${id}`, { method: "DELETE" });
+    if (res.ok) loadIntegrations();
+  };
+
+  const getIntegrationStatus = (type: string): "available" | "coming_soon" | "connected" => {
+    if (type === "csv_import") return "available";
+    const connected = connectedIntegrations.find((i) => i.type === type);
+    if (connected && connected.status === "active") return "connected";
+    return "coming_soon";
+  };
+
+  const getConnectedId = (type: string): string | null => {
+    return connectedIntegrations.find((i) => i.type === type)?.id ?? null;
+  };
 
   return (
     <div>
@@ -136,9 +255,24 @@ export default function SettingsPage() {
       {activeTab === "general" && (
         <div className="space-y-8 max-w-2xl">
           <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
-            <h2 className="text-base font-semibold text-surface-900 mb-6">
-              Company
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-base font-semibold text-surface-900">Company</h2>
+              <Button
+                variant={saveSuccess ? "success" : "primary"}
+                size="sm"
+                icon={saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveSuccess ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+                disabled={saving || !companyLoaded}
+                onClick={saveCompany}
+              >
+                {saveSuccess ? "Saved" : "Save Changes"}
+              </Button>
+            </div>
+            {saveError && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {saveError}
+              </div>
+            )}
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-2">
@@ -146,6 +280,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
+                  value={company.name}
+                  onChange={(e) => setCompany((c) => ({ ...c, name: e.target.value }))}
                   placeholder="My Startup Inc."
                   className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
                 />
@@ -155,24 +291,28 @@ export default function SettingsPage() {
                   <label className="block text-sm font-medium text-surface-700 mb-2">
                     Stage
                   </label>
-                  <select className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20d%3D%22m2%204%204%204%204-4%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]">
-                    <option>Pre-seed</option>
-                    <option>Seed</option>
-                    <option>Series A</option>
-                    <option>Series B</option>
-                    <option>Series C+</option>
-                    <option>Bootstrapped</option>
+                  <select
+                    value={company.stage}
+                    onChange={(e) => setCompany((c) => ({ ...c, stage: e.target.value }))}
+                    className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20d%3D%22m2%204%204%204%204-4%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]"
+                  >
+                    {STAGE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-surface-700 mb-2">
                     Currency
                   </label>
-                  <select className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20d%3D%22m2%204%204%204%204-4%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]">
-                    <option>USD ($)</option>
-                    <option>EUR (&euro;)</option>
-                    <option>GBP (&pound;)</option>
-                    <option>INR (&#8377;)</option>
+                  <select
+                    value={company.currency}
+                    onChange={(e) => setCompany((c) => ({ ...c, currency: e.target.value }))}
+                    className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20d%3D%22m2%204%204%204%204-4%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_12px_center]"
+                  >
+                    {CURRENCY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -394,60 +534,76 @@ export default function SettingsPage() {
       {activeTab === "integrations" && (
         <div className="max-w-3xl">
           <div className="space-y-3">
-            {integrations.map((integration) => (
-              <div
-                key={integration.type}
-                className="rounded-2xl bg-surface-0 border border-surface-200 p-5 flex items-center gap-4 hover:border-surface-300 transition-all"
-              >
-                <div className="h-11 w-11 rounded-xl bg-surface-100 flex items-center justify-center text-surface-600 shrink-0">
-                  {integration.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-surface-900">
-                      {integration.name}
-                    </h3>
-                    {integration.status === "coming_soon" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-500">
-                        <Clock className="h-3 w-3" />
-                        Coming Soon
-                      </span>
-                    )}
-                    {integration.status === "connected" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-medium text-success-700">
-                        <Check className="h-3 w-3" />
-                        Connected
-                      </span>
+            {INTEGRATION_DEFS.map((integration) => {
+              const status = getIntegrationStatus(integration.type);
+              const connectedId = getConnectedId(integration.type);
+              return (
+                <div
+                  key={integration.type}
+                  className={`rounded-2xl bg-surface-0 border p-5 flex items-center gap-4 transition-all ${
+                    status === "connected"
+                      ? "border-success-200 bg-success-50/30"
+                      : "border-surface-200 hover:border-surface-300"
+                  }`}
+                >
+                  <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
+                    status === "connected"
+                      ? "bg-success-100 text-success-600"
+                      : "bg-surface-100 text-surface-600"
+                  }`}>
+                    {integration.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-surface-900">
+                        {integration.name}
+                      </h3>
+                      {status === "coming_soon" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-500">
+                          <Clock className="h-3 w-3" />
+                          Coming Soon
+                        </span>
+                      )}
+                      {status === "connected" && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-medium text-success-700">
+                          <Check className="h-3 w-3" />
+                          Connected
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-surface-500 mt-0.5">
+                      {integration.description}
+                    </p>
+                  </div>
+                  <div>
+                    {status === "available" && integration.href ? (
+                      <Link
+                        href={integration.href}
+                        className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 transition-colors shadow-sm shadow-brand-600/20"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </Link>
+                    ) : status === "connected" && connectedId ? (
+                      <button
+                        onClick={() => disconnectIntegration(connectedId)}
+                        className="flex items-center gap-1.5 rounded-xl border border-danger-200 px-4 py-2 text-xs font-medium text-danger-600 hover:bg-danger-50 transition-colors"
+                      >
+                        <Unplug className="h-3.5 w-3.5" />
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="rounded-xl border border-surface-200 px-4 py-2 text-xs font-medium text-surface-400 cursor-not-allowed"
+                      >
+                        Connect
+                      </button>
                     )}
                   </div>
-                  <p className="text-xs text-surface-500 mt-0.5">
-                    {integration.description}
-                  </p>
                 </div>
-                <div>
-                  {integration.status === "available" && integration.href ? (
-                    <Link
-                      href={integration.href}
-                      className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 transition-colors shadow-sm shadow-brand-600/20"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      Import
-                    </Link>
-                  ) : integration.status === "connected" ? (
-                    <button className="rounded-xl border border-surface-300 px-4 py-2 text-xs font-medium text-surface-600 hover:bg-surface-50 transition-colors">
-                      Manage
-                    </button>
-                  ) : (
-                    <button
-                      disabled
-                      className="rounded-xl border border-surface-200 px-4 py-2 text-xs font-medium text-surface-400 cursor-not-allowed"
-                    >
-                      Connect
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
