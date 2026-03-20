@@ -112,6 +112,9 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)
 
   packages/ai:
     dependencies:
@@ -125,6 +128,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@types/node':
+        specifier: ^22.19.15
+        version: 22.19.15
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
