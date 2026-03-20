@@ -13,6 +13,7 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!session.user.emailVerified) redirect("/verify-email");
 
   const user = {
     name: session.user.name ?? null,

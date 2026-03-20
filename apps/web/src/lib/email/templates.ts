@@ -20,6 +20,30 @@ function layout(content: string): string {
 </html>`;
 }
 
+export function verificationEmail(
+  verifyUrl: string
+): { subject: string; html: string; text: string } {
+  return {
+    subject: "Verify your Burnless email",
+    html: layout(`
+      <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Verify your email</h1>
+      <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
+        Click below to verify your email and get started with Burnless.
+        This link expires in 24 hours.
+      </p>
+      <a href="${verifyUrl}"
+         style="display:inline-block;background:#fff;color:#000;font-weight:600;
+                padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;">
+        Verify email &rarr;
+      </a>
+      <p style="color:#666;font-size:13px;margin:24px 0 0;">
+        If you didn't create a Burnless account, ignore this email.
+      </p>
+    `),
+    text: `Verify your Burnless email:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this email.`,
+  };
+}
+
 export function welcomeEmail(name: string): { subject: string; html: string; text: string } {
   return {
     subject: "Welcome to Burnless",
@@ -103,6 +127,93 @@ function metricRow(label: string, value: string, change?: number): string {
     <td style="padding:10px 0;border-bottom:1px solid #222;color:#fff;font-size:14px;font-weight:600;text-align:right;">${value}</td>
     <td style="padding:10px 0;border-bottom:1px solid #222;font-size:12px;text-align:right;padding-left:12px;">${change !== undefined ? changeArrow(change) : ""}</td>
   </tr>`;
+}
+
+// ---------------------------------------------------------------------------
+// Billing emails
+// ---------------------------------------------------------------------------
+
+const PLAN_DISPLAY: Record<string, string> = {
+  pro: "Pro",
+  team: "Team",
+  free: "Free",
+};
+
+export function subscriptionConfirmedEmail(
+  plan: string
+): { subject: string; html: string; text: string } {
+  const planName = PLAN_DISPLAY[plan] ?? plan;
+  return {
+    subject: `You're on Burnless ${planName}`,
+    html: layout(`
+      <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Subscription confirmed</h1>
+      <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
+        Your Burnless <strong style="color:#fff;">${planName}</strong> plan is now active.
+        You have full access to all ${planName} features.
+      </p>
+      <a href="${BASE_URL}/settings?tab=billing"
+         style="display:inline-block;background:#fff;color:#000;font-weight:600;
+                padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;">
+        Manage billing &rarr;
+      </a>
+      <p style="color:#666;font-size:13px;margin:24px 0 0;">
+        You can manage your subscription, update payment methods, or download invoices from the billing settings page.
+      </p>
+    `),
+    text: `Subscription confirmed — Burnless ${planName}\n\nYour ${planName} plan is now active. Manage billing: ${BASE_URL}/settings?tab=billing`,
+  };
+}
+
+export function paymentFailedEmail(): { subject: string; html: string; text: string } {
+  return {
+    subject: "Burnless — payment failed",
+    html: layout(`
+      <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Payment failed</h1>
+      <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
+        We couldn't process your latest payment. Please update your payment method
+        to keep your plan active. If the issue persists, your account will be
+        downgraded to the Free plan.
+      </p>
+      <a href="${BASE_URL}/settings?tab=billing"
+         style="display:inline-block;background:#fff;color:#000;font-weight:600;
+                padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;">
+        Update payment &rarr;
+      </a>
+      <p style="color:#666;font-size:13px;margin:24px 0 0;">
+        Questions? Reply to this email.
+      </p>
+    `),
+    text: `Payment failed — Burnless\n\nPlease update your payment method: ${BASE_URL}/settings?tab=billing`,
+  };
+}
+
+export function subscriptionCanceledEmail(
+  periodEnd: Date
+): { subject: string; html: string; text: string } {
+  const endStr = periodEnd.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  return {
+    subject: "Burnless — subscription cancellation scheduled",
+    html: layout(`
+      <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Cancellation scheduled</h1>
+      <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
+        Your subscription will remain active until <strong style="color:#fff;">${endStr}</strong>.
+        After that date your account will be downgraded to the Free plan.
+      </p>
+      <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
+        Changed your mind? You can reactivate anytime before ${endStr} from your billing settings.
+      </p>
+      <a href="${BASE_URL}/settings?tab=billing"
+         style="display:inline-block;background:#fff;color:#000;font-weight:600;
+                padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;">
+        Manage subscription &rarr;
+      </a>
+    `),
+    text: `Cancellation scheduled — Burnless\n\nYour plan stays active until ${endStr}. Reactivate: ${BASE_URL}/settings?tab=billing`,
+  };
 }
 
 export function weeklyDigestEmail(

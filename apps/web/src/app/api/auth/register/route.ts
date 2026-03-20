@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, users } from "@burnless/db";
+import { db, users, verificationTokens } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";
-import { welcomeEmail } from "@/lib/email/templates";
+import { verificationEmail } from "@/lib/email/templates";
+
+const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -55,12 +59,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }
 
-  // Send welcome email (fire-and-forget — don't block registration)
+  // Send verification email (fire-and-forget — don't block registration)
   if (email.provider && user.email) {
-    const template = welcomeEmail(user.name ?? "there");
-    email.provider.send({ to: user.email, ...template }).catch((err: unknown) => {
-      console.error("[email] Failed to send welcome email:", err);
-    });
+    const normalizedEmail = user.email.toLowerCase().trim();
+    const token = randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + TOKEN_EXPIRY_MS);
+
+    db.insert(verificationTokens)
+      .values({
+        identifier: `verify:${normalizedEmail}`,
+        token,
+        expires,
+      })
+      .then(() => {
+        const verifyUrl = `${BASE_URL}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+        const template = verificationEmail(verifyUrl);
+        return email.provider.send({ to: normalizedEmail, ...template });
+      })
+      .catch((err: unknown) => {
+        console.error("[email] Failed to send verification email:", err);
+      });
   }
 
   return NextResponse.json(user, { status: 201 });

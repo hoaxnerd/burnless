@@ -111,7 +111,7 @@ export default function LoginPage() {
       } else {
         trackEvent("auth_signup_success", { method: "credentials" });
         identifyUser(email, { name: name || undefined });
-        window.location.href = "/onboarding";
+        window.location.href = "/verify-email";
       }
     } catch {
       trackEvent("auth_signup_error", { method: "credentials" });
