@@ -9,8 +9,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@burnless/db";
 import { aiConversations, aiMessages } from "@burnless/db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, lt } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 export async function GET(request: Request) {
   const ctx = await requireCompanyAccess();
@@ -30,17 +31,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ conversationId, messages });
   }
 
-  // List all conversations
-  const conversations = await db
+  // List conversations with cursor-based pagination
+  const { limit, cursor } = parsePaginationParams(request);
+
+  const conditions = [
+    eq(aiConversations.companyId, ctx.companyId),
+    eq(aiConversations.userId, ctx.userId),
+  ];
+
+  if (cursor) {
+    conditions.push(lt(aiConversations.id, cursor));
+  }
+
+  const rows = await db
     .select()
     .from(aiConversations)
-    .where(
-      and(
-        eq(aiConversations.companyId, ctx.companyId),
-        eq(aiConversations.userId, ctx.userId)
-      )
-    )
-    .orderBy(desc(aiConversations.updatedAt));
+    .where(and(...conditions))
+    .orderBy(desc(aiConversations.updatedAt))
+    .limit(limit + 1);
 
-  return NextResponse.json(conversations);
+  return NextResponse.json(paginatedResponse(rows, limit));
 }
