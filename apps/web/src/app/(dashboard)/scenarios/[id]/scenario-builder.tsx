@@ -107,14 +107,14 @@ function useUndoRedo<T>(initial: T) {
   const undo = useCallback(() => {
     if (indexRef.current > 0) {
       indexRef.current--;
-      setState(historyRef.current[indexRef.current]);
+      setState(historyRef.current[indexRef.current]!);
     }
   }, []);
 
   const redo = useCallback(() => {
     if (indexRef.current < historyRef.current.length - 1) {
       indexRef.current++;
-      setState(historyRef.current[indexRef.current]);
+      setState(historyRef.current[indexRef.current]!);
     }
   }, []);
 

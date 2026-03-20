@@ -1,3 +1,4 @@
+/// <reference path="./vendor.d.ts" />
 /**
  * Bank connector abstraction layer.
  *
@@ -130,7 +131,7 @@ export class PlaidBankConnector implements BankConnector {
   async getAccounts(accessToken: string): Promise<BankAccount[]> {
     const client = await this.getClient();
     const response = await client.accountsGet({ access_token: accessToken });
-    return response.data.accounts.map((acc) => ({
+    return response.data.accounts.map((acc: any) => ({
       id: acc.account_id,
       externalId: acc.account_id,
       name: acc.name,
@@ -156,7 +157,7 @@ export class PlaidBankConnector implements BankConnector {
       });
       return {
         accounts: [],
-        transactions: response.data.added.map((t) => this.mapTransaction(t)),
+        transactions: response.data.added.map((t: any) => this.mapTransaction(t)),
         syncedAt: new Date(),
         cursor: response.data.next_cursor,
         hasMore: response.data.has_more,
@@ -174,7 +175,7 @@ export class PlaidBankConnector implements BankConnector {
 
     return {
       accounts: [],
-      transactions: response.data.transactions.map((t) => this.mapTransaction(t)),
+      transactions: response.data.transactions.map((t: any) => this.mapTransaction(t)),
       syncedAt: new Date(),
       hasMore: response.data.total_transactions > response.data.transactions.length,
     };

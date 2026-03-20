@@ -44,7 +44,7 @@ export async function POST(
         // Route events to handlers
         switch (event.type) {
           case "checkout.session.completed": {
-            const session = event.data.object;
+            const session = event.data.object as Record<string, any>;
             const companyId = session.metadata?.companyId;
             if (companyId) {
               await db
@@ -58,13 +58,13 @@ export async function POST(
           case "customer.subscription.deleted": {
             // Subscription state changes are read from Stripe directly
             // in the billing GET endpoint. Log for now.
-            console.log(`[webhook] ${event.type}:`, event.data.object.id);
+            console.log(`[webhook] ${event.type}:`, (event.data.object as Record<string, any>).id);
             break;
           }
           case "invoice.payment_failed": {
             console.log(
               `[webhook] Payment failed for customer:`,
-              event.data.object.customer
+              (event.data.object as Record<string, any>).customer
             );
             break;
           }

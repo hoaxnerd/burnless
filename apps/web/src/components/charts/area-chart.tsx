@@ -30,7 +30,7 @@ export function AreaChartWidget({
   showLatestLabel = false,
 }: AreaChartProps) {
   const gradientId = `area-gradient-${color.replace("#", "")}`;
-  const latestValue = data.length > 0 ? data[data.length - 1].value : null;
+  const latestValue = data.length > 0 ? data[data.length - 1]!.value : null;
 
   return (
     <div className="relative">
@@ -57,7 +57,7 @@ export function AreaChartWidget({
           {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />}
           <XAxis
             dataKey="month"
-            tickFormatter={formatMonth}
+            tickFormatter={(v) => formatMonth(String(v))}
             tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
             axisLine={false}
             tickLine={false}

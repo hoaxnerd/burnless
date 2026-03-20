@@ -11,8 +11,8 @@
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
-    // In development, warn but don't crash — allows partial setup
-    if (process.env.NODE_ENV === "development") {
+    // In development or during build, warn but don't crash
+    if (process.env.NODE_ENV === "development" || process.env.NEXT_PHASE === "phase-production-build") {
       console.warn(`[env] Missing required env var: ${name}`);
       return "";
     }
@@ -37,12 +37,16 @@ export const env = {
   isProd: process.env.NODE_ENV === "production",
 
   // ── Database ────────────────────────────────────────────────────────────
-  /** PostgreSQL connection string. Required. */
-  DATABASE_URL: required("DATABASE_URL"),
+  /** PostgreSQL connection string. Required at runtime (lazy to avoid build-time errors). */
+  get DATABASE_URL(): string {
+    return required("DATABASE_URL");
+  },
 
   // ── Auth ────────────────────────────────────────────────────────────────
-  /** NextAuth secret for JWT signing. Required. */
-  AUTH_SECRET: required("AUTH_SECRET"),
+  /** NextAuth secret for JWT signing. Required at runtime (lazy to avoid build-time errors). */
+  get AUTH_SECRET(): string {
+    return required("AUTH_SECRET");
+  },
   /** GitHub OAuth (optional — social login) */
   AUTH_GITHUB_ID: optional("AUTH_GITHUB_ID"),
   AUTH_GITHUB_SECRET: optional("AUTH_GITHUB_SECRET"),

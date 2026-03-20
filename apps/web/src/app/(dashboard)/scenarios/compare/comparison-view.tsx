@@ -467,7 +467,7 @@ function ComparisonChart({
     const delta = line.deltaAbsolute[i]?.value ?? 0;
     const isGood = positiveIsGood ? delta >= 0 : delta <= 0;
     const fill = delta === 0 ? "transparent" : isGood ? "#22c55e" : "#ef4444";
-    const pathD = `M${basePts[i].x},${basePts[i].y} L${basePts[i + 1].x},${basePts[i + 1].y} L${compPts[i + 1].x},${compPts[i + 1].y} L${compPts[i].x},${compPts[i].y} Z`;
+    const pathD = `M${basePts[i]!.x},${basePts[i]!.y} L${basePts[i + 1]!.x},${basePts[i + 1]!.y} L${compPts[i + 1]!.x},${compPts[i + 1]!.y} L${compPts[i]!.x},${compPts[i]!.y} Z`;
     deltaSegments.push(
       <path key={i} d={pathD} fill={fill} opacity={0.12} />
     );
@@ -526,8 +526,8 @@ function ComparisonChart({
           })}
 
         {/* Endpoint dots */}
-        <circle cx={basePts[n - 1].x} cy={basePts[n - 1].y} r={3} fill="#3b82f6" />
-        <circle cx={compPts[n - 1].x} cy={compPts[n - 1].y} r={3} fill="#f59e0b" />
+        <circle cx={basePts[n - 1]!.x} cy={basePts[n - 1]!.y} r={3} fill="#3b82f6" />
+        <circle cx={compPts[n - 1]!.x} cy={compPts[n - 1]!.y} r={3} fill="#f59e0b" />
       </svg>
     </div>
   );

@@ -56,7 +56,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
-          const currency = isValidCurrency(data.currency) ? data.currency : "USD";
+          const currency: CurrencyCode = isValidCurrency(data.currency) ? data.currency : "USD";
           setSettings({
             locale: data.locale || CURRENCIES[currency]?.defaultLocale || "en-US",
             currency,

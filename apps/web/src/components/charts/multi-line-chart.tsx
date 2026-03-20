@@ -70,7 +70,7 @@ export function MultiLineChart({
           <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
           <XAxis
             dataKey="month"
-            tickFormatter={formatMonth}
+            tickFormatter={(v) => formatMonth(String(v))}
             tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
             axisLine={false}
             tickLine={false}
