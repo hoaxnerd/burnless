@@ -145,13 +145,25 @@ export const POST = withErrorHandler(async (request: Request) => {
       // Create initial revenue stream if user has revenue
       if (monthlyRevenue > 0) {
         const revenueType = businessModel === "saas" ? "subscription" : businessModel === "services" ? "services" : "one_time";
+
+        // Each revenue type has its own parameter shape expected by the engine
+        let revenueParams: Record<string, number>;
+        if (revenueType === "subscription") {
+          revenueParams = { monthlyPrice: monthlyRevenue, startingCustomers: 1, monthlyGrowthRate: 5 };
+        } else if (revenueType === "services") {
+          // Convert monthly revenue into hours * rate (assume $150/hr default)
+          const hourlyRate = 150;
+          revenueParams = { hoursPerMonth: Math.round(monthlyRevenue / hourlyRate), hourlyRate };
+        } else {
+          // one_time: convert to units * price (1 unit at full amount)
+          revenueParams = { unitsPerMonth: 1, pricePerUnit: monthlyRevenue };
+        }
+
         await tx.insert(revenueStreams).values({
           scenarioId: scenario.id,
           name: `${body.company_name} Revenue`,
           type: revenueType,
-          parameters: revenueType === "subscription"
-            ? { monthlyPrice: monthlyRevenue, startingCustomers: 1, monthlyGrowthRate: 5 }
-            : { amount: monthlyRevenue },
+          parameters: revenueParams,
         });
       }
 

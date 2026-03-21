@@ -225,9 +225,17 @@ function computeOneTimeRevenue(
   const months = monthRange(periodStart, periodEnd);
   const series: MonthlySeries = new Map();
 
+  // Guard against missing required params (e.g. legacy data with {amount} shape)
+  const unitsPerMonth = params.unitsPerMonth ?? 0;
+  const pricePerUnit = params.pricePerUnit ?? 0;
+  if (unitsPerMonth === 0 && pricePerUnit === 0) {
+    for (const m of months) series.set(monthKey(m), D(0));
+    return series;
+  }
+
   for (let i = 0; i < months.length; i++) {
-    const units = dMul(params.unitsPerMonth, dPow(D(1).plus(params.unitGrowthRate ?? 0), i));
-    series.set(monthKey(months[i]!), dRound2(units.mul(params.pricePerUnit)));
+    const units = dMul(unitsPerMonth, dPow(D(1).plus(params.unitGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(units.mul(pricePerUnit)));
   }
 
   return series;
@@ -258,9 +266,17 @@ function computeServicesRevenue(
   const months = monthRange(periodStart, periodEnd);
   const series: MonthlySeries = new Map();
 
+  // Guard against missing required params (e.g. legacy data with {amount} shape)
+  const hoursPerMonth = params.hoursPerMonth ?? 0;
+  const hourlyRate = params.hourlyRate ?? 0;
+  if (hoursPerMonth === 0 && hourlyRate === 0) {
+    for (const m of months) series.set(monthKey(m), D(0));
+    return series;
+  }
+
   for (let i = 0; i < months.length; i++) {
-    const hours = D(params.hoursPerMonth).mul(dPow(D(1).plus(params.hoursGrowthRate ?? 0), i));
-    const rate = D(params.hourlyRate).mul(dPow(D(1).plus(D(params.rateIncreaseRate ?? 0).div(12)), i));
+    const hours = D(hoursPerMonth).mul(dPow(D(1).plus(params.hoursGrowthRate ?? 0), i));
+    const rate = D(hourlyRate).mul(dPow(D(1).plus(D(params.rateIncreaseRate ?? 0).div(12)), i));
     series.set(monthKey(months[i]!), dRound2(hours.mul(rate)));
   }
 
