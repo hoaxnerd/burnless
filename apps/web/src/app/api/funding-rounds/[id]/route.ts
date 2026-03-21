@@ -4,6 +4,7 @@ import { db, fundingRounds } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { positiveAmount, percentage } from "@/lib/financial-validation";
+import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -37,6 +38,7 @@ export const PATCH = withErrorHandler(async (
 
   const [row] = await db.update(fundingRounds).set(updates).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
+  await logAudit(ctx, "funding_round", id, "update", { after: row });
   return NextResponse.json(row);
 });
 
@@ -52,5 +54,6 @@ export const DELETE = withErrorHandler(async (
 
   const [row] = await db.delete(fundingRounds).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
+  await logAudit(ctx, "funding_round", id, "delete", { before: row });
   return NextResponse.json({ deleted: true });
 });

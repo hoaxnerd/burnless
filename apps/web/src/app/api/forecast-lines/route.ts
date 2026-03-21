@@ -4,6 +4,7 @@ import { db, forecastLines, getScenarioForCompany } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { logAudit } from "@/lib/audit";
 
 const createSchema = z.object({
   scenarioId: z.string(),
@@ -58,5 +59,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     .values(parsed.data)
     .returning();
 
+  if (row) await logAudit(ctx, "forecast_line", row.id, "create", { after: row });
   return NextResponse.json(row, { status: 201 });
 });

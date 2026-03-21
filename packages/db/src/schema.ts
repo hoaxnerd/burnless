@@ -759,6 +759,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   aiConversations: many(aiConversations),
   aiInsightCache: many(aiInsightCache),
   weeklyDigests: many(weeklyDigests),
+  financialAuditLogs: many(financialAuditLogs),
 }));
 
 export const companyMembersRelations = relations(companyMembers, ({ one }) => ({
@@ -1055,6 +1056,71 @@ export const merchantCategoryMappingsRelations = relations(
     account: one(financialAccounts, {
       fields: [merchantCategoryMappings.accountId],
       references: [financialAccounts.id],
+    }),
+  })
+);
+
+// ── Financial Audit Logs ─────────────────────────────────────────────────────
+
+export const auditActionEnum = pgEnum("audit_action", [
+  "create",
+  "update",
+  "delete",
+  "import",
+  "rollback",
+]);
+
+export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
+  "transaction",
+  "financial_account",
+  "scenario",
+  "forecast_line",
+  "forecast_value",
+  "headcount_plan",
+  "revenue_stream",
+  "funding_round",
+  "import_batch",
+  "department",
+  "metric",
+]);
+
+export const financialAuditLogs = pgTable(
+  "financial_audit_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entityType: auditEntityTypeEnum("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    action: auditActionEnum("action").notNull(),
+    changes: jsonb("changes"), // { before?: Record, after?: Record } — null for creates/deletes when full snapshot not needed
+    metadata: jsonb("metadata"), // extra context: IP, user agent, import batch ID, etc.
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("financial_audit_company_idx").on(table.companyId),
+    index("financial_audit_entity_idx").on(table.entityType, table.entityId),
+    index("financial_audit_user_idx").on(table.companyId, table.userId),
+    index("financial_audit_created_idx").on(table.companyId, table.createdAt),
+  ]
+);
+
+export const financialAuditLogsRelations = relations(
+  financialAuditLogs,
+  ({ one }) => ({
+    company: one(companies, {
+      fields: [financialAuditLogs.companyId],
+      references: [companies.id],
+    }),
+    user: one(users, {
+      fields: [financialAuditLogs.userId],
+      references: [users.id],
     }),
   })
 );

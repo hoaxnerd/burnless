@@ -4,6 +4,7 @@ import { db, departments } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { logAudit } from "@/lib/audit";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -40,5 +41,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if ("error" in parsed) return parsed.error;
 
   const [row] = await db.insert(departments).values({ companyId: ctx.companyId, ...parsed.data }).returning();
+  if (row) await logAudit(ctx, "department", row.id, "create", { after: row });
   return NextResponse.json(row, { status: 201 });
 });

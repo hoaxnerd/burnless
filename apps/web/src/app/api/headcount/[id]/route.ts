@@ -4,6 +4,7 @@ import { db, headcountPlans, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { positiveAmount, ratio } from "@/lib/financial-validation";
+import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -38,6 +39,7 @@ export const PATCH = withErrorHandler(async (
 
   const [row] = await db.update(headcountPlans).set(updates).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
+  await logAudit(ctx, "headcount_plan", id, "update", { after: row });
   return NextResponse.json(row);
 });
 
@@ -53,5 +55,6 @@ export const DELETE = withErrorHandler(async (
 
   const [row] = await db.delete(headcountPlans).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
+  await logAudit(ctx, "headcount_plan", id, "delete", { before: row });
   return NextResponse.json({ deleted: true });
 });

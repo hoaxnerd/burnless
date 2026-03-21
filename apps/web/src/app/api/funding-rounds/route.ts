@@ -5,6 +5,7 @@ import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { positiveAmount, percentage } from "@/lib/financial-validation";
+import { logAudit } from "@/lib/audit";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -59,5 +60,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     })
     .returning();
 
+  if (row) await logAudit(ctx, "funding_round", row.id, "create", { after: row });
   return NextResponse.json(row, { status: 201 });
 });

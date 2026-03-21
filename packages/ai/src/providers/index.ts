@@ -36,31 +36,35 @@ const PROVIDER_MAP: Record<string, ProviderFactory> = {
 };
 
 // ── Default models per provider ─────────────────────────────────────────────
+// All model IDs are overridable via env vars:
+//   AI_MODEL_DEFAULT_<PROVIDER>    — default model for a provider
+//   AI_MODEL_<PROVIDER>_<TIER>     — tier-specific model override (e.g. AI_MODEL_ANTHROPIC_FAST)
+// This avoids code changes when upgrading to new model versions.
 
 const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-4o",
-  openrouter: "anthropic/claude-sonnet-4-20250514",
-  // gemini: "gemini-2.0-flash",
+  anthropic: process.env.AI_MODEL_DEFAULT_ANTHROPIC ?? "claude-sonnet-4-20250514",
+  openai: process.env.AI_MODEL_DEFAULT_OPENAI ?? "gpt-4o",
+  openrouter: process.env.AI_MODEL_DEFAULT_OPENROUTER ?? "anthropic/claude-sonnet-4-20250514",
+  // gemini: process.env.AI_MODEL_DEFAULT_GEMINI ?? "gemini-2.0-flash",
 };
 
 // ── Tier → model mapping per provider ───────────────────────────────────────
 
 const TIER_MODELS: Record<string, Record<ModelTier, string>> = {
   anthropic: {
-    fast: "claude-haiku-4-5-20251001",
-    standard: "claude-sonnet-4-20250514",
-    deep: "claude-sonnet-4-20250514", // use sonnet for deep too — opus only when justified
+    fast: process.env.AI_MODEL_ANTHROPIC_FAST ?? "claude-haiku-4-5-20251001",
+    standard: process.env.AI_MODEL_ANTHROPIC_STANDARD ?? "claude-sonnet-4-20250514",
+    deep: process.env.AI_MODEL_ANTHROPIC_DEEP ?? "claude-sonnet-4-20250514",
   },
   openai: {
-    fast: "gpt-4o-mini",
-    standard: "gpt-4o",
-    deep: "o4-mini",
+    fast: process.env.AI_MODEL_OPENAI_FAST ?? "gpt-4o-mini",
+    standard: process.env.AI_MODEL_OPENAI_STANDARD ?? "gpt-4o",
+    deep: process.env.AI_MODEL_OPENAI_DEEP ?? "o4-mini",
   },
   openrouter: {
-    fast: "anthropic/claude-haiku-4-5-20251001",
-    standard: "anthropic/claude-sonnet-4-20250514",
-    deep: "anthropic/claude-sonnet-4-20250514",
+    fast: process.env.AI_MODEL_OPENROUTER_FAST ?? "anthropic/claude-haiku-4-5-20251001",
+    standard: process.env.AI_MODEL_OPENROUTER_STANDARD ?? "anthropic/claude-sonnet-4-20250514",
+    deep: process.env.AI_MODEL_OPENROUTER_DEEP ?? "anthropic/claude-sonnet-4-20250514",
   },
 };
 

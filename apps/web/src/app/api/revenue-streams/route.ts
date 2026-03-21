@@ -4,6 +4,7 @@ import { db, revenueStreams, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { logAudit } from "@/lib/audit";
 
 const createSchema = z.object({
   scenarioId: z.string(),
@@ -57,5 +58,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const [row] = await db.insert(revenueStreams).values(parsed.data).returning();
+  if (row) await logAudit(ctx, "revenue_stream", row.id, "create", { after: row });
   return NextResponse.json(row, { status: 201 });
 });

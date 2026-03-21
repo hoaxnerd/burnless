@@ -64,6 +64,13 @@
       "when": 1774090186094,
       "tag": "0008_add_ai_provider_config",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774104124595,
+      "tag": "0009_open_robin_chapel",
+      "breakpoints": true
     }
   ]
 }

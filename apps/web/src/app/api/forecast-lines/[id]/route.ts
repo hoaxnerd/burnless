@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, forecastLines, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
   method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]).optional(),
@@ -36,6 +37,7 @@ export const PATCH = withErrorHandler(async (
     .returning();
 
   if (!row) return errorResponse("Forecast line not found", 404);
+  await logAudit(ctx, "forecast_line", id, "update", { after: row });
   return NextResponse.json(row);
 });
 
@@ -51,5 +53,6 @@ export const DELETE = withErrorHandler(async (
 
   const [row] = await db.delete(forecastLines).where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Forecast line not found", 404);
+  await logAudit(ctx, "forecast_line", id, "delete", { before: row });
   return NextResponse.json({ deleted: true });
 });
