@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, financialAccounts } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -16,9 +17,21 @@ const createSchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const GET = withErrorHandler(async (_request: Request) => {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+
+  const url = new URL(request.url);
+  const usePagination = url.searchParams.has("limit");
+
+  if (usePagination) {
+    const { limit, cursor } = parsePaginationParams(request);
+    const where = cursor
+      ? and(eq(financialAccounts.companyId, ctx.companyId), gt(financialAccounts.id, cursor))
+      : eq(financialAccounts.companyId, ctx.companyId);
+    const rows = await db.select().from(financialAccounts).where(where).orderBy(financialAccounts.sortOrder).limit(limit + 1);
+    return NextResponse.json(paginatedResponse(rows, limit));
+  }
 
   const rows = await db
     .select()

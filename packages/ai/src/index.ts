@@ -19,6 +19,9 @@ export type { InsightPage, PageInsightContext, PageInsight } from "./page-insigh
 // Prompts
 export { SYSTEM_PROMPT, buildSystemMessage } from "./prompts";
 
+// Input sanitization
+export { sanitizeUserMessage, detectInjectionAttempt } from "./sanitize";
+
 // Provider system
 export {
   createProvider,

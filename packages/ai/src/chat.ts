@@ -16,6 +16,7 @@ import {
   type CompletionRequest,
 } from "./providers";
 import { getProviderForFeature } from "./routing";
+import { sanitizeUserMessage } from "./sanitize";
 
 interface ChatOptions {
   messages: ChatMessage[];
@@ -43,7 +44,9 @@ export async function chat(options: ChatOptions): Promise<{
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
-    content: m.content,
+    content: m.role === "user" && typeof m.content === "string"
+      ? sanitizeUserMessage(m.content)
+      : m.content,
   }));
 
   const toolResults: ToolCallResult[] = [];
@@ -109,7 +112,9 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
-    content: m.content,
+    content: m.role === "user" && typeof m.content === "string"
+      ? sanitizeUserMessage(m.content)
+      : m.content,
   }));
 
   while (true) {

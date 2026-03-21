@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, revenueStreams, scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 const createSchema = z.object({
   scenarioId: z.string(),
@@ -24,6 +25,17 @@ export const GET = withErrorHandler(async (request: Request) => {
     .from(scenarios)
     .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
   if (!scenario) return errorResponse("Scenario not found", 404);
+
+  const usePagination = url.searchParams.has("limit");
+
+  if (usePagination) {
+    const { limit, cursor } = parsePaginationParams(request);
+    const where = cursor
+      ? and(eq(revenueStreams.scenarioId, scenarioId), gt(revenueStreams.id, cursor))
+      : eq(revenueStreams.scenarioId, scenarioId);
+    const rows = await db.select().from(revenueStreams).where(where).limit(limit + 1);
+    return NextResponse.json(paginatedResponse(rows, limit));
+  }
 
   const rows = await db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
   return NextResponse.json(rows);
