@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
@@ -5,6 +6,7 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { BoardUpdateView } from "./board-update-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -24,18 +26,25 @@ export default async function BoardUpdatePage({
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <ScenarioPrompt context="generate reports" />;
 
+  return (
+    <Suspense fallback={<ReportContentSkeleton />}>
+      <BoardUpdateContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+    </Suspense>
+  );
+}
+
+async function BoardUpdateContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
   const [data, revenueDetails, expenseDetails, funding] = await Promise.all([
-    computeDashboardData(company.id, scenario.id),
-    computeRevenueDetails(company.id, scenario.id),
-    computeExpenseDetails(company.id, scenario.id),
-    getFundingRounds(company.id),
+    computeDashboardData(companyId, scenarioId),
+    computeRevenueDetails(companyId, scenarioId),
+    computeExpenseDetails(companyId, scenarioId),
+    getFundingRounds(companyId),
   ]);
 
   const { metrics, currentMonth, totalRevenue, totalExpenses, netIncome, cashPosition, profitAndLoss } = data;
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
-  // Key metrics for the board update
   const currentRev = totalRevenue.get(currentMonth) ?? 0;
   const prevRev = totalRevenue.get(prevMonth) ?? 0;
   const revGrowth = prevRev > 0 ? ((currentRev - prevRev) / prevRev * 100) : 0;
@@ -55,10 +64,9 @@ export default async function BoardUpdatePage({
   const totalFunding = funding.reduce((sum, r) => sum + Number(r.amount), 0);
 
   const boardData = {
-    companyName: company.name,
-    scenarioName: scenario.name,
+    companyName,
+    scenarioName,
     reportMonth: currentMonth,
-    // Revenue section
     revenue: {
       current: currentRev,
       previous: prevRev,
@@ -71,7 +79,6 @@ export default async function BoardUpdatePage({
       hasSaaS: revenueDetails.hasSaaS,
       streamCount: revenueDetails.streamCount,
     },
-    // Expenses section
     expenses: {
       current: currentExp,
       previous: prevExp,
@@ -79,7 +86,6 @@ export default async function BoardUpdatePage({
       topCategories: expenseDetails.subcategoryBreakdown.slice(0, 5),
       anomalyCount: expenseDetails.anomalyCount,
     },
-    // Cash & runway
     cash: {
       position: currentCash,
       burnRate,
@@ -87,17 +93,14 @@ export default async function BoardUpdatePage({
       totalFunding,
       netIncome: currentNet,
     },
-    // Profitability
     profitability: {
       grossMargin,
       netIncome: currentNet,
       netMargin: currentRev > 0 ? (currentNet / currentRev * 100) : 0,
     },
-    // Timeline data for charts
     revenueTimeline: seriesToArray(totalRevenue),
     expenseTimeline: seriesToArray(totalExpenses),
     cashTimeline: seriesToArray(cashPosition),
-    // P&L summary for table
     pnlSummary: {
       revenue: profitAndLoss.revenue.values,
       cogs: profitAndLoss.cogs.values,

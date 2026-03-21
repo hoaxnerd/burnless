@@ -6,7 +6,6 @@ import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { AreaChartWidget, BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
-import { generateCashFlowPDF, downloadPDF } from "@/lib/pdf-export";
 
 export function CashFlowView({
   cashFlow,
@@ -62,6 +61,7 @@ export function CashFlowView({
   };
 
   const handleExportPDF = async () => {
+    const { generateCashFlowPDF, downloadPDF } = await import("@/lib/pdf-export");
     const doc = await generateCashFlowPDF(cf, {
       title: "Cash Flow Statement",
       companyName: companyName ?? "Company",

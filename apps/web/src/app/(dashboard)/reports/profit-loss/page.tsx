@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { getCompany, getDefaultScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { ProfitLossView } from "./profit-loss-view";
 
 export default async function ProfitLossPage() {
@@ -9,8 +11,6 @@ export default async function ProfitLossPage() {
   if (!company) return <SetupPrompt context="viewing reports" />;
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <ScenarioPrompt context="generate a Profit & Loss report" />;
-
-  const data = await computeDashboardData(company.id, scenario.id);
 
   return (
     <div>
@@ -24,11 +24,14 @@ export default async function ProfitLossPage() {
           {company.name} &mdash; {scenario.name} scenario
         </p>
       </div>
-      <ProfitLossView
-        profitAndLoss={data.profitAndLoss}
-        companyName={company.name}
-        scenarioName={scenario.name}
-      />
+      <Suspense fallback={<ReportContentSkeleton />}>
+        <ProfitLossContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+      </Suspense>
     </div>
   );
+}
+
+async function ProfitLossContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+  const data = await computeDashboardData(companyId, scenarioId);
+  return <ProfitLossView profitAndLoss={data.profitAndLoss} companyName={companyName} scenarioName={scenarioName} />;
 }

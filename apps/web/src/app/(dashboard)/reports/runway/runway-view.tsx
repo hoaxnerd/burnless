@@ -4,7 +4,6 @@ import type { MetricValue } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, MetricCard } from "@/components/ui";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
-import { generateRunwaySummaryPDF, downloadPDF } from "@/lib/pdf-export";
 
 interface RunwayViewProps {
   cashPosition: MetricValue[];
@@ -53,6 +52,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
   };
 
   const handleExportPDF = async () => {
+    const { generateRunwaySummaryPDF, downloadPDF } = await import("@/lib/pdf-export");
     const doc = await generateRunwaySummaryPDF(
       {
         startingCash,

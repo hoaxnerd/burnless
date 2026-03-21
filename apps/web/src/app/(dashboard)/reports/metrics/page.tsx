@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { getCompany, getDefaultScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { MetricsExplorer } from "./metrics-explorer";
 
 export default async function MetricsPage() {
@@ -9,8 +11,6 @@ export default async function MetricsPage() {
   if (!company) return <SetupPrompt context="viewing reports" />;
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <ScenarioPrompt context="explore metrics" />;
-
-  const data = await computeDashboardData(company.id, scenario.id);
 
   return (
     <div>
@@ -24,7 +24,14 @@ export default async function MetricsPage() {
           {company.name} &mdash; {scenario.name} &mdash; All 60+ financial and SaaS metrics
         </p>
       </div>
-      <MetricsExplorer metrics={data.metrics} currentMonth={data.currentMonth} />
+      <Suspense fallback={<ReportContentSkeleton />}>
+        <MetricsContent companyId={company.id} scenarioId={scenario.id} />
+      </Suspense>
     </div>
   );
+}
+
+async function MetricsContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
+  const data = await computeDashboardData(companyId, scenarioId);
+  return <MetricsExplorer metrics={data.metrics} currentMonth={data.currentMonth} />;
 }

@@ -6,7 +6,6 @@ import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
-import { generateBalanceSheetPDF, downloadPDF } from "@/lib/pdf-export";
 
 export function BalanceSheetView({
   balanceSheet,
@@ -49,6 +48,7 @@ export function BalanceSheetView({
   };
 
   const handleExportPDF = async () => {
+    const { generateBalanceSheetPDF, downloadPDF } = await import("@/lib/pdf-export");
     const doc = await generateBalanceSheetPDF(bs, {
       title: "Balance Sheet",
       companyName: companyName ?? "Company",

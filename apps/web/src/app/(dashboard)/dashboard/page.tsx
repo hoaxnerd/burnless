@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   getCompany,
@@ -127,12 +128,14 @@ export default async function DashboardPage({
 
       {/* AI Insight Banner */}
       {hasData && (
-        <AiInsightBanner
-          runway={currentRunway}
-          burnRate={currentBurn}
-          mrrGrowth={mrrGrowthPct}
-          cash={currentCash}
-        />
+        <Suspense fallback={<div className="h-16 rounded-2xl bg-surface-50 animate-pulse mb-4" />}>
+          <AiInsightBanner
+            runway={currentRunway}
+            burnRate={currentBurn}
+            mrrGrowth={mrrGrowthPct}
+            cash={currentCash}
+          />
+        </Suspense>
       )}
 
       {/* Header */}
@@ -229,22 +232,32 @@ export default async function DashboardPage({
           />
 
           {/* Charts — 48px section gap */}
-          <DashboardCharts
-            revenueVsExpenses={revenueVsExpenses}
-            cashData={metrics.cashPosition}
-            burnData={metrics.netBurnRate}
-            runwayData={metrics.cashRunwayMonths.map((m) => ({
-              ...m,
-              value: Math.min(m.value, 100),
-            }))}
-            mrrData={metrics.mrr}
-            hasSaaS={metrics.mrr.some((m) => m.value > 0)}
-          />
+          <Suspense fallback={
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
+              ))}
+            </div>
+          }>
+            <DashboardCharts
+              revenueVsExpenses={revenueVsExpenses}
+              cashData={metrics.cashPosition}
+              burnData={metrics.netBurnRate}
+              runwayData={metrics.cashRunwayMonths.map((m) => ({
+                ...m,
+                value: Math.min(m.value, 100),
+              }))}
+              mrrData={metrics.mrr}
+              hasSaaS={metrics.mrr.some((m) => m.value > 0)}
+            />
+          </Suspense>
 
           {/* Pinned AI Insights */}
-          <div className="mt-6 sm:mt-8">
-            <PinnedInsights />
-          </div>
+          <Suspense fallback={<div className="mt-6 sm:mt-8 h-24 rounded-2xl bg-surface-50 animate-pulse" />}>
+            <div className="mt-6 sm:mt-8">
+              <PinnedInsights />
+            </div>
+          </Suspense>
 
           {/* Bottom section: Scenarios + Key Metrics */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">

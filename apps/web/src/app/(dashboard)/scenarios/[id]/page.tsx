@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getScenarioById, getCompany, getForecastLines, getRevenueStreams, getHeadcountPlans, getFundingRounds } from "@/lib/data";
 import { notFound } from "next/navigation";
 import { ScenarioBuilder } from "./scenario-builder";
@@ -14,12 +15,36 @@ export default async function ScenarioDetailPage({
   const scenario = await getScenarioById(id);
   if (!scenario || scenario.companyId !== company.id) notFound();
 
+  return (
+    <Suspense fallback={
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 w-64 bg-surface-100 rounded" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 h-96 bg-surface-50 rounded-2xl" />
+          <div className="lg:col-span-2 h-96 bg-surface-50 rounded-2xl" />
+        </div>
+      </div>
+    }>
+      <ScenarioContent scenarioId={id} companyId={company.id} scenario={scenario} />
+    </Suspense>
+  );
+}
+
+async function ScenarioContent({
+  scenarioId,
+  companyId,
+  scenario,
+}: {
+  scenarioId: string;
+  companyId: string;
+  scenario: { id: string; name: string; type: string; description: string | null; isDefault: boolean; isBudget: boolean };
+}) {
   const [forecastLines, revenueStreams, headcountPlans, fundingRounds] =
     await Promise.all([
-      getForecastLines(id),
-      getRevenueStreams(id),
-      getHeadcountPlans(id),
-      getFundingRounds(company.id),
+      getForecastLines(scenarioId),
+      getRevenueStreams(scenarioId),
+      getHeadcountPlans(scenarioId),
+      getFundingRounds(companyId),
     ]);
 
   return (

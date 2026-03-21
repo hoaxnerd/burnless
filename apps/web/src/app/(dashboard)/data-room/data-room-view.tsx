@@ -4,14 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Download, FileText, Table, FolderOpen, Check, Loader2 } from "lucide-react";
 import type { ProfitAndLoss, CashFlowStatement, BalanceSheet } from "@burnless/engine";
-import {
-  generateInvestorDataRoomPDF,
-  generateProfitLossPDF,
-  generateCashFlowPDF,
-  generateBalanceSheetPDF,
-  generateRunwaySummaryPDF,
-  downloadPDF,
-} from "@/lib/pdf-export";
 
 interface DataRoomViewProps {
   companyName: string;
@@ -69,6 +61,7 @@ export function DataRoomView({
     try {
       switch (id) {
         case "full-deck": {
+          const { generateInvestorDataRoomPDF, downloadPDF } = await import("@/lib/pdf-export");
           const doc = await generateInvestorDataRoomPDF({
             companyName,
             scenarioName,
@@ -84,21 +77,25 @@ export function DataRoomView({
           break;
         }
         case "pnl": {
+          const { generateProfitLossPDF, downloadPDF } = await import("@/lib/pdf-export");
           const doc = await generateProfitLossPDF(profitAndLoss, { ...opts, title: "Profit & Loss Statement" });
           downloadPDF(doc, "profit-and-loss");
           break;
         }
         case "cashflow": {
+          const { generateCashFlowPDF, downloadPDF } = await import("@/lib/pdf-export");
           const doc = await generateCashFlowPDF(cashFlow, { ...opts, title: "Cash Flow Statement" });
           downloadPDF(doc, "cash-flow");
           break;
         }
         case "balance": {
+          const { generateBalanceSheetPDF, downloadPDF } = await import("@/lib/pdf-export");
           const doc = await generateBalanceSheetPDF(balanceSheet, { ...opts, title: "Balance Sheet" });
           downloadPDF(doc, "balance-sheet");
           break;
         }
         case "runway": {
+          const { generateRunwaySummaryPDF, downloadPDF } = await import("@/lib/pdf-export");
           const cashPosition = cashFlow.endingCash;
           const doc = await generateRunwaySummaryPDF(
             { startingCash, netBurnRate, grossBurnRate: 0, runwayMonths, cashPosition },

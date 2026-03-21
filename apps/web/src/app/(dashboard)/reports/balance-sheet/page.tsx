@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { getCompany, getDefaultScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { BalanceSheetView } from "./balance-sheet-view";
 
 export default async function BalanceSheetPage() {
@@ -9,8 +11,6 @@ export default async function BalanceSheetPage() {
   if (!company) return <SetupPrompt context="viewing reports" />;
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <ScenarioPrompt context="generate a Balance Sheet" />;
-
-  const data = await computeDashboardData(company.id, scenario.id);
 
   return (
     <div>
@@ -24,7 +24,14 @@ export default async function BalanceSheetPage() {
           {company.name} &mdash; {scenario.name} scenario
         </p>
       </div>
-      <BalanceSheetView balanceSheet={data.balanceSheet} companyName={company.name} scenarioName={scenario.name} />
+      <Suspense fallback={<ReportContentSkeleton />}>
+        <BalanceSheetContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+      </Suspense>
     </div>
   );
+}
+
+async function BalanceSheetContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+  const data = await computeDashboardData(companyId, scenarioId);
+  return <BalanceSheetView balanceSheet={data.balanceSheet} companyName={companyName} scenarioName={scenarioName} />;
 }
