@@ -25,6 +25,30 @@ import {
   type RequestLog,
 } from "./providers/resilience";
 
+// ── Per-feature provider routing ──────────────────────────────────────────
+//
+// Allows different AI features to use different providers. This enables
+// cost optimization (cheap models for classification, expensive for reasoning)
+// and provider-specific strengths (e.g., Anthropic for nuance, OpenAI for speed).
+//
+// Configuration hierarchy for per-feature provider:
+//   1. Environment variable: AI_PROVIDER_<FEATURE> (e.g., AI_PROVIDER_CHAT=openai)
+//   2. FEATURE_PROVIDERS map below (code-level defaults)
+//   3. Global AI_PROVIDER env var (fallback for all features)
+//
+// To route chat to OpenAI while keeping everything else on Anthropic:
+//   AI_PROVIDER=anthropic AI_PROVIDER_CHAT=openai
+
+/**
+ * Per-feature provider overrides. Features not listed here use the global provider.
+ * Edit this map to set code-level defaults; env vars override these at runtime.
+ */
+const FEATURE_PROVIDERS: Record<string, string> = {
+  // Examples (uncomment to activate):
+  // categorize_transaction: "openai",   // GPT-4o-mini is fast + cheap for classification
+  // chat: "anthropic",                  // Claude excels at nuanced financial reasoning
+};
+
 // ── Feature → Tier mapping ──────────────────────────────────────────────────
 
 /**
@@ -238,7 +262,28 @@ function emitRequestLog(log: RequestLog): void {
 
 // ── Resolve provider name ────────────────────────────────────────────────────
 
-function resolveProviderName(): string {
+/**
+ * Resolve the provider name for a given feature (or globally).
+ *
+ * Resolution order:
+ *   1. AI_PROVIDER_<FEATURE> env var (e.g., AI_PROVIDER_CHAT)
+ *   2. FEATURE_PROVIDERS code-level map
+ *   3. AI_PROVIDER global env var
+ *   4. Auto-detect from available API keys
+ */
+function resolveProviderName(feature?: string): string {
+  // Per-feature env var override: AI_PROVIDER_CHAT, AI_PROVIDER_CATEGORIZE_TRANSACTION, etc.
+  if (feature) {
+    const envKey = `AI_PROVIDER_${feature.toUpperCase()}`;
+    const envOverride = process.env[envKey];
+    if (envOverride) return envOverride;
+
+    // Code-level per-feature default
+    const codeDefault = FEATURE_PROVIDERS[feature];
+    if (codeDefault) return codeDefault;
+  }
+
+  // Global fallback
   return (
     process.env.AI_PROVIDER ??
     (process.env.ANTHROPIC_API_KEY ? "anthropic" : null) ??
@@ -246,6 +291,18 @@ function resolveProviderName(): string {
     (process.env.OPENROUTER_API_KEY ? "openrouter" : null) ??
     "unknown"
   );
+}
+
+/** Get the current per-feature provider routing map (for dashboard display). */
+export function getFeatureProviderMap(): Readonly<Record<string, string>> {
+  // Merge code defaults with env overrides
+  const result: Record<string, string> = { ...FEATURE_PROVIDERS };
+  for (const feature of Object.keys(FEATURE_TIERS)) {
+    const envKey = `AI_PROVIDER_${feature.toUpperCase()}`;
+    const envOverride = process.env[envKey];
+    if (envOverride) result[feature] = envOverride;
+  }
+  return result;
 }
 
 // ── Wrap provider with resilience ────────────────────────────────────────────
@@ -293,13 +350,16 @@ function wrapWithResilience(
  */
 export function getProviderForFeature(feature: string): LlmProvider | null {
   const tier = getFeatureTier(feature);
-  const provider = createProviderForTier(tier);
+  const providerName = resolveProviderName(feature);
+
+  // Create provider with per-feature provider override
+  const provider = createProviderForTier(tier, {
+    provider: providerName !== "unknown" ? providerName : undefined,
+  });
   if (!provider) {
-    console.warn(`[ai-router] No provider available for feature "${feature}" (tier: ${tier}). AI is unconfigured.`);
+    console.warn(`[ai-router] No provider available for feature "${feature}" (tier: ${tier}, provider: ${providerName}). AI is unconfigured.`);
     return null;
   }
-
-  const providerName = resolveProviderName();
 
   // Stack: TrackedProvider → ResilientProvider → raw provider
   // Resilience handles retries/circuit/rate, Tracked handles usage metrics
@@ -331,10 +391,12 @@ export async function completeWithFallback(
 ): Promise<LlmResponse | null> {
   const primaryTier = getFeatureTier(feature);
   const tiersToTry: ModelTier[] = [primaryTier, ...getFallbackTiers(primaryTier)];
-  const providerName = resolveProviderName();
+  const providerName = resolveProviderName(feature);
 
   for (const tier of tiersToTry) {
-    const provider = createProviderForTier(tier);
+    const provider = createProviderForTier(tier, {
+      provider: providerName !== "unknown" ? providerName : undefined,
+    });
     if (!provider) continue;
 
     const resilient = wrapWithResilience(provider, providerName, feature);
@@ -343,7 +405,6 @@ export async function completeWithFallback(
       return await resilient.complete(request);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Circuit open errors mean we should skip to next tier immediately
       if (err instanceof CircuitOpenError) {
         console.warn(
           `[ai-router] ${feature}: circuit open for ${providerName}, skipping tier "${tier}"`

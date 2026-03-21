@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getFeatureTier,
   getFeatureTierMap,
+  getFeatureProviderMap,
   estimateCostMicros,
   onUsage,
 } from "../routing";
@@ -119,6 +120,51 @@ describe("Cost estimation", () => {
     const sonnetCost = estimateCostMicros("claude-sonnet-4-20250514", 10000, 5000);
     // Haiku should be at least 3x cheaper
     expect(haikuCost).toBeLessThan(sonnetCost / 3);
+  });
+});
+
+describe("Per-feature provider routing", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    // Shallow clone to allow per-test env overrides
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("env var AI_PROVIDER_CHAT overrides global provider for chat feature", () => {
+    process.env.AI_PROVIDER = "anthropic";
+    process.env.AI_PROVIDER_CHAT = "openai";
+
+    const map = getFeatureProviderMap();
+    expect(map.chat).toBe("openai");
+  });
+
+  it("env var override uses uppercase feature name", () => {
+    process.env.AI_PROVIDER_CATEGORIZE_TRANSACTION = "openai";
+
+    const map = getFeatureProviderMap();
+    expect(map.categorize_transaction).toBe("openai");
+  });
+
+  it("features without overrides are not in the map", () => {
+    // No env overrides set, FEATURE_PROVIDERS is empty by default
+    const map = getFeatureProviderMap();
+    // Only features with explicit overrides (env or code) should appear
+    const hasOnlyOverrides = Object.keys(map).every(
+      (k) => process.env[`AI_PROVIDER_${k.toUpperCase()}`] !== undefined
+    );
+    expect(hasOnlyOverrides).toBe(true);
+  });
+
+  it("returns a copy that cannot mutate internal state", () => {
+    const map1 = getFeatureProviderMap();
+    (map1 as Record<string, string>).chat = "modified";
+    const map2 = getFeatureProviderMap();
+    expect(map2.chat).not.toBe("modified");
   });
 });
 

@@ -49,6 +49,7 @@ export {
   getProviderForTier,
   getFeatureTier,
   getFeatureTierMap,
+  getFeatureProviderMap,
   completeWithFallback,
   estimateCostMicros,
   onUsage,
