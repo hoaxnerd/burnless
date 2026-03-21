@@ -20,6 +20,7 @@ vi.mock("@burnless/db", () => ({
     insert: mockInsert,
   },
   users: { id: "id", email: "email", name: "name" },
+  verificationTokens: { identifier: "identifier", token: "token", expires: "expires" },
   eq: vi.fn(),
 }));
 
@@ -42,6 +43,7 @@ vi.mock("@/lib/email", () => ({
 }));
 
 vi.mock("@/lib/email/templates", () => ({
+  verificationEmail: vi.fn().mockReturnValue({ subject: "Verify", html: "<p>Verify</p>" }),
   welcomeEmail: vi.fn().mockReturnValue({ subject: "Welcome", html: "<p>Hi</p>" }),
 }));
 
@@ -50,9 +52,13 @@ mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });
 mockWhere.mockReturnValue({ limit: mockLimit });
 
-// Chain: db.insert(users).values(...).returning(...)
+// Chain: db.insert(users).values(...).returning(...) / .then(...)
 mockInsert.mockReturnValue({ values: mockValues });
-mockValues.mockReturnValue({ returning: mockReturning });
+mockValues.mockReturnValue({
+  returning: mockReturning,
+  then: (cb: (v: unknown) => void) => Promise.resolve().then(cb),
+  catch: () => Promise.resolve(),
+});
 
 import { POST } from "../register/route";
 
@@ -72,7 +78,11 @@ describe("POST /api/auth/register", () => {
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ limit: mockLimit });
     mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
+    mockValues.mockReturnValue({
+      returning: mockReturning,
+      then: (cb: (v: unknown) => void) => Promise.resolve().then(cb),
+      catch: () => Promise.resolve(),
+    });
   });
 
   describe("successful registration", () => {
