@@ -1,7 +1,9 @@
-import { getCompany, getDefaultScenario, getFundingRounds, getScenarios } from "@/lib/data";
+import { Suspense } from "react";
+import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { DataRoomView } from "./data-room-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 export default async function DataRoomPage() {
   const company = await getCompany();
@@ -9,13 +11,19 @@ export default async function DataRoomPage() {
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <ScenarioPrompt context="generate investor-ready reports" />;
 
-  const [data, fundingRounds, scenarios] = await Promise.all([
-    computeDashboardData(company.id, scenario.id),
-    getFundingRounds(company.id),
-    getScenarios(company.id),
+  return (
+    <Suspense fallback={<ReportContentSkeleton />}>
+      <DataRoomContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+    </Suspense>
+  );
+}
+
+async function DataRoomContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+  const [data, fundingRounds] = await Promise.all([
+    computeDashboardData(companyId, scenarioId),
+    getFundingRounds(companyId),
   ]);
 
-  // Build key metrics for the data room
   const latestRevenue = data.metrics.totalRevenue[data.metrics.totalRevenue.length - 1];
   const latestArr = data.metrics.arr[data.metrics.arr.length - 1];
   const latestBurn = data.metrics.netBurnRate[data.metrics.netBurnRate.length - 1];
@@ -51,8 +59,8 @@ export default async function DataRoomPage() {
 
   return (
     <DataRoomView
-      companyName={company.name}
-      scenarioName={scenario.name}
+      companyName={companyName}
+      scenarioName={scenarioName}
       profitAndLoss={data.profitAndLoss}
       cashFlow={data.cashFlow}
       balanceSheet={data.balanceSheet}

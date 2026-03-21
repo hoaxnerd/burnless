@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { getCompany, getActiveScenario, getBudgetScenario, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -37,10 +39,18 @@ export default async function ExpensesPage({
     );
   }
 
+  return (
+    <Suspense fallback={<ReportContentSkeleton />}>
+      <ExpensesContent companyId={company.id} scenarioId={scenario.id} />
+    </Suspense>
+  );
+}
+
+async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
   const [data, accounts, expenseDetails] = await Promise.all([
-    computeDashboardData(company.id, scenario.id),
-    getAccounts(company.id),
-    computeExpenseDetails(company.id, scenario.id),
+    computeDashboardData(companyId, scenarioId),
+    getAccounts(companyId),
+    computeExpenseDetails(companyId, scenarioId),
   ]);
 
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
@@ -55,10 +65,10 @@ export default async function ExpensesPage({
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
   // Budget vs actuals data
-  const budgetScenario = await getBudgetScenario(company.id);
+  const budgetScenario = await getBudgetScenario(companyId);
   let budgetTimeline: { month: string; value: number }[] | null = null;
-  if (budgetScenario && budgetScenario.id !== scenario.id) {
-    const budgetData = await computeDashboardData(company.id, budgetScenario.id);
+  if (budgetScenario && budgetScenario.id !== scenarioId) {
+    const budgetData = await computeDashboardData(companyId, budgetScenario.id);
     budgetTimeline = seriesToArray(budgetData.totalExpenses);
   }
 
@@ -89,7 +99,7 @@ export default async function ExpensesPage({
           </p>
         </div>
         <AddExpenseForm
-          scenarioId={scenario.id}
+          scenarioId={scenarioId}
           accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
         />
       </div>
@@ -101,7 +111,7 @@ export default async function ExpensesPage({
         opexTimeline={opexTimeline}
         cogsTimeline={cogsTimeline}
         budgetTimeline={budgetTimeline}
-        scenarioId={scenario.id}
+        scenarioId={scenarioId}
       />
     </div>
   );

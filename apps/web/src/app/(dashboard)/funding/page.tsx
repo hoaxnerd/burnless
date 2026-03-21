@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { FundingDetails } from "./funding-details";
 import { AddFundingForm } from "./add-funding-form";
 import { SetupPrompt } from "@/components/ui/empty-state";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -20,10 +22,18 @@ export default async function FundingPage({
   const company = await getCompany();
   if (!company) return <SetupPrompt context="tracking funding" />;
 
-  const scenario = await getActiveScenario(company.id, params.scenarioId);
+  return (
+    <Suspense fallback={<ReportContentSkeleton />}>
+      <FundingContent companyId={company.id} scenarioId={params.scenarioId} />
+    </Suspense>
+  );
+}
+
+async function FundingContent({ companyId, scenarioId: paramScenarioId }: { companyId: string; scenarioId?: string }) {
+  const scenario = await getActiveScenario(companyId, paramScenarioId);
   const [fundingRounds, data] = await Promise.all([
-    getFundingRounds(company.id),
-    scenario ? computeDashboardData(company.id, scenario.id) : null,
+    getFundingRounds(companyId),
+    scenario ? computeDashboardData(companyId, scenario.id) : null,
   ]);
 
   const currentMonth = data?.currentMonth ?? monthKey(new Date());
@@ -35,7 +45,6 @@ export default async function FundingPage({
     .filter((r) => !r.isProjected)
     .reduce((sum, r) => sum + Number(r.amount), 0);
 
-  const projectedRounds = fundingRounds.filter((r) => r.isProjected);
   const completedRounds = fundingRounds.filter((r) => !r.isProjected);
 
   // Compute dilution for cap table

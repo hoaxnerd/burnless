@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
 import { TeamDetails } from "./team-details";
 import { AddHireForm } from "./add-hire-form";
+import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -18,9 +20,29 @@ export default async function TeamPage({
   const params = await searchParams;
   const company = await getCompany();
   const scenario = company ? await getActiveScenario(company.id, params.scenarioId) : null;
-  const plans = scenario ? await getHeadcountPlans(scenario.id) : [];
-  const departments = company ? await getDepartments(company.id) : [];
-  const data = company && scenario ? await computeDashboardData(company.id, scenario.id) : null;
+
+  return (
+    <Suspense fallback={<ReportContentSkeleton />}>
+      <TeamContent companyId={company?.id} scenarioId={scenario?.id} scenarioName={scenario?.name} />
+    </Suspense>
+  );
+}
+
+async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?: string; scenarioId?: string; scenarioName?: string }) {
+  if (!companyId || !scenarioId) {
+    return (
+      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
+        <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
+        <p className="text-sm text-surface-500">Complete onboarding to start team planning.</p>
+      </div>
+    );
+  }
+
+  const [plans, departments, data] = await Promise.all([
+    getHeadcountPlans(scenarioId),
+    getDepartments(companyId),
+    computeDashboardData(companyId, scenarioId),
+  ]);
 
   const deptMap = new Map(departments.map((d) => [d.id, d.name]));
 
@@ -37,9 +59,9 @@ export default async function TeamPage({
     0
   );
 
-  const totalBurn = data ? (data.metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0) : 0;
+  const totalBurn = data.metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
   const costPercentOfBurn = totalBurn > 0 ? (totalMonthlyCost / totalBurn * 100) : 0;
-  const revPerEmployee = data ? (data.metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0) : 0;
+  const revPerEmployee = data.metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0;
 
   // Group by department
   const deptGroups = new Map<string, typeof plans>();
@@ -83,15 +105,13 @@ export default async function TeamPage({
           <h1 className="text-2xl font-bold tracking-tight text-surface-900">Team</h1>
           <p className="mt-1 text-sm text-surface-500">
             Headcount planning, costs, and hiring timeline
-            {scenario && <span className="ml-2 text-surface-400">&mdash; {scenario.name}</span>}
+            {scenarioName && <span className="ml-2 text-surface-400">&mdash; {scenarioName}</span>}
           </p>
         </div>
-        {scenario && (
-          <AddHireForm
-            scenarioId={scenario.id}
-            departments={departments.map((d) => ({ id: d.id, name: d.name }))}
-          />
-        )}
+        <AddHireForm
+          scenarioId={scenarioId}
+          departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+        />
       </div>
 
       {/* Summary cards */}
