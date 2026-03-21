@@ -1053,6 +1053,58 @@ export const merchantCategoryMappingsRelations = relations(
   })
 );
 
+// ── AI Tool Audit Logs ───────────────────────────────────────────────────────
+
+export const aiToolAuditLogStatusEnum = pgEnum("ai_tool_audit_log_status", [
+  "success",
+  "error",
+  "validation_error",
+]);
+
+export const aiToolAuditLogs = pgTable(
+  "ai_tool_audit_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .references(() => aiConversations.id, { onDelete: "set null" }),
+    toolName: text("tool_name").notNull(),
+    input: jsonb("input").notNull(),
+    status: aiToolAuditLogStatusEnum("status").notNull(),
+    result: jsonb("result"),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_tool_audit_company_idx").on(table.companyId),
+    index("ai_tool_audit_user_idx").on(table.companyId, table.userId),
+    index("ai_tool_audit_created_idx").on(table.companyId, table.createdAt),
+    index("ai_tool_audit_tool_idx").on(table.companyId, table.toolName),
+  ]
+);
+
+export const aiToolAuditLogsRelations = relations(aiToolAuditLogs, ({ one }) => ({
+  company: one(companies, {
+    fields: [aiToolAuditLogs.companyId],
+    references: [companies.id],
+  }),
+  user: one(users, {
+    fields: [aiToolAuditLogs.userId],
+    references: [users.id],
+  }),
+  conversation: one(aiConversations, {
+    fields: [aiToolAuditLogs.conversationId],
+    references: [aiConversations.id],
+  }),
+}));
+
 // ── AI Usage Logs (cost tracking per feature) ───────────────────────────────
 
 export const aiUsageLogs = pgTable(

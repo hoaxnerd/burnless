@@ -137,6 +137,7 @@ export async function POST(request: Request) {
               companyId: ctx.companyId,
               scenarioId: scenario.id,
               userId: ctx.userId,
+              conversationId: conversationId!,
             });
           },
         });

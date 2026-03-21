@@ -56,10 +56,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ insights: [], cached: true });
   }
 
+  const cachedAt = cached[0].updatedAt;
+  const ageMs = Date.now() - cachedAt.getTime();
+  const stale = ageMs > 24 * 60 * 60 * 1000; // > 24h
+  const expiresAt = cached[0].expiresAt;
+
   return NextResponse.json({
     insights: cached[0].content,
     cached: true,
-    cachedAt: cached[0].updatedAt,
+    cachedAt,
+    expiresAt,
+    stale,
+    ageMs,
+    canRefresh: status.canGenerate,
   });
 }
 

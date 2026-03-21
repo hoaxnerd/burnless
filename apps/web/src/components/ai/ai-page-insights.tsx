@@ -11,8 +11,10 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  Clock,
 } from "lucide-react";
 import { AiGate } from "./ai-gate";
+import { useAiFeature } from "./ai-feature-context";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -71,6 +73,20 @@ const typeIcons: Record<InsightType, typeof TrendingUp> = {
   coaching: GraduationCap,
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Format a timestamp as a human-readable relative age. */
+function formatAge(dateStr: string): string {
+  const ms = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsProps) {
@@ -80,8 +96,11 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [errorVariant, setErrorVariant] = useState<ReturnType<typeof classifyError>>("generic");
   const [cached, setCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  const [canRefresh, setCanRefresh] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const [slow, setSlow] = useState(false);
+  const insightFeature = useAiFeature("insights");
 
   const fetchInsights = useCallback(
     async (forceGenerate = false) => {
@@ -103,6 +122,8 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
               setInsights(data.insights);
               setCached(true);
               setCachedAt(data.cachedAt ?? null);
+              setStale(data.stale ?? false);
+              setCanRefresh(data.canRefresh ?? true);
               setLoading(false);
               clearTimeout(slowTimer);
               clearTimeout(abortTimer);
@@ -125,6 +146,8 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
         setInsights(data.insights ?? []);
         setCached(false);
         setCachedAt(null);
+        setStale(false);
+        setCanRefresh(true);
       } catch (err) {
         setError(true);
         setErrorVariant(classifyError(err));
@@ -197,29 +220,27 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
               AI Insights
             </span>
             {cached && cachedAt && (
-              <span className="text-[10px] text-surface-300">
-                as of{" "}
-                {new Date(cachedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+              <span className={`text-[10px] flex items-center gap-1 ${stale ? "text-warning-500" : "text-surface-300"}`}>
+                {stale && <Clock className="h-2.5 w-2.5" />}
+                {formatAge(cachedAt)}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                fetchInsights(true);
-              }}
-              disabled={loading}
-              className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all disabled:opacity-50"
-              title="Refresh insights"
-            >
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-            </button>
+            {/* Show refresh even in cached-only mode when stale */}
+            {(canRefresh || (cached && stale)) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fetchInsights(true);
+                }}
+                disabled={loading || (!canRefresh && !stale)}
+                className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all disabled:opacity-50"
+                title={canRefresh ? "Refresh insights" : "Cached mode — refresh unavailable"}
+              >
+                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            )}
             {expanded ? (
               <ChevronUp className="h-3.5 w-3.5 text-surface-400" />
             ) : (
@@ -227,6 +248,25 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
             )}
           </div>
         </button>
+
+        {/* Staleness warning banner */}
+        {stale && expanded && (
+          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
+            <p className="text-xs text-warning-700">
+              These insights are over 24 hours old and may not reflect recent changes.
+              {canRefresh && (
+                <button
+                  onClick={() => fetchInsights(true)}
+                  disabled={loading}
+                  className="ml-1 underline hover:no-underline font-medium"
+                >
+                  Refresh now
+                </button>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* Insights list */}
         {expanded && (

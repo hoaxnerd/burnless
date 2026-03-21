@@ -16,6 +16,7 @@ import {
   financialAccounts,
   departments,
   transactions,
+  aiToolAuditLogs,
 } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -26,6 +27,7 @@ interface ToolContext {
   companyId: string;
   scenarioId: string;
   userId: string;
+  conversationId?: string;
 }
 
 // ── Validation helpers ──────────────────────────────────────────────────────
@@ -232,55 +234,121 @@ function latest(arr: Array<{ month: string; value: number }> | undefined): numbe
   return arr[arr.length - 1]!.value;
 }
 
+/** Log a tool call to the audit table. Fire-and-forget — never blocks the response. */
+function logToolAudit(
+  context: ToolContext,
+  toolName: string,
+  input: Record<string, unknown>,
+  status: "success" | "error" | "validation_error",
+  result: unknown,
+  durationMs: number
+) {
+  db.insert(aiToolAuditLogs)
+    .values({
+      companyId: context.companyId,
+      userId: context.userId,
+      conversationId: context.conversationId ?? null,
+      toolName,
+      input,
+      status,
+      result: result as Record<string, unknown>,
+      durationMs,
+    })
+    .catch((err) => {
+      console.warn("[ai-tool-audit] Failed to log tool call:", err instanceof Error ? err.message : err);
+    });
+}
+
 /** Execute a tool call and return a string result for the AI. */
 export async function executeToolCall(
   toolName: string,
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const startTime = performance.now();
+
   // Validate input before execution
   const validation = validateToolInput(toolName, input);
   if (!validation.success) {
-    return JSON.stringify({ error: validation.error });
+    const errorResult = { error: validation.error };
+    logToolAudit(context, toolName, input, "validation_error", errorResult, Math.round(performance.now() - startTime));
+    return JSON.stringify(errorResult);
   }
   const data = validation.data;
 
-  switch (toolName) {
-    case "create_scenario":
-      return createScenario(data, context);
-    case "create_forecast_line":
-      return createForecastLine(data, context);
-    case "add_headcount":
-      return addHeadcount(data, context);
-    case "add_revenue_stream":
-      return addRevenueStream(data, context);
-    case "compare_scenarios":
-      return compareScenariosTool(data, context);
-    case "compute_metrics":
-      return computeMetrics(data, context);
-    case "generate_financial_statements":
-      return generateStatements(data, context);
-    case "add_funding_round":
-      return addFundingRound(data, context);
-    case "create_account":
-      return createAccount(data, context);
-    case "create_department":
-      return createDepartment(data, context);
-    case "categorize_transactions":
-      return categorizeTransactions(data, context);
-    case "generate_report_narrative":
-      return generateReportNarrative(data, context);
-    case "suggest_cost_cuts":
-      return suggestCostCuts(data, context);
-    case "benchmark_metrics":
-      return benchmarkMetrics(data, context);
-    case "model_dilution":
-      return modelDilution(data, context);
-    case "forecast_revenue":
-      return forecastRevenue(data, context);
-    default:
-      return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+  let result: string;
+  try {
+    switch (toolName) {
+      case "create_scenario":
+        result = await createScenario(data, context);
+        break;
+      case "create_forecast_line":
+        result = await createForecastLine(data, context);
+        break;
+      case "add_headcount":
+        result = await addHeadcount(data, context);
+        break;
+      case "add_revenue_stream":
+        result = await addRevenueStream(data, context);
+        break;
+      case "compare_scenarios":
+        result = await compareScenariosTool(data, context);
+        break;
+      case "compute_metrics":
+        result = await computeMetrics(data, context);
+        break;
+      case "generate_financial_statements":
+        result = await generateStatements(data, context);
+        break;
+      case "add_funding_round":
+        result = await addFundingRound(data, context);
+        break;
+      case "create_account":
+        result = await createAccount(data, context);
+        break;
+      case "create_department":
+        result = await createDepartment(data, context);
+        break;
+      case "categorize_transactions":
+        result = await categorizeTransactions(data, context);
+        break;
+      case "generate_report_narrative":
+        result = await generateReportNarrative(data, context);
+        break;
+      case "suggest_cost_cuts":
+        result = await suggestCostCuts(data, context);
+        break;
+      case "benchmark_metrics":
+        result = await benchmarkMetrics(data, context);
+        break;
+      case "model_dilution":
+        result = await modelDilution(data, context);
+        break;
+      case "forecast_revenue":
+        result = await forecastRevenue(data, context);
+        break;
+      default:
+        result = JSON.stringify({ error: `Unknown tool: ${toolName}` });
+        logToolAudit(context, toolName, input, "error", { error: `Unknown tool: ${toolName}` }, Math.round(performance.now() - startTime));
+        return result;
+    }
+  } catch (err) {
+    const durationMs = Math.round(performance.now() - startTime);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logToolAudit(context, toolName, input, "error", { error: errorMsg }, durationMs);
+    return JSON.stringify({ error: `Tool execution failed: ${errorMsg}` });
   }
+
+  const durationMs = Math.round(performance.now() - startTime);
+  let parsedResult: unknown;
+  try {
+    parsedResult = JSON.parse(result);
+  } catch {
+    parsedResult = { raw: result };
+  }
+  logToolAudit(context, toolName, input, "success", parsedResult, durationMs);
+
+  return result;
 }
 
 async function createScenario(
