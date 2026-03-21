@@ -16,6 +16,7 @@ import { QuickActions } from "./quick-actions";
 import { PinnedInsights } from "./pinned-insights";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
+import { BoardMeetingMode } from "./board-meeting-mode";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -98,9 +99,26 @@ export default async function DashboardPage({
   const hasExpenses = data.totalExpenses.size > 0 && Array.from(data.totalExpenses.values()).some((v) => v > 0);
   const hasRevenue = revenueStreams.length > 0;
   const hasFunding = fundingRounds.length > 0;
+  const allPopulated = hasFunding && hasExpenses && hasRevenue;
 
   /* ── Pinned secondary metrics ───────────────────────────────────── */
   const pinnedScenarios = allScenarios.filter((s) => !s.isDefault).slice(0, 4);
+
+  /* ── Board Meeting Mode data ──────────────────────────────────── */
+  const mrrGrowthPct = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
+  const monthLabel = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const boardData = {
+    companyName: company.name,
+    monthLabel,
+    cash: currentCash,
+    burn: currentBurn,
+    runway: currentRunway,
+    mrr: currentMrr,
+    mrrGrowth: mrrGrowthPct,
+    headcount: currentHeadcount,
+    headcountDelta: currentHeadcount - prevHeadcount,
+  };
 
   return (
     <div>
@@ -112,17 +130,20 @@ export default async function DashboardPage({
         <AiInsightBanner
           runway={currentRunway}
           burnRate={currentBurn}
-          mrrGrowth={prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0}
+          mrrGrowth={mrrGrowthPct}
           cash={currentCash}
         />
       )}
 
       {/* Header */}
-      <div className="mb-8 sm:mb-12 animate-slide-up">
-        <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">Dashboard</h1>
-        <p className="mt-1.5 text-sm text-surface-400">
-          {company.name} &mdash; Financial command center
-        </p>
+      <div className="mb-8 sm:mb-12 animate-slide-up flex items-start justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">Dashboard</h1>
+          <p className="mt-1.5 text-sm text-surface-400">
+            {company.name} &mdash; Financial command center
+          </p>
+        </div>
+        {hasData && <BoardMeetingMode data={boardData} />}
       </div>
 
       {/* Hero KPI Cards — progressively populate as data arrives */}
@@ -136,6 +157,7 @@ export default async function DashboardPage({
           description={!hasFunding ? "Add funding to see cash" : undefined}
           sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
           stagger={0}
+          celebrate={allPopulated}
         />
         <HeroKpiCard
           variant="burn"
@@ -146,6 +168,7 @@ export default async function DashboardPage({
           description={!hasExpenses ? "Add expenses to calculate" : undefined}
           sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
           stagger={1}
+          celebrate={allPopulated}
         />
         <HeroKpiCard
           variant="runway"
@@ -169,6 +192,7 @@ export default async function DashboardPage({
               : undefined
           }
           stagger={2}
+          celebrate={allPopulated}
         />
         <HeroKpiCard
           variant="revenue"
@@ -179,11 +203,13 @@ export default async function DashboardPage({
           description={!hasRevenue ? "Add revenue streams" : undefined}
           sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
           stagger={3}
+          celebrate={allPopulated}
         />
       </div>
 
       {!hasData ? (
         <DashboardEmptyState
+          companyName={company.name}
           hasExpenses={hasExpenses}
           hasRevenue={hasRevenue}
           hasFunding={hasFunding}

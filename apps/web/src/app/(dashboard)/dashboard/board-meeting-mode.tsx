@@ -1,0 +1,381 @@
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import { X, Download, Copy, Check, Presentation } from "lucide-react";
+import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
+
+/* ── Types ──────────────────────────────────────────────────────────────────── */
+
+export interface BoardMeetingData {
+  companyName: string;
+  /** e.g. "March 2026" */
+  monthLabel: string;
+  cash: number;
+  burn: number;
+  runway: number;
+  mrr: number;
+  /** MRR MoM growth as a percentage, e.g. 12.3 */
+  mrrGrowth: number;
+  headcount: number;
+  headcountDelta: number;
+}
+
+type Signal = "green" | "amber" | "red" | "neutral";
+
+interface MetricDisplay {
+  label: string;
+  value: string;
+  signal: Signal;
+  note: string;
+}
+
+/* ── Traffic-light logic ────────────────────────────────────────────────────── */
+
+function getRunwaySignal(months: number): { signal: Signal; note: string } {
+  if (months >= 999) return { signal: "green", note: "Infinite runway" };
+  if (months >= 12) return { signal: "green", note: "Healthy" };
+  if (months >= 6) return { signal: "amber", note: "Under 12mo target" };
+  return { signal: "red", note: `${months < 3 ? "Critical" : "Low"} — act now` };
+}
+
+function getBurnSignal(burn: number, runway: number): { signal: Signal; note: string } {
+  if (burn <= 0) return { signal: "green", note: "Net positive" };
+  if (runway >= 18) return { signal: "green", note: "Sustainable" };
+  if (runway >= 6) return { signal: "amber", note: "Watch" };
+  return { signal: "red", note: "High relative to cash" };
+}
+
+function getCashSignal(cash: number, runway: number): { signal: Signal; note: string } {
+  if (cash <= 0) return { signal: "red", note: "Out of cash" };
+  if (runway >= 12) return { signal: "green", note: "Healthy" };
+  if (runway >= 6) return { signal: "amber", note: "Monitor" };
+  return { signal: "red", note: "Low" };
+}
+
+function getGrowthSignal(growthPct: number): { signal: Signal; note: string } {
+  if (growthPct >= 10) return { signal: "green", note: "Top quartile" };
+  if (growthPct >= 5) return { signal: "green", note: "Solid growth" };
+  if (growthPct >= 0) return { signal: "amber", note: "Flat" };
+  return { signal: "red", note: "Declining" };
+}
+
+function getMrrSignal(mrr: number, growthPct: number): { signal: Signal; note: string } {
+  if (mrr <= 0) return { signal: "neutral", note: "No revenue yet" };
+  if (growthPct >= 10) return { signal: "green", note: `Growing ${growthPct.toFixed(0)}% MoM` };
+  if (growthPct >= 0) return { signal: "amber", note: `+${growthPct.toFixed(0)}% MoM` };
+  return { signal: "red", note: `${growthPct.toFixed(0)}% MoM` };
+}
+
+function getHeadcountSignal(delta: number): { signal: Signal; note: string } {
+  if (delta > 0) return { signal: "neutral", note: `+${delta} this month` };
+  if (delta < 0) return { signal: "amber", note: `${delta} this month` };
+  return { signal: "neutral", note: "Stable" };
+}
+
+/* ── Formatting ─────────────────────────────────────────────────────────────── */
+
+function fmtCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
+  return `${sign}$${abs.toFixed(0)}`;
+}
+
+function buildMetrics(data: BoardMeetingData): MetricDisplay[] {
+  const cashSig = getCashSignal(data.cash, data.runway);
+  const burnSig = getBurnSignal(data.burn, data.runway);
+  const runwaySig = getRunwaySignal(data.runway);
+  const mrrSig = getMrrSignal(data.mrr, data.mrrGrowth);
+  const growthSig = getGrowthSignal(data.mrrGrowth);
+  const hcSig = getHeadcountSignal(data.headcountDelta);
+
+  return [
+    { label: "Cash", value: fmtCurrency(data.cash), ...cashSig },
+    { label: "Burn", value: `${fmtCurrency(data.burn)}/mo`, ...burnSig },
+    {
+      label: "Runway",
+      value: data.runway >= 999 ? "\u221e" : `${data.runway.toFixed(1)} mo`,
+      ...runwaySig,
+    },
+    { label: "MRR", value: fmtCurrency(data.mrr), ...mrrSig },
+    {
+      label: "Growth",
+      value: `${data.mrrGrowth >= 0 ? "+" : ""}${data.mrrGrowth.toFixed(1)}%`,
+      ...growthSig,
+    },
+    { label: "Headcount", value: `${data.headcount}`, ...hcSig },
+  ];
+}
+
+/* ── Signal dot component ───────────────────────────────────────────────────── */
+
+const signalColors: Record<Signal, string> = {
+  green: "bg-success-500",
+  amber: "bg-warning-500",
+  red: "bg-danger-500",
+  neutral: "bg-surface-300",
+};
+
+function SignalDot({ signal }: { signal: Signal }) {
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${signalColors[signal]} shrink-0`}
+      aria-label={signal}
+    />
+  );
+}
+
+/* ── Clipboard text builder ─────────────────────────────────────────────────── */
+
+function toClipboardText(data: BoardMeetingData, metrics: MetricDisplay[]): string {
+  const lines = [
+    `${data.companyName} Financial Snapshot`,
+    data.monthLabel,
+    "",
+    ...metrics.map((m) => `${m.label.padEnd(12)} ${m.value.padEnd(12)} ${m.note}`),
+    "",
+    "Generated by Burnless",
+  ];
+  return lines.join("\n");
+}
+
+/* ── PDF generation ─────────────────────────────────────────────────────────── */
+
+async function generateBoardPDF(data: BoardMeetingData, metrics: MetricDisplay[]) {
+  const [{ default: jsPDF }] = await Promise.all([import("jspdf")]);
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Brand bar
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, pageWidth, 4, "F");
+
+  // Title
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.text(`${data.companyName}`, 20, 25);
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Financial Snapshot — ${data.monthLabel}`, 20, 33);
+
+  // Metrics
+  let y = 50;
+  const signalEmoji: Record<Signal, string> = {
+    green: "\u25CF", // filled circle
+    amber: "\u25CF",
+    red: "\u25CF",
+    neutral: "\u25CB", // empty circle
+  };
+  const signalPdfColor: Record<Signal, [number, number, number]> = {
+    green: [34, 197, 94],
+    amber: [245, 158, 11],
+    red: [239, 68, 68],
+    neutral: [156, 163, 175],
+  };
+
+  for (const metric of metrics) {
+    // Signal dot
+    const [r, g, b] = signalPdfColor[metric.signal];
+    doc.setFillColor(r, g, b);
+    doc.circle(25, y - 1.5, 2.5, "F");
+
+    // Label
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 30);
+    doc.text(metric.label, 32, y);
+
+    // Value
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "normal");
+    doc.text(metric.value, 80, y);
+
+    // Note
+    doc.setFontSize(10);
+    doc.setTextColor(120, 120, 120);
+    doc.text(metric.note, 120, y);
+
+    y += 14;
+  }
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(180, 180, 180);
+  doc.text("Generated by Burnless", 20, 280);
+  doc.text(new Date().toLocaleDateString(), pageWidth - 20, 280, { align: "right" });
+
+  doc.save(`${data.companyName.replace(/\s+/g, "-")}-board-snapshot-${data.monthLabel.replace(/\s+/g, "-")}.pdf`);
+}
+
+/* ── Board Meeting Mode component ───────────────────────────────────────────── */
+
+export function BoardMeetingButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-xl bg-surface-0 border border-surface-200 px-4 py-2 text-sm font-medium text-surface-600 hover:bg-surface-50 hover:border-surface-300 transition-all"
+      title="Board Meeting Mode (B)"
+    >
+      <Presentation className="h-4 w-4" />
+      <span className="hidden sm:inline">Board Mode</span>
+    </button>
+  );
+}
+
+export function BoardMeetingOverlay({
+  data,
+  onClose,
+}: {
+  data: BoardMeetingData;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const metrics = buildMetrics(data);
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const handleCopy = useCallback(async () => {
+    const text = toClipboardText(data, metrics);
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [data, metrics]);
+
+  const handleExportPDF = useCallback(async () => {
+    setExporting(true);
+    try {
+      await generateBoardPDF(data, metrics);
+    } finally {
+      setExporting(false);
+    }
+  }, [data, metrics]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
+        onClick={onClose}
+      />
+      {/* Modal */}
+      <div
+        ref={overlayRef}
+        className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Board Meeting Mode"
+      >
+        <div className="bg-surface-0 rounded-2xl shadow-2xl border border-surface-200 w-full max-w-lg animate-scale-in">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-surface-100">
+            <div>
+              <h2 className="text-lg font-bold text-surface-900">{data.companyName}</h2>
+              <p className="text-sm text-surface-400 mt-0.5">
+                Financial Snapshot &mdash; {data.monthLabel}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Metrics */}
+          <div className="px-6 py-5 space-y-1">
+            {metrics.map((m) => (
+              <div
+                key={m.label}
+                className="flex items-center justify-between py-3 px-3 -mx-3 rounded-xl hover:bg-surface-50 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <SignalDot signal={m.signal} />
+                  <span className="text-sm font-medium text-surface-700">{m.label}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-surface-400">{m.note}</span>
+                  <span className="text-sm font-bold text-surface-900 tabular-nums min-w-[72px] text-right">
+                    {m.value}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 px-6 py-4 border-t border-surface-100 bg-surface-50/50 rounded-b-2xl">
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? "Exporting\u2026" : "Share as PDF"}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-surface-0 border border-surface-200 px-4 py-2.5 text-sm font-semibold text-surface-700 hover:bg-surface-100 transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 text-success-500" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy to clipboard
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Footer hint */}
+          <div className="px-6 py-2.5 border-t border-surface-100">
+            <p className="text-[10px] text-surface-300 text-center">
+              Press <kbd className="font-mono bg-surface-100 px-1 rounded">Esc</kbd> to close
+              &middot; Press <kbd className="font-mono bg-surface-100 px-1 rounded">B</kbd> to
+              toggle
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ── Wrapper that manages state + keyboard shortcut ─────────────────────────── */
+
+export function BoardMeetingMode({ data }: { data: BoardMeetingData }) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((prev) => !prev), []);
+
+  usePageShortcuts([
+    {
+      key: "b",
+      label: "B",
+      description: "Board Meeting Mode",
+      action: toggle,
+    },
+  ]);
+
+  return (
+    <>
+      <BoardMeetingButton onClick={toggle} />
+      {open && <BoardMeetingOverlay data={data} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
