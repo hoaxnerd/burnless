@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { getProviderForFeature } from "@burnless/ai";
-import { getAuthUser, errorResponse } from "@/lib/api-helpers";
+import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
 
@@ -39,7 +39,7 @@ interface EnrichmentResult {
   fields: EnrichedField[];
 }
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Please sign in to continue", 401);
 
@@ -202,4 +202,4 @@ Only include fields you can reasonably infer from the domain name.`;
       Connection: "keep-alive",
     },
   });
-}
+});

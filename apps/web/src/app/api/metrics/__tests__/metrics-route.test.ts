@@ -19,6 +19,7 @@ const { mockRequireCompanyAccess, mockErrorResponse } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   errorResponse: mockErrorResponse,
+  withErrorHandler: <T extends Function>(handler: T) => handler,
 }));
 
 // Mock DB — return minimal chain stubs

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, revenueStreams, scenarios } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   scenarioId: z.string(),
@@ -11,7 +11,7 @@ const createSchema = z.object({
   parameters: z.record(z.unknown()).default({}),
 });
 
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -27,9 +27,9 @@ export async function GET(request: Request) {
 
   const rows = await db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
   return NextResponse.json(rows);
-}
+});
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -46,4 +46,4 @@ export async function POST(request: Request) {
 
   const [row] = await db.insert(revenueStreams).values(parsed.data).returning();
   return NextResponse.json(row, { status: 201 });
-}
+});

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, transactions, fundingRounds } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -24,7 +24,7 @@ import {
  *
  * Returns computed P&L, Cash Flow, and Balance Sheet for a scenario.
  */
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -166,4 +166,4 @@ export async function GET(request: Request) {
       totalHeadcount: Array.from(headcountCosts.headcount.entries()).sort(([a], [b]) => a.localeCompare(b)),
     },
   });
-}
+});

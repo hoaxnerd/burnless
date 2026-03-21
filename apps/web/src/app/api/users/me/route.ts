@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, users, companies, sessions, accounts } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { getAuthUser, errorResponse } from "@/lib/api-helpers";
+import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 /**
  * DELETE /api/users/me
@@ -13,7 +13,7 @@ import { getAuthUser, errorResponse } from "@/lib/api-helpers";
  *   1. Delete all companies owned by user (each cascades to all child data)
  *   2. Delete the user record (cascades to accounts, sessions, companyMembers, aiConversations)
  */
-export async function DELETE(request: Request) {
+export const DELETE = withErrorHandler(async (request: Request) => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Unauthorized", 401);
 
@@ -51,4 +51,4 @@ export async function DELETE(request: Request) {
     console.error("User deletion failed:", error);
     return errorResponse("Failed to delete user data. Please try again.", 500);
   }
-}
+});

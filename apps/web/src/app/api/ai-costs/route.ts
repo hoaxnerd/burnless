@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, aiUsageLogs } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 /**
  * GET /api/ai-costs — AI cost dashboard data.
@@ -9,7 +9,7 @@ import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
  * Returns per-feature spend breakdown for the current billing period (last 30 days).
  * Query params: ?days=30 (default), ?days=7
  */
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -73,4 +73,4 @@ export async function GET(request: Request) {
       costUSD: (d.totalCostMicros ?? 0) / 1_000_000,
     })),
   });
-}
+});

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, privacyConsents } from "@burnless/db";
 import { eq, and, isNull, desc } from "drizzle-orm";
-import { getAuthUser, errorResponse, parseBody } from "@/lib/api-helpers";
+import { getAuthUser, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { z } from "zod";
 
 const VALID_PURPOSES = [
@@ -21,7 +21,7 @@ const consentSchema = z.object({
  *
  * Returns current consent status for all purposes.
  */
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Unauthorized", 401);
 
@@ -55,7 +55,7 @@ export async function GET() {
   });
 
   return NextResponse.json({ consents: status });
-}
+});
 
 /**
  * POST /api/users/me/consent
@@ -63,7 +63,7 @@ export async function GET() {
  * Record a consent decision. Creates an immutable audit log entry.
  * Previous consents for the same purpose are marked as revoked.
  */
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Unauthorized", 401);
 
@@ -111,4 +111,4 @@ export async function POST(request: Request) {
     granted,
     recordedAt: now.toISOString(),
   });
-}
+});

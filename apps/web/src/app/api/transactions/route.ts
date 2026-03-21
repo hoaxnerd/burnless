@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, transactions } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 const createSchema = z.object({
@@ -15,7 +15,7 @@ const createSchema = z.object({
   metadata: z.record(z.unknown()).nullable().default(null),
 });
 
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -39,9 +39,9 @@ export async function GET(request: Request) {
     .limit(limit + 1);
 
   return NextResponse.json(paginatedResponse(rows, limit));
-}
+});
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -58,4 +58,4 @@ export async function POST(request: Request) {
     .returning();
 
   return NextResponse.json(row, { status: 201 });
-}
+});

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, transactions, financialAccounts, importBatches, merchantCategoryMappings } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import crypto from "crypto";
 
@@ -44,7 +44,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 // ── POST /api/import ─────────────────────────────────────────────────────────
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -259,4 +259,4 @@ export async function POST(request: Request) {
 
     return errorResponse("Import failed", 500);
   }
-}
+});

@@ -18,7 +18,7 @@ import {
 } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { getAuthUser, getUserCompany, errorResponse } from "@/lib/api-helpers";
+import { getAuthUser, getUserCompany, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   onboardingSchema,
   parseStage,
@@ -27,7 +27,7 @@ import {
   parseTeamSize,
 } from "@/lib/onboarding-helpers";
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Please sign in to continue", 401);
   const userId = user.id;
@@ -196,4 +196,4 @@ export async function POST(request: Request) {
     console.error("[onboarding] Error:", message);
     return errorResponse(message, 500);
   }
-}
+});

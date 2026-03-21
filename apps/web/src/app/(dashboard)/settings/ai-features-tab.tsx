@@ -1,17 +1,11 @@
 "use client";
 
 import { Power, Database, Sparkles } from "lucide-react";
-import { AI_FEATURE_LIST, type AiDataMode } from "@burnless/ai";
-
-interface AiFlags {
-  masterEnabled: boolean;
-  dataMode: AiDataMode;
-  features: Record<string, boolean>;
-}
+import { AI_FEATURE_LIST, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
 
 interface AiFeaturesTabProps {
-  flags: AiFlags;
-  updateFlags: (patch: Partial<AiFlags>) => void;
+  flags: AiFeatureFlagsState;
+  updateFlags: (patch: Partial<AiFeatureFlagsState>) => void;
 }
 
 export function AiFeaturesTab({ flags, updateFlags }: AiFeaturesTabProps) {

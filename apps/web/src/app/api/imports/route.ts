@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { db, importBatches, financialAccounts } from "@burnless/db";
 import { eq, desc, lt } from "drizzle-orm";
 import { and } from "drizzle-orm";
-import { requireCompanyAccess } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 // -- GET /api/imports -- List import history with cursor pagination ----------
 
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -38,4 +38,4 @@ export async function GET(request: Request) {
     .limit(limit + 1);
 
   return NextResponse.json(paginatedResponse(batches, limit));
-}
+});

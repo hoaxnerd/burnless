@@ -6,9 +6,9 @@
 import { NextResponse } from "next/server";
 import { db, weeklyDigests } from "@burnless/db";
 import { eq, desc, and, isNull } from "drizzle-orm";
-import { requireCompanyAccess } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx && ctx.error) return ctx.error;
 
@@ -29,9 +29,9 @@ export async function GET() {
   }
 
   return NextResponse.json({ digest });
-}
+});
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx && ctx.error) return ctx.error;
 
@@ -52,4 +52,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-}
+});

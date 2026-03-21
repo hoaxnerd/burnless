@@ -4,12 +4,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireCompanyAccess } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { getDefaultScenario } from "@/lib/data";
 import { generateAlerts } from "@/lib/alerts";
 
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -39,4 +39,4 @@ export async function GET() {
   } catch {
     return NextResponse.json({ alerts: [] });
   }
-}
+});

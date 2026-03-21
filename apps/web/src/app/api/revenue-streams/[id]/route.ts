@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, revenueStreams } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -10,10 +10,10 @@ const updateSchema = z.object({
   parameters: z.record(z.unknown()).optional(),
 });
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -26,12 +26,12 @@ export async function PATCH(
   const [row] = await db.update(revenueStreams).set(parsed.data).where(eq(revenueStreams.id, id)).returning();
   if (!row) return errorResponse("Revenue stream not found", 404);
   return NextResponse.json(row);
-}
+});
 
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -41,4 +41,4 @@ export async function DELETE(
   const [row] = await db.delete(revenueStreams).where(eq(revenueStreams.id, id)).returning();
   if (!row) return errorResponse("Revenue stream not found", 404);
   return NextResponse.json({ deleted: true });
-}
+});

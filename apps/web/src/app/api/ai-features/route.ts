@@ -11,18 +11,18 @@ import { z } from "zod";
 import { db } from "@burnless/db";
 import { aiFeatureFlags } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
 
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
   const flags = await getOrCreateFlags(ctx.companyId);
   return NextResponse.json(flags);
-}
+});
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ const patchSchema = z.object({
     .optional(),
 });
 
-export async function PATCH(request: Request) {
+export const PATCH = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -86,7 +86,7 @@ export async function PATCH(request: Request) {
     dataMode: updated!.dataMode,
     features: updated!.features,
   });
-}
+});
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

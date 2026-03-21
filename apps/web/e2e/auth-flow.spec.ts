@@ -3,9 +3,9 @@ import { test, expect } from "@playwright/test";
 /**
  * Auth flow E2E tests — login page UI behavior.
  *
- * Tests that don't require a database connection.
- * Full signup/signin integration tests are in auth-integration.spec.ts
- * and require DATABASE_URL to be set.
+ * Tests that don't require a database connection run unconditionally.
+ * Full signup/signin integration tests are in the "Auth flow (requires DB)"
+ * section below and are skipped unless DATABASE_URL is set.
  */
 
 test.describe("Login page UI", () => {

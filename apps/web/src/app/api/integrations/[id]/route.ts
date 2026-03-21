@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 // ── PATCH /api/integrations/[id] — Update integration status ────────────────
 
@@ -11,10 +11,10 @@ const updateSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -40,14 +40,14 @@ export async function PATCH(
   if (!updated) return errorResponse("Integration not found", 404);
 
   return NextResponse.json(updated);
-}
+});
 
 // ── DELETE /api/integrations/[id] — Disconnect integration ──────────────────
 
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -65,4 +65,4 @@ export async function DELETE(
   if (!deleted) return errorResponse("Integration not found", 404);
 
   return NextResponse.json({ success: true });
-}
+});

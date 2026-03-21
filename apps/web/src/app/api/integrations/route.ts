@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 // ── GET /api/integrations — List all integrations for company ───────────────
 
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -16,7 +16,7 @@ export async function GET() {
     .where(eq(integrations.companyId, ctx.companyId));
 
   return NextResponse.json(rows);
-}
+});
 
 // ── POST /api/integrations — Create/connect an integration ──────────────────
 
@@ -33,7 +33,7 @@ const createSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -78,4 +78,4 @@ export async function POST(request: Request) {
     .returning();
 
   return NextResponse.json(created, { status: 201 });
-}
+});

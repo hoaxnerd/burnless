@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, scenarios, forecastLines, revenueStreams } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, errorResponse, parseBody } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { getDefaultScenario, getRevenueStreams, getForecastLines } from "@/lib/data";
@@ -19,7 +19,7 @@ const generateSchema = z.object({
   type: z.enum(["best_worst", "best", "worst"]).default("best_worst"),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -196,4 +196,4 @@ export async function POST(request: Request) {
       lastMonthExpenses: lastExpenses,
     },
   });
-}
+});

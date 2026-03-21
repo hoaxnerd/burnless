@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, companies } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 // ── GET /api/company — Get company profile ──────────────────────────────────
 
-export async function GET() {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -19,7 +19,7 @@ export async function GET() {
   if (!company) return errorResponse("Company not found", 404);
 
   return NextResponse.json(company);
-}
+});
 
 // ── PATCH /api/company — Update company profile ─────────────────────────────
 
@@ -39,7 +39,7 @@ const updateSchema = z.object({
   fiscalYearEnd: z.number().min(1).max(12).optional(),
 });
 
-export async function PATCH(request: Request) {
+export const PATCH = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -72,4 +72,4 @@ export async function PATCH(request: Request) {
     .returning();
 
   return NextResponse.json(updated);
-}
+});

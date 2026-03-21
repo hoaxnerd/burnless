@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -21,7 +21,7 @@ import {
 /**
  * GET /api/scenarios/compare?baseId=xxx&compareId=yyy
  */
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       { name: "Headcount", ...serializeComparison(result.headcount) },
     ],
   });
-}
+});
 
 async function buildScenarioData(
   scenarioId: string,

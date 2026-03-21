@@ -86,6 +86,37 @@ export async function getCompanyPlan(
   return "free";
 }
 
+/**
+ * Wrap a route handler with standardized error handling.
+ * Catches unhandled errors, logs them, reports to Sentry, and returns a safe 500.
+ * Overloaded for routes with and without dynamic params.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
+  handler: T
+): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wrapped = async (...args: any[]) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      const request = args[0] as Request;
+      const pathname = new URL(request.url).pathname;
+      console.error(`[API Error] ${request.method} ${pathname}:`, error);
+
+      import("@sentry/nextjs")
+        .then((Sentry) => Sentry.captureException(error))
+        .catch(() => {});
+
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
+  };
+  return wrapped as T;
+}
+
 /** Parse JSON body with Zod schema. */
 export async function parseBody<T>(
   request: Request,

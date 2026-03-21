@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, headcountPlans } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -13,10 +13,10 @@ const updateSchema = z.object({
   benefitsRate: z.number().min(0).max(1).optional(),
 });
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -33,12 +33,12 @@ export async function PATCH(
   const [row] = await db.update(headcountPlans).set(updates).where(eq(headcountPlans.id, id)).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   return NextResponse.json(row);
-}
+});
 
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -48,4 +48,4 @@ export async function DELETE(
   const [row] = await db.delete(headcountPlans).where(eq(headcountPlans.id, id)).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   return NextResponse.json({ deleted: true });
-}
+});

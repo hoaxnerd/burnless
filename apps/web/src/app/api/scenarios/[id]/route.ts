@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { scenarios, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -11,10 +11,10 @@ const updateSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
-export async function GET(
+export const GET = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const { id } = await params;
@@ -22,12 +22,12 @@ export async function GET(
   const row = await findByIdForCompany(scenarios, id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json(row);
-}
+});
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -48,12 +48,12 @@ export async function PATCH(
   const row = await updateForCompany(scenarios, id, ctx.companyId, updates);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json(row);
-}
+});
 
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -63,4 +63,4 @@ export async function DELETE(
   const row = await deleteForCompany(scenarios, id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json({ deleted: true });
-}
+});

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getScenarioForCompany, getScenarioData } from "@burnless/db";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -23,7 +23,7 @@ import {
  *
  * Returns all computed financial and SaaS metrics for a scenario.
  */
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -141,4 +141,4 @@ export async function GET(request: Request) {
     period: { start: startDateStr, end: endDateStr },
     metrics,
   });
-}
+});

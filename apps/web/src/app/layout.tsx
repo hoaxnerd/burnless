@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { CookieConsentBanner } from "@/components/cookie-consent";
 import { AnalyticsProvider } from "@/components/analytics-provider";
+import { CookieConsentLoader } from "@/components/cookie-consent-loader";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -69,7 +69,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <AnalyticsProvider />
         </Suspense>
-        <CookieConsentBanner />
+        <CookieConsentLoader />
       </body>
     </html>
   );

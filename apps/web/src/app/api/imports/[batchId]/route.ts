@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { db, importBatches, transactions } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, requireRole, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 // ── DELETE /api/imports/[batchId] — Rollback an import batch ────────────────
 
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   _request: Request,
   { params }: { params: Promise<{ batchId: string }> }
-) {
+) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -60,4 +60,4 @@ export async function DELETE(
     success: true,
     message: `Rolled back ${batch.importedCount} transactions`,
   });
-}
+});
