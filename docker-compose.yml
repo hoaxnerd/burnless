@@ -1,6 +1,13 @@
 # Burnless — Local Development Stack
 # Usage: docker compose up -d
-# All dependencies for local testing. Production uses managed services.
+#
+# Default: starts core infra only (Postgres, Redis, SearXNG, Crawl4AI, Mailpit).
+# The app connects to your HOST Ollama at localhost:11434 — no Docker Ollama needed
+# if you already have Ollama running locally.
+#
+# For devs without local Ollama:
+#   docker compose --profile ollama up -d
+# This starts a containerized Ollama + auto-pulls models.
 
 services:
   # ── Database (PostgreSQL + pgvector) ────────────────────────────────────────
@@ -37,12 +44,14 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Local LLM (Ollama) ─────────────────────────────────────────────────────
-  # OpenAI-compatible API at http://localhost:11434/v1
-  # Serves both chat (gemma3:12b) and embeddings (nomic-embed-text)
+  # ── Local LLM (Ollama) — OPTIONAL ──────────────────────────────────────────
+  # Only needed if you don't have Ollama running on your host machine.
+  # Start with: docker compose --profile ollama up -d
+  # The app defaults to localhost:11434 which hits your host Ollama.
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    profiles: ["ollama"]
     ports:
       - "11434:11434"
     volumes:
@@ -57,6 +66,7 @@ services:
   # Auto-pull the chat + embedding models on first boot
   ollama-init:
     image: ollama/ollama:latest
+    profiles: ["ollama"]
     depends_on:
       ollama:
         condition: service_healthy

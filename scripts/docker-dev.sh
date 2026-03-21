@@ -3,9 +3,10 @@
 # Start all Docker services and the Next.js dev server.
 #
 # Usage:
-#   ./scripts/docker-dev.sh          # Start everything
+#   ./scripts/docker-dev.sh          # Start everything (uses host Ollama)
 #   ./scripts/docker-dev.sh --down   # Stop everything
 #   ./scripts/docker-dev.sh --reset  # Stop, remove volumes, start fresh
+#   ./scripts/docker-dev.sh --ollama # Start with Docker Ollama (no host Ollama)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,16 +20,21 @@ NC='\033[0m'
 log() { echo -e "${GREEN}[burnless]${NC} $1"; }
 warn() { echo -e "${YELLOW}[burnless]${NC} $1"; }
 
+USE_DOCKER_OLLAMA=false
+
 # ── Handle flags ──────────────────────────────────────────────────────────────
 case "${1:-}" in
   --down)
     log "Stopping Docker services..."
-    docker compose down
+    docker compose --profile ollama down 2>/dev/null || docker compose down
     exit 0
     ;;
   --reset)
     warn "Removing all Docker volumes and restarting..."
-    docker compose down -v
+    docker compose --profile ollama down -v 2>/dev/null || docker compose down -v
+    ;;
+  --ollama)
+    USE_DOCKER_OLLAMA=true
     ;;
 esac
 
@@ -39,8 +45,13 @@ if [ ! -f .env ]; then
 fi
 
 # ── Start Docker services ────────────────────────────────────────────────────
-log "Starting Docker services..."
-docker compose up -d
+if [ "$USE_DOCKER_OLLAMA" = true ]; then
+  log "Starting Docker services (with Docker Ollama)..."
+  docker compose --profile ollama up -d
+else
+  log "Starting Docker services (using host Ollama)..."
+  docker compose up -d
+fi
 
 # ── Wait for PostgreSQL ──────────────────────────────────────────────────────
 log "Waiting for PostgreSQL + pgvector..."
@@ -69,19 +80,24 @@ log "All services running:"
 echo "  App:              http://localhost:3000"
 echo "  PostgreSQL:       localhost:5432  (+ pgvector)"
 echo "  Redis:            localhost:6379"
-echo "  Ollama API:       http://localhost:11434  (chat: gemma3:12b, embed: nomic-embed-text)"
 echo "  SearXNG Search:   http://localhost:8888  (web search for AI)"
 echo "  Crawl4AI:         http://localhost:11235"
 echo "  Mailpit UI:       http://localhost:8025"
 echo "  Mailpit SMTP:     localhost:1025"
-echo ""
 
-# ── Check Ollama models ──────────────────────────────────────────────────────
-if docker compose exec ollama ollama list 2>/dev/null | grep -q "gemma3:12b"; then
-  log "Ollama chat model (gemma3:12b) is ready."
+# ── Check Ollama availability ────────────────────────────────────────────────
+if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+  log "Ollama is running at localhost:11434"
+  MODELS=$(curl -sf http://localhost:11434/api/tags 2>/dev/null | python3 -c "import sys,json; [print(f'    - {m[\"name\"]}') for m in json.load(sys.stdin).get('models',[])]" 2>/dev/null || echo "    (couldn't list models)")
+  echo "$MODELS"
 else
-  warn "Ollama models are being pulled (may take a few minutes)."
-  warn "Check progress: docker compose logs -f ollama-init"
+  if [ "$USE_DOCKER_OLLAMA" = true ]; then
+    warn "Docker Ollama is starting up. Models being pulled..."
+    warn "Check progress: docker compose logs -f ollama-init"
+  else
+    warn "No Ollama detected at localhost:11434."
+    warn "Install Ollama (https://ollama.com) or use: ./scripts/docker-dev.sh --ollama"
+  fi
 fi
 
 echo ""
