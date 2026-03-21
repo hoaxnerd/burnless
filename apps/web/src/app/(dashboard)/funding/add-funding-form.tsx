@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { validateField, validateAll, fundingFormSchema } from "@/lib/form-validation";
 
 const ROUND_TYPES = [
@@ -16,10 +16,34 @@ const ROUND_TYPES = [
   { value: "grant", label: "Grant" },
 ] as const;
 
-export function AddFundingForm() {
+export interface EditRound {
+  id: string;
+  name: string;
+  type: string;
+  amount: string | number;
+  date: string;
+  preMoneyValuation?: string | number | null;
+  dilutionPercent?: string | number | null;
+  isProjected: boolean;
+}
+
+interface AddFundingFormProps {
+  editRound?: EditRound;
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export function AddFundingForm({ editRound, open: controlledOpen, onClose }: AddFundingFormProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const isEditing = !!editRound;
+  const isControlled = controlledOpen !== undefined;
+
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -34,6 +58,60 @@ export function AddFundingForm() {
   const [preMoneyValuation, setPreMoneyValuation] = useState("");
   const [dilutionPercent, setDilutionPercent] = useState("");
   const [isProjected, setIsProjected] = useState(false);
+
+  // Pre-populate fields when editing
+  useEffect(() => {
+    if (editRound && open) {
+      setName(editRound.name);
+      setType(editRound.type);
+      setAmount(String(editRound.amount));
+      // Parse ISO date string to YYYY-MM-DD format
+      const dateStr = editRound.date;
+      if (dateStr.includes("T")) {
+        setDate(dateStr.split("T")[0]!);
+      } else {
+        setDate(dateStr);
+      }
+      setPreMoneyValuation(editRound.preMoneyValuation != null ? String(editRound.preMoneyValuation) : "");
+      setDilutionPercent(editRound.dilutionPercent != null ? String(editRound.dilutionPercent) : "");
+      setIsProjected(editRound.isProjected);
+      setFieldErrors({});
+      setTouched({});
+      setError(null);
+      setConfirmDelete(false);
+    }
+  }, [editRound, open]);
+
+  function handleOpen() {
+    if (isControlled) return;
+    setInternalOpen(true);
+  }
+
+  function handleClose() {
+    if (isControlled && onClose) {
+      onClose();
+    } else {
+      setInternalOpen(false);
+    }
+    setConfirmDelete(false);
+    setError(null);
+    if (!isEditing) {
+      resetForm();
+    }
+  }
+
+  function resetForm() {
+    setName("");
+    setType("seed");
+    setAmount("");
+    const d = new Date();
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+    setPreMoneyValuation("");
+    setDilutionPercent("");
+    setIsProjected(false);
+    setFieldErrors({});
+    setTouched({});
+  }
 
   function handleBlur(field: string, value: string) {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -84,31 +162,32 @@ export function AddFundingForm() {
     setSaving(true);
 
     try {
-      const res = await fetch("/api/funding-rounds", {
-        method: "POST",
+      const body = {
+        name,
+        type,
+        amount: Number(amount),
+        date,
+        preMoneyValuation: preMoneyValuation ? Number(preMoneyValuation) : null,
+        dilutionPercent: dilutionPercent ? Number(dilutionPercent) : null,
+        isProjected,
+      };
+
+      const url = isEditing
+        ? `/api/funding-rounds/${editRound.id}`
+        : "/api/funding-rounds";
+
+      const res = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          type,
-          amount: Number(amount),
-          date,
-          preMoneyValuation: preMoneyValuation ? Number(preMoneyValuation) : null,
-          dilutionPercent: dilutionPercent ? Number(dilutionPercent) : null,
-          isProjected,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to add funding round");
+        throw new Error(data.error ?? `Failed to ${isEditing ? "update" : "add"} funding round`);
       }
 
-      setName("");
-      setAmount("");
-      setPreMoneyValuation("");
-      setDilutionPercent("");
-      setIsProjected(false);
-      setOpen(false);
+      handleClose();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -117,17 +196,51 @@ export function AddFundingForm() {
     }
   }
 
+  async function handleDelete() {
+    if (!editRound) return;
+
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/funding-rounds/${editRound.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete funding round");
+      }
+
+      handleClose();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
-      >
-        <Plus className="h-4 w-4" />
-        Add Funding Round
-      </button>
+      {/* Only show the trigger button when not in controlled (edit) mode */}
+      {!isControlled && (
+        <button
+          onClick={handleOpen}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add Funding Round
+        </button>
+      )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add Funding Round">
+      <Modal open={open} onClose={handleClose} title={isEditing ? "Edit Funding Round" : "Add Funding Round"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
@@ -208,23 +321,52 @@ export function AddFundingForm() {
           )}
 
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="isProjected" checked={isProjected}
+            <input type="checkbox" id={isEditing ? "isProjectedEdit" : "isProjected"} checked={isProjected}
               onChange={(e) => setIsProjected(e.target.checked)}
               className="h-4 w-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
-            <label htmlFor="isProjected" className="text-sm text-surface-700">
+            <label htmlFor={isEditing ? "isProjectedEdit" : "isProjected"} className="text-sm text-surface-700">
               This is a projected/planned round (not yet closed)
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)}
-              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || !name || !amount || Object.keys(fieldErrors).length > 0}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
-              {saving ? "Adding..." : "Add Round"}
-            </button>
+          <div className="flex items-center justify-between pt-2">
+            {/* Delete button (only in edit mode) */}
+            {isEditing ? (
+              <div>
+                {confirmDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-danger-600">Are you sure?</span>
+                    <button type="button" onClick={handleDelete} disabled={deleting}
+                      className="rounded-lg bg-danger-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-700 transition-colors disabled:opacity-50">
+                      {deleting ? "Deleting..." : "Yes, delete"}
+                    </button>
+                    <button type="button" onClick={() => setConfirmDelete(false)} disabled={deleting}
+                      className="rounded-lg border border-surface-300 px-3 py-1.5 text-xs font-medium text-surface-700 hover:bg-surface-50 transition-colors">
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={handleDelete}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-danger-200 px-3 py-1.5 text-xs font-medium text-danger-600 hover:bg-danger-50 transition-colors">
+                    <Trash2 className="h-3 w-3" />
+                    Delete
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex gap-3">
+              <button type="button" onClick={handleClose}
+                className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving || !name || !amount || Object.keys(fieldErrors).length > 0}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
+                {saving ? (isEditing ? "Saving..." : "Adding...") : (isEditing ? "Save Changes" : "Add Round")}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>

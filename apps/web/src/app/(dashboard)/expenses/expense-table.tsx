@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { formatCompactCurrency } from "@/components/charts";
+import { Modal } from "@/components/ui";
+import { EditExpenseForm } from "./edit-expense-form";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
 
 interface ExpenseTableProps {
@@ -16,6 +19,7 @@ type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent"
 type SortDir = "asc" | "desc";
 
 export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOverride }: ExpenseTableProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "recurring" | "anomaly">("all");
@@ -24,6 +28,14 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  // Edit state
+  const [editingItem, setEditingItem] = useState<ExpenseLineItem | null>(null);
+
+  // Delete confirmation state
+  const [deletingItem, setDeletingItem] = useState<ExpenseLineItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -85,6 +97,32 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
+
+  const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
+
+  async function handleDeleteConfirm() {
+    if (!deletingItem) return;
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/forecast-lines/${deletingItem.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete expense");
+      }
+
+      setDeletingItem(null);
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
@@ -233,12 +271,15 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
               <th scope="col" className="text-center px-4 py-3 text-xs font-medium text-surface-500 uppercase">
                 Flags
               </th>
+              <th scope="col" className="w-20 px-4 py-3 text-xs font-medium text-surface-500 uppercase text-right">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center">
+                <td colSpan={7} className="px-6 py-12 text-center">
                   <p className="text-sm text-surface-500">
                     {search || categoryFilter !== "all" || typeFilter !== "all"
                       ? "No expenses match your filters."
@@ -255,6 +296,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 const changeIcon = item.changePercent > 0.01 ? "\u2191" : item.changePercent < -0.01 ? "\u2193" : "\u2192";
                 const changeLabel = item.changePercent > 0.01 ? "Increasing" : item.changePercent < -0.01 ? "Decreasing" : "Stable";
                 const changeColor = item.changePercent > 0.01 ? "text-red-600" : item.changePercent < -0.01 ? "text-green-600" : "text-surface-500";
+                const synthetic = isSynthetic(item);
 
                 return (
                   <tr
@@ -287,7 +329,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               setOverrides((prev) => ({ ...prev, [item.id]: newCat }));
                               setEditingCategoryId(null);
                               onCategoryOverride?.(item.id, newCat);
-                              // Learn: save merchant→category mapping
+                              // Learn: save merchant->category mapping
                               fetch("/api/merchant-mappings", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -363,6 +405,31 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      {!synthetic && (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setEditingItem(item)}
+                            className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            title="Edit expense"
+                            aria-label={`Edit ${item.accountName}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDeletingItem(item);
+                            }}
+                            className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete expense"
+                            aria-label={`Delete ${item.accountName}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })
@@ -370,6 +437,53 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
           </tbody>
         </table>
       </div>
+
+      {/* Edit expense modal */}
+      {editingItem && (
+        <EditExpenseForm
+          item={editingItem}
+          open={!!editingItem}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={!!deletingItem}
+        onClose={() => { setDeletingItem(null); setDeleteError(null); }}
+        title="Delete Expense"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
+              {deleteError}
+            </div>
+          )}
+          <p className="text-sm text-surface-700">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-surface-900">{deletingItem?.accountName}</span>?
+            This will remove the forecast line permanently.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => { setDeletingItem(null); setDeleteError(null); }}
+              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

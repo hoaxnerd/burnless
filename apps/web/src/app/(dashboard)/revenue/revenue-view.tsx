@@ -157,6 +157,7 @@ export function RevenueView({
         monthlyByStream={monthlyByStream}
         streamNames={streamNames}
         totalRevenue={g.currentRevenue}
+        scenarioId={scenarioId}
       />
     </div>
   );

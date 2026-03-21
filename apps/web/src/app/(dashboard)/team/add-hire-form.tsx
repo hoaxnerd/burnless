@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { validateField, validateAll, hireFormSchema } from "@/lib/form-validation";
 
 interface Department {
@@ -11,15 +11,47 @@ interface Department {
   name: string;
 }
 
+export interface EditHire {
+  id: string;
+  departmentId: string;
+  title: string;
+  count: number;
+  salary: string | number;
+  startDate: string;
+  endDate?: string | null;
+  benefitsRate: string | number;
+}
+
 interface AddHireFormProps {
   scenarioId: string;
   departments: Department[];
+  editHire?: EditHire;
+  open?: boolean;
+  onClose?: () => void;
 }
 
-export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
+function defaultStartDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function toDateInputValue(dateStr: string): string {
+  // Handle ISO date strings by extracting YYYY-MM-DD
+  return dateStr.slice(0, 10);
+}
+
+export function AddHireForm({ scenarioId, departments, editHire, open: controlledOpen, onClose }: AddHireFormProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const isEditMode = !!editHire;
+
+  // Internal open state for add mode; edit mode is controlled externally
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -30,11 +62,47 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
   const [count, setCount] = useState("1");
   const [salary, setSalary] = useState("");
   const [benefitsRate, setBenefitsRate] = useState("20");
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  });
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState("");
+
+  // Populate fields when editHire changes
+  useEffect(() => {
+    if (editHire) {
+      setTitle(editHire.title);
+      setDepartmentId(editHire.departmentId);
+      setCount(String(editHire.count));
+      setSalary(String(Number(editHire.salary)));
+      setBenefitsRate(String(Math.round(Number(editHire.benefitsRate) * 100)));
+      setStartDate(toDateInputValue(editHire.startDate));
+      setEndDate(editHire.endDate ? toDateInputValue(editHire.endDate) : "");
+      setNewDeptName("");
+      setError(null);
+      setFieldErrors({});
+      setTouched({});
+      setConfirmDelete(false);
+    }
+  }, [editHire]);
+
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalOpen(false);
+    }
+    setError(null);
+    setFieldErrors({});
+    setTouched({});
+    setConfirmDelete(false);
+    if (!isEditMode) {
+      setTitle("");
+      setCount("1");
+      setSalary("");
+      setBenefitsRate("20");
+      setNewDeptName("");
+      setEndDate("");
+      setStartDate(defaultStartDate());
+    }
+  }, [onClose, isEditMode]);
 
   function handleBlur(field: string, value: string) {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -56,6 +124,37 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
         else delete next[field];
         return next;
       });
+    }
+  }
+
+  async function handleDelete() {
+    if (!editHire) return;
+
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/headcount/${editHire.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete team member");
+      }
+
+      handleClose();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -90,31 +189,48 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
         throw new Error("Please select or create a department");
       }
 
-      const res = await fetch("/api/headcount", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scenarioId,
-          departmentId: deptId,
-          title,
-          count: Number(count),
-          salary: Number(salary),
-          startDate,
-          benefitsRate: Number(benefitsRate) / 100,
-        }),
-      });
+      if (isEditMode) {
+        // PATCH existing hire
+        const res = await fetch(`/api/headcount/${editHire.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            count: Number(count),
+            salary: Number(salary),
+            startDate,
+            endDate: endDate || null,
+            benefitsRate: Number(benefitsRate) / 100,
+          }),
+        });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to add team member");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "Failed to update team member");
+        }
+      } else {
+        // POST new hire
+        const res = await fetch("/api/headcount", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scenarioId,
+            departmentId: deptId,
+            title,
+            count: Number(count),
+            salary: Number(salary),
+            startDate,
+            benefitsRate: Number(benefitsRate) / 100,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "Failed to add team member");
+        }
       }
 
-      setTitle("");
-      setCount("1");
-      setSalary("");
-      setBenefitsRate("20");
-      setNewDeptName("");
-      setOpen(false);
+      handleClose();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -125,15 +241,22 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
-      >
-        <Plus className="h-4 w-4" />
-        Add Team Member
-      </button>
+      {/* Only show the add button in add mode */}
+      {!isEditMode && (
+        <button
+          onClick={() => setInternalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add Team Member
+        </button>
+      )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add Team Member / Planned Hire">
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title={isEditMode ? "Edit Team Member" : "Add Team Member / Planned Hire"}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
@@ -223,6 +346,17 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
             </div>
           </div>
 
+          {isEditMode && (
+            <div>
+              <label className="block text-sm font-medium text-surface-700 mb-1">End Date (optional)</label>
+              <input type="date" value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <p className="mt-1 text-xs text-surface-400">Leave empty for ongoing positions</p>
+            </div>
+          )}
+
           {salary && (
             <div className="rounded-lg bg-surface-50 border border-surface-200 px-4 py-3">
               <p className="text-xs text-surface-500">Monthly impact:</p>
@@ -232,15 +366,36 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)}
-              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || !title || !salary || Object.keys(fieldErrors).length > 0}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
-              {saving ? "Adding..." : "Add Member"}
-            </button>
+          <div className="flex items-center justify-between pt-2">
+            {/* Delete button - only in edit mode */}
+            <div>
+              {isEditMode && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting || saving}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                    confirmDelete
+                      ? "bg-danger-600 text-white hover:bg-danger-700"
+                      : "text-danger-600 hover:bg-danger-50 border border-danger-200"
+                  }`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete"}
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={handleClose}
+                className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving || deleting || !title || !salary || Object.keys(fieldErrors).length > 0}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
+                {saving ? (isEditMode ? "Saving..." : "Adding...") : (isEditMode ? "Save Changes" : "Add Member")}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>

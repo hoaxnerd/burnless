@@ -1,14 +1,19 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
+import { AddRevenueStreamForm, type EditRevenueStream } from "./add-revenue-stream-form";
 
 interface RevenueStreamBreakdownProps {
   streams: StreamBreakdown[];
   monthlyByStream: Record<string, unknown>[];
   streamNames: string[];
   totalRevenue: number;
+  scenarioId: string;
 }
 
 const typeLabels: Record<string, string> = {
@@ -30,7 +35,12 @@ export function RevenueStreamBreakdown({
   monthlyByStream,
   streamNames,
   totalRevenue,
+  scenarioId,
 }: RevenueStreamBreakdownProps) {
+  const router = useRouter();
+  const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   if (streams.length === 0) return null;
 
   // Build stacked chart bars (max 6 streams, rest grouped)
@@ -45,6 +55,24 @@ export function RevenueStreamBreakdown({
       stackId: "revenue",
     };
   });
+
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to delete this revenue stream? This action cannot be undone.")) return;
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/revenue-streams/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete");
+      }
+      router.refresh();
+    } catch {
+      // Error is handled silently; the stream remains if delete fails
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -63,9 +91,10 @@ export function RevenueStreamBreakdown({
             const color = typeColors[stream.type] ?? chartColors.palette[i % chartColors.palette.length] ?? "#94a3b8";
             const changeIcon = stream.changePercent > 0.01 ? "\u2191" : stream.changePercent < -0.01 ? "\u2193" : "\u2192";
             const changeColor = stream.changePercent > 0.01 ? "text-green-500" : stream.changePercent < -0.01 ? "text-red-500" : "text-surface-400";
+            const isDeleting = deletingId === stream.id;
 
             return (
-              <div key={stream.id}>
+              <div key={stream.id} className="group">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
@@ -79,6 +108,33 @@ export function RevenueStreamBreakdown({
                     <span className={`text-[10px] font-medium ${changeColor}`}>
                       {changeIcon}{Math.abs(stream.changePercent * 100).toFixed(0)}%
                     </span>
+                    {/* Edit/delete actions — visible on hover */}
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() =>
+                          setEditingStream({
+                            id: stream.id,
+                            name: stream.name,
+                            type: stream.type,
+                            parameters: stream.parameters,
+                          })
+                        }
+                        className="rounded p-1 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        aria-label={`Edit ${stream.name}`}
+                        title="Edit stream"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(stream.id)}
+                        disabled={isDeleting}
+                        className="rounded p-1 text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${stream.name}`}
+                        title="Delete stream"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
@@ -104,6 +160,16 @@ export function RevenueStreamBreakdown({
           </div>
         </div>
       </div>
+
+      {/* Edit modal (controlled) */}
+      {editingStream && (
+        <AddRevenueStreamForm
+          scenarioId={scenarioId}
+          editStream={editingStream}
+          open={!!editingStream}
+          onClose={() => setEditingStream(null)}
+        />
+      )}
     </div>
   );
 }

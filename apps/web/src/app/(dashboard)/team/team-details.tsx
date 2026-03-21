@@ -1,15 +1,24 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { AddHireForm, type EditHire } from "./add-hire-form";
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface TeamMember {
   id: string;
+  departmentId: string;
   title: string;
   count: number;
   salary: number;
   benefitsRate: number;
   startDate: string;
+  endDate?: string | null;
 }
 
 interface DepartmentGroup {
@@ -21,11 +30,13 @@ interface DepartmentGroup {
 
 interface PlannedHire {
   id: string;
+  departmentId: string;
   title: string;
   department: string;
   salary: number;
   benefitsRate: number;
   startDate: string;
+  endDate?: string | null;
   count: number;
 }
 
@@ -33,6 +44,8 @@ interface TeamDetailsProps {
   departmentBreakdown: DepartmentGroup[];
   plannedHires: PlannedHire[];
   totalMonthlyCost: number;
+  scenarioId: string;
+  departments: Department[];
 }
 
 function formatCurrency(value: number): string {
@@ -54,8 +67,14 @@ export function TeamDetails({
   departmentBreakdown,
   plannedHires,
   totalMonthlyCost,
+  scenarioId,
+  departments,
 }: TeamDetailsProps) {
+  const router = useRouter();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+  const [editingHire, setEditingHire] = useState<EditHire | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const maxDeptCost = useMemo(
     () => Math.max(...departmentBreakdown.map((d) => d.monthlyCost), 1),
@@ -88,6 +107,54 @@ export function TeamDetails({
     });
   }
 
+  function openEditModal(member: TeamMember) {
+    setEditingHire({
+      id: member.id,
+      departmentId: member.departmentId,
+      title: member.title,
+      count: member.count,
+      salary: member.salary,
+      startDate: member.startDate,
+      endDate: member.endDate,
+      benefitsRate: member.benefitsRate,
+    });
+  }
+
+  function openEditModalFromHire(hire: PlannedHire) {
+    setEditingHire({
+      id: hire.id,
+      departmentId: hire.departmentId,
+      title: hire.title,
+      count: hire.count,
+      salary: hire.salary,
+      startDate: hire.startDate,
+      endDate: hire.endDate,
+      benefitsRate: hire.benefitsRate,
+    });
+  }
+
+  async function handleInlineDelete(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/headcount/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete");
+      }
+      router.refresh();
+    } catch {
+      // Silently fail - user can retry
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
+
   if (departmentBreakdown.length === 0 && plannedHires.length === 0) {
     return (
       <div className="rounded-2xl bg-surface-0 border border-surface-200 p-16 text-center">
@@ -109,6 +176,17 @@ export function TeamDetails({
 
   return (
     <div className="space-y-8">
+      {/* Edit modal (rendered once, controlled by editingHire state) */}
+      {editingHire && (
+        <AddHireForm
+          scenarioId={scenarioId}
+          departments={departments}
+          editHire={editingHire}
+          open={!!editingHire}
+          onClose={() => setEditingHire(null)}
+        />
+      )}
+
       {/* Department Cost Distribution */}
       {departmentBreakdown.length > 0 && (
         <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
@@ -173,7 +251,7 @@ export function TeamDetails({
                           return (
                             <div
                               key={member.id}
-                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors"
+                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors group/row"
                             >
                               <div className="flex items-center gap-2.5">
                                 <div className={`h-2 w-2 rounded-full ${color.dot}`} />
@@ -191,6 +269,27 @@ export function TeamDetails({
                                 <span className="text-sm tabular-nums font-medium text-surface-700">
                                   {formatCurrency(monthlyCost)}/mo
                                 </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
+                                    className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                    title="Edit team member"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleInlineDelete(member.id); }}
+                                    disabled={deletingId === member.id}
+                                    className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                                      confirmDeleteId === member.id
+                                        ? "text-white bg-danger-600 hover:bg-danger-700"
+                                        : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
+                                    }`}
+                                    title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -267,7 +366,7 @@ export function TeamDetails({
                           return (
                             <div
                               key={hire.id}
-                              className="flex items-center justify-between px-4 py-2.5"
+                              className="flex items-center justify-between px-4 py-2.5 group/hire"
                             >
                               <div className="flex items-center gap-2">
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
@@ -286,6 +385,27 @@ export function TeamDetails({
                                 <span className="text-sm tabular-nums font-medium text-surface-700">
                                   +{formatCurrency(impact)}/mo
                                 </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover/hire:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openEditModalFromHire(hire); }}
+                                    className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                    title="Edit planned hire"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleInlineDelete(hire.id); }}
+                                    disabled={deletingId === hire.id}
+                                    className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                                      confirmDeleteId === hire.id
+                                        ? "text-white bg-danger-600 hover:bg-danger-700"
+                                        : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
+                                    }`}
+                                    title={confirmDeleteId === hire.id ? "Click again to confirm" : "Delete planned hire"}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );

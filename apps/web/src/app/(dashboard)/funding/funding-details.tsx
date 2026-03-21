@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { DollarSign, Calculator, TrendingUp, Clock } from "lucide-react";
+import { DollarSign, Calculator, TrendingUp, Clock, Pencil } from "lucide-react";
+import { AddFundingForm, type EditRound } from "./add-funding-form";
 
 interface FundingRound {
   id: string;
@@ -66,6 +67,9 @@ export function FundingDetails({
 }: FundingDetailsProps) {
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
+
+  // Edit modal state
+  const [editingRound, setEditingRound] = useState<EditRound | null>(null);
 
   // Dilution calculator state
   const [calcRaiseAmount, setCalcRaiseAmount] = useState(2_000_000);
@@ -230,7 +234,7 @@ export function FundingDetails({
 
           <div className="divide-y divide-surface-100">
             {completedRounds.map((round) => (
-              <div key={round.id} className="px-6 py-4 hover:bg-surface-50/50 transition-colors">
+              <div key={round.id} className="group px-6 py-4 hover:bg-surface-50/50 transition-colors">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -243,21 +247,30 @@ export function FundingDetails({
                       {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold tabular-nums text-surface-900">
-                      {formatCurrency(round.amount)}
-                    </p>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      {round.preMoneyValuation && (
-                        <span className="text-[10px] text-surface-400">
-                          {formatCurrency(round.preMoneyValuation)} pre
-                        </span>
-                      )}
-                      {round.dilutionPercent && (
-                        <span className="text-[10px] text-surface-400">
-                          {round.dilutionPercent.toFixed(1)}% dilution
-                        </span>
-                      )}
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => setEditingRound(round)}
+                      className="mt-0.5 rounded-lg p-1.5 text-surface-300 opacity-0 group-hover:opacity-100 hover:bg-surface-100 hover:text-surface-600 transition-all"
+                      aria-label={`Edit ${round.name}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="text-right">
+                      <p className="text-sm font-bold tabular-nums text-surface-900">
+                        {formatCurrency(round.amount)}
+                      </p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {round.preMoneyValuation && (
+                          <span className="text-[10px] text-surface-400">
+                            {formatCurrency(round.preMoneyValuation)} pre
+                          </span>
+                        )}
+                        {round.dilutionPercent && (
+                          <span className="text-[10px] text-surface-400">
+                            {round.dilutionPercent.toFixed(1)}% dilution
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -265,7 +278,7 @@ export function FundingDetails({
             ))}
 
             {projectedRounds.map((round) => (
-              <div key={round.id} className="px-6 py-4 bg-surface-50/30">
+              <div key={round.id} className="group px-6 py-4 bg-surface-50/30">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -282,15 +295,24 @@ export function FundingDetails({
                       {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium tabular-nums text-surface-500 italic">
-                      {formatCurrency(round.amount)}
-                    </p>
-                    {round.dilutionPercent && (
-                      <span className="text-[10px] text-surface-400 italic">
-                        ~{round.dilutionPercent.toFixed(0)}% dilution
-                      </span>
-                    )}
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => setEditingRound(round)}
+                      className="mt-0.5 rounded-lg p-1.5 text-surface-300 opacity-0 group-hover:opacity-100 hover:bg-surface-100 hover:text-surface-600 transition-all"
+                      aria-label={`Edit ${round.name}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="text-right">
+                      <p className="text-sm font-medium tabular-nums text-surface-500 italic">
+                        {formatCurrency(round.amount)}
+                      </p>
+                      {round.dilutionPercent && (
+                        <span className="text-[10px] text-surface-400 italic">
+                          ~{round.dilutionPercent.toFixed(0)}% dilution
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -331,6 +353,15 @@ export function FundingDetails({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit funding round modal */}
+      {editingRound && (
+        <AddFundingForm
+          editRound={editingRound}
+          open={!!editingRound}
+          onClose={() => setEditingRound(null)}
+        />
       )}
     </div>
   );

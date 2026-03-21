@@ -19,6 +19,7 @@ export interface StreamBreakdown {
   id: string;
   name: string;
   type: string;
+  parameters: Record<string, unknown>;
   currentRevenue: number;
   prevRevenue: number;
   changePercent: number;
@@ -104,6 +105,7 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
       id: stream.id,
       name: stream.name,
       type: stream.type,
+      parameters: (stream.parameters ?? {}) as Record<string, unknown>,
       currentRevenue: current,
       prevRevenue: prev,
       changePercent: change,

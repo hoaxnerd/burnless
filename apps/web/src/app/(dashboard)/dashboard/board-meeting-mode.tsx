@@ -229,8 +229,31 @@ export function BoardMeetingOverlay({
 }) {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const metrics = buildMetrics(data);
+
+  // Safely build metrics with fallback defaults
+  const safeData: BoardMeetingData = {
+    companyName: data?.companyName ?? "Company",
+    monthLabel: data?.monthLabel ?? "",
+    cash: Number.isFinite(data?.cash) ? data.cash : 0,
+    burn: Number.isFinite(data?.burn) ? data.burn : 0,
+    runway: Number.isFinite(data?.runway) ? data.runway : 0,
+    mrr: Number.isFinite(data?.mrr) ? data.mrr : 0,
+    mrrGrowth: Number.isFinite(data?.mrrGrowth) ? data.mrrGrowth : 0,
+    headcount: Number.isFinite(data?.headcount) ? data.headcount : 0,
+    headcountDelta: Number.isFinite(data?.headcountDelta) ? data.headcountDelta : 0,
+  };
+  const metrics = buildMetrics(safeData);
+
+  // Wait for client-side mount before rendering portal (avoids SSR/hydration mismatch)
+  useEffect(() => { setMounted(true); }, []);
+
+  // Lock body scroll while overlay is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -243,37 +266,40 @@ export function BoardMeetingOverlay({
 
   const handleCopy = useCallback(async () => {
     try {
-      const text = toClipboardText(data, metrics);
+      const text = toClipboardText(safeData, metrics);
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may not be available in non-HTTPS contexts
     }
-  }, [data, metrics]);
+  }, [safeData, metrics]);
 
   const handleExportPDF = useCallback(async () => {
     setExporting(true);
     try {
-      await generateBoardPDF(data, metrics);
+      await generateBoardPDF(safeData, metrics);
+    } catch {
+      // PDF generation may fail if jspdf can't load — silently degrade
     } finally {
       setExporting(false);
     }
-  }, [data, metrics]);
+  }, [safeData, metrics]);
 
   // Portal to document.body to escape any parent CSS transform containing blocks
   // (e.g. animate-page-enter uses transform which breaks position:fixed)
+  if (!mounted) return null;
   return createPortal(
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] animate-fade-in"
         onClick={onClose}
       />
       {/* Modal */}
       <div
         ref={overlayRef}
-        className="fixed inset-0 flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 flex items-center justify-center z-[60] p-4"
         role="dialog"
         aria-modal="true"
         aria-label="Board Meeting Mode"
@@ -285,9 +311,9 @@ export function BoardMeetingOverlay({
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-surface-100">
             <div>
-              <h2 className="text-lg font-bold text-surface-900">{data.companyName}</h2>
+              <h2 className="text-lg font-bold text-surface-900">{safeData.companyName}</h2>
               <p className="text-sm text-surface-400 mt-0.5">
-                Financial Snapshot &mdash; {data.monthLabel}
+                Financial Snapshot &mdash; {safeData.monthLabel}
               </p>
             </div>
             <button

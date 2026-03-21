@@ -80,21 +80,25 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
     ),
     members: members.map((m) => ({
       id: m.id,
+      departmentId: m.departmentId,
       title: m.title,
       count: m.count,
       salary: Number(m.salary),
       benefitsRate: Number(m.benefitsRate),
       startDate: m.startDate.toISOString(),
+      endDate: m.endDate ? m.endDate.toISOString() : null,
     })),
   }));
 
   const plannedHiresData = plannedHires.map((h) => ({
     id: h.id,
+    departmentId: h.departmentId,
     title: h.title,
     department: deptMap.get(h.departmentId) ?? "Other",
     salary: Number(h.salary),
     benefitsRate: Number(h.benefitsRate),
     startDate: h.startDate.toISOString(),
+    endDate: h.endDate ? h.endDate.toISOString() : null,
     count: h.count,
   }));
 
@@ -147,6 +151,8 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
         departmentBreakdown={departmentBreakdown}
         plannedHires={plannedHiresData}
         totalMonthlyCost={totalMonthlyCost}
+        scenarioId={scenarioId}
+        departments={departments.map((d) => ({ id: d.id, name: d.name }))}
       />
     </div>
   );

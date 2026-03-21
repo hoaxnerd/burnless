@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import {
   validateField,
@@ -22,14 +22,30 @@ const STREAM_TYPES = [
   { value: "usage_based", label: "Usage-Based" },
 ] as const;
 
-interface AddRevenueStreamFormProps {
-  scenarioId: string;
+export interface EditRevenueStream {
+  id: string;
+  name: string;
+  type: string;
+  parameters: Record<string, unknown>;
 }
 
-export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) {
+interface AddRevenueStreamFormProps {
+  scenarioId: string;
+  editStream?: EditRevenueStream;
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export function AddRevenueStreamForm({ scenarioId, editStream, open: controlledOpen, onClose }: AddRevenueStreamFormProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const isEditing = !!editStream;
+  const isControlled = controlledOpen !== undefined;
+
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -54,6 +70,53 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
   // Usage-based params
   const [pricePerUnit, setPricePerUnit] = useState("");
   const [expectedUnits, setExpectedUnits] = useState("");
+
+  // Pre-populate fields when editing
+  useEffect(() => {
+    if (editStream && open) {
+      setName(editStream.name);
+      setType(editStream.type);
+      const p = editStream.parameters;
+
+      // Reset all param fields first
+      setMonthlyPrice("");
+      setStartingCustomers("");
+      setNewCustomersPerMonth("");
+      setMonthlyChurnRate("");
+      setHourlyRate("");
+      setMonthlyHours("");
+      setUnitPrice("");
+      setMonthlyUnits("");
+      setPricePerUnit("");
+      setExpectedUnits("");
+
+      switch (editStream.type) {
+        case "subscription":
+          setMonthlyPrice(String(p.monthlyPrice ?? ""));
+          setStartingCustomers(String(p.startingCustomers ?? ""));
+          setNewCustomersPerMonth(String(p.newCustomersPerMonth ?? ""));
+          // Churn is stored as decimal (e.g. 0.025) but displayed as percentage (2.5)
+          setMonthlyChurnRate(p.monthlyChurnRate != null ? String(Number(p.monthlyChurnRate) * 100) : "");
+          break;
+        case "services":
+          setHourlyRate(String(p.hourlyRate ?? ""));
+          setMonthlyHours(String(p.monthlyHours ?? ""));
+          break;
+        case "one_time":
+          setUnitPrice(String(p.unitPrice ?? ""));
+          setMonthlyUnits(String(p.monthlyUnits ?? ""));
+          break;
+        case "usage_based":
+          setPricePerUnit(String(p.pricePerUnit ?? ""));
+          setExpectedUnits(String(p.expectedUnits ?? ""));
+          break;
+      }
+
+      setFieldErrors({});
+      setTouched({});
+      setError(null);
+    }
+  }, [editStream, open]);
 
   const PARAM_FIELDS: Record<string, string[]> = {
     subscription: ["monthlyPrice", "startingCustomers", "newCustomersPerMonth", "monthlyChurnRate"],
@@ -147,6 +210,61 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
     }
   }
 
+  function resetForm() {
+    setName("");
+    setType("subscription");
+    setMonthlyPrice("");
+    setStartingCustomers("");
+    setNewCustomersPerMonth("");
+    setMonthlyChurnRate("");
+    setHourlyRate("");
+    setMonthlyHours("");
+    setUnitPrice("");
+    setMonthlyUnits("");
+    setPricePerUnit("");
+    setExpectedUnits("");
+    setFieldErrors({});
+    setTouched({});
+    setError(null);
+  }
+
+  const handleClose = useCallback(() => {
+    if (isControlled) {
+      onClose?.();
+    } else {
+      setInternalOpen(false);
+    }
+    if (!isEditing) {
+      resetForm();
+    }
+  }, [isControlled, onClose, isEditing]);
+
+  async function handleDelete() {
+    if (!editStream) return;
+    if (!confirm("Are you sure you want to delete this revenue stream? This action cannot be undone.")) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/revenue-streams/${editStream.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete revenue stream");
+      }
+
+      handleClose();
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -188,35 +306,31 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
     setSaving(true);
 
     try {
-      const res = await fetch("/api/revenue-streams", {
-        method: "POST",
+      const url = isEditing
+        ? `/api/revenue-streams/${editStream.id}`
+        : "/api/revenue-streams";
+
+      const method = isEditing ? "PATCH" : "POST";
+
+      const body = isEditing
+        ? { name, type, parameters: buildParams() }
+        : { scenarioId, name, type, parameters: buildParams() };
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scenarioId,
-          name,
-          type,
-          parameters: buildParams(),
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to create revenue stream");
+        throw new Error(data.error ?? (isEditing ? "Failed to update revenue stream" : "Failed to create revenue stream"));
       }
 
-      // Reset
-      setName("");
-      setMonthlyPrice("");
-      setStartingCustomers("");
-      setNewCustomersPerMonth("");
-      setMonthlyChurnRate("");
-      setHourlyRate("");
-      setMonthlyHours("");
-      setUnitPrice("");
-      setMonthlyUnits("");
-      setPricePerUnit("");
-      setExpectedUnits("");
-      setOpen(false);
+      handleClose();
+      if (!isEditing) {
+        resetForm();
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -227,15 +341,18 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
-      >
-        <Plus className="h-4 w-4" />
-        Add Revenue Stream
-      </button>
+      {/* Only render the trigger button in add mode (uncontrolled) */}
+      {!isControlled && (
+        <button
+          onClick={() => setInternalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add Revenue Stream
+        </button>
+      )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add Revenue Stream">
+      <Modal open={open} onClose={handleClose} title={isEditing ? "Edit Revenue Stream" : "Add Revenue Stream"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
@@ -413,15 +530,31 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)}
-              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || !name || hasFieldErrors}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
-              {saving ? "Adding..." : "Add Stream"}
-            </button>
+          <div className="flex items-center justify-between gap-3 pt-2">
+            {isEditing ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting || saving}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-danger-300 px-3 py-2 text-sm font-medium text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex gap-3">
+              <button type="button" onClick={handleClose}
+                className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving || deleting || !name || hasFieldErrors}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
+                {saving ? (isEditing ? "Saving..." : "Adding...") : (isEditing ? "Save Changes" : "Add Stream")}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>

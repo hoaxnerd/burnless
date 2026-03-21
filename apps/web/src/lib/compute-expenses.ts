@@ -33,6 +33,9 @@ export interface ExpenseLineItem {
   subcategoryConfidence: number;
   categorySource: "rule" | "merchant_memory" | "manual";
   method: string;
+  parameters: Record<string, unknown>;
+  startDate: string;
+  endDate: string | null;
   currentAmount: number;
   prevAmount: number;
   changePercent: number;
@@ -169,6 +172,9 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategoryConfidence: confidence,
       categorySource: source,
       method: fLine.method,
+      parameters: (fLine.parameters ?? {}) as Record<string, unknown>,
+      startDate: fLine.startDate instanceof Date ? fLine.startDate.toISOString().slice(0, 10) : String(fLine.startDate),
+      endDate: fLine.endDate instanceof Date ? fLine.endDate.toISOString().slice(0, 10) : fLine.endDate ? String(fLine.endDate) : null,
       currentAmount,
       prevAmount,
       changePercent,
@@ -192,6 +198,9 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategoryConfidence: 1.0,
       categorySource: "manual",
       method: "fixed",
+      parameters: {},
+      startDate: periodStart.toISOString().slice(0, 10),
+      endDate: null,
       currentAmount: hcCurrent,
       prevAmount: hcPrev,
       changePercent: hcChange,
