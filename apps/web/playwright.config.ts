@@ -23,9 +23,29 @@ export default defineConfig({
   },
 
   projects: [
+    // Auth setup — registers & signs in a test user, saves session cookies.
+    // Only runs when DATABASE_URL is set (skipped internally otherwise).
+    {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+    },
+
+    // Default project — runs all non-auth tests (smoke, UI, mobile audit).
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /auth\.setup\.ts/,
+    },
+
+    // Authenticated project — tests that need a logged-in session.
+    // Depends on "setup" so session cookies exist before tests run.
+    // Tests that use `test.use({ storageState: "e2e/.auth/user.json" })`
+    // get the pre-authenticated context automatically.
+    {
+      name: "authenticated",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+      testMatch: /critical-user-flows\.spec\.ts/,
     },
   ],
 

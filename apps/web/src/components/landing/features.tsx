@@ -82,12 +82,11 @@ export function FeatureBento() {
             return (
               <div
                 key={feature.title}
-                className={`${feature.span} group relative rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm p-6 sm:p-8 transition-all duration-300 hover:border-surface-200/50 hover:scale-[1.02] hover:shadow-xl`}
+                className={`${feature.span} group relative rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm p-6 sm:p-8 transition-all duration-500 hover:border-surface-200/50 hover:scale-[1.02] hover:shadow-xl ${
+                  inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
                 style={{
-                  transition: "all 0.3s var(--ease-smooth)",
-                  opacity: inView ? 1 : 0,
-                  transform: inView ? "translateY(0)" : "translateY(30px)",
-                  transitionDelay: `${i * 0.08}s`,
+                  transitionDelay: inView ? `${i * 0.08}s` : "0s",
                 }}
               >
                 {/* Gradient background on hover */}

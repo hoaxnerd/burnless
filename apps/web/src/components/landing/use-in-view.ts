@@ -10,6 +10,8 @@ export function useInView(threshold = 0.15) {
     const el = ref.current;
     if (!el) return;
 
+    const reveal = () => setInView(true);
+
     // If the element is already in the viewport on mount, reveal immediately
     const rect = el.getBoundingClientRect();
     if (
@@ -18,22 +20,30 @@ export function useInView(threshold = 0.15) {
       rect.left < window.innerWidth &&
       rect.right > 0
     ) {
-      setInView(true);
+      reveal();
       return;
     }
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          setInView(true);
+          reveal();
           observer.unobserve(el);
         }
       },
-      { threshold, rootMargin: "50px" }
+      { threshold, rootMargin: "100px 0px" }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+
+    // Safety fallback: reveal after 3s if observer hasn't fired
+    // Prevents permanently hidden content from broken observer
+    const fallback = setTimeout(reveal, 3000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
   }, [threshold]);
 
   return { ref, inView };
