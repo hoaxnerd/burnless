@@ -13,7 +13,7 @@ import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
-import { executeToolCall } from "@/lib/ai-tool-executor";
+import { executeToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
 import { initAiUsageTracking } from "@/lib/ai-usage-tracker";
