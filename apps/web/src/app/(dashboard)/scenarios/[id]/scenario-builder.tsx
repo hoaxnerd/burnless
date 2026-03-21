@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { ChartCard } from "@/components/ui/chart-card";
+import { generateRunwaySummaryPDF, downloadPDF } from "@/lib/pdf-export";
 
 interface ScenarioData {
   id: string;
@@ -229,18 +230,58 @@ export function ScenarioBuilder({
   );
 
   // Register keyboard listener
-  useState(() => {
-    if (typeof window !== "undefined") {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-  });
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   const projectionMonths = 24;
   const { series, runwayMonth } = useMemo(
     () => projectCashFlow(params, projectionMonths),
     [params],
   );
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPDF = useCallback(async () => {
+    setExporting(true);
+    try {
+      const grossBurn = params.monthlyBurn + params.headcount * params.monthlyHireCost;
+      const netBurn = grossBurn - params.monthlyRevenue;
+      const now = new Date();
+      const cashPosition = Array.from({ length: 12 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        let cash = params.cashOnHand;
+        let rev = params.monthlyRevenue;
+        let burn = grossBurn;
+        for (let m = 0; m < i; m++) {
+          cash -= burn - rev;
+          rev *= 1 + params.revenueGrowthRate / 100;
+          burn *= 1 + params.burnGrowthRate / 100;
+        }
+        return { month: monthKey, value: Math.round(cash) };
+      });
+
+      const doc = await generateRunwaySummaryPDF(
+        {
+          startingCash: params.cashOnHand,
+          netBurnRate: netBurn,
+          grossBurnRate: grossBurn,
+          runwayMonths: runwayMonth ?? 120,
+          cashPosition,
+        },
+        {
+          title: `Runway Summary — ${scenario.name}`,
+          companyName: "Burnless",
+          scenarioName: scenario.name,
+        },
+      );
+      downloadPDF(doc, `runway-${scenario.name.toLowerCase().replace(/\s+/g, "-")}`);
+    } finally {
+      setExporting(false);
+    }
+  }, [params, scenario.name, runwayMonth]);
 
   const lastMonth = series[series.length - 1];
   const breakEvenMonth = series.findIndex((s) => s.revenue >= s.burn);
@@ -308,13 +349,13 @@ export function ScenarioBuilder({
             Reset
           </button>
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 rounded-xl border border-surface-200 px-3 py-2 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="flex items-center gap-1.5 rounded-xl border border-surface-200 px-3 py-2 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Export as PDF"
-            data-print-visible
           >
             <Download className="h-3.5 w-3.5" />
-            Export PDF
+            {exporting ? "Exporting..." : "Export PDF"}
           </button>
           {isActive ? (
             <button
@@ -535,55 +576,6 @@ export function ScenarioBuilder({
         )}
       </div>
 
-      {/* Print-only summary — visible only when exported */}
-      <div className="hidden print:block print:break-before-page">
-        <div className="border border-gray-300 rounded-lg p-6 mt-8">
-          <h2 className="text-base font-bold text-gray-900 mb-4">
-            Scenario Summary — {scenario.name}
-          </h2>
-          <p className="text-xs text-gray-500 mb-4">
-            Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-          </p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 text-xs font-medium text-gray-500">Parameter</th>
-                <th className="text-right py-2 text-xs font-medium text-gray-500">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(paramLabels) as Array<keyof WhatIfParams>).map((key) => (
-                <tr key={key} className="border-b border-gray-100">
-                  <td className="py-2 text-xs text-gray-700">{paramLabels[key]}</td>
-                  <td className="py-2 text-xs font-semibold text-gray-900 text-right">
-                    {paramFormats[key](params[key])}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-4 grid grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-500">Runway</p>
-              <p className="text-sm font-bold">{runwayMonth ? `${runwayMonth} months` : "120+ months"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Net Burn</p>
-              <p className="text-sm font-bold">
-                {formatCurrency(params.monthlyBurn + params.headcount * params.monthlyHireCost - params.monthlyRevenue)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Break Even</p>
-              <p className="text-sm font-bold">{breakEvenMonth >= 0 ? `Month ${breakEvenMonth + 1}` : "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">End Cash (24mo)</p>
-              <p className="text-sm font-bold">{formatCurrency(Math.max(lastMonth?.cash ?? 0, 0))}</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
