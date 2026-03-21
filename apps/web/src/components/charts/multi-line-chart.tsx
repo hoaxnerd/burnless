@@ -38,7 +38,7 @@ export function MultiLineChart({
           <div key={line.dataKey} className="flex items-center gap-1.5">
             <div className="relative flex items-center">
               {line.dashed ? (
-                <svg width="14" height="3" className="block">
+                <svg width="14" height="3" className="block" aria-hidden="true">
                   <line
                     x1="0"
                     y1="1.5"

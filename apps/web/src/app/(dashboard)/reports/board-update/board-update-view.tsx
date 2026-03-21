@@ -366,9 +366,9 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200 bg-surface-50">
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Line Item</th>
+                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Line Item</th>
                 {d.pnlSummary.revenue.slice(-6).map((pt) => (
-                  <th key={pt.month} className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">
+                  <th key={pt.month} scope="col" className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">
                     {formatShortMonth(pt.month)}
                   </th>
                 ))}
@@ -421,6 +421,7 @@ function PnlRow({
             bold ? "font-semibold text-surface-900" : "text-surface-700"
           } ${highlight && pt.value < 0 ? "text-red-600" : highlight && pt.value > 0 ? "text-green-600" : ""}`}
         >
+          {highlight && pt.value !== 0 && <span className="sr-only">{pt.value > 0 ? "Profit" : "Loss"}:</span>}
           {formatCompactCurrency(pt.value)}
         </td>
       ))}

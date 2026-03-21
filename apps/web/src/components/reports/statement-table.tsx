@@ -32,11 +32,11 @@ export function StatementTable({ sections, title }: StatementTableProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b-2 border-surface-300">
-            <th className="text-left px-3 py-2 text-xs font-semibold text-surface-700 uppercase tracking-wider min-w-[200px]">
+            <th scope="col" className="text-left px-3 py-2 text-xs font-semibold text-surface-700 uppercase tracking-wider min-w-[200px]">
               {title}
             </th>
             {months.map((m) => (
-              <th key={m} className="text-right px-3 py-2 text-xs font-medium text-surface-500 min-w-[90px]">
+              <th key={m} scope="col" className="text-right px-3 py-2 text-xs font-medium text-surface-500 min-w-[90px]">
                 {formatMonthYear(m)}
               </th>
             ))}
@@ -81,7 +81,9 @@ function StatementSection({
             {hasChildren && (
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-4 h-4 flex items-center justify-center text-surface-400 hover:text-surface-700"
+                className="min-w-[44px] min-h-[44px] -m-2.5 flex items-center justify-center text-surface-400 hover:text-surface-700"
+                aria-expanded={expanded}
+                aria-label={`${expanded ? "Collapse" : "Expand"} ${item.name}`}
               >
                 <span className="text-xs">{expanded ? "\u25BC" : "\u25B6"}</span>
               </button>

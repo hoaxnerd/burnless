@@ -81,12 +81,12 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200">
-                <th className="text-left px-3 py-2 text-xs font-medium text-surface-500 uppercase">Account</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-surface-500 uppercase">Category</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Budget (YTD)</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Actual (YTD)</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Variance</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Var %</th>
+                <th scope="col" className="text-left px-3 py-2 text-xs font-medium text-surface-500 uppercase">Account</th>
+                <th scope="col" className="text-left px-3 py-2 text-xs font-medium text-surface-500 uppercase">Category</th>
+                <th scope="col" className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Budget (YTD)</th>
+                <th scope="col" className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Actual (YTD)</th>
+                <th scope="col" className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Variance</th>
+                <th scope="col" className="text-right px-3 py-2 text-xs font-medium text-surface-500 uppercase">Var %</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-100">
@@ -104,6 +104,7 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
                     <td className="px-3 py-2 text-right tabular-nums">{formatCompactCurrency(budgetTotal)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCompactCurrency(actualTotal)}</td>
                     <td className={`px-3 py-2 text-right tabular-nums font-medium ${isMostlyFavorable ? "text-green-600" : "text-red-600"}`}>
+                      <span className="sr-only">{isMostlyFavorable ? "Favorable" : "Unfavorable"}:</span>
                       {formatCompactCurrency(varianceTotal)}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums ${isMostlyFavorable ? "text-green-600" : "text-red-600"}`}>

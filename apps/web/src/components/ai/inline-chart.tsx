@@ -76,7 +76,7 @@ function RevenueForecastChart({ data }: { data: Record<string, unknown> }) {
         <span className="text-[10px] font-medium text-surface-500 uppercase tracking-wider">Revenue Forecast</span>
         <span className="text-[10px] text-surface-400">{method} &middot; {(growth * 100).toFixed(1)}%/mo avg</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label="Revenue forecast chart with confidence interval">
         {/* CI band */}
         {ciBand && <path d={ciBand} fill="rgba(59, 130, 246, 0.08)" stroke="none" />}
         {/* Projected line */}

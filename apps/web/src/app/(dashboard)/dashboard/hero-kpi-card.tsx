@@ -41,6 +41,7 @@ function Sparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       className="overflow-visible"
+      aria-hidden="true"
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

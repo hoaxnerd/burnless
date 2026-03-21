@@ -264,15 +264,16 @@ export function ComparisonView({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-surface-50">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 sticky left-0 bg-surface-50">
+                    <th scope="col" className="text-left px-4 py-3 text-xs font-medium text-surface-500 sticky left-0 bg-surface-50">
                       Metric
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500">
+                    <th scope="col" className="text-left px-4 py-3 text-xs font-medium text-surface-500">
                       Scenario
                     </th>
                     {data.lines[0]?.baseValues.map((v) => (
                       <th
                         key={v.month}
+                        scope="col"
                         className="text-right px-3 py-3 text-xs font-medium text-surface-500 whitespace-nowrap"
                       >
                         {formatMonth(v.month)}
@@ -360,6 +361,7 @@ function ComparisonRow({
                   : "text-red-600"
               }`}
             >
+              <span className="sr-only">{positive ? "Favorable" : "Unfavorable"}:</span>
               {formatDelta(d.value, isCurrency)}
               {pct !== 0 && (
                 <span className="ml-1 text-[10px] opacity-70">
@@ -405,6 +407,7 @@ function DeltaBadge({
       }`}
     >
       <Icon className="h-3 w-3" />
+      <span className="sr-only">{isGood ? "Favorable" : "Unfavorable"}:</span>
       {formatDelta(value, isCurrency)}
       {percent !== 0 && (
         <span className="opacity-70">
@@ -490,7 +493,7 @@ function ComparisonChart({
           </span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${line.name} comparison chart: ${baseName} vs ${compareName}`}>
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
           const yPos = pad.top + (1 - pct) * chartH;

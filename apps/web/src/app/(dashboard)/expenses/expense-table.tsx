@@ -181,8 +181,8 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-surface-200 bg-surface-50">
-              <th className="w-10 px-4 py-3">
-                <button onClick={toggleAll} className="flex items-center justify-center">
+              <th scope="col" className="w-10 px-4 py-3">
+                <button onClick={toggleAll} aria-label="Select all expenses" className="flex items-center justify-center">
                   <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
                     selected.size === filtered.length && filtered.length > 0
                       ? "bg-brand-600 border-brand-600"
@@ -195,6 +195,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 </button>
               </th>
               <th
+                scope="col"
                 className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase cursor-pointer select-none hover:text-surface-700 transition-colors"
                 onClick={() => handleSort("accountName")}
               >
@@ -203,6 +204,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 </span>
               </th>
               <th
+                scope="col"
                 className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase cursor-pointer select-none hover:text-surface-700 transition-colors"
                 onClick={() => handleSort("subcategory")}
               >
@@ -211,6 +213,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 </span>
               </th>
               <th
+                scope="col"
                 className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase cursor-pointer select-none hover:text-surface-700 transition-colors"
                 onClick={() => handleSort("currentAmount")}
               >
@@ -219,6 +222,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 </span>
               </th>
               <th
+                scope="col"
                 className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase cursor-pointer select-none hover:text-surface-700 transition-colors"
                 onClick={() => handleSort("changePercent")}
               >
@@ -226,7 +230,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                   Trend {sortIcon("changePercent")}
                 </span>
               </th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-surface-500 uppercase">
+              <th scope="col" className="text-center px-4 py-3 text-xs font-medium text-surface-500 uppercase">
                 Flags
               </th>
             </tr>
@@ -249,6 +253,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
               filtered.map((item) => {
                 const isSelected = selected.has(item.id);
                 const changeIcon = item.changePercent > 0.01 ? "\u2191" : item.changePercent < -0.01 ? "\u2193" : "\u2192";
+                const changeLabel = item.changePercent > 0.01 ? "Increasing" : item.changePercent < -0.01 ? "Decreasing" : "Stable";
                 const changeColor = item.changePercent > 0.01 ? "text-red-600" : item.changePercent < -0.01 ? "text-green-600" : "text-surface-500";
 
                 return (
@@ -257,7 +262,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""}`}
                   >
                     <td className="w-10 px-4 py-3">
-                      <button onClick={() => toggleSelect(item.id)} className="flex items-center justify-center">
+                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${item.accountName}`} className="flex items-center justify-center">
                         <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
                           isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
                         }`}>
@@ -340,6 +345,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
+                        <span className="sr-only">{changeLabel}</span>
                         {changeIcon} {Math.abs(item.changePercent * 100).toFixed(0)}%
                       </span>
                     </td>

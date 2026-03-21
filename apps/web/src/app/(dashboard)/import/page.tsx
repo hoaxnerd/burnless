@@ -526,12 +526,12 @@ export default function ImportPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-50 dark:bg-surface-800">
                   <tr className="border-b border-surface-200 dark:border-surface-700">
-                    <th className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">File</th>
-                    <th className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Account</th>
-                    <th className="text-center py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Imported</th>
-                    <th className="text-center py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Status</th>
-                    <th className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Date</th>
-                    <th className="text-right py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Actions</th>
+                    <th scope="col" className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">File</th>
+                    <th scope="col" className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Account</th>
+                    <th scope="col" className="text-center py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Imported</th>
+                    <th scope="col" className="text-center py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Status</th>
+                    <th scope="col" className="text-left py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Date</th>
+                    <th scope="col" className="text-right py-2 px-4 font-medium text-surface-600 dark:text-surface-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -594,7 +594,7 @@ export default function ImportPage() {
             <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-50">
               Bank & Payment Connections
             </h3>
-            <button onClick={() => setShowBankSync(false)} className="text-surface-400 hover:text-surface-600">
+            <button onClick={() => setShowBankSync(false)} aria-label="Close bank connections panel" className="min-w-[44px] min-h-[44px] -m-2 flex items-center justify-center text-surface-400 hover:text-surface-600">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -662,7 +662,7 @@ export default function ImportPage() {
         <div className="mb-6 flex items-center gap-2 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950 dark:text-danger-300">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           {error}
-          <button onClick={() => setError(null)} className="ml-auto">
+          <button onClick={() => setError(null)} aria-label="Dismiss error" className="ml-auto min-w-[44px] min-h-[44px] -m-2 flex items-center justify-center">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -824,11 +824,11 @@ export default function ImportPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-surface-200 dark:border-surface-700">
-                      <th className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Date</th>
-                      <th className="text-right py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Amount</th>
-                      <th className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Description</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Date</th>
+                      <th scope="col" className="text-right py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Amount</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Description</th>
                       {mapping.category && (
-                        <th className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Category</th>
+                        <th scope="col" className="text-left py-2 px-3 font-medium text-surface-600 dark:text-surface-400">Category</th>
                       )}
                     </tr>
                   </thead>
@@ -911,18 +911,18 @@ export default function ImportPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-50 dark:bg-surface-800 z-10">
                   <tr className="border-b border-surface-200 dark:border-surface-700">
-                    <th className="w-8 py-2.5 px-3"></th>
-                    <th className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Status</th>
-                    <th className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Date</th>
-                    <th className="text-right py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Amount</th>
-                    <th className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Description</th>
-                    <th className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">
+                    <th scope="col" className="w-8 py-2.5 px-3"><span className="sr-only">Select</span></th>
+                    <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Status</th>
+                    <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Date</th>
+                    <th scope="col" className="text-right py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Amount</th>
+                    <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Description</th>
+                    <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">
                       <div className="flex items-center gap-1">
                         <Sparkles className="h-3 w-3 text-brand-500" />
                         AI Category
                       </div>
                     </th>
-                    <th className="w-12 py-2.5 px-3"></th>
+                    <th scope="col" className="w-12 py-2.5 px-3"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>

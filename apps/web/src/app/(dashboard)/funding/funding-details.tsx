@@ -162,7 +162,7 @@ export function FundingDetails({
 
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <svg width={donutSize} height={donutSize}>
+              <svg width={donutSize} height={donutSize} aria-hidden="true">
                 {(() => {
                   let cumAngle = 0;
                   return capTableSegments.map((seg, i) => {

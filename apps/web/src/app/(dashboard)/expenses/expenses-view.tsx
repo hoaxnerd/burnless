@@ -202,11 +202,11 @@ export function ExpensesView({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-surface-200 bg-surface-50">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Month</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Budget</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Forecast</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Variance</th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">% Diff</th>
+                    <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Month</th>
+                    <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Budget</th>
+                    <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Forecast</th>
+                    <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Variance</th>
+                    <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">% Diff</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -220,6 +220,7 @@ export function ExpensesView({
                         <td className="px-6 py-3 text-right text-sm text-surface-700">{formatCompactCurrency(row.budget)}</td>
                         <td className="px-6 py-3 text-right text-sm text-surface-700">{formatCompactCurrency(row.actual)}</td>
                         <td className={`px-6 py-3 text-right text-sm font-medium ${isGood ? "text-green-600" : "text-red-600"}`}>
+                          <span className="sr-only">{isGood ? "Under budget" : "Over budget"}:</span>
                           {isGood ? "+" : ""}{formatCompactCurrency(variance)}
                         </td>
                         <td className={`px-6 py-3 text-right text-sm font-medium ${isGood ? "text-green-600" : "text-red-600"}`}>

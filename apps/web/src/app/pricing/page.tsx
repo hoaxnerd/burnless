@@ -327,10 +327,11 @@ export default function PricingPage() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-surface-200/30">
-                    <th className="py-4 pr-4 text-sm font-medium text-surface-500 w-1/3">Feature</th>
+                    <th scope="col" className="py-4 pr-4 text-sm font-medium text-surface-500 w-1/3">Feature</th>
                     {tiers.map((tier) => (
                       <th
                         key={tier.name}
+                        scope="col"
                         className={`py-4 px-4 text-sm font-semibold text-center ${
                           tier.highlight ? "text-brand-500" : "text-surface-900"
                         }`}

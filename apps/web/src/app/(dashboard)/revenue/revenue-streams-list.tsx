@@ -80,9 +80,9 @@ export function RevenueStreamsList({
           <table className="w-full">
             <thead>
               <tr className="border-b border-surface-200 bg-surface-50">
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Stream</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Type</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Parameters</th>
+                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Stream</th>
+                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Type</th>
+                <th scope="col" className="text-right px-6 py-3 text-xs font-medium text-surface-500 uppercase">Parameters</th>
               </tr>
             </thead>
             <tbody>

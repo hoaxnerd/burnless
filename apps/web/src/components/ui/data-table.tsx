@@ -71,6 +71,7 @@ export function DataTable<T>({
               return (
                 <th
                   key={col.key}
+                  scope="col"
                   className={`${cellPadding} text-xs font-medium text-surface-500 uppercase tracking-wider ${
                     col.align === "right"
                       ? "text-right"
