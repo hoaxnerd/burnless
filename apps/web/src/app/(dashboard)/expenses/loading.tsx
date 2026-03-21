@@ -5,6 +5,7 @@ function Sk({ className }: { className: string }) {
 export default function ExpensesLoading() {
   return (
     <div className="animate-fade-in" role="status" aria-label="Loading expenses">
+      {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
           <Sk className="h-7 w-32" />
@@ -13,6 +14,7 @@ export default function ExpensesLoading() {
         <Sk className="h-10 w-36 rounded-xl" />
       </div>
 
+      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className={`rounded-xl border border-surface-200 bg-surface-0 p-6 animate-slide-up stagger-${i}`}>
@@ -26,6 +28,7 @@ export default function ExpensesLoading() {
         ))}
       </div>
 
+      {/* Insights skeleton */}
       <div className="space-y-3 mb-6">
         {[1, 2].map((i) => (
           <div key={i} className={`rounded-xl border border-surface-200 bg-surface-50/50 p-4 animate-slide-up stagger-${i + 4}`}>
@@ -40,8 +43,10 @@ export default function ExpensesLoading() {
         ))}
       </div>
 
+      {/* View toggle */}
       <Sk className="h-9 w-44 rounded-lg mb-6" />
 
+      {/* Charts section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 rounded-xl border border-surface-200 bg-surface-0 p-6">
           <Sk className="h-5 w-36 mb-1" />
@@ -67,6 +72,7 @@ export default function ExpensesLoading() {
         </div>
       </div>
 
+      {/* Table skeleton */}
       <div className="rounded-xl border border-surface-200 bg-surface-0 overflow-hidden">
         <div className="px-6 py-4 border-b border-surface-200 flex items-center gap-3">
           <Sk className="h-5 w-28" />

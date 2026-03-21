@@ -4,7 +4,12 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+
+function formatCurrency(value: number): string {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
+  return `$${value.toFixed(0)}`;
+}
 
 export default async function ExpensesPage({
   searchParams,
@@ -13,10 +18,24 @@ export default async function ExpensesPage({
 }) {
   const params = await searchParams;
   const company = await getCompany();
-  if (!company) return <SetupPrompt context="tracking expenses" />;
+  if (!company) {
+    return (
+      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
+        <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
+        <p className="text-sm text-surface-500">Complete onboarding to start tracking expenses.</p>
+      </div>
+    );
+  }
 
   const scenario = await getActiveScenario(company.id, params.scenarioId);
-  if (!scenario) return <ScenarioPrompt context="track expenses" />;
+  if (!scenario) {
+    return (
+      <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
+        <h3 className="text-lg font-semibold text-surface-900 mb-2">Create a scenario first</h3>
+        <p className="text-sm text-surface-500">You need a financial scenario to track expenses.</p>
+      </div>
+    );
+  }
 
   const [data, accounts, expenseDetails] = await Promise.all([
     computeDashboardData(company.id, scenario.id),
@@ -27,6 +46,7 @@ export default async function ExpensesPage({
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
   const totalExpenseAmount = totalExpenses.get(currentMonth) ?? 0;
   const opexAmount = totalOpex.get(currentMonth) ?? 0;
+  const cogsAmount = totalCogs.get(currentMonth) ?? 0;
   const personnelCost = data.headcountCostSeries.get(currentMonth) ?? 0;
 
   const now = new Date();
@@ -34,6 +54,7 @@ export default async function ExpensesPage({
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
+  // Budget vs actuals data
   const budgetScenario = await getBudgetScenario(company.id);
   let budgetTimeline: { month: string; value: number }[] | null = null;
   if (budgetScenario && budgetScenario.id !== scenario.id) {
@@ -41,17 +62,19 @@ export default async function ExpensesPage({
     budgetTimeline = seriesToArray(budgetData.totalExpenses);
   }
 
+  // Summary metrics
   const summaryMetrics = {
     totalMonthly: totalExpenseAmount,
-    changePercent: changePercent !== null ? Number(changePercent) : null,
+    changePercent: changePercent ? Number(changePercent) : null,
     personnelCost,
     personnelPercent: totalExpenseAmount > 0 ? (personnelCost / totalExpenseAmount * 100) : 0,
     opexAmount: Math.max(0, opexAmount - personnelCost),
-    cogsAmount: totalCogs.get(currentMonth) ?? 0,
+    cogsAmount,
     anomalyCount: expenseDetails.anomalyCount,
     recurringCount: expenseDetails.recurringCount,
   };
 
+  // Timeline data
   const timeline = seriesToArray(totalExpenses);
   const opexTimeline = seriesToArray(totalOpex);
   const cogsTimeline = seriesToArray(totalCogs);
