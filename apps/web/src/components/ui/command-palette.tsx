@@ -16,6 +16,7 @@ import {
   Sparkles,
   Search,
   ArrowRight,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,27 +31,53 @@ interface CommandItem {
   action?: () => void;
   keywords?: string[];
   section: string;
+  category: "page" | "action" | "data" | "ai";
 }
+
+type CategoryFilter = "all" | "page" | "action" | "data" | "ai";
+
+const CATEGORY_LABELS: Record<CategoryFilter, string> = {
+  all: "All",
+  page: "Pages",
+  action: "Actions",
+  data: "Data",
+  ai: "AI",
+};
+
+const RECENT_SEARCHES_KEY = "burnless:recent-searches";
+const MAX_RECENT = 5;
+
+const SUGGESTED_QUERIES = [
+  "How much runway do we have?",
+  "Show monthly burn rate",
+  "Compare scenarios",
+  "Export financial report",
+];
 
 /* ── Commands registry ─────────────────────────────────────────────────────── */
 
 function buildCommands(onToggleAI?: () => void): CommandItem[] {
   return [
-    // Navigation
-    { id: "nav-dashboard", label: "Dashboard", description: "Financial overview", icon: LayoutDashboard, href: "/dashboard", keywords: ["home", "overview", "kpi"], section: "Navigate" },
-    { id: "nav-expenses", label: "Expenses", description: "Track spending", icon: Receipt, href: "/expenses", keywords: ["costs", "spending", "burn"], section: "Navigate" },
-    { id: "nav-revenue", label: "Revenue", description: "Revenue streams & MRR", icon: TrendingUp, href: "/revenue", keywords: ["mrr", "arr", "income", "sales"], section: "Navigate" },
-    { id: "nav-funding", label: "Funding", description: "Rounds & cap table", icon: Landmark, href: "/funding", keywords: ["raise", "investors", "cap table", "dilution"], section: "Navigate" },
-    { id: "nav-team", label: "Team", description: "Headcount & hiring", icon: Users, href: "/team", keywords: ["employees", "hiring", "org", "people"], section: "Navigate" },
-    { id: "nav-scenarios", label: "Scenarios", description: "What-if modeling", icon: GitBranch, href: "/scenarios", keywords: ["what if", "model", "forecast"], section: "Navigate" },
-    { id: "nav-reports", label: "Reports", description: "Financial statements", icon: FileBarChart, href: "/reports", keywords: ["p&l", "cash flow", "balance sheet", "runway"], section: "Navigate" },
-    { id: "nav-import", label: "Import Data", description: "Upload CSV files", icon: Upload, href: "/import", keywords: ["csv", "upload", "data"], section: "Navigate" },
-    { id: "nav-data-room", label: "Data Room", description: "Investor-ready snapshots", icon: FolderOpen, href: "/data-room", keywords: ["investors", "board", "share"], section: "Navigate" },
-    { id: "nav-settings", label: "Settings", description: "App preferences", icon: Settings, href: "/settings", keywords: ["config", "preferences", "account"], section: "Navigate" },
+    // Pages
+    { id: "nav-dashboard", label: "Dashboard", description: "Financial overview & KPIs", icon: LayoutDashboard, href: "/dashboard", keywords: ["home", "overview", "kpi"], section: "Pages", category: "page" },
+    { id: "nav-expenses", label: "Expenses", description: "Track spending & burn", icon: Receipt, href: "/expenses", keywords: ["costs", "spending", "burn"], section: "Pages", category: "page" },
+    { id: "nav-revenue", label: "Revenue", description: "Revenue streams & MRR", icon: TrendingUp, href: "/revenue", keywords: ["mrr", "arr", "income", "sales"], section: "Pages", category: "page" },
+    { id: "nav-funding", label: "Funding", description: "Rounds & cap table", icon: Landmark, href: "/funding", keywords: ["raise", "investors", "cap table", "dilution"], section: "Pages", category: "page" },
+    { id: "nav-team", label: "Team", description: "Headcount & hiring plan", icon: Users, href: "/team", keywords: ["employees", "hiring", "org", "people"], section: "Pages", category: "page" },
+    { id: "nav-scenarios", label: "Scenarios", description: "What-if modeling", icon: GitBranch, href: "/scenarios", keywords: ["what if", "model", "forecast"], section: "Pages", category: "page" },
+    { id: "nav-reports", label: "Reports", description: "Financial statements", icon: FileBarChart, href: "/reports", keywords: ["p&l", "cash flow", "balance sheet", "runway"], section: "Pages", category: "page" },
+    { id: "nav-data-room", label: "Data Room", description: "Investor-ready snapshots", icon: FolderOpen, href: "/data-room", keywords: ["investors", "board", "share"], section: "Pages", category: "page" },
+    { id: "nav-import", label: "Import Data", description: "Upload CSV files", icon: Upload, href: "/import", keywords: ["csv", "upload", "data"], section: "Pages", category: "page" },
+    { id: "nav-settings", label: "Settings", description: "App preferences", icon: Settings, href: "/settings", keywords: ["config", "preferences", "account"], section: "Pages", category: "page" },
 
     // Actions
-    { id: "act-new-scenario", label: "New Scenario", description: "Create a what-if scenario", icon: GitBranch, href: "/scenarios/new", keywords: ["create", "new", "what if"], section: "Actions" },
-    { id: "act-import-csv", label: "Import CSV", description: "Upload expense data", icon: Upload, href: "/import", keywords: ["upload", "csv"], section: "Actions" },
+    { id: "act-new-scenario", label: "New Scenario", description: "Create a what-if scenario", icon: GitBranch, href: "/scenarios/new", keywords: ["create", "new", "what if"], section: "Actions", category: "action" },
+    { id: "act-import-csv", label: "Import CSV", description: "Upload expense data", icon: Upload, href: "/import", keywords: ["upload", "csv"], section: "Actions", category: "action" },
+    { id: "act-generate-report", label: "Generate Report", description: "Create financial report", icon: FileBarChart, href: "/reports", keywords: ["report", "export", "pdf"], section: "Actions", category: "action" },
+
+    // Data
+    { id: "data-expenses", label: "Expense Data", description: "View all expense entries", icon: Receipt, href: "/expenses", keywords: ["costs", "entries"], section: "Data", category: "data" },
+    { id: "data-revenue", label: "Revenue Data", description: "View revenue streams", icon: TrendingUp, href: "/revenue", keywords: ["income", "mrr"], section: "Data", category: "data" },
 
     // AI
     ...(onToggleAI
@@ -61,12 +88,48 @@ function buildCommands(onToggleAI?: () => void): CommandItem[] {
             description: "Open AI companion",
             icon: Sparkles,
             action: onToggleAI,
-            keywords: ["ai", "chat", "assistant", "help"],
+            keywords: ["ai", "chat", "assistant", "help", "intelligence"],
             section: "AI",
+            category: "ai" as const,
           } satisfies CommandItem,
         ]
       : []),
   ];
+}
+
+/* ── Recent searches helpers ───────────────────────────────────────────────── */
+
+function getRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearch(query: string) {
+  if (typeof window === "undefined" || !query.trim()) return;
+  try {
+    const recent = getRecentSearches().filter((s) => s !== query);
+    recent.unshift(query);
+    localStorage.setItem(
+      RECENT_SEARCHES_KEY,
+      JSON.stringify(recent.slice(0, MAX_RECENT)),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearRecentSearches() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
@@ -85,19 +148,32 @@ export function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const commands = useMemo(() => buildCommands(onToggleAI), [onToggleAI]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return commands;
-    const q = query.toLowerCase();
-    return commands.filter(
-      (cmd) =>
-        cmd.label.toLowerCase().includes(q) ||
-        cmd.description?.toLowerCase().includes(q) ||
-        cmd.keywords?.some((k) => k.includes(q)),
-    );
-  }, [query, commands]);
+    let items = commands;
+
+    // Apply category filter
+    if (categoryFilter !== "all") {
+      items = items.filter((cmd) => cmd.category === categoryFilter);
+    }
+
+    // Apply text search
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      items = items.filter(
+        (cmd) =>
+          cmd.label.toLowerCase().includes(q) ||
+          cmd.description?.toLowerCase().includes(q) ||
+          cmd.keywords?.some((k) => k.includes(q)),
+      );
+    }
+
+    return items;
+  }, [query, commands, categoryFilter]);
 
   // Group by section
   const sections = useMemo(() => {
@@ -116,7 +192,8 @@ export function CommandPalette({
     if (open) {
       setQuery("");
       setActiveIndex(0);
-      // Focus input after animation
+      setCategoryFilter("all");
+      setRecentSearches(getRecentSearches());
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
@@ -128,8 +205,14 @@ export function CommandPalette({
     active?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
+  // Clamp active index when results change
+  useEffect(() => {
+    setActiveIndex((prev) => Math.min(prev, Math.max(0, flatItems.length - 1)));
+  }, [flatItems.length]);
+
   const execute = useCallback(
     (item: CommandItem) => {
+      if (query.trim()) saveRecentSearch(query.trim());
       onClose();
       if (item.action) {
         item.action();
@@ -137,7 +220,7 @@ export function CommandPalette({
         router.push(item.href);
       }
     },
-    [onClose, router],
+    [onClose, router, query],
   );
 
   const handleKeyDown = useCallback(
@@ -167,6 +250,12 @@ export function CommandPalette({
   if (!open) return null;
 
   let itemIndex = -1;
+  const showRecent = !query.trim() && categoryFilter === "all" && recentSearches.length > 0;
+  const showSuggested = !query.trim() && categoryFilter === "all" && onToggleAI;
+
+  // Available categories based on commands
+  const availableCategories: CategoryFilter[] = ["all", "page", "action", "data"];
+  if (onToggleAI) availableCategories.push("ai");
 
   return (
     <>
@@ -177,9 +266,9 @@ export function CommandPalette({
       />
 
       {/* Palette */}
-      <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh] pointer-events-none">
+      <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[12vh] px-4 pointer-events-none">
         <div
-          className="pointer-events-auto w-full max-w-lg bg-surface-0 border border-surface-200 rounded-2xl shadow-xl overflow-hidden animate-scale-in"
+          className="pointer-events-auto w-full max-w-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-2xl shadow-xl overflow-hidden animate-scale-in"
           role="combobox"
           aria-expanded={true}
           aria-haspopup="listbox"
@@ -187,13 +276,15 @@ export function CommandPalette({
           onKeyDown={handleKeyDown}
         >
           {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-200">
-            <Search className="h-5 w-5 text-surface-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-surface-200 dark:border-surface-700">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-brand-50 dark:bg-brand-950 flex-shrink-0">
+              <Search className="h-4 w-4 text-brand-500" />
+            </div>
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search pages, actions..."
-              className="flex-1 bg-transparent text-sm text-surface-900 placeholder:text-surface-400 outline-none"
+              placeholder="Search pages, actions, data..."
+              className="flex-1 bg-transparent text-sm text-surface-900 dark:text-surface-50 placeholder:text-surface-400 outline-none"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -202,9 +293,29 @@ export function CommandPalette({
               aria-label="Command palette search"
               aria-autocomplete="list"
             />
-            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-surface-200 bg-surface-50 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded-lg border border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-700 px-1.5 py-0.5 text-[10px] font-mono text-surface-400">
               ESC
             </kbd>
+          </div>
+
+          {/* Category filter tabs */}
+          <div className="flex items-center gap-1 px-4 py-2 border-b border-surface-100 dark:border-surface-700/50 overflow-x-auto">
+            {availableCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setCategoryFilter(cat);
+                  setActiveIndex(0);
+                }}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                  categoryFilter === cat
+                    ? "bg-brand-600 text-white"
+                    : "text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700"
+                }`}
+              >
+                {CATEGORY_LABELS[cat]}
+              </button>
+            ))}
           </div>
 
           {/* Results */}
@@ -214,9 +325,85 @@ export function CommandPalette({
             role="listbox"
             id="command-palette-listbox"
           >
+            {/* Recent searches */}
+            {showRecent && (
+              <div className="mb-1">
+                <div className="flex items-center justify-between px-4 py-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
+                    Recent
+                  </span>
+                  <button
+                    onClick={() => {
+                      clearRecentSearches();
+                      setRecentSearches([]);
+                    }}
+                    className="text-[10px] text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {recentSearches.map((search) => (
+                  <button
+                    key={search}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-left text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+                    onClick={() => {
+                      setQuery(search);
+                      setActiveIndex(0);
+                    }}
+                  >
+                    <Clock className="h-3.5 w-3.5 text-surface-400 flex-shrink-0" />
+                    <span className="text-sm">{search}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Suggested AI queries */}
+            {showSuggested && (
+              <div className="mb-1">
+                <div className="px-4 py-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
+                    Suggested
+                  </span>
+                </div>
+                {SUGGESTED_QUERIES.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-left text-surface-600 dark:text-surface-300 hover:bg-accent-50 dark:hover:bg-accent-950 transition-colors group"
+                    onClick={() => {
+                      onClose();
+                      onToggleAI?.();
+                    }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-accent-400 flex-shrink-0" />
+                    <span className="text-sm">{suggestion}</span>
+                    <span className="ml-auto text-[10px] text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Ask AI
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Command results */}
             {flatItems.length === 0 ? (
               <div className="px-4 py-8 text-center">
-                <p className="text-sm text-surface-400">No results for &ldquo;{query}&rdquo;</p>
+                <p className="text-sm text-surface-400">
+                  No results for &ldquo;{query}&rdquo;
+                </p>
+                {onToggleAI && query.trim() && (
+                  <button
+                    onClick={() => {
+                      saveRecentSearch(query.trim());
+                      onClose();
+                      onToggleAI();
+                    }}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-50 dark:bg-accent-950 text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900 transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Ask AI about &ldquo;{query}&rdquo;
+                  </button>
+                )}
               </div>
             ) : (
               Array.from(sections.entries()).map(([section, items]) => (
@@ -231,6 +418,7 @@ export function CommandPalette({
                     const isActive = itemIndex === activeIndex;
                     const Icon = item.icon;
                     const currentIndex = itemIndex;
+                    const isAI = item.category === "ai";
                     return (
                       <button
                         key={item.id}
@@ -239,21 +427,42 @@ export function CommandPalette({
                         aria-selected={isActive}
                         className={`
                           w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
-                          ${isActive ? "bg-brand-50 text-brand-700" : "text-surface-700 hover:bg-surface-50"}
+                          ${isActive
+                            ? isAI
+                              ? "bg-accent-50 dark:bg-accent-950 text-accent-700 dark:text-accent-300"
+                              : "bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300"
+                            : "text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700/50"
+                          }
                         `}
                         onClick={() => execute(item)}
                         onMouseEnter={() => setActiveIndex(currentIndex)}
                       >
-                        <Icon
-                          className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-brand-500" : "text-surface-400"}`}
-                        />
+                        <div
+                          className={`flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0 ${
+                            isActive
+                              ? isAI
+                                ? "bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400"
+                                : "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400"
+                              : "bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.label}</p>
                           {item.description && (
-                            <p className="text-xs text-surface-400 truncate">{item.description}</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate">
+                              {item.description}
+                            </p>
                           )}
                         </div>
-                        {isActive && <ArrowRight className="h-3.5 w-3.5 text-brand-400" />}
+                        {isActive && (
+                          <ArrowRight
+                            className={`h-3.5 w-3.5 ${
+                              isAI ? "text-accent-400" : "text-brand-400"
+                            }`}
+                          />
+                        )}
                       </button>
                     );
                   })}
@@ -263,33 +472,40 @@ export function CommandPalette({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-surface-200 bg-surface-50/50">
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-900/30">
             <div className="flex items-center gap-3 text-[10px] text-surface-400">
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-surface-200 px-1 py-0.5 font-mono">↑↓</kbd>
+                <kbd className="rounded border border-surface-200 dark:border-surface-600 px-1 py-0.5 font-mono">
+                  ↑↓
+                </kbd>
                 navigate
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-surface-200 px-1 py-0.5 font-mono">↵</kbd>
+                <kbd className="rounded border border-surface-200 dark:border-surface-600 px-1 py-0.5 font-mono">
+                  ↵
+                </kbd>
                 select
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-surface-200 px-1 py-0.5 font-mono">esc</kbd>
+                <kbd className="rounded border border-surface-200 dark:border-surface-600 px-1 py-0.5 font-mono">
+                  esc
+                </kbd>
                 close
               </span>
             </div>
-            {/* "Use Intelligence" button — pass query to AI */}
+            {/* Use Intelligence button — always visible when AI available and there's a query */}
             {onToggleAI && query.trim() && (
               <button
                 onClick={() => {
+                  saveRecentSearch(query.trim());
                   onClose();
                   onToggleAI();
                 }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium
-                  bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-950/30 dark:to-purple-950/30
-                  text-brand-600 dark:text-brand-400
-                  border border-brand-200/50 dark:border-brand-800/30
-                  hover:shadow-sm hover:border-brand-300/70 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium
+                  bg-gradient-to-r from-accent-50 to-brand-50 dark:from-accent-950/40 dark:to-brand-950/40
+                  text-accent-700 dark:text-accent-400
+                  border border-accent-200/50 dark:border-accent-800/30
+                  hover:shadow-sm hover:border-accent-300/70 dark:hover:border-accent-700/50 transition-all"
               >
                 <Sparkles className="h-3 w-3" />
                 Use Intelligence

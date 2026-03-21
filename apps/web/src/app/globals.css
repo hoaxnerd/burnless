@@ -54,6 +54,32 @@
 
   --color-info: #3b82f6;
 
+  /* Accent — Violet (AI features, insights, premium highlights) */
+  --color-accent-50: #f5f3ff;
+  --color-accent-100: #ede9fe;
+  --color-accent-200: #ddd6fe;
+  --color-accent-300: #c4b5fd;
+  --color-accent-400: #a78bfa;
+  --color-accent-500: #8b5cf6;
+  --color-accent-600: #7c3aed;
+  --color-accent-700: #6d28d9;
+  --color-accent-800: #5b21b6;
+  --color-accent-900: #4c1d95;
+  --color-accent-950: #2e1065;
+
+  /* Highlight — Teal (secondary CTAs, data viz, neutral emphasis) */
+  --color-highlight-50: #f0fdfa;
+  --color-highlight-100: #ccfbf1;
+  --color-highlight-200: #99f6e4;
+  --color-highlight-300: #5eead4;
+  --color-highlight-400: #2dd4bf;
+  --color-highlight-500: #14b8a6;
+  --color-highlight-600: #0d9488;
+  --color-highlight-700: #0f766e;
+  --color-highlight-800: #115e59;
+  --color-highlight-900: #134e4a;
+  --color-highlight-950: #042f2e;
+
   /* Legacy aliases for existing code */
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -118,6 +144,15 @@
   --color-brand-50: #172554;
   --color-brand-100: #1e3a8a;
   --color-brand-200: #1d4ed8;
+
+  /* Dark accent/highlight */
+  --color-accent-50: rgba(139, 92, 246, 0.1);
+  --color-accent-100: rgba(139, 92, 246, 0.15);
+  --color-accent-950: rgba(139, 92, 246, 0.05);
+
+  --color-highlight-50: rgba(20, 184, 166, 0.1);
+  --color-highlight-100: rgba(20, 184, 166, 0.15);
+  --color-highlight-950: rgba(20, 184, 166, 0.05);
 
   /* Dark semantic colors */
   --color-success-50: rgba(16, 185, 129, 0.1);
