@@ -1,6 +1,7 @@
 import { getCompany, getScenarios } from "@/lib/data";
 import { ScenarioCards } from "./scenario-cards";
 import { CreateScenarioDialog } from "./create-scenario-dialog";
+import { ScenarioInsightsWrapper } from "./scenario-insights-wrapper";
 
 export default async function ScenariosPage() {
   const company = await getCompany();
@@ -27,6 +28,8 @@ export default async function ScenariosPage() {
         </div>
         <CreateScenarioDialog />
       </div>
+
+      <ScenarioInsightsWrapper scenarios={scenarioData} />
 
       <ScenarioCards scenarios={scenarioData} />
     </div>

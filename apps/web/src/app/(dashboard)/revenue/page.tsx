@@ -42,6 +42,7 @@ export default async function RevenuePage({
         revenueDetails={revenueDetails}
         revenueTimeline={revenueTimeline}
         mrrTimeline={mrrTimeline}
+        scenarioId={scenario.id}
       />
     </div>
   );

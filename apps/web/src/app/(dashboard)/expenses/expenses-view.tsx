@@ -8,6 +8,7 @@ import { ChartCard } from "@/components/ui";
 import { ExpenseCategoryChart } from "./expense-category-chart";
 import { ExpenseTable } from "./expense-table";
 import { ExpenseInsights } from "./expense-insights";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import type { ExpenseDetails } from "@/lib/compute-expenses";
 
 interface MetricPoint {
@@ -49,6 +50,7 @@ export function ExpensesView({
   opexTimeline,
   cogsTimeline,
   budgetTimeline,
+  scenarioId,
 }: ExpensesViewProps) {
   const [view, setView] = useState<"overview" | "budget">("overview");
   const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount, cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
@@ -113,7 +115,18 @@ export function ExpensesView({
         </div>
       </div>
 
-      {/* AI Insights */}
+      {/* AI-powered proactive insights (LLM-generated, cached daily) */}
+      <AiPageInsights
+        page="expenses"
+        scenarioId={scenarioId}
+        pageData={{
+          subcategoryBreakdown: expenseDetails.subcategoryBreakdown,
+          anomalyCount,
+          recurringCount,
+        }}
+      />
+
+      {/* Deterministic insights (always available, no LLM) */}
       <div className="animate-fade-in">
         <ExpenseInsights
           breakdown={expenseDetails.subcategoryBreakdown}

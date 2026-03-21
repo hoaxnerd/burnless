@@ -1,0 +1,245 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import {
+  Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  ShieldAlert,
+  BarChart3,
+  GraduationCap,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { AiGate } from "./ai-gate";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type InsightType =
+  | "variance_analysis"
+  | "runway_alert"
+  | "financial_narrative"
+  | "benchmark"
+  | "coaching";
+
+interface PageInsight {
+  type: InsightType;
+  title: string;
+  summary: string;
+  severity: "info" | "warning" | "critical";
+}
+
+interface AiPageInsightsProps {
+  /** Which page these insights are for */
+  page: "expenses" | "revenue" | "scenarios";
+  /** Scenario ID for context */
+  scenarioId: string;
+  /** Additional page-specific data to send to the API */
+  pageData?: Record<string, unknown>;
+}
+
+// ── Severity styles ─────────────────────────────────────────────────────────
+
+const severityConfig = {
+  critical: {
+    border: "border-danger-500/20",
+    bg: "bg-danger-50/50",
+    iconColor: "text-danger-500",
+    dot: "bg-danger-500",
+  },
+  warning: {
+    border: "border-warning-500/20",
+    bg: "bg-warning-50/50",
+    iconColor: "text-warning-500",
+    dot: "bg-warning-500",
+  },
+  info: {
+    border: "border-brand-500/15",
+    bg: "bg-brand-50/30",
+    iconColor: "text-brand-500",
+    dot: "bg-brand-500",
+  },
+} as const;
+
+const typeIcons: Record<InsightType, typeof TrendingUp> = {
+  variance_analysis: BarChart3,
+  runway_alert: ShieldAlert,
+  financial_narrative: TrendingUp,
+  benchmark: BarChart3,
+  coaching: GraduationCap,
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsProps) {
+  const [insights, setInsights] = useState<PageInsight[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [cached, setCached] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(true);
+
+  const fetchInsights = useCallback(
+    async (forceGenerate = false) => {
+      setLoading(true);
+      setError(false);
+
+      try {
+        if (!forceGenerate) {
+          // Try cached first
+          const cachedRes = await fetch(`/api/insights?page=${page}`);
+          if (cachedRes.ok) {
+            const data = await cachedRes.json();
+            if (data.insights?.length > 0) {
+              setInsights(data.insights);
+              setCached(true);
+              setCachedAt(data.cachedAt ?? null);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        // Generate fresh insights
+        const res = await fetch("/api/insights", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ page, scenarioId, pageData }),
+        });
+
+        if (!res.ok) throw new Error("Failed to generate insights");
+
+        const data = await res.json();
+        setInsights(data.insights ?? []);
+        setCached(false);
+        setCachedAt(null);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, scenarioId, pageData]
+  );
+
+  useEffect(() => {
+    fetchInsights();
+  }, [fetchInsights]);
+
+  if (loading && insights.length === 0) {
+    return (
+      <AiGate feature="insights" hideWhenOff>
+        <InsightsSkeleton />
+      </AiGate>
+    );
+  }
+
+  if (error || insights.length === 0) return null;
+
+  return (
+    <AiGate feature="insights" hideWhenOff>
+      <div className="rounded-2xl border border-surface-200 bg-surface-0 overflow-hidden mb-6 animate-slide-up">
+        {/* Header */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-50/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-brand-400" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
+              AI Insights
+            </span>
+            {cached && cachedAt && (
+              <span className="text-[10px] text-surface-300">
+                as of{" "}
+                {new Date(cachedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                fetchInsights(true);
+              }}
+              disabled={loading}
+              className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all disabled:opacity-50"
+              title="Refresh insights"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            {expanded ? (
+              <ChevronUp className="h-3.5 w-3.5 text-surface-400" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-surface-400" />
+            )}
+          </div>
+        </button>
+
+        {/* Insights list */}
+        {expanded && (
+          <div className="px-4 pb-4 space-y-2">
+            {insights.map((insight, i) => {
+              const style = severityConfig[insight.severity];
+              const Icon = typeIcons[insight.type] ?? TrendingUp;
+
+              return (
+                <div
+                  key={`${insight.type}-${i}`}
+                  className={`rounded-xl border ${style.border} ${style.bg} p-3.5 transition-all`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <Icon className={`h-4 w-4 ${style.iconColor}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-surface-900 leading-snug">
+                        {insight.title}
+                      </p>
+                      <p className="text-xs text-surface-500 mt-1 leading-relaxed">
+                        {insight.summary}
+                      </p>
+                    </div>
+                    <div className={`flex-shrink-0 h-2 w-2 rounded-full mt-1.5 ${style.dot}`} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </AiGate>
+  );
+}
+
+// ── Skeleton ─────────────────────────────────────────────────────────────────
+
+function InsightsSkeleton() {
+  return (
+    <div className="rounded-2xl border border-surface-200 bg-surface-0 p-4 mb-6 animate-pulse">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-3.5 w-3.5 rounded bg-surface-200" />
+        <div className="h-3 w-20 rounded bg-surface-200" />
+      </div>
+      <div className="space-y-2">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="rounded-xl border border-surface-100 bg-surface-50/50 p-3.5">
+            <div className="flex items-start gap-3">
+              <div className="h-4 w-4 rounded bg-surface-200 flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-4 w-3/4 rounded bg-surface-200" />
+                <div className="h-3 w-full rounded bg-surface-100" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

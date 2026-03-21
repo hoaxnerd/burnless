@@ -32,6 +32,7 @@ const FEATURE_TIERS: Record<string, ModelTier> = {
   batch_categorize: "fast",
   proactive_alert: "fast",
   field_classification: "fast",
+  page_insights: "fast",
 
   // Standard tier — Sonnet-class
   onboarding_enrich: "standard",

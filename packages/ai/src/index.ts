@@ -13,6 +13,8 @@ export { getFinancialTools, financialTools } from "./tools";
 
 // Insights
 export { generateInsights } from "./insights";
+export { generatePageInsights } from "./page-insights";
+export type { InsightPage, PageInsightContext, PageInsight } from "./page-insights";
 
 // Prompts
 export { SYSTEM_PROMPT, buildSystemMessage } from "./prompts";

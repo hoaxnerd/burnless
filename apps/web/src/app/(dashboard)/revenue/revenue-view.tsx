@@ -7,6 +7,7 @@ import { ChartCard } from "@/components/ui";
 import { RevenueWaterfallChart } from "./revenue-waterfall-chart";
 import { RevenueStreamBreakdown } from "./revenue-stream-breakdown";
 import { RevenueInsights } from "./revenue-insights";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import type { RevenueDetails } from "@/lib/compute-revenue";
 import type { MetricValue } from "@burnless/engine";
 
@@ -14,6 +15,7 @@ interface RevenueViewProps {
   revenueDetails: RevenueDetails;
   revenueTimeline: { month: string; value: number }[];
   mrrTimeline: MetricValue[];
+  scenarioId: string;
 }
 
 function formatCurrency(value: number): string {
@@ -26,6 +28,7 @@ export function RevenueView({
   revenueDetails,
   revenueTimeline,
   mrrTimeline,
+  scenarioId,
 }: RevenueViewProps) {
   const { growthMetrics: g, hasSaaS, streamBreakdown, waterfall, monthlyByStream, streamNames } = revenueDetails;
 
@@ -108,7 +111,23 @@ export function RevenueView({
         )}
       </div>
 
-      {/* AI Insights */}
+      {/* AI-powered proactive insights (LLM-generated, cached daily) */}
+      <AiPageInsights
+        page="revenue"
+        scenarioId={scenarioId}
+        pageData={{
+          growthMetrics: g,
+          streamBreakdown: streamBreakdown.map((s) => ({
+            name: s.name,
+            type: s.type,
+            currentRevenue: s.currentRevenue,
+            percentage: s.percentage,
+            changePercent: s.changePercent,
+          })),
+        }}
+      />
+
+      {/* Deterministic insights (always available, no LLM) */}
       <div className="animate-fade-in">
         <RevenueInsights
           growthMetrics={g}
