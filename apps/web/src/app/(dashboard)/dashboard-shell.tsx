@@ -191,6 +191,13 @@ export function DashboardShell({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  // Listen for custom event from child components (e.g. AiCommandCenter)
+  useEffect(() => {
+    const handler = () => setAiPanelOpen(true);
+    window.addEventListener("burnless:open-ai-panel", handler);
+    return () => window.removeEventListener("burnless:open-ai-panel", handler);
+  }, []);
+
   const toggleAI = useCallback(() => setAiPanelOpen((prev) => !prev), []);
 
   return (

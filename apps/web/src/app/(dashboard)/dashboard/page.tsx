@@ -13,9 +13,8 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
 import { HeroKpiCard } from "./hero-kpi-card";
 import { DashboardCharts } from "./dashboard-charts";
-import { AiInsightBanner } from "./ai-insight-banner";
+import { AiCommandCenter } from "./ai-command-center";
 import { QuickActions } from "./quick-actions";
-import { PinnedInsights } from "./pinned-insights";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
 import { BoardMeetingMode } from "./board-meeting-mode";
@@ -136,12 +135,13 @@ export default async function DashboardPage({
         {/* Monday Morning CFO Digest */}
         {hasData && <WeeklyDigestBanner />}
 
-        {/* AI Insight Banner */}
+        {/* AI Command Center */}
         {hasData && (
-          <Suspense fallback={<div className="h-16 rounded-2xl bg-surface-50 animate-pulse mb-4" />}>
-            <AiInsightBanner
+          <Suspense fallback={<div className="h-48 rounded-2xl bg-surface-50 animate-pulse mb-6" />}>
+            <AiCommandCenter
               runway={currentRunway}
               burnRate={currentBurn}
+              mrr={currentMrr}
               mrrGrowth={mrrGrowthPct}
               cash={currentCash}
             />
@@ -256,13 +256,6 @@ export default async function DashboardPage({
                 mrrData={metrics.mrr}
                 hasSaaS={metrics.mrr.some((m) => m.value > 0)}
               />
-            </Suspense>
-
-            {/* Pinned AI Insights */}
-            <Suspense fallback={<div className="mt-6 sm:mt-8 h-24 rounded-2xl bg-surface-50 animate-pulse" />}>
-              <div className="mt-6 sm:mt-8">
-                <PinnedInsights />
-              </div>
             </Suspense>
 
             {/* Bottom section: Scenarios + Customizable Key Metrics */}

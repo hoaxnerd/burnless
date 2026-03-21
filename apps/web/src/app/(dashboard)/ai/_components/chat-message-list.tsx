@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, User, Copy, Check } from "lucide-react";
+import { Bot, User, Copy, Check, Sparkles } from "lucide-react";
 import { FormattedContent } from "./formatted-content";
 import { ToolResultDisplay } from "./tool-result-display";
 import type { Message } from "./types";
@@ -21,6 +21,7 @@ interface ChatMessageListProps {
   copiedIndex: number | null;
   onCopy: (content: string, index: number) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  isLoading?: boolean;
 }
 
 export function ChatMessageList({
@@ -28,79 +29,145 @@ export function ChatMessageList({
   copiedIndex,
   onCopy,
   messagesEndRef,
+  isLoading,
 }: ChatMessageListProps) {
   return (
-    <div className="flex-1 overflow-auto space-y-4 mb-4 pr-2">
-      {messages.map((msg, i) => (
-        <div
-          key={i}
-          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-        >
-          <div className="flex gap-3 max-w-[85%]">
-            {msg.role === "assistant" && (
-              <div className="flex-shrink-0 mt-1">
-                <div className="h-7 w-7 rounded-full bg-brand-100 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-brand-600" />
+    <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
+      {messages.map((msg, i) => {
+        const isUser = msg.role === "user";
+        const isFirstAssistant =
+          !isUser && messages.findIndex((m) => m.role === "assistant") === i;
+
+        return (
+          <div
+            key={i}
+            className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
+          >
+            <div className={`flex gap-3 ${isUser ? "max-w-[80%]" : "max-w-[85%]"}`}>
+              {/* Assistant avatar */}
+              {!isUser && (
+                <div className="flex-shrink-0 mt-1">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm shadow-brand-500/20">
+                    <Bot className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+              )}
+
+              <div className="group/msg min-w-0">
+                {/* AI capabilities badge on first assistant message */}
+                {isFirstAssistant && (
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-600">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      AI Financial Companion
+                    </span>
+                  </div>
+                )}
+
+                {/* Tool call indicators */}
+                {msg.toolCalls && msg.toolCalls.length > 0 && (
+                  <ToolResultDisplay toolCalls={msg.toolCalls} />
+                )}
+
+                {/* Message bubble */}
+                <div
+                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    isUser
+                      ? "bg-brand-600 text-white rounded-br-md"
+                      : "bg-surface-0 border border-surface-200 text-surface-800 rounded-bl-md shadow-sm"
+                  }`}
+                >
+                  <FormattedContent content={msg.content} />
+
+                  {/* Typing indicator — shown when streaming with no content yet */}
+                  {msg.isStreaming && !msg.content && (
+                    <div className="flex items-center gap-2 py-1">
+                      <span className="flex gap-1">
+                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:150ms]" />
+                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      <span className="text-xs text-surface-400 animate-pulse">
+                        Thinking...
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Streaming cursor */}
+                  {msg.isStreaming && msg.content && (
+                    <span className="inline-block ml-0.5 w-2 h-4 bg-brand-500 animate-pulse rounded-sm align-text-bottom" />
+                  )}
+                </div>
+
+                {/* Timestamp + copy button row */}
+                <div
+                  className={`mt-1.5 flex items-center gap-2 ${isUser ? "justify-end" : "justify-start"}`}
+                >
+                  <span className="text-[10px] text-surface-400">
+                    {formatRelativeTime(msg.createdAt)}
+                  </span>
+                  {!isUser && !msg.isStreaming && msg.content && (
+                    <button
+                      onClick={() => onCopy(msg.content, i)}
+                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-surface-400 hover:text-surface-600"
+                      aria-label="Copy message"
+                    >
+                      {copiedIndex === i ? (
+                        <>
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span className="text-green-500">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-            <div className="group/msg">
-              {/* Tool call indicators */}
-              {msg.toolCalls && msg.toolCalls.length > 0 && (
-                <ToolResultDisplay toolCalls={msg.toolCalls} />
+
+              {/* User avatar */}
+              {isUser && (
+                <div className="flex-shrink-0 mt-1">
+                  <div className="h-8 w-8 rounded-full bg-surface-200 flex items-center justify-center">
+                    <User className="h-4 w-4 text-surface-600" />
+                  </div>
+                </div>
               )}
-              <div
-                className={`rounded-xl px-4 py-3 text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-brand-600 text-white"
-                    : "bg-surface-0 border border-surface-200 text-surface-800"
-                }`}
-              >
-                <FormattedContent content={msg.content} />
-                {msg.isStreaming && !msg.content && (
-                  <span className="inline-flex items-center gap-1 text-surface-400 text-xs">
-                    <span className="flex gap-0.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0ms]" />
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:150ms]" />
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:300ms]" />
-                    </span>
-                    <span className="ml-1">Thinking</span>
-                  </span>
-                )}
-                {msg.isStreaming && msg.content && (
-                  <span className="inline-block ml-1 animate-pulse">▊</span>
-                )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Bottom-of-chat typing indicator when loading but last message is complete */}
+      {isLoading &&
+        messages.length > 0 &&
+        !messages[messages.length - 1]?.isStreaming && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 mt-1">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm shadow-brand-500/20">
+                  <Bot className="h-4 w-4 text-white" />
+                </div>
               </div>
-              {/* Timestamp + copy button row */}
-              <div className={`mt-1 flex items-center gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <span className="text-[10px] text-surface-400">
-                  {formatRelativeTime(msg.createdAt)}
-                </span>
-                {msg.role === "assistant" && !msg.isStreaming && msg.content && (
-                  <button
-                    onClick={() => onCopy(msg.content, i)}
-                    className="opacity-0 group-hover/msg:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-surface-400 hover:text-surface-600"
-                    aria-label="Copy message"
-                  >
-                    {copiedIndex === i ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </button>
-                )}
+              <div className="rounded-2xl rounded-bl-md bg-surface-0 border border-surface-200 px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0ms]" />
+                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:150ms]" />
+                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:300ms]" />
+                  </span>
+                  <span className="text-xs text-surface-400 animate-pulse">
+                    Thinking...
+                  </span>
+                </div>
               </div>
             </div>
-            {msg.role === "user" && (
-              <div className="flex-shrink-0 mt-1">
-                <div className="h-7 w-7 rounded-full bg-surface-200 flex items-center justify-center">
-                  <User className="h-4 w-4 text-surface-600" />
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      ))}
+        )}
+
       <div ref={messagesEndRef} />
     </div>
   );
