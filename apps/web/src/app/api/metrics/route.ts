@@ -37,8 +37,12 @@ export const GET = withErrorHandler(async (request: Request) => {
   const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
   if (!scenario) return errorResponse("Scenario not found", 404);
 
-  const periodStart = new Date(startDateStr + "-01");
-  const periodEnd = new Date(endDateStr + "-28");
+  // Parse YYYY-MM strings via numeric constructor to avoid UTC-vs-local timezone drift
+  // (new Date("2026-01-01") is UTC midnight, which in UTC-8 becomes Dec 31 — wrong month)
+  const [sY, sM] = startDateStr.split("-").map(Number);
+  const [eY, eM] = endDateStr.split("-").map(Number);
+  const periodStart = new Date(sY!, sM! - 1, 1);
+  const periodEnd = new Date(eY!, eM!, 0); // day 0 = last day of target month
 
   const data = await getScenarioData(scenarioId, ctx.companyId);
 

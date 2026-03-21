@@ -9,6 +9,7 @@ import {
 } from "@/lib/email/templates";
 import { getProviderByType, planFromPlanId } from "@/lib/payment";
 import type { PaymentProviderType, NormalizedWebhookData } from "@burnless/engine";
+import { withErrorHandler } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 
 const log = logger("webhook");
@@ -156,7 +157,7 @@ async function handlePaymentFailed(data: NormalizedWebhookData) {
  * Both providers return normalized data — handlers are fully provider-agnostic.
  * Other providers return 200 acknowledgement (not yet implemented).
  */
-export async function POST(
+export const POST = withErrorHandler(async function POST(
   request: Request,
   { params }: { params: Promise<{ provider: string }> }
 ) {
@@ -231,4 +232,4 @@ export async function POST(
         { status: 404 }
       );
   }
-}
+});

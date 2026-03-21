@@ -40,8 +40,11 @@ export const GET = withErrorHandler(async (request: Request) => {
     .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
   if (!scenario) return errorResponse("Scenario not found", 404);
 
-  const periodStart = new Date(startDateStr + "-01");
-  const periodEnd = new Date(endDateStr + "-28"); // last day approximation
+  // Parse YYYY-MM strings via numeric constructor to avoid UTC-vs-local timezone drift
+  const [sY, sM] = startDateStr.split("-").map(Number);
+  const [eY, eM] = endDateStr.split("-").map(Number);
+  const periodStart = new Date(sY!, sM! - 1, 1);
+  const periodEnd = new Date(eY!, eM!, 0); // day 0 = last day of target month
 
   // Fetch all data in parallel
   const [fLines, accounts, revStreams, hcPlans, funding] = await Promise.all([

@@ -110,7 +110,9 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   let scenario;
   if (scenarioId) {
-    const [found] = await db.select().from(scenariosTable).where(eq(scenariosTable.id, scenarioId));
+    const [found] = await db.select().from(scenariosTable).where(
+      and(eq(scenariosTable.id, scenarioId), eq(scenariosTable.companyId, ctx.companyId))
+    );
     scenario = found ?? await getDefaultScenario(ctx.companyId);
   } else {
     scenario = await getDefaultScenario(ctx.companyId);
