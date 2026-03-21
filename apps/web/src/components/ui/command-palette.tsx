@@ -278,6 +278,23 @@ export function CommandPalette({
                 close
               </span>
             </div>
+            {/* "Use Intelligence" button — pass query to AI */}
+            {onToggleAI && query.trim() && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onToggleAI();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium
+                  bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-950/30 dark:to-purple-950/30
+                  text-brand-600 dark:text-brand-400
+                  border border-brand-200/50 dark:border-brand-800/30
+                  hover:shadow-sm hover:border-brand-300/70 transition-all"
+              >
+                <Sparkles className="h-3 w-3" />
+                Use Intelligence
+              </button>
+            )}
           </div>
         </div>
       </div>
