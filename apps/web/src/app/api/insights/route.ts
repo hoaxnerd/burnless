@@ -124,13 +124,21 @@ export async function POST(request: Request) {
     insights = generateInsights(snapshot);
     cacheType = "dashboard";
   } else {
-    // LLM-powered page insights
+    // LLM-powered page insights — wrapped in try/catch so failures return empty insights
     const pageKey = page as InsightPage;
-    insights = await generatePageInsights({
-      page: pageKey,
-      snapshot,
-      pageData,
-    });
+    try {
+      insights = await generatePageInsights({
+        page: pageKey,
+        snapshot,
+        pageData,
+      });
+    } catch (err) {
+      console.warn(
+        `[insights] generatePageInsights failed for page="${page}":`,
+        err instanceof Error ? err.message : err
+      );
+      insights = [];
+    }
     cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
   }
 

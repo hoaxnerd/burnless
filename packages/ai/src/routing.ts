@@ -294,7 +294,10 @@ function wrapWithResilience(
 export function getProviderForFeature(feature: string): LlmProvider | null {
   const tier = getFeatureTier(feature);
   const provider = createProviderForTier(tier);
-  if (!provider) return null;
+  if (!provider) {
+    console.warn(`[ai-router] No provider available for feature "${feature}" (tier: ${tier}). AI is unconfigured.`);
+    return null;
+  }
 
   const providerName = resolveProviderName();
 

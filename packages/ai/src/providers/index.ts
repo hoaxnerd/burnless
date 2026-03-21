@@ -130,6 +130,9 @@ export function createProvider(
     (providerName === "openrouter" ? process.env.OPENROUTER_API_KEY : undefined);
 
   if (!apiKey) {
+    console.warn(
+      `[ai] No API key found for provider "${providerName}". Set AI_API_KEY or the provider-specific key (e.g. ANTHROPIC_API_KEY). AI features will be unavailable.`
+    );
     return null;
   }
 
