@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, fundingRounds } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
@@ -39,6 +40,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db.update(fundingRounds).set(updates).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "update", { after: row });
+  revalidateTag("funding-rounds");
   return NextResponse.json(row);
 });
 
@@ -55,5 +57,6 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(fundingRounds).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "delete", { before: row });
+  revalidateTag("funding-rounds");
   return NextResponse.json({ deleted: true });
 });

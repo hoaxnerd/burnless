@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { financialAccounts, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -44,6 +45,7 @@ export const PATCH = withErrorHandler(async (
   const row = await updateForCompany(financialAccounts, id, ctx.companyId, parsed.data);
   if (!row) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "update", { after: row });
+  revalidateTag("accounts");
   return NextResponse.json(row);
 });
 
@@ -60,5 +62,6 @@ export const DELETE = withErrorHandler(async (
   const row = await deleteForCompany(financialAccounts, id, ctx.companyId);
   if (!row) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "delete", { before: row });
+  revalidateTag("accounts");
   return NextResponse.json({ deleted: true });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
@@ -66,5 +67,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "scenario", row.id, "create", { after: row });
+  revalidateTag("scenarios");
   return NextResponse.json(row, { status: 201 });
 });

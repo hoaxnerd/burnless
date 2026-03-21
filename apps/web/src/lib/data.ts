@@ -1,5 +1,8 @@
 /**
  * Server-side data access layer. Used by server components to fetch data.
+ *
+ * DB queries are wrapped with unstable_cache for cross-request caching.
+ * Cache tags allow targeted invalidation when data is mutated via API routes.
  */
 
 import { db, getCompanyForUser } from "@burnless/db";
@@ -16,6 +19,7 @@ import {
   dashboardPreferences,
 } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { auth } from "./auth";
 
 /** Get the company for a specific user via their membership. */
@@ -41,58 +45,94 @@ export async function getCompany() {
 }
 
 /** Get all scenarios for a company. */
-export async function getScenarios(companyId: string) {
-  return db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).orderBy(scenarios.createdAt);
-}
+export const getScenarios = unstable_cache(
+  async (companyId: string) => {
+    return db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).orderBy(scenarios.createdAt);
+  },
+  ["scenarios"],
+  { revalidate: 30, tags: ["scenarios"] }
+);
 
 /** Get the default (or first) scenario for a company. */
-export async function getDefaultScenario(companyId: string) {
-  const rows = await db
-    .select()
-    .from(scenarios)
-    .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true)))
-    .limit(1);
-  if (rows[0]) return rows[0];
-  // Fallback to first scenario
-  const [first] = await db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).limit(1);
-  return first ?? null;
-}
+export const getDefaultScenario = unstable_cache(
+  async (companyId: string) => {
+    const rows = await db
+      .select()
+      .from(scenarios)
+      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true)))
+      .limit(1);
+    if (rows[0]) return rows[0];
+    // Fallback to first scenario
+    const [first] = await db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).limit(1);
+    return first ?? null;
+  },
+  ["default-scenario"],
+  { revalidate: 30, tags: ["scenarios"] }
+);
 
 /** Get all financial accounts for a company. */
-export async function getAccounts(companyId: string) {
-  return db.select().from(financialAccounts).where(eq(financialAccounts.companyId, companyId));
-}
+export const getAccounts = unstable_cache(
+  async (companyId: string) => {
+    return db.select().from(financialAccounts).where(eq(financialAccounts.companyId, companyId));
+  },
+  ["accounts"],
+  { revalidate: 60, tags: ["accounts"] }
+);
 
 /** Get all forecast lines for a scenario. */
-export async function getForecastLines(scenarioId: string) {
-  return db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId));
-}
+export const getForecastLines = unstable_cache(
+  async (scenarioId: string) => {
+    return db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId));
+  },
+  ["forecast-lines"],
+  { revalidate: 30, tags: ["forecast-lines"] }
+);
 
 /** Get revenue streams for a scenario. */
-export async function getRevenueStreams(scenarioId: string) {
-  return db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
-}
+export const getRevenueStreams = unstable_cache(
+  async (scenarioId: string) => {
+    return db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
+  },
+  ["revenue-streams"],
+  { revalidate: 30, tags: ["revenue-streams"] }
+);
 
 /** Get headcount plans for a scenario. */
-export async function getHeadcountPlans(scenarioId: string) {
-  return db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId));
-}
+export const getHeadcountPlans = unstable_cache(
+  async (scenarioId: string) => {
+    return db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId));
+  },
+  ["headcount-plans"],
+  { revalidate: 30, tags: ["headcount-plans"] }
+);
 
 /** Get departments for a company. */
-export async function getDepartments(companyId: string) {
-  return db.select().from(departments).where(eq(departments.companyId, companyId));
-}
+export const getDepartments = unstable_cache(
+  async (companyId: string) => {
+    return db.select().from(departments).where(eq(departments.companyId, companyId));
+  },
+  ["departments"],
+  { revalidate: 60, tags: ["departments"] }
+);
 
 /** Get funding rounds for a company. */
-export async function getFundingRounds(companyId: string) {
-  return db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId));
-}
+export const getFundingRounds = unstable_cache(
+  async (companyId: string) => {
+    return db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId));
+  },
+  ["funding-rounds"],
+  { revalidate: 30, tags: ["funding-rounds"] }
+);
 
 /** Get a scenario by ID. */
-export async function getScenarioById(scenarioId: string) {
-  const [scenario] = await db.select().from(scenarios).where(eq(scenarios.id, scenarioId));
-  return scenario ?? null;
-}
+export const getScenarioById = unstable_cache(
+  async (scenarioId: string) => {
+    const [scenario] = await db.select().from(scenarios).where(eq(scenarios.id, scenarioId));
+    return scenario ?? null;
+  },
+  ["scenario-by-id"],
+  { revalidate: 30, tags: ["scenarios"] }
+);
 
 /**
  * Get the active scenario for a page: uses scenarioId from searchParams
@@ -110,14 +150,18 @@ export async function getActiveScenario(
 }
 
 /** Get the budget scenario (isBudget=true) for a company. */
-export async function getBudgetScenario(companyId: string) {
-  const [scenario] = await db
-    .select()
-    .from(scenarios)
-    .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true)))
-    .limit(1);
-  return scenario ?? null;
-}
+export const getBudgetScenario = unstable_cache(
+  async (companyId: string) => {
+    const [scenario] = await db
+      .select()
+      .from(scenarios)
+      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true)))
+      .limit(1);
+    return scenario ?? null;
+  },
+  ["budget-scenario"],
+  { revalidate: 30, tags: ["scenarios"] }
+);
 
 /** Get transactions for a company. */
 export async function getTransactions(companyId: string) {

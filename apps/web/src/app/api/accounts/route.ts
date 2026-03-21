@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, financialAccounts } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
@@ -58,5 +59,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "financial_account", row.id, "create", { after: row });
+  revalidateTag("accounts");
   return NextResponse.json(row, { status: 201 });
 });

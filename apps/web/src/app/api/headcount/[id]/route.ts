@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, headcountPlans, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -40,6 +41,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db.update(headcountPlans).set(updates).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
+  revalidateTag("headcount-plans");
   return NextResponse.json(row);
 });
 
@@ -56,5 +58,6 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(headcountPlans).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "delete", { before: row });
+  revalidateTag("headcount-plans");
   return NextResponse.json({ deleted: true });
 });

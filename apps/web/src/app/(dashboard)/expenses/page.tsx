@@ -41,10 +41,12 @@ export default async function ExpensesPage({
 }
 
 async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
-  const [data, accounts, expenseDetails] = await Promise.all([
+  // Fetch everything in parallel — including budget scenario (was previously a waterfall)
+  const [data, accounts, expenseDetails, budgetScenario] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),
     computeExpenseDetails(companyId, scenarioId),
+    getBudgetScenario(companyId),
   ]);
 
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
@@ -58,8 +60,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
-  // Budget vs actuals data
-  const budgetScenario = await getBudgetScenario(companyId);
+  // Budget vs actuals data (budget scenario was fetched in parallel above)
   let budgetTimeline: { month: string; value: number }[] | null = null;
   if (budgetScenario && budgetScenario.id !== scenarioId) {
     const budgetData = await computeDashboardData(companyId, budgetScenario.id);

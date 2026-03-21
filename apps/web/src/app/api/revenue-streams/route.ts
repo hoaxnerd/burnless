@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, revenueStreams, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
@@ -59,5 +60,6 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const [row] = await db.insert(revenueStreams).values(parsed.data).returning();
   if (row) await logAudit(ctx, "revenue_stream", row.id, "create", { after: row });
+  revalidateTag("revenue-streams");
   return NextResponse.json(row, { status: 201 });
 });

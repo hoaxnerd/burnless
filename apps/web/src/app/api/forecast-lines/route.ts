@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, forecastLines, getScenarioForCompany } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
@@ -60,5 +61,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "forecast_line", row.id, "create", { after: row });
+  revalidateTag("forecast-lines");
   return NextResponse.json(row, { status: 201 });
 });

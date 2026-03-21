@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, forecastLines, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -38,6 +39,7 @@ export const PATCH = withErrorHandler(async (
 
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
+  revalidateTag("forecast-lines");
   return NextResponse.json(row);
 });
 
@@ -54,5 +56,6 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(forecastLines).where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "delete", { before: row });
+  revalidateTag("forecast-lines");
   return NextResponse.json({ deleted: true });
 });

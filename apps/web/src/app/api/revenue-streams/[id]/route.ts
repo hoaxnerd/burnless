@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, revenueStreams } from "@burnless/db";
 import { eq } from "drizzle-orm";
@@ -27,6 +28,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db.update(revenueStreams).set(parsed.data).where(eq(revenueStreams.id, id)).returning();
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
+  revalidateTag("revenue-streams");
   return NextResponse.json(row);
 });
 
@@ -43,5 +45,6 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(revenueStreams).where(eq(revenueStreams.id, id)).returning();
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "delete", { before: row });
+  revalidateTag("revenue-streams");
   return NextResponse.json({ deleted: true });
 });
