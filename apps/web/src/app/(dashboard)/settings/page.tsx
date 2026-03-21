@@ -29,6 +29,7 @@ import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { AI_FEATURE_LIST, type AiDataMode } from "@burnless/ai";
 import { CURRENCIES, DATA_REGIONS, type CurrencyCode, type DataRegion } from "@burnless/types";
 import { Button } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
 
 interface IntegrationDef {
   type: string;
@@ -822,6 +823,7 @@ function BillingTab() {
   const [billing, setBilling] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
     fetch("/api/billing")
@@ -840,9 +842,13 @@ function BillingTab() {
         body: JSON.stringify({ action: "checkout", plan }),
       });
       const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toastError(data.error || "Failed to start checkout");
+      }
     } catch {
-      // Stripe not configured — fail silently
+      toastError("Unable to connect to billing service");
     } finally {
       setActionLoading(null);
     }
@@ -857,9 +863,13 @@ function BillingTab() {
         body: JSON.stringify({ action: "portal" }),
       });
       const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toastError(data.error || "Failed to open billing portal");
+      }
     } catch {
-      // fail silently
+      toastError("Unable to connect to billing service");
     } finally {
       setActionLoading(null);
     }
@@ -878,9 +888,13 @@ function BillingTab() {
         setBilling((prev) =>
           prev ? { ...prev, cancelAtPeriodEnd: true, currentPeriodEnd: data.currentPeriodEnd } : prev
         );
+        toastSuccess("Subscription will cancel at the end of the billing period");
+      } else {
+        const data = await res.json();
+        toastError(data.error || "Failed to cancel subscription");
       }
     } catch {
-      // fail silently
+      toastError("Unable to connect to billing service");
     } finally {
       setActionLoading(null);
     }
@@ -896,9 +910,13 @@ function BillingTab() {
       });
       if (res.ok) {
         setBilling((prev) => (prev ? { ...prev, cancelAtPeriodEnd: false } : prev));
+        toastSuccess("Subscription reactivated");
+      } else {
+        const data = await res.json();
+        toastError(data.error || "Failed to reactivate subscription");
       }
     } catch {
-      // fail silently
+      toastError("Unable to connect to billing service");
     } finally {
       setActionLoading(null);
     }
