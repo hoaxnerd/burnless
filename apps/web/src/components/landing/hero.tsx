@@ -222,6 +222,12 @@ export function HeroSection() {
             >
               See your runway →
             </Link>
+            <Link
+              href="#features"
+              className="rounded-xl border border-surface-200/30 bg-surface-0/5 backdrop-blur-sm px-8 py-3.5 text-base font-medium text-surface-600 hover:bg-surface-50/10 hover:border-surface-200/50 transition-all hover:-translate-y-0.5"
+            >
+              See how it works
+            </Link>
           </div>
 
           {/* Trust badges */}
@@ -250,6 +256,17 @@ export function HeroSection() {
           <FloatingMetric label="MRR Growth" value="+23%" position="-right-4 top-1/3" delay="1.3s" />
           <FloatingMetric label="Burn Rate" value="$42.5K" position="-left-8 bottom-1/4" delay="1.5s" />
           <DashboardMockup />
+        </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2"
+        style={{ animation: "heroTextReveal 0.8s var(--ease-smooth) 1.8s both" }}
+      >
+        <span className="text-[10px] uppercase tracking-widest text-surface-400">Scroll to explore</span>
+        <div className="w-5 h-8 rounded-full border-2 border-surface-300/40 flex justify-center pt-1.5">
+          <div className="w-1 h-2 rounded-full bg-surface-400/60 animate-bounce" />
         </div>
       </div>
 
