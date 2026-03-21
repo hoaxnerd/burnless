@@ -38,7 +38,17 @@ const nextConfig: NextConfig = {
     "@burnless/ai",
     "@burnless/engine",
   ],
-  serverExternalPackages: ["plaid", "razorpay", "stripe", "openai", "@anthropic-ai/sdk"],
+  serverExternalPackages: [
+    "plaid",
+    "razorpay",
+    "stripe",
+    "openai",
+    "@anthropic-ai/sdk",
+    "@sentry/nextjs",
+    "@sentry/node",
+    "@opentelemetry/instrumentation",
+    "@opentelemetry/api",
+  ],
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts"],
   },
