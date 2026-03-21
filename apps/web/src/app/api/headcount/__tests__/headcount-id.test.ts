@@ -65,11 +65,16 @@ vi.mock("@burnless/db", () => ({
     endDate: "endDate",
     benefitsRate: "benefitsRate",
   },
+  scenarios: {
+    id: "id",
+    companyId: "companyId",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  inArray: vi.fn(),
 }));
 
 import { PATCH, DELETE } from "../[id]/route";
@@ -90,6 +95,10 @@ function makeParams(id: string): { params: Promise<{ id: string }> } {
 describe("PATCH /api/headcount/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // companyScenarioIds subquery: db.select().from().where()
+    const subqueryChain = { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue("subquery") }) };
+    mockSelect.mockReturnValue(subqueryChain);
 
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });
@@ -157,6 +166,10 @@ describe("PATCH /api/headcount/[id]", () => {
 describe("DELETE /api/headcount/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // companyScenarioIds subquery: db.select().from().where()
+    const subqueryChain = { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue("subquery") }) };
+    mockSelect.mockReturnValue(subqueryChain);
 
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });

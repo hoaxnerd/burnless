@@ -46,13 +46,13 @@ describe("Modal", () => {
 
   it("calls onClose when backdrop is clicked", () => {
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <Modal open={true} onClose={onClose} title="Test">
         <p>Content</p>
       </Modal>
     );
-    // Backdrop is the first fixed div with aria-hidden
-    const backdrop = container.querySelector('[aria-hidden="true"]');
+    // Modal uses portal — backdrop renders into document.body
+    const backdrop = document.querySelector('[aria-hidden="true"]');
     expect(backdrop).toBeTruthy();
     fireEvent.click(backdrop!);
     expect(onClose).toHaveBeenCalledOnce();
