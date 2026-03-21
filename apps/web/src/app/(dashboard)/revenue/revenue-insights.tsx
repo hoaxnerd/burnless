@@ -172,14 +172,14 @@ function AiInsightsList({ growthMetrics, streams, hasSaaS }: RevenueInsightsProp
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+          <Sparkles className="h-3.5 w-3.5 text-accent-500" />
           <span className="text-[10px] font-medium uppercase tracking-widest text-surface-400">
             AI Revenue Intelligence
           </span>
         </div>
         <Link
           href="/ai"
-          className="inline-flex items-center gap-1 text-[10px] font-medium text-brand-600 hover:text-brand-700 transition-colors"
+          className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-600 hover:text-accent-700 transition-colors"
         >
           Deep analysis <ArrowRight className="h-3 w-3" />
         </Link>

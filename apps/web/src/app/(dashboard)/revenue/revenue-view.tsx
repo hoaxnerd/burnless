@@ -143,7 +143,7 @@ export function RevenueView({
         </ChartCard>
         {hasSaaS && (
           <ChartCard title="MRR Trend" subtitle="Monthly recurring revenue">
-            <AreaChartWidget data={mrrTimeline} color="#7c3aed" />
+            <AreaChartWidget data={mrrTimeline} color="#14b8a6" />
           </ChartCard>
         )}
       </div>

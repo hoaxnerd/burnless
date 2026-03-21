@@ -88,7 +88,7 @@ export function WeeklyDigestBanner() {
               </span>
             </div>
             {isAI && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-medium text-brand-500">
+              <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-2 py-0.5 text-[10px] font-medium text-accent-500">
                 <Sparkles className="h-2.5 w-2.5" />
                 AI
               </span>

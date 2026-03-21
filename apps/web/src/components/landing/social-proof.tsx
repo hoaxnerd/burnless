@@ -80,8 +80,8 @@ function StatCard({
         transform: active ? "translateY(0)" : "translateY(20px)",
       }}
     >
-      <div className="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-1">
-        <Icon className="w-5 h-5 text-brand-400" />
+      <div className="w-10 h-10 rounded-xl bg-highlight-500/10 border border-highlight-500/20 flex items-center justify-center mb-1">
+        <Icon className="w-5 h-5 text-highlight-500" />
       </div>
       <div className="text-2xl sm:text-3xl font-bold text-surface-900 font-mono tabular-nums tracking-tight">
         {prefix}

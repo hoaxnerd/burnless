@@ -60,7 +60,9 @@ export function ModeSwitcher() {
               relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
               transition-all duration-200
               ${
-                isActive
+                isActive && m.value === "intelligence"
+                  ? "bg-surface-0 text-accent-700 shadow-sm"
+                  : isActive
                   ? "bg-surface-0 text-surface-900 shadow-sm"
                   : isDisabled
                     ? "text-surface-300 cursor-not-allowed"

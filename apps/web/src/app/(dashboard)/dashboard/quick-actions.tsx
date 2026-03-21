@@ -212,7 +212,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
           `;
 
           if (action.primary) {
-            const cls = `${baseClasses} border border-brand-500/20 bg-brand-500/10 text-brand-600 hover:bg-brand-500/15 hover:border-brand-500/30`;
+            const cls = `${baseClasses} border border-accent-500/20 bg-accent-500/10 text-accent-600 hover:bg-accent-500/15 hover:border-accent-500/30`;
             return action.href ? (
               <a key={action.key} href={action.href} className={cls}>
                 <Icon className="h-3.5 w-3.5" /> {action.label}

@@ -177,9 +177,9 @@ const variantConfig: Record<
   },
   revenue: {
     icon: TrendingUp,
-    accentColor: "text-violet-500",
-    sparkColor: "#8b5cf6",
-    glowClass: "from-violet-500/5 to-transparent",
+    accentColor: "text-highlight-500",
+    sparkColor: "#14b8a6",
+    glowClass: "from-highlight-500/5 to-transparent",
     href: "/revenue",
   },
 };

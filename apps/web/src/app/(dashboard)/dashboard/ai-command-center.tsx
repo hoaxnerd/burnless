@@ -154,13 +154,13 @@ export function AiCommandCenter({
     <AiGate feature="insights" hideWhenOff>
       <div className="relative mb-6 animate-slide-up">
         {/* Gradient border wrapper */}
-        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-brand-500/20 via-violet-500/20 to-brand-500/10 pointer-events-none" />
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-accent-500/20 via-accent-400/20 to-accent-500/10 pointer-events-none" />
 
         {/* Main card */}
         <div className="relative rounded-2xl bg-surface-0 overflow-hidden">
           {/* Ambient glow */}
           <div
-            className="absolute inset-0 bg-gradient-to-br from-brand-500/[0.03] via-transparent to-violet-500/[0.03] pointer-events-none"
+            className="absolute inset-0 bg-gradient-to-br from-accent-500/[0.03] via-transparent to-accent-400/[0.03] pointer-events-none"
             style={{ animation: "ambientBreath 6s ease-in-out infinite" }}
           />
 
@@ -169,9 +169,9 @@ export function AiCommandCenter({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 opacity-20 blur-sm" />
-                  <div className="relative rounded-xl bg-gradient-to-br from-brand-500/10 to-violet-500/10 p-2">
-                    <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-brand-500" />
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-accent-500 to-accent-400 opacity-20 blur-sm" />
+                  <div className="relative rounded-xl bg-gradient-to-br from-accent-500/10 to-accent-400/10 p-2">
+                    <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-accent-500" />
                   </div>
                 </div>
                 <div>
@@ -186,7 +186,7 @@ export function AiCommandCenter({
 
               <button
                 onClick={openAiPanel}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-brand-500/20 bg-brand-500/10 px-3.5 py-2 text-xs font-medium text-brand-600 hover:bg-brand-500/15 hover:border-brand-500/30 transition-all duration-200 press-effect"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-accent-500/20 bg-accent-500/10 px-3.5 py-2 text-xs font-medium text-accent-600 hover:bg-accent-500/15 hover:border-accent-500/30 transition-all duration-200 press-effect"
               >
                 <Bot className="h-3.5 w-3.5" />
                 Talk to AI

@@ -47,7 +47,7 @@ export function ChatMessageList({
               {/* Assistant avatar */}
               {!isUser && (
                 <div className="flex-shrink-0 mt-1">
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm shadow-brand-500/20">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center shadow-sm shadow-accent-500/20">
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                 </div>
@@ -57,7 +57,7 @@ export function ChatMessageList({
                 {/* AI capabilities badge on first assistant message */}
                 {isFirstAssistant && (
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-600">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-100 px-2 py-0.5 text-[10px] font-medium text-accent-600">
                       <Sparkles className="h-2.5 w-2.5" />
                       AI Financial Companion
                     </span>
@@ -83,9 +83,9 @@ export function ChatMessageList({
                   {msg.isStreaming && !msg.content && (
                     <div className="flex items-center gap-2 py-1">
                       <span className="flex gap-1">
-                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0ms]" />
-                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:150ms]" />
-                        <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:300ms]" />
+                        <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:150ms]" />
+                        <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:300ms]" />
                       </span>
                       <span className="text-xs text-surface-400 animate-pulse">
                         Thinking...
@@ -95,7 +95,7 @@ export function ChatMessageList({
 
                   {/* Streaming cursor */}
                   {msg.isStreaming && msg.content && (
-                    <span className="inline-block ml-0.5 w-2 h-4 bg-brand-500 animate-pulse rounded-sm align-text-bottom" />
+                    <span className="inline-block ml-0.5 w-2 h-4 bg-accent-500 animate-pulse rounded-sm align-text-bottom" />
                   )}
                 </div>
 
@@ -148,16 +148,16 @@ export function ChatMessageList({
           <div className="flex justify-start animate-fade-in">
             <div className="flex gap-3">
               <div className="flex-shrink-0 mt-1">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-sm shadow-brand-500/20">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center shadow-sm shadow-accent-500/20">
                   <Bot className="h-4 w-4 text-white" />
                 </div>
               </div>
               <div className="rounded-2xl rounded-bl-md bg-surface-0 border border-surface-200 px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-2">
                   <span className="flex gap-1">
-                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0ms]" />
-                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:150ms]" />
-                    <span className="h-2 w-2 rounded-full bg-brand-400 animate-bounce [animation-delay:300ms]" />
+                    <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:0ms]" />
+                    <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:150ms]" />
+                    <span className="h-2 w-2 rounded-full bg-accent-400 animate-bounce [animation-delay:300ms]" />
                   </span>
                   <span className="text-xs text-surface-400 animate-pulse">
                     Thinking...

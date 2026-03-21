@@ -334,7 +334,7 @@ export default function AiCompanionPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-surface-900 flex items-center gap-2">
               <div className="relative">
-                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-brand-600" />
+                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-accent-600" />
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white" />
               </div>
               AI Financial Companion
@@ -351,7 +351,7 @@ export default function AiCompanionPage() {
                 Online
               </span>
               <span className="inline-flex items-center gap-1">
-                <Zap className="h-3 w-3 text-brand-500" />
+                <Zap className="h-3 w-3 text-accent-500" />
                 Claude
               </span>
             </div>
@@ -388,7 +388,7 @@ export default function AiCompanionPage() {
             <div className="w-full max-w-2xl">
               {/* Greeting */}
               <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 mb-4 shadow-lg shadow-brand-500/20">
+                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-accent-500 to-accent-700 mb-4 shadow-lg shadow-accent-500/20">
                   <Sparkles className="h-7 w-7 text-white" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-surface-900">

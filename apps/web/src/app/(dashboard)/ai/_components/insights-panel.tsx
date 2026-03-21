@@ -8,7 +8,7 @@ function severityIcon(severity: string) {
     case "warning":
       return <AlertTriangle className="h-4 w-4 text-amber-500" />;
     default:
-      return <TrendingUp className="h-4 w-4 text-blue-500" />;
+      return <TrendingUp className="h-4 w-4 text-accent-500" />;
   }
 }
 
@@ -19,7 +19,7 @@ function severityBorder(severity: string) {
     case "warning":
       return "border-amber-200 bg-amber-50";
     default:
-      return "border-blue-200 bg-blue-50";
+      return "border-accent-200 bg-accent-50";
   }
 }
 

@@ -39,8 +39,8 @@ function AIChatMockup({ visible }: { visible: boolean }) {
     <div className="rounded-xl border border-surface-200/20 bg-surface-0/40 backdrop-blur-sm overflow-hidden shadow-lg">
       {/* Chat header */}
       <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-surface-200/15 bg-surface-100/5">
-        <div className="w-6 h-6 rounded-full bg-brand-500/20 flex items-center justify-center">
-          <Bot className="w-3 h-3 text-brand-400" />
+        <div className="w-6 h-6 rounded-full bg-accent-500/20 flex items-center justify-center">
+          <Bot className="w-3 h-3 text-accent-400" />
         </div>
         <span className="text-xs font-semibold text-surface-900">Burnless AI</span>
         <span className="ml-auto flex items-center gap-1 text-[10px] text-success-500">
@@ -69,14 +69,14 @@ function AIChatMockup({ visible }: { visible: boolean }) {
             className="flex items-start gap-2"
             style={{ animation: "fadeSlideIn 0.3s var(--ease-smooth, ease-out) both" }}
           >
-            <div className="w-5 h-5 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-2.5 h-2.5 text-brand-400" />
+            <div className="w-5 h-5 rounded-full bg-accent-500/15 flex items-center justify-center shrink-0 mt-0.5">
+              <Bot className="w-2.5 h-2.5 text-accent-400" />
             </div>
             <div className="rounded-xl rounded-tl-sm bg-surface-200/10 border border-surface-200/15 px-3 py-2 flex gap-1">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="w-1 h-1 rounded-full bg-brand-400"
+                  className="w-1 h-1 rounded-full bg-accent-400"
                   style={{
                     animation: "typingCursor 1.2s ease-in-out infinite",
                     animationDelay: `${i * 0.15}s`,
@@ -93,8 +93,8 @@ function AIChatMockup({ visible }: { visible: boolean }) {
             className="flex items-start gap-2"
             style={{ animation: "fadeSlideIn 0.4s var(--ease-smooth, ease-out) both" }}
           >
-            <div className="w-5 h-5 rounded-full bg-brand-500/15 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-2.5 h-2.5 text-brand-400" />
+            <div className="w-5 h-5 rounded-full bg-accent-500/15 flex items-center justify-center shrink-0 mt-0.5">
+              <Bot className="w-2.5 h-2.5 text-accent-400" />
             </div>
             <div className="rounded-xl rounded-tl-sm bg-surface-200/10 border border-surface-200/15 px-3 py-2 max-w-[90%]">
               <p className="text-xs text-surface-900 leading-relaxed">
@@ -231,18 +231,18 @@ const bottomFeatures = [
     icon: GitBranch,
     title: "Scenario Planning",
     description: "Model any 'what if' before you commit",
-    gradient: "from-violet-500/15 to-brand-500/5",
-    iconColor: "text-violet-400",
-    iconBg: "bg-violet-500/10 border-violet-500/20",
+    gradient: "from-accent-500/15 to-accent-400/5",
+    iconColor: "text-accent-400",
+    iconBg: "bg-accent-500/10 border-accent-500/20",
     visual: "branches",
   },
   {
     icon: BarChart3,
     title: "Revenue Intelligence",
     description: "MRR, ARR, churn — benchmarked",
-    gradient: "from-success-500/15 to-brand-500/5",
-    iconColor: "text-success-400",
-    iconBg: "bg-success-500/10 border-success-500/20",
+    gradient: "from-highlight-500/15 to-highlight-400/5",
+    iconColor: "text-highlight-500",
+    iconBg: "bg-highlight-500/10 border-highlight-500/20",
     visual: "chart",
   },
   {
@@ -268,7 +268,7 @@ const bottomFeatures = [
 function BranchVisual() {
   return (
     <div className="flex items-center justify-center h-full">
-      <svg width="80" height="64" viewBox="0 0 80 64" fill="none" className="text-violet-400/60">
+      <svg width="80" height="64" viewBox="0 0 80 64" fill="none" className="text-accent-400/60">
         {/* Main trunk */}
         <path d="M40 4 L40 60" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         {/* Branch left */}
@@ -281,9 +281,9 @@ function BranchVisual() {
         <circle cx="40" cy="20" r="3" fill="currentColor" />
         <circle cx="40" cy="35" r="3" fill="currentColor" />
         <circle cx="40" cy="48" r="3" fill="currentColor" />
-        <circle cx="22" cy="12" r="3" className="text-violet-300/80" fill="currentColor" />
-        <circle cx="58" cy="28" r="3" className="text-violet-300/80" fill="currentColor" />
-        <circle cx="20" cy="42" r="3" className="text-violet-300/80" fill="currentColor" />
+        <circle cx="22" cy="12" r="3" className="text-accent-300/80" fill="currentColor" />
+        <circle cx="58" cy="28" r="3" className="text-accent-300/80" fill="currentColor" />
+        <circle cx="20" cy="42" r="3" className="text-accent-300/80" fill="currentColor" />
       </svg>
     </div>
   );
@@ -438,10 +438,10 @@ export function FeatureBento() {
               {/* Right: Copy */}
               <div className="p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-9 h-9 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-brand-400" />
+                  <div className="w-9 h-9 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-accent-400" />
                   </div>
-                  <div className="h-px flex-1 bg-gradient-to-r from-brand-500/20 to-transparent" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-accent-500/20 to-transparent" />
                 </div>
 
                 <h3 className="text-2xl sm:text-3xl font-bold text-surface-900 tracking-tight mb-3">
@@ -458,8 +458,8 @@ export function FeatureBento() {
                     { icon: GitBranch, text: "One-click scenarios" },
                   ].map((item) => (
                     <div key={item.text} className="flex items-center gap-3 group/item">
-                      <div className="w-7 h-7 rounded-lg bg-brand-500/8 border border-brand-500/15 flex items-center justify-center transition-all duration-300 group-hover/item:bg-brand-500/15 group-hover/item:border-brand-500/25">
-                        <item.icon className="w-3.5 h-3.5 text-brand-400" />
+                      <div className="w-7 h-7 rounded-lg bg-accent-500/8 border border-accent-500/15 flex items-center justify-center transition-all duration-300 group-hover/item:bg-accent-500/15 group-hover/item:border-accent-500/25">
+                        <item.icon className="w-3.5 h-3.5 text-accent-400" />
                       </div>
                       <span className="text-sm font-medium text-surface-700 transition-colors duration-300 group-hover/item:text-surface-900">
                         {item.text}
