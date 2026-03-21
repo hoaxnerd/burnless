@@ -78,6 +78,15 @@ export type {
   AiFeatureMeta,
 } from "./feature-flags";
 
+// Embeddings
+export {
+  createEmbeddingService,
+  resetEmbeddingService,
+  OpenAIEmbeddingProvider,
+  NoopEmbeddingProvider,
+  type EmbeddingService,
+} from "./embeddings";
+
 // Types
 export type {
   FinancialSnapshot,

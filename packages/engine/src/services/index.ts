@@ -3,7 +3,6 @@
 export {
   createSearchService,
   resetSearchService,
-  MeiliSearchProvider,
   NoopSearchProvider,
   type SearchService,
   type SearchDocument,
@@ -20,3 +19,13 @@ export {
   type CrawlResult,
   type CrawlOptions,
 } from "./crawl";
+
+export {
+  createWebSearchService,
+  resetWebSearchService,
+  SearXNGProvider,
+  NoopWebSearchProvider,
+  type WebSearchService,
+  type WebSearchResult,
+  type WebSearchOptions,
+} from "./web-search";

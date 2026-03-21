@@ -3,9 +3,11 @@
 # All dependencies for local testing. Production uses managed services.
 
 services:
-  # ── Database ────────────────────────────────────────────────────────────────
+  # ── Database (PostgreSQL + pgvector) ────────────────────────────────────────
+  # pgvector image includes the vector extension for semantic search / embeddings.
+  # No separate search service needed — pgvector handles it within PostgreSQL.
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -37,7 +39,7 @@ services:
 
   # ── Local LLM (Ollama) ─────────────────────────────────────────────────────
   # OpenAI-compatible API at http://localhost:11434/v1
-  # Pull model on first run: docker exec burnless-ollama ollama pull gemma3:12b
+  # Serves both chat (gemma3:12b) and embeddings (nomic-embed-text)
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
@@ -52,36 +54,36 @@ services:
       retries: 10
       start_period: 30s
 
-  # Auto-pull the default model on first boot
+  # Auto-pull the chat + embedding models on first boot
   ollama-init:
     image: ollama/ollama:latest
     depends_on:
       ollama:
         condition: service_healthy
     restart: "no"
-    entrypoint: ["ollama", "pull", "gemma3:12b"]
+    entrypoint: ["/bin/sh", "-c", "ollama pull gemma3:12b && ollama pull nomic-embed-text"]
     environment:
       OLLAMA_HOST: http://ollama:11434
 
-  # ── Search Engine (MeiliSearch) ─────────────────────────────────────────────
-  # REST API at http://localhost:7700
-  # Production: switch to Algolia, Typesense, or managed MeiliSearch
-  meilisearch:
-    image: getmeili/meilisearch:v1.12
+  # ── Web Search (SearXNG) ───────────────────────────────────────────────────
+  # Self-hosted meta search engine — provides web search tool for the AI.
+  # API at http://localhost:8888/search?q=...&format=json
+  # Production: switch to Tavily, Serper, or Brave Search API
+  searxng:
+    image: searxng/searxng:latest
     restart: unless-stopped
     ports:
-      - "7700:7700"
+      - "8888:8080"
     environment:
-      MEILI_ENV: development
-      MEILI_MASTER_KEY: burnless-dev-key
-      MEILI_NO_ANALYTICS: "true"
+      SEARXNG_BASE_URL: http://localhost:8888
     volumes:
-      - meilidata:/meili_data
+      - searxng_data:/etc/searxng
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health || exit 1"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 15s
 
   # ── Web Crawler (Crawl4AI) ─────────────────────────────────────────────────
   # REST API at http://localhost:11235
@@ -120,4 +122,4 @@ volumes:
   pgdata:
   redisdata:
   ollama_models:
-  meilidata:
+  searxng_data:

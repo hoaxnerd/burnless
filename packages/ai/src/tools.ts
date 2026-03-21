@@ -433,6 +433,30 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "web_search",
+    description:
+      "Search the web for real-time information — market data, competitor analysis, regulatory updates, industry benchmarks, economic indicators, and other current information that may not be in the company's own data. Returns the top results with titles, URLs, and snippets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query. Be specific — include relevant context like 'SaaS', 'startup', year, geography, etc.",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum number of results to return (1-10). Defaults to 5.",
+        },
+        timeRange: {
+          type: "string",
+          enum: ["day", "week", "month", "year"],
+          description: "Restrict results to a time range. Useful for recent data.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "forecast_revenue",
     description:
       "Project future revenue based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",

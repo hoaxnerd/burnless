@@ -43,11 +43,15 @@ log "Starting Docker services..."
 docker compose up -d
 
 # ── Wait for PostgreSQL ──────────────────────────────────────────────────────
-log "Waiting for PostgreSQL..."
+log "Waiting for PostgreSQL + pgvector..."
 until docker compose exec postgres pg_isready -U burnless -q 2>/dev/null; do
   sleep 1
 done
 log "PostgreSQL is ready."
+
+# ── Enable pgvector extension ────────────────────────────────────────────────
+log "Enabling pgvector extension..."
+docker compose exec postgres psql -U burnless -d burnless -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>/dev/null || true
 
 # ── Install dependencies ─────────────────────────────────────────────────────
 if [ ! -d node_modules ]; then
@@ -62,21 +66,21 @@ pnpm db:push
 # ── Print service URLs ───────────────────────────────────────────────────────
 echo ""
 log "All services running:"
-echo "  App:          http://localhost:3000"
-echo "  PostgreSQL:   localhost:5432"
-echo "  Redis:        localhost:6379"
-echo "  Ollama API:   http://localhost:11434"
-echo "  MeiliSearch:  http://localhost:7700"
-echo "  Crawl4AI:     http://localhost:11235"
-echo "  Mailpit UI:   http://localhost:8025"
-echo "  Mailpit SMTP: localhost:1025"
+echo "  App:              http://localhost:3000"
+echo "  PostgreSQL:       localhost:5432  (+ pgvector)"
+echo "  Redis:            localhost:6379"
+echo "  Ollama API:       http://localhost:11434  (chat: gemma3:12b, embed: nomic-embed-text)"
+echo "  SearXNG Search:   http://localhost:8888  (web search for AI)"
+echo "  Crawl4AI:         http://localhost:11235"
+echo "  Mailpit UI:       http://localhost:8025"
+echo "  Mailpit SMTP:     localhost:1025"
 echo ""
 
-# ── Check Ollama model ───────────────────────────────────────────────────────
+# ── Check Ollama models ──────────────────────────────────────────────────────
 if docker compose exec ollama ollama list 2>/dev/null | grep -q "gemma3:12b"; then
-  log "Ollama model gemma3:12b is ready."
+  log "Ollama chat model (gemma3:12b) is ready."
 else
-  warn "Ollama model gemma3:12b is being pulled (may take a few minutes)."
+  warn "Ollama models are being pulled (may take a few minutes)."
   warn "Check progress: docker compose logs -f ollama-init"
 fi
 
