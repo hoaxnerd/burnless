@@ -77,8 +77,13 @@ export function useProactiveAlerts() {
           }, delay);
           delay += 800;
         }
-      } catch {
-        // Silently fail — alerts are non-critical
+      } catch (err) {
+        // Alerts are non-critical, but log for visibility
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          import("@sentry/nextjs")
+            .then((Sentry) => Sentry.captureMessage("Proactive alerts load failed", { level: "warning", extra: { error: String(err) } }))
+            .catch(() => {});
+        }
       }
     })();
 

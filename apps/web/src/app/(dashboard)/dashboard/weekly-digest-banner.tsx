@@ -18,12 +18,28 @@ export function WeeklyDigestBanner() {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/digest")
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    fetch("/api/digest", { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (data.digest) setDigest(data.digest);
       })
-      .catch(() => {});
+      .catch((err) => {
+        // Log to Sentry — digest is non-critical but we want visibility
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          import("@sentry/nextjs")
+            .then((Sentry) => Sentry.captureMessage("Weekly digest load failed", { level: "warning", extra: { error: String(err) } }))
+            .catch(() => {});
+        }
+      })
+      .finally(() => clearTimeout(timer));
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, []);
 
   if (!digest || dismissed) return null;

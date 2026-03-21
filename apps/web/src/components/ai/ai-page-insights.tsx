@@ -13,6 +13,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { AiGate } from "./ai-gate";
+import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,19 +77,26 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [insights, setInsights] = useState<PageInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [errorVariant, setErrorVariant] = useState<ReturnType<typeof classifyError>>("generic");
   const [cached, setCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
+  const [slow, setSlow] = useState(false);
 
   const fetchInsights = useCallback(
     async (forceGenerate = false) => {
       setLoading(true);
       setError(false);
+      setSlow(false);
+
+      const controller = new AbortController();
+      const slowTimer = setTimeout(() => setSlow(true), 5000);
+      const abortTimer = setTimeout(() => controller.abort(), 15000);
 
       try {
         if (!forceGenerate) {
           // Try cached first
-          const cachedRes = await fetch(`/api/insights?page=${page}`);
+          const cachedRes = await fetch(`/api/insights?page=${page}`, { signal: controller.signal });
           if (cachedRes.ok) {
             const data = await cachedRes.json();
             if (data.insights?.length > 0) {
@@ -96,6 +104,8 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
               setCached(true);
               setCachedAt(data.cachedAt ?? null);
               setLoading(false);
+              clearTimeout(slowTimer);
+              clearTimeout(abortTimer);
               return;
             }
           }
@@ -106,6 +116,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ page, scenarioId, pageData }),
+          signal: controller.signal,
         });
 
         if (!res.ok) throw new Error("Failed to generate insights");
@@ -114,10 +125,20 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
         setInsights(data.insights ?? []);
         setCached(false);
         setCachedAt(null);
-      } catch {
+      } catch (err) {
         setError(true);
+        setErrorVariant(classifyError(err));
+        // Log to Sentry
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          import("@sentry/nextjs")
+            .then((Sentry) => Sentry.captureException(err, { extra: { page, scenarioId } }))
+            .catch(() => {});
+        }
       } finally {
         setLoading(false);
+        setSlow(false);
+        clearTimeout(slowTimer);
+        clearTimeout(abortTimer);
       }
     },
     [page, scenarioId, pageData]
@@ -130,12 +151,37 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   if (loading && insights.length === 0) {
     return (
       <AiGate feature="insights" hideWhenOff>
-        <InsightsSkeleton />
+        {slow ? (
+          <div className="rounded-2xl border border-surface-200 bg-surface-0 p-4 mb-6 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-4 w-4 text-brand-400 animate-spin flex-shrink-0" />
+              <p className="text-sm text-surface-500">Generating insights — this may take a moment...</p>
+            </div>
+          </div>
+        ) : (
+          <InsightsSkeleton />
+        )}
       </AiGate>
     );
   }
 
-  if (error || insights.length === 0) return null;
+  if (error && insights.length === 0) {
+    return (
+      <AiGate feature="insights" hideWhenOff>
+        <div className="mb-6">
+          <DataLoadError
+            title="Couldn't load insights"
+            variant={errorVariant}
+            onRetry={() => fetchInsights()}
+            retrying={loading}
+            compact
+          />
+        </div>
+      </AiGate>
+    );
+  }
+
+  if (insights.length === 0) return null;
 
   return (
     <AiGate feature="insights" hideWhenOff>
