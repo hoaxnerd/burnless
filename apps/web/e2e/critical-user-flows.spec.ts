@@ -46,7 +46,7 @@ test.describe("Auth flow: register → login → dashboard", () => {
     await expect(page.getByPlaceholder("Min. 8 characters")).toBeVisible();
   });
 
-  test("registration creates account and redirects to verify-email", async ({
+  test("registration creates account and redirects to dashboard", async ({
     page,
   }) => {
     const uniqueEmail = `e2e-reg-${Date.now()}@burnless-test.com`;
@@ -65,8 +65,8 @@ test.describe("Auth flow: register → login → dashboard", () => {
     // Submit signup — button text is "Create account"
     await page.getByRole("button", { name: /create account/i }).click();
 
-    // Should redirect to verify-email page
-    await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
+    // Email verification disabled (BUR-161) — redirects to dashboard/onboarding
+    await expect(page).toHaveURL(/\/(dashboard|onboarding)/, { timeout: 15_000 });
   });
 
   test("existing user sees signin form and can log in", async ({ page }) => {
@@ -131,7 +131,9 @@ test.describe("Auth flow: register → login → dashboard", () => {
     });
   });
 
-  test("unverified user is redirected to verify-email after login", async ({
+  // Email verification temporarily disabled (BUR-161)
+  // Unverified users are allowed through to dashboard/onboarding
+  test("unverified user can access dashboard after login", async ({
     page,
   }) => {
     const unverifiedEmail = `e2e-unverified-${Date.now()}@burnless-test.com`;
@@ -149,8 +151,8 @@ test.describe("Auth flow: register → login → dashboard", () => {
     await page.getByPlaceholder("Enter your password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    // Should redirect to verify-email, NOT dashboard
-    await expect(page).toHaveURL(/\/verify-email/, { timeout: 15_000 });
+    // Should go to dashboard/onboarding, NOT verify-email
+    await expect(page).toHaveURL(/\/(dashboard|onboarding)/, { timeout: 15_000 });
   });
 });
 

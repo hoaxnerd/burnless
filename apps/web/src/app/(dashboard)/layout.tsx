@@ -14,7 +14,8 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (!session.user.isEmailVerified) redirect("/verify-email");
+  // Email verification temporarily disabled (BUR-161)
+  // if (!session.user.isEmailVerified) redirect("/verify-email");
 
   const company = await getCompany();
   if (!company) redirect("/onboarding");
