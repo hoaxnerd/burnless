@@ -155,7 +155,8 @@ export function HeroKpiCard({
   description,
   sparkData,
   stagger = 0,
-}: HeroKpiCardProps) {
+  celebrate = false,
+}: HeroKpiCardProps & { celebrate?: boolean }) {
   const config = variantConfig[variant];
   const Icon = config.icon;
   const router = useRouter();
@@ -185,30 +186,36 @@ export function HeroKpiCard({
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(config.href); }}
       className={`
         group relative overflow-hidden cursor-pointer
-        rounded-2xl bg-surface-0 border border-surface-200
+        rounded-2xl border
         p-5 sm:p-6
-        hover:border-surface-300 hover:shadow-lg
         transition-all duration-300
         animate-slide-up stagger-${stagger + 1}
+        ${ghost
+          ? "bg-surface-50/50 border-dashed border-surface-200/70 hover:border-surface-300"
+          : "bg-surface-0 border-surface-200 hover:border-surface-300 hover:shadow-lg"
+        }
+        ${celebrate ? "animate-celebrate" : ""}
       `}
     >
-      {/* Subtle gradient glow */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-br ${config.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
-      />
+      {/* Subtle gradient glow — only on populated cards */}
+      {!ghost && (
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${config.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+        />
+      )}
 
       <div className="relative z-10">
         {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className={`${config.accentColor}`}>
+            <div className={ghost ? "text-surface-300" : config.accentColor}>
               <Icon className="h-4 w-4" strokeWidth={2} />
             </div>
-            <span className="text-xs font-medium uppercase tracking-wider text-surface-400">
+            <span className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-300" : "text-surface-400"}`}>
               {label}
             </span>
           </div>
-          {sparkData && sparkData.length >= 2 && (
+          {!ghost && sparkData && sparkData.length >= 2 && (
             <Sparkline data={sparkData} color={config.sparkColor} />
           )}
         </div>
@@ -229,7 +236,7 @@ export function HeroKpiCard({
             <span className="text-xs text-surface-400">{changeLabel}</span>
           )}
           {description && !change && (
-            <span className="text-xs text-surface-400">{description}</span>
+            <span className={`text-xs ${ghost ? "text-surface-300" : "text-surface-400"}`}>{description}</span>
           )}
         </div>
       </div>
