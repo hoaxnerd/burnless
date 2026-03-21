@@ -316,7 +316,7 @@ export default function ImportPage() {
 
           if (!dateStr || !amountStr) return null;
 
-          let amount = parseFloat(
+          const amount = parseFloat(
             amountStr.replace(/[$,\u20AC\u00A3()]/g, "").replace(/^\((.+)\)$/, "-$1")
           );
           if (isNaN(amount)) return null;

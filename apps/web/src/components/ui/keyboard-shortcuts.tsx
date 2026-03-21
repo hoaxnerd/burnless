@@ -42,7 +42,10 @@ export function useShortcuts() {
 export function usePageShortcuts(shortcuts: Shortcut[]) {
   const { registerPageShortcuts } = useShortcuts();
   const shortcutsRef = useRef(shortcuts);
-  shortcutsRef.current = shortcuts;
+
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+  });
 
   useEffect(() => {
     const unregister = registerPageShortcuts(shortcutsRef.current);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wallet,
@@ -68,19 +67,9 @@ function Sparkline({
 /* ── Animated number counter ──────────────────────────────────────────────── */
 
 function AnimatedValue({ value }: { value: string }) {
-  const [displayed, setDisplayed] = useState(value);
-  const prevRef = useRef(value);
-
-  useEffect(() => {
-    if (prevRef.current !== value) {
-      prevRef.current = value;
-      setDisplayed(value);
-    }
-  }, [value]);
-
   return (
     <span className="display-number tabular-nums transition-all duration-300">
-      {displayed}
+      {value}
     </span>
   );
 }

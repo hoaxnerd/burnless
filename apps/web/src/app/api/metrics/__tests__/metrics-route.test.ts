@@ -8,9 +8,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockRequireCompanyAccess, mockErrorResponse } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockErrorResponse: vi.fn((msg: string, status: number) => {
+  mockErrorResponse: vi.fn(async (msg: string, status: number) => {
     // Import NextResponse at call time
-    const { NextResponse } = require("next/server");
+    const { NextResponse } = await import("next/server");
     return NextResponse.json({ error: msg }, { status });
   }),
 }));

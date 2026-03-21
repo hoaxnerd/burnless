@@ -43,8 +43,8 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
   // Sync state when URL changes externally
   useEffect(() => {
     if (urlScenarioId !== activeScenarioId) {
-      setActiveScenarioId(urlScenarioId);
-      if (!urlScenarioId) setActiveScenarioName(null);
+      setActiveScenarioId(urlScenarioId); // eslint-disable-line react-hooks/set-state-in-effect -- sync URL params to state
+      if (!urlScenarioId) setActiveScenarioName(null); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [urlScenarioId, activeScenarioId]);
 

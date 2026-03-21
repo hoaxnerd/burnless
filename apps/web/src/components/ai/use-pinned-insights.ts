@@ -30,7 +30,7 @@ export function usePinnedInsights() {
   const [pins, setPins] = useState<PinnedInsight[]>([]);
 
   useEffect(() => {
-    setPins(loadPins());
+    setPins(loadPins()); // eslint-disable-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount
   }, []);
 
   const pin = useCallback((content: string, page: string) => {

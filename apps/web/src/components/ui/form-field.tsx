@@ -108,12 +108,12 @@ export function CurrencyInput({
   max,
   id,
 }: CurrencyInputProps) {
-  const [displayValue, setDisplayValue] = useState(() => formatCurrencyDisplay(value));
-  const [focused, setFocused] = useState(false);
-
   function formatCurrencyDisplay(num: number): string {
     return fmtNum(num, locale);
   }
+
+  const [displayValue, setDisplayValue] = useState(() => formatCurrencyDisplay(value));
+  const [focused, setFocused] = useState(false);
 
   function parseCurrency(str: string): number {
     const cleaned = str.replace(/[^0-9.-]/g, "");

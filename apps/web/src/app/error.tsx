@@ -44,6 +44,7 @@ export default function AppError({
           >
             Try again
           </button>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             className="rounded-xl bg-surface-100 px-5 py-2.5 text-sm font-semibold text-surface-700 hover:bg-surface-200 transition-colors"

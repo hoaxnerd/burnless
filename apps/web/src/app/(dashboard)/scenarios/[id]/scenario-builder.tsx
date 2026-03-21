@@ -86,8 +86,15 @@ const paramFormats: Record<keyof WhatIfParams, (v: number) => string> = {
 
 function useUndoRedo<T>(initial: T) {
   const [state, setState] = useState(initial);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const historyRef = useRef<T[]>([initial]);
   const indexRef = useRef(0);
+
+  const updateFlags = useCallback(() => {
+    setCanUndo(indexRef.current > 0);
+    setCanRedo(indexRef.current < historyRef.current.length - 1);
+  }, []);
 
   const set = useCallback((next: T | ((prev: T) => T)) => {
     setState((prev) => {
@@ -101,26 +108,26 @@ function useUndoRedo<T>(initial: T) {
       } else {
         indexRef.current++;
       }
+      updateFlags();
       return nextVal;
     });
-  }, []);
+  }, [updateFlags]);
 
   const undo = useCallback(() => {
     if (indexRef.current > 0) {
       indexRef.current--;
       setState(historyRef.current[indexRef.current]!);
+      updateFlags();
     }
-  }, []);
+  }, [updateFlags]);
 
   const redo = useCallback(() => {
     if (indexRef.current < historyRef.current.length - 1) {
       indexRef.current++;
       setState(historyRef.current[indexRef.current]!);
+      updateFlags();
     }
-  }, []);
-
-  const canUndo = indexRef.current > 0;
-  const canRedo = indexRef.current < historyRef.current.length - 1;
+  }, [updateFlags]);
 
   return { state, set, undo, redo, canUndo, canRedo };
 }

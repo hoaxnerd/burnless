@@ -35,11 +35,11 @@ export function ScenarioCompareView({
 
   useEffect(() => {
     if (baseId === compareId) {
-      setComparison(null);
+      setComparison(null); // eslint-disable-line react-hooks/set-state-in-effect -- clear stale data when IDs match
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect -- fetch lifecycle: loading -> result
     fetch(`/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`)
       .then((r) => r.json())
       .then((data) => setComparison(data))

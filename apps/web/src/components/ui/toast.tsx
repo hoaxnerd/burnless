@@ -171,7 +171,7 @@ function ToastPortal({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect -- client-only portal mount check
   }, []);
 
   if (!mounted || toasts.length === 0) return null;

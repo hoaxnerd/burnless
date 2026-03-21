@@ -81,7 +81,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     else setSelected(new Set(filtered.map((i) => i.id)));
   };
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
+  const sortIcon = (col: SortKey) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
@@ -199,7 +199,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 onClick={() => handleSort("accountName")}
               >
                 <span className="inline-flex items-center gap-1">
-                  Expense <SortIcon col="accountName" />
+                  Expense {sortIcon("accountName")}
                 </span>
               </th>
               <th
@@ -207,7 +207,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 onClick={() => handleSort("subcategory")}
               >
                 <span className="inline-flex items-center gap-1">
-                  Category <SortIcon col="subcategory" />
+                  Category {sortIcon("subcategory")}
                 </span>
               </th>
               <th
@@ -215,7 +215,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 onClick={() => handleSort("currentAmount")}
               >
                 <span className="inline-flex items-center gap-1 justify-end">
-                  Monthly <SortIcon col="currentAmount" />
+                  Monthly {sortIcon("currentAmount")}
                 </span>
               </th>
               <th
@@ -223,7 +223,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 onClick={() => handleSort("changePercent")}
               >
                 <span className="inline-flex items-center gap-1 justify-end">
-                  Trend <SortIcon col="changePercent" />
+                  Trend {sortIcon("changePercent")}
                 </span>
               </th>
               <th className="text-center px-4 py-3 text-xs font-medium text-surface-500 uppercase">

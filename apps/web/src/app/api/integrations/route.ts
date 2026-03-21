@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, integrations } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse } from "@/lib/api-helpers";
 
 // ── GET /api/integrations — List all integrations for company ───────────────
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   const [existing] = await db
     .select()
     .from(integrations)
-    .where(eq(integrations.companyId, ctx.companyId))
+    .where(and(eq(integrations.companyId, ctx.companyId), eq(integrations.type, type)))
     .limit(1);
 
   // Upsert — reconnect if disconnected

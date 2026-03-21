@@ -46,7 +46,7 @@ function VerifyEmailContent() {
 
   useEffect(() => {
     if (token && emailParam) {
-      verifyToken();
+      verifyToken(); // eslint-disable-line react-hooks/set-state-in-effect -- async fetch, not synchronous setState
     }
   }, [token, emailParam, verifyToken]);
 

@@ -18,7 +18,7 @@ export function ScenarioBanner() {
         })
         .catch(() => {});
     } else {
-      setResolvedName(activeScenarioName);
+      setResolvedName(activeScenarioName); // eslint-disable-line react-hooks/set-state-in-effect -- sync derived state from context
     }
   }, [activeScenarioId, activeScenarioName]);
 

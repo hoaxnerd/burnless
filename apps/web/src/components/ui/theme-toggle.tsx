@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("burnless-theme") as Theme | null;
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const resolved = stored ?? (prefersDark ? "dark" : "light");
-    setTheme(resolved);
+    setTheme(resolved); // eslint-disable-line react-hooks/set-state-in-effect -- hydrate theme from localStorage on mount
     document.documentElement.classList.toggle("dark", resolved === "dark");
   }, []);
 

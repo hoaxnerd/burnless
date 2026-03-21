@@ -315,7 +315,7 @@ export default function OnboardingPage() {
             Welcome to Burnless
           </h1>
           <p className="mt-3 text-surface-500 dark:text-surface-400 max-w-sm mx-auto">
-            Enter your company website and we'll set everything up for you.
+            Enter your company website and we&apos;ll set everything up for you.
           </p>
 
           <form onSubmit={handleWebsiteSubmit} className="mt-8">
@@ -345,7 +345,7 @@ export default function OnboardingPage() {
             className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-800 px-6 py-3.5 text-base font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
           >
             <SkipForward className="w-4 h-4" />
-            I'll fill in manually
+            I&apos;ll fill in manually
           </button>
           <p className="mt-2 text-center text-xs text-surface-400">
             You can always update this later in Settings
@@ -398,7 +398,7 @@ export default function OnboardingPage() {
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl border border-surface-300 dark:border-surface-600 px-5 py-2.5 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
           >
             <SkipForward className="w-4 h-4" />
-            Skip — I'll fill in manually
+            Skip — I&apos;ll fill in manually
           </button>
           <button
             onClick={skipOnboarding}
@@ -572,7 +572,7 @@ export default function OnboardingPage() {
             onClick={skipOnboarding}
             className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-surface-200 dark:border-surface-700 px-6 py-3 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
           >
-            I'll do this later
+            I&apos;ll do this later
           </button>
 
           <p className="mt-3 text-center text-xs text-surface-400">
@@ -627,10 +627,10 @@ export default function OnboardingPage() {
           <Check className="w-7 h-7 text-success-600 dark:text-success-500" />
         </div>
         <h2 className="text-xl font-bold text-surface-900 dark:text-surface-50">
-          You're all set!
+          You&apos;re all set!
         </h2>
         <p className="mt-2 text-sm text-surface-500 dark:text-surface-400">
-          {fields.company_name.value || "Your company"}'s financial model is
+          {fields.company_name.value || "Your company"}&apos;s financial model is
           ready.
         </p>
         <button

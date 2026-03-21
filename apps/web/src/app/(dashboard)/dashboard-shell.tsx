@@ -135,7 +135,7 @@ function DashboardContent({
 
   // Close mobile sidebar on navigation
   useEffect(() => {
-    setMobileOpen(false);
+    setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- intentional: close sidebar on route change
   }, [pathname]);
 
   const scenarioId = searchParams.get("scenarioId");

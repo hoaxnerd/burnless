@@ -78,7 +78,7 @@ describe("DELETE /api/users/me", () => {
 
   it("deletes user data in transaction with correct confirmation", async () => {
     mockGetAuthUser.mockResolvedValue({ id: "user-1" });
-    mockTransaction.mockImplementation(async (fn: Function) => {
+    mockTransaction.mockImplementation(async (fn: (...args: unknown[]) => unknown) => {
       const tx = {
         delete: mockDelete,
       };
