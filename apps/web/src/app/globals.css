@@ -416,6 +416,21 @@ body {
   animation: scaleIn var(--duration-normal) var(--ease-smooth) both;
 }
 
+.animate-slide-in-right {
+  animation: slideInRight var(--duration-normal) var(--ease-smooth) both;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .animate-celebrate {
   animation: celebrate 0.6s var(--ease-bounce) both;
 }
@@ -493,7 +508,7 @@ body {
 
 .skip-link {
   position: absolute;
-  top: -40px;
+  top: -100%;
   left: 0;
   padding: 12px 16px;
   background: var(--color-brand-600);

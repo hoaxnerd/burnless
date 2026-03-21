@@ -103,6 +103,31 @@ export {
   type CustomMetricDefinition,
 } from "./metrics";
 
+// Metric registry — catalog, definitions, dependency graph, formatting
+export {
+  METRIC_REGISTRY,
+  CATEGORY_META,
+  DEFAULT_HERO_CARDS,
+  DEFAULT_SECONDARY_METRICS,
+  INTELLIGENCE_DEFAULTS,
+  getMetricDef,
+  getMetricsByCategory,
+  getMetricsByTier,
+  getMetricCatalog,
+  buildMetricDependencyGraph,
+  getMetricDependencyTree,
+  getMetricDependents,
+  extractMetricValue,
+  formatMetricValue,
+  evaluateBenchmark,
+  type MetricDefinition,
+  type MetricCategory,
+  type MetricTier,
+  type MetricFormat,
+  type MetricBenchmark,
+  type SignalDirection,
+} from "./metric-registry";
+
 // Scenario comparison
 export {
   compareScenarios,

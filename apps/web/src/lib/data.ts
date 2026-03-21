@@ -13,6 +13,7 @@ import {
   transactions,
   departments,
   fundingRounds,
+  dashboardPreferences,
 } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { auth } from "./auth";
@@ -121,4 +122,23 @@ export async function getBudgetScenario(companyId: string) {
 /** Get transactions for a company. */
 export async function getTransactions(companyId: string) {
   return db.select().from(transactions).where(eq(transactions.companyId, companyId));
+}
+
+/** Get dashboard preferences for the current user and company. */
+export async function getDashboardPreferences() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  const membership = await getCompanyForUser(session.user.id);
+  if (!membership) return null;
+  const [prefs] = await db
+    .select()
+    .from(dashboardPreferences)
+    .where(
+      and(
+        eq(dashboardPreferences.userId, session.user.id),
+        eq(dashboardPreferences.companyId, membership.companyId)
+      )
+    )
+    .limit(1);
+  return prefs ?? null;
 }

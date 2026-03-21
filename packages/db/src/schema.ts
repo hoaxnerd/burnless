@@ -734,11 +734,71 @@ export const aiMessages = pgTable(
   ]
 );
 
+// ── Dashboard Preferences (per-user layout, mode, card customization) ────────
+
+export const dashboardModeEnum = pgEnum("dashboard_mode", [
+  "intelligence",
+  "dynamic",
+  "custom",
+]);
+
+export const dashboardPreferences = pgTable(
+  "dashboard_preferences",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    /** Global dashboard display mode */
+    mode: dashboardModeEnum("mode").notNull().default("dynamic"),
+    /** Ordered list of hero card metric slugs (4 cards) */
+    heroCards: jsonb("hero_cards").$type<string[]>().notNull().default([]),
+    /** Ordered list of secondary metric slugs */
+    secondaryMetrics: jsonb("secondary_metrics").$type<string[]>().notNull().default([]),
+    /** Per-card mode overrides: { [metricSlug]: "intelligence" | "dynamic" | "custom" } */
+    cardModeOverrides: jsonb("card_mode_overrides")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    /** Per-card scenario overrides: { [metricSlug]: scenarioId } */
+    cardScenarioOverrides: jsonb("card_scenario_overrides")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    /** User-defined custom metric formulas: [{ id, name, formula, dependsOn }] */
+    customMetrics: jsonb("custom_metrics")
+      .$type<
+        Array<{
+          id: string;
+          name: string;
+          formula: string;
+          dependsOn: string[];
+        }>
+      >()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("dashboard_prefs_user_company_idx").on(table.userId, table.companyId),
+  ]
+);
+
 // ── Relations ─────────────────────────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
   companyMemberships: many(companyMembers),
   ownedCompanies: many(companies),
+  dashboardPreferences: many(dashboardPreferences),
 }));
 
 export const companiesRelations = relations(companies, ({ one, many }) => ({
@@ -760,6 +820,18 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   aiInsightCache: many(aiInsightCache),
   weeklyDigests: many(weeklyDigests),
   financialAuditLogs: many(financialAuditLogs),
+  dashboardPreferences: many(dashboardPreferences),
+}));
+
+export const dashboardPreferencesRelations = relations(dashboardPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [dashboardPreferences.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [dashboardPreferences.companyId],
+    references: [companies.id],
+  }),
 }));
 
 export const companyMembersRelations = relations(companyMembers, ({ one }) => ({
@@ -1176,6 +1248,58 @@ export const aiToolAuditLogsRelations = relations(aiToolAuditLogs, ({ one }) => 
     references: [aiConversations.id],
   }),
 }));
+
+// ── User Preferences (sidebar order, quick action mode, UI settings) ────────
+
+export const quickActionModeEnum = pgEnum("quick_action_mode", [
+  "intelligence",
+  "dynamic",
+  "custom",
+]);
+
+export const userPreferences = pgTable(
+  "user_preferences",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    sidebarOrder: jsonb("sidebar_order").$type<string[]>(), // ordered array of nav item IDs
+    quickActionMode: quickActionModeEnum("quick_action_mode").notNull().default("dynamic"),
+    customQuickActions: jsonb("custom_quick_actions").$type<string[]>(), // IDs of pinned quick actions
+    sidebarCollapsed: boolean("sidebar_collapsed").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("user_preferences_user_company_idx").on(
+      table.userId,
+      table.companyId
+    ),
+  ]
+);
+
+export const userPreferencesRelations = relations(
+  userPreferences,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userPreferences.userId],
+      references: [users.id],
+    }),
+    company: one(companies, {
+      fields: [userPreferences.companyId],
+      references: [companies.id],
+    }),
+  })
+);
 
 // ── AI Usage Logs (cost tracking per feature) ───────────────────────────────
 

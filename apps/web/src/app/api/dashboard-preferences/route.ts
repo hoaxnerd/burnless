@@ -1,0 +1,102 @@
+/**
+ * GET/PATCH /api/dashboard-preferences — Read and update dashboard layout,
+ * mode, card configuration, and custom metrics.
+ */
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { db, dashboardPreferences } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { DEFAULT_HERO_CARDS, DEFAULT_SECONDARY_METRICS } from "@burnless/engine";
+
+// ── GET ─────────────────────────────────────────────────────────────────────
+
+export const GET = withErrorHandler(async () => {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx.error;
+
+  const [prefs] = await db
+    .select()
+    .from(dashboardPreferences)
+    .where(
+      and(
+        eq(dashboardPreferences.userId, ctx.userId),
+        eq(dashboardPreferences.companyId, ctx.companyId)
+      )
+    )
+    .limit(1);
+
+  // Return defaults if no preferences saved yet
+  return NextResponse.json(
+    prefs ?? {
+      mode: "dynamic",
+      heroCards: DEFAULT_HERO_CARDS,
+      secondaryMetrics: DEFAULT_SECONDARY_METRICS,
+      cardModeOverrides: {},
+      cardScenarioOverrides: {},
+      customMetrics: [],
+    }
+  );
+});
+
+// ── PATCH ───────────────────────────────────────────────────────────────────
+
+const patchSchema = z.object({
+  mode: z.enum(["intelligence", "dynamic", "custom"]).optional(),
+  heroCards: z.array(z.string()).max(8).optional(),
+  secondaryMetrics: z.array(z.string()).max(20).optional(),
+  cardModeOverrides: z.record(z.string(), z.enum(["intelligence", "dynamic", "custom"])).optional(),
+  cardScenarioOverrides: z.record(z.string(), z.string()).optional(),
+  customMetrics: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).max(100),
+        formula: z.string().min(1).max(500),
+        dependsOn: z.array(z.string()),
+      })
+    )
+    .max(20)
+    .optional(),
+});
+
+export const PATCH = withErrorHandler(async (request: Request) => {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx.error;
+
+  const body = patchSchema.parse(await request.json());
+
+  // Upsert — create if missing, update if exists
+  const [existing] = await db
+    .select({ id: dashboardPreferences.id })
+    .from(dashboardPreferences)
+    .where(
+      and(
+        eq(dashboardPreferences.userId, ctx.userId),
+        eq(dashboardPreferences.companyId, ctx.companyId)
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    const [updated] = await db
+      .update(dashboardPreferences)
+      .set(body)
+      .where(eq(dashboardPreferences.id, existing.id))
+      .returning();
+    return NextResponse.json(updated);
+  }
+
+  const [created] = await db
+    .insert(dashboardPreferences)
+    .values({
+      userId: ctx.userId,
+      companyId: ctx.companyId,
+      heroCards: body.heroCards ?? DEFAULT_HERO_CARDS,
+      secondaryMetrics: body.secondaryMetrics ?? DEFAULT_SECONDARY_METRICS,
+      ...body,
+    })
+    .returning();
+  return NextResponse.json(created, { status: 201 });
+});

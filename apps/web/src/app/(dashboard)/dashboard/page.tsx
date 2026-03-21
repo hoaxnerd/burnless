@@ -7,6 +7,7 @@ import {
   getAccounts,
   getRevenueStreams,
   getFundingRounds,
+  getDashboardPreferences,
 } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { seriesToArray, monthKey } from "@burnless/engine";
@@ -18,6 +19,11 @@ import { PinnedInsights } from "./pinned-insights";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
 import { BoardMeetingMode } from "./board-meeting-mode";
+import { DashboardIntelligenceProvider } from "./dashboard-intelligence-context";
+import { DashboardHeader } from "./dashboard-header";
+import { CustomizableMetrics } from "./customizable-metrics";
+import { StatsCatalog } from "./stats-catalog";
+import { FormulaViewer } from "./formula-viewer";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -52,13 +58,15 @@ export default async function DashboardPage({
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
-  const [data, allScenarios, accounts, revenueStreams, fundingRounds] = await Promise.all([
-    computeDashboardData(company.id, scenario.id),
-    getScenarios(company.id),
-    getAccounts(company.id),
-    getRevenueStreams(scenario.id),
-    getFundingRounds(company.id),
-  ]);
+  const [data, allScenarios, accounts, revenueStreams, fundingRounds, dashPrefs] =
+    await Promise.all([
+      computeDashboardData(company.id, scenario.id),
+      getScenarios(company.id),
+      getAccounts(company.id),
+      getRevenueStreams(scenario.id),
+      getFundingRounds(company.id),
+      getDashboardPreferences().catch(() => null),
+    ]);
 
   const { metrics, hasData, currentMonth } = data;
 
@@ -84,17 +92,9 @@ export default async function DashboardPage({
     expenses: expensesArr[i]?.value ?? 0,
   }));
 
-  /* ── Key metrics: current and previous for MoM ────────────────── */
-  const currentGrossMargin = metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0;
-  const prevGrossMargin = metrics.grossMarginPercent.find((m) => m.month === prevMonth)?.value ?? 0;
+  /* ── Headcount for secondary metrics ────────────────────────────── */
   const currentHeadcount = Math.round(data.headcountSeries.get(currentMonth) ?? 0);
   const prevHeadcount = Math.round(data.headcountSeries.get(prevMonth) ?? 0);
-  const currentRevPerEmp = metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0;
-  const currentEbitda = metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0;
-  const prevEbitda = metrics.ebitda.find((m) => m.month === prevMonth)?.value ?? 0;
-  const currentRuleOf40 = metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0;
-  const prevRuleOf40 = metrics.ruleOf40.find((m) => m.month === prevMonth)?.value ?? 0;
-  const currentBurnMultiple = metrics.burnMultiple.find((m) => m.month === currentMonth)?.value ?? 0;
 
   /* ── Context flags for empty state & quick actions ──────────────── */
   const hasExpenses = data.totalExpenses.size > 0 && Array.from(data.totalExpenses.values()).some((v) => v > 0);
@@ -122,257 +122,207 @@ export default async function DashboardPage({
   };
 
   return (
-    <div>
-      {/* Monday Morning CFO Digest */}
-      {hasData && <WeeklyDigestBanner />}
+    <DashboardIntelligenceProvider
+      initialPreferences={dashPrefs ? {
+        mode: (dashPrefs.mode as "intelligence" | "dynamic" | "custom") ?? "dynamic",
+        heroCards: (dashPrefs.heroCards as string[]) ?? [],
+        secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
+        cardModeOverrides: (dashPrefs.cardModeOverrides as Record<string, "intelligence" | "dynamic" | "custom">) ?? {},
+        cardScenarioOverrides: (dashPrefs.cardScenarioOverrides as Record<string, string>) ?? {},
+        customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
+      } : null}
+    >
+      <div>
+        {/* Monday Morning CFO Digest */}
+        {hasData && <WeeklyDigestBanner />}
 
-      {/* AI Insight Banner */}
-      {hasData && (
-        <Suspense fallback={<div className="h-16 rounded-2xl bg-surface-50 animate-pulse mb-4" />}>
-          <AiInsightBanner
-            runway={currentRunway}
-            burnRate={currentBurn}
-            mrrGrowth={mrrGrowthPct}
-            cash={currentCash}
-          />
-        </Suspense>
-      )}
-
-      {/* Header */}
-      <div className="mb-8 sm:mb-12 animate-slide-up flex items-start justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-surface-900 tracking-tight">Dashboard</h1>
-          <p className="mt-1.5 text-sm text-surface-400">
-            {company.name} &mdash; Financial command center
-          </p>
-        </div>
-        {hasData && <BoardMeetingMode data={boardData} />}
-      </div>
-
-      {/* Hero KPI Cards — progressively populate as data arrives */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-        <HeroKpiCard
-          variant="cash"
-          label="Cash Position"
-          value={hasFunding ? formatCurrency(currentCash) : "$---"}
-          change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
-          changeLabel={hasFunding ? "vs last month" : undefined}
-          description={!hasFunding ? "Add funding to see cash" : undefined}
-          sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
-          stagger={0}
-          celebrate={allPopulated}
-        />
-        <HeroKpiCard
-          variant="burn"
-          label="Monthly Burn"
-          value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
-          change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
-          changeLabel={hasExpenses ? "vs last month" : undefined}
-          description={!hasExpenses ? "Add expenses to calculate" : undefined}
-          sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
-          stagger={1}
-          celebrate={allPopulated}
-        />
-        <HeroKpiCard
-          variant="runway"
-          label="Runway"
-          value={
-            hasFunding && hasExpenses
-              ? currentRunway >= 999
-                ? "\u221e"
-                : `${Math.round(currentRunway)} mo`
-              : "-- mo"
-          }
-          description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
-          sparkData={
-            hasFunding && hasExpenses
-              ? sparkline(
-                  metrics.cashRunwayMonths.map((m) => ({
-                    ...m,
-                    value: Math.min(m.value, 100),
-                  }))
-                )
-              : undefined
-          }
-          stagger={2}
-          celebrate={allPopulated}
-        />
-        <HeroKpiCard
-          variant="revenue"
-          label="MRR"
-          value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
-          change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
-          changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
-          description={!hasRevenue ? "Add revenue streams" : undefined}
-          sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
-          stagger={3}
-          celebrate={allPopulated}
-        />
-      </div>
-
-      {!hasData ? (
-        <DashboardEmptyState
-          companyName={company.name}
-          hasExpenses={hasExpenses}
-          hasRevenue={hasRevenue}
-          hasFunding={hasFunding}
-        />
-      ) : (
-        <>
-          {/* Quick Actions */}
-          <QuickActions
-            scenarioId={scenario.id}
-            accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
-            context={{
-              hasRevenue,
-              hasMultipleScenarios: allScenarios.length > 1,
-              burnRate: currentBurn,
-              runway: currentRunway,
-            }}
-          />
-
-          {/* Charts — 48px section gap */}
-          <Suspense fallback={
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
-              ))}
-            </div>
-          }>
-            <DashboardCharts
-              revenueVsExpenses={revenueVsExpenses}
-              cashData={metrics.cashPosition}
-              burnData={metrics.netBurnRate}
-              runwayData={metrics.cashRunwayMonths.map((m) => ({
-                ...m,
-                value: Math.min(m.value, 100),
-              }))}
-              mrrData={metrics.mrr}
-              hasSaaS={metrics.mrr.some((m) => m.value > 0)}
+        {/* AI Insight Banner */}
+        {hasData && (
+          <Suspense fallback={<div className="h-16 rounded-2xl bg-surface-50 animate-pulse mb-4" />}>
+            <AiInsightBanner
+              runway={currentRunway}
+              burnRate={currentBurn}
+              mrrGrowth={mrrGrowthPct}
+              cash={currentCash}
             />
           </Suspense>
+        )}
 
-          {/* Pinned AI Insights */}
-          <Suspense fallback={<div className="mt-6 sm:mt-8 h-24 rounded-2xl bg-surface-50 animate-pulse" />}>
-            <div className="mt-6 sm:mt-8">
-              <PinnedInsights />
-            </div>
-          </Suspense>
+        {/* Header with Mode Switcher */}
+        <DashboardHeader
+          companyName={company.name}
+          hasData={hasData}
+          boardData={boardData}
+        />
 
-          {/* Bottom section: Scenarios + Key Metrics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
-            {/* Pinned Scenarios */}
-            {pinnedScenarios.length > 0 && (
-              <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
-                  <Link
-                    href="/scenarios"
-                    className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
-                  >
-                    View all
-                  </Link>
-                </div>
-                <div className="space-y-2">
-                  {pinnedScenarios.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
+        {/* Hero KPI Cards — progressively populate as data arrives */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <HeroKpiCard
+            variant="cash"
+            label="Cash Position"
+            value={hasFunding ? formatCurrency(currentCash) : "$---"}
+            change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
+            changeLabel={hasFunding ? "vs last month" : undefined}
+            description={!hasFunding ? "Add funding to see cash" : undefined}
+            sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
+            stagger={0}
+            celebrate={allPopulated}
+          />
+          <HeroKpiCard
+            variant="burn"
+            label="Monthly Burn"
+            value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
+            change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
+            changeLabel={hasExpenses ? "vs last month" : undefined}
+            description={!hasExpenses ? "Add expenses to calculate" : undefined}
+            sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
+            stagger={1}
+            celebrate={allPopulated}
+          />
+          <HeroKpiCard
+            variant="runway"
+            label="Runway"
+            value={
+              hasFunding && hasExpenses
+                ? currentRunway >= 999
+                  ? "\u221e"
+                  : `${Math.round(currentRunway)} mo`
+                : "-- mo"
+            }
+            description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
+            sparkData={
+              hasFunding && hasExpenses
+                ? sparkline(
+                    metrics.cashRunwayMonths.map((m) => ({
+                      ...m,
+                      value: Math.min(m.value, 100),
+                    }))
+                  )
+                : undefined
+            }
+            stagger={2}
+            celebrate={allPopulated}
+          />
+          <HeroKpiCard
+            variant="revenue"
+            label="MRR"
+            value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
+            change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
+            changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
+            description={!hasRevenue ? "Add revenue streams" : undefined}
+            sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
+            stagger={3}
+            celebrate={allPopulated}
+          />
+        </div>
+
+        {!hasData ? (
+          <DashboardEmptyState
+            companyName={company.name}
+            hasExpenses={hasExpenses}
+            hasRevenue={hasRevenue}
+            hasFunding={hasFunding}
+          />
+        ) : (
+          <>
+            {/* Quick Actions */}
+            <QuickActions
+              scenarioId={scenario.id}
+              accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+              context={{
+                hasRevenue,
+                hasMultipleScenarios: allScenarios.length > 1,
+                burnRate: currentBurn,
+                runway: currentRunway,
+              }}
+            />
+
+            {/* Charts */}
+            <Suspense fallback={
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
+                ))}
+              </div>
+            }>
+              <DashboardCharts
+                revenueVsExpenses={revenueVsExpenses}
+                cashData={metrics.cashPosition}
+                burnData={metrics.netBurnRate}
+                runwayData={metrics.cashRunwayMonths.map((m) => ({
+                  ...m,
+                  value: Math.min(m.value, 100),
+                }))}
+                mrrData={metrics.mrr}
+                hasSaaS={metrics.mrr.some((m) => m.value > 0)}
+              />
+            </Suspense>
+
+            {/* Pinned AI Insights */}
+            <Suspense fallback={<div className="mt-6 sm:mt-8 h-24 rounded-2xl bg-surface-50 animate-pulse" />}>
+              <div className="mt-6 sm:mt-8">
+                <PinnedInsights />
+              </div>
+            </Suspense>
+
+            {/* Bottom section: Scenarios + Customizable Key Metrics */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
+              {/* Pinned Scenarios */}
+              {pinnedScenarios.length > 0 && (
+                <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
+                    <Link
+                      href="/scenarios"
+                      className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
                     >
-                      <div>
-                        <p className="text-sm font-medium text-surface-900">{s.name}</p>
-                        <span className="text-xs text-surface-400 capitalize">{s.type}</span>
-                      </div>
-                      <Link
-                        href="/scenarios"
-                        className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
+                      View all
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    {pinnedScenarios.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
                       >
-                        View
-                      </Link>
-                    </div>
-                  ))}
+                        <div>
+                          <p className="text-sm font-medium text-surface-900">{s.name}</p>
+                          <span className="text-xs text-surface-400 capitalize">{s.type}</span>
+                        </div>
+                        <Link
+                          href="/scenarios"
+                          className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Key Metrics */}
-            <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6 hover-lift">
-              <h2 className="text-sm font-semibold text-surface-900 mb-4">Key Metrics</h2>
-              <div className="space-y-1">
-                <MetricRow
-                  label="ARR"
-                  value={formatCurrency(currentMrr * 12)}
-                  change={prevMrr > 0 ? pctChange(currentMrr * 12, prevMrr * 12) : null}
-                />
-                <MetricRow
-                  label="Gross Margin"
-                  value={`${currentGrossMargin.toFixed(1)}%`}
-                  change={prevGrossMargin > 0 ? `${(currentGrossMargin - prevGrossMargin) >= 0 ? "+" : ""}${(currentGrossMargin - prevGrossMargin).toFixed(1)}pp` : null}
-                  benchmark={{ label: "Median 65%", status: currentGrossMargin >= 65 ? "good" : currentGrossMargin >= 50 ? "warn" : "bad" }}
-                />
-                <MetricRow
-                  label="Headcount"
-                  value={`${currentHeadcount}`}
-                  change={prevHeadcount > 0 && currentHeadcount !== prevHeadcount ? `${currentHeadcount > prevHeadcount ? "+" : ""}${currentHeadcount - prevHeadcount}` : null}
-                />
-                <MetricRow
-                  label="Rev/Employee"
-                  value={formatCurrency(currentRevPerEmp)}
-                />
-                <MetricRow
-                  label="EBITDA"
-                  value={formatCurrency(currentEbitda)}
-                  change={prevEbitda !== 0 ? pctChange(currentEbitda, prevEbitda) : null}
-                />
-                <MetricRow
-                  label="Rule of 40"
-                  value={`${currentRuleOf40.toFixed(0)}`}
-                  change={prevRuleOf40 !== 0 ? `${(currentRuleOf40 - prevRuleOf40) >= 0 ? "+" : ""}${(currentRuleOf40 - prevRuleOf40).toFixed(0)}` : null}
-                  benchmark={{ label: "Target: 40", status: currentRuleOf40 >= 40 ? "good" : currentRuleOf40 >= 30 ? "warn" : "bad" }}
-                />
-                <MetricRow
-                  label="Burn Multiple"
-                  value={`${currentBurnMultiple.toFixed(1)}x`}
-                  benchmark={{ label: "Good < 2x", status: currentBurnMultiple <= 2 ? "good" : currentBurnMultiple <= 3 ? "warn" : "bad" }}
-                />
-              </div>
+              {/* Customizable Key Metrics */}
+              <CustomizableMetrics
+                metrics={metrics}
+                currentMonth={currentMonth}
+                prevMonth={prevMonth}
+                headcount={{ current: currentHeadcount, previous: prevHeadcount }}
+              />
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )}
+
+        {/* Stats Catalog Slide-over */}
+        <StatsCatalog />
+
+        {/* Formula Dependency Viewer */}
+        <FormulaViewer />
+      </div>
+    </DashboardIntelligenceProvider>
   );
 }
 
 /* ── Supporting Components ────────────────────────────────────────────────── */
-
-function MetricRow({ label, value, change, benchmark }: {
-  label: string;
-  value: string;
-  change?: string | null;
-  benchmark?: { label: string; status: "good" | "warn" | "bad" } | null;
-}) {
-  return (
-    <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3">
-      <span className="text-sm text-surface-500">{label}</span>
-      <div className="flex items-center gap-3">
-        {change && (
-          <span className={`text-xs font-medium tabular-nums ${
-            change.startsWith("+") ? "text-success-500" : change.startsWith("-") ? "text-danger-500" : "text-surface-400"
-          }`}>{change}</span>
-        )}
-        {benchmark && (
-          <span className={`text-xs tabular-nums ${
-            benchmark.status === "good" ? "text-success-500"
-            : benchmark.status === "warn" ? "text-warning-500"
-            : "text-danger-500"
-          }`}>{benchmark.label}</span>
-        )}
-        <span className="text-sm font-semibold text-surface-900 tabular-nums">{value}</span>
-      </div>
-    </div>
-  );
-}
 
 function SetupPrompt() {
   return (
