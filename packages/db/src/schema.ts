@@ -295,6 +295,7 @@ export const financialAccounts = pgTable(
   },
   (table) => [
     index("financial_accounts_company_idx").on(table.companyId),
+    index("financial_accounts_parent_idx").on(table.parentId),
   ]
 );
 
@@ -429,6 +430,10 @@ export const forecastLines = pgTable(
   },
   (table) => [
     index("forecast_lines_scenario_idx").on(table.scenarioId),
+    uniqueIndex("forecast_lines_scenario_account_idx").on(
+      table.scenarioId,
+      table.accountId
+    ),
   ]
 );
 
@@ -448,6 +453,7 @@ export const forecastValues = pgTable(
   },
   (table) => [
     index("forecast_values_line_idx").on(table.forecastLineId),
+    index("forecast_values_month_idx").on(table.month),
     uniqueIndex("forecast_values_line_month_idx").on(
       table.forecastLineId,
       table.month
@@ -715,7 +721,10 @@ export const aiMessages = pgTable(
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
-    index("ai_messages_conversation_idx").on(table.conversationId),
+    index("ai_messages_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt
+    ),
   ]
 );
 
@@ -1022,6 +1031,7 @@ export const merchantCategoryMappings = pgTable(
   },
   (table) => [
     index("merchant_mappings_company_idx").on(table.companyId),
+    index("merchant_mappings_pattern_idx").on(table.merchantPattern),
     uniqueIndex("merchant_mappings_company_pattern_idx").on(
       table.companyId,
       table.merchantPattern
