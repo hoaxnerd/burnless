@@ -4,16 +4,17 @@ import { db, headcountPlans, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { positiveAmount, ratio } from "@/lib/financial-validation";
 
 const createSchema = z.object({
   scenarioId: z.string(),
   departmentId: z.string(),
   title: z.string().min(1),
   count: z.number().int().min(1).default(1),
-  salary: z.number().min(0),
+  salary: positiveAmount(),
   startDate: z.string().transform((s) => new Date(s)),
   endDate: z.string().nullable().default(null).transform((s) => (s ? new Date(s) : null)),
-  benefitsRate: z.number().min(0).max(1).default(0.20),
+  benefitsRate: ratio().default(0.20),
 });
 
 export const GET = withErrorHandler(async (request: Request) => {

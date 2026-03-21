@@ -82,6 +82,12 @@ export const env = {
 
   /** Whether Stripe is configured */
   get hasStripe(): boolean {
+    if (this.STRIPE_SECRET_KEY && !this.STRIPE_WEBHOOK_SECRET && this.isProd) {
+      throw new Error(
+        "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set. " +
+        "Without it, webhook events cannot be verified and billing is insecure."
+      );
+    }
     return !!this.STRIPE_SECRET_KEY;
   },
 
@@ -94,6 +100,12 @@ export const env = {
 
   /** Whether Razorpay is configured */
   get hasRazorpay(): boolean {
+    if (this.RAZORPAY_KEY_ID && this.RAZORPAY_KEY_SECRET && !this.RAZORPAY_WEBHOOK_SECRET && this.isProd) {
+      throw new Error(
+        "RAZORPAY_WEBHOOK_SECRET is required when Razorpay credentials are set. " +
+        "Without it, webhook events cannot be verified and billing is insecure."
+      );
+    }
     return !!(this.RAZORPAY_KEY_ID && this.RAZORPAY_KEY_SECRET);
   },
 

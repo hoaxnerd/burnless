@@ -4,11 +4,12 @@ import { db, transactions } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
 import { requireCompanyAccess, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { monetaryAmount } from "@/lib/financial-validation";
 
 const createSchema = z.object({
   accountId: z.string(),
   date: z.string().transform((s) => new Date(s)),
-  amount: z.number(),
+  amount: monetaryAmount(),
   description: z.string().nullable().default(null),
   source: z.enum(["manual", "import", "integration", "forecast"]).default("manual"),
   externalId: z.string().nullable().default(null),

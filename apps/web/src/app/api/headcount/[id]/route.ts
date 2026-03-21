@@ -3,14 +3,15 @@ import { z } from "zod";
 import { db, headcountPlans } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { positiveAmount, ratio } from "@/lib/financial-validation";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   count: z.number().int().min(1).optional(),
-  salary: z.number().min(0).optional(),
+  salary: positiveAmount().optional(),
   startDate: z.string().transform((s) => new Date(s)).optional(),
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
-  benefitsRate: z.number().min(0).max(1).optional(),
+  benefitsRate: ratio().optional(),
 });
 
 export const PATCH = withErrorHandler(async (

@@ -4,13 +4,14 @@ import { db, transactions, financialAccounts, importBatches, merchantCategoryMap
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
+import { monetaryAmount } from "@/lib/financial-validation";
 import crypto from "crypto";
 
 // ── Schema ───────────────────────────────────────────────────────────────────
 
 const importTransactionSchema = z.object({
   date: z.string(),
-  amount: z.number(),
+  amount: monetaryAmount(),
   description: z.string().nullable(),
   accountId: z.string(),
   externalId: z.string().optional(),

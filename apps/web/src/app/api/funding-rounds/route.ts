@@ -4,14 +4,15 @@ import { db, fundingRounds } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+import { positiveAmount, percentage } from "@/lib/financial-validation";
 
 const createSchema = z.object({
   name: z.string().min(1),
   type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
-  amount: z.number().min(0),
+  amount: positiveAmount(),
   date: z.string().transform((s) => new Date(s)),
-  preMoneyValuation: z.number().nullable().default(null),
-  dilutionPercent: z.number().nullable().default(null),
+  preMoneyValuation: positiveAmount().nullable().default(null),
+  dilutionPercent: percentage().nullable().default(null),
   isProjected: z.boolean().default(false),
 });
 
