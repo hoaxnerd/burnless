@@ -590,6 +590,39 @@ export function resetAllResilience(): void {
   rateLimiters.clear();
 }
 
+/** Health status for a single provider. */
+export interface ProviderHealthStatus {
+  provider: string;
+  circuit: { state: CircuitState; failureCount: number; successCount: number };
+  rateLimit: { remaining: number; maxRequests: number; windowMs: number };
+}
+
+/** Get health status for all active providers. */
+export function getAllProviderHealth(): ProviderHealthStatus[] {
+  const providers = new Set([
+    ...circuitBreakers.keys(),
+    ...rateLimiters.keys(),
+  ]);
+
+  return Array.from(providers).map((name) => {
+    const cb = circuitBreakers.get(name);
+    const rl = rateLimiters.get(name);
+    const rlConfig = PROVIDER_RATE_LIMITS[name] ?? DEFAULT_RATE_LIMITER_CONFIG;
+
+    return {
+      provider: name,
+      circuit: cb
+        ? cb.getStats()
+        : { state: "closed" as CircuitState, failureCount: 0, successCount: 0 },
+      rateLimit: {
+        remaining: rl ? rl.remaining() : rlConfig.maxRequests,
+        maxRequests: rlConfig.maxRequests,
+        windowMs: rlConfig.windowMs,
+      },
+    };
+  });
+}
+
 // ── Per-provider rate limit configs ────────────────────────────────────────
 
 const PROVIDER_RATE_LIMITS: Record<string, RateLimiterConfig> = {

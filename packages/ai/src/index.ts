@@ -50,11 +50,13 @@ export {
   getFeatureTier,
   getFeatureTierMap,
   getFeatureProviderMap,
+  getAllProviderHealth,
   completeWithFallback,
   estimateCostMicros,
   onUsage,
   onRequestLog,
 } from "./routing";
+export type { ProviderHealthStatus } from "./routing";
 
 // Feature flags
 export {

@@ -5,12 +5,13 @@ import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { type CompanyProfile, type ConnectedIntegration, tabs } from "./settings-data";
 import { GeneralTab } from "./general-tab";
 import { AiFeaturesTab } from "./ai-features-tab";
+import { AiDashboardTab } from "./ai-dashboard-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { BillingTab } from "./billing-tab";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
-    "general" | "ai" | "integrations" | "billing"
+    "general" | "ai" | "ai-dashboard" | "integrations" | "billing"
   >("general");
   const { flags, updateFlags, loaded: aiLoaded, monthlyBudgetCents, budget } = useAiFlags();
 
@@ -158,6 +159,9 @@ export default function SettingsPage() {
       {activeTab === "ai" && aiLoaded && (
         <AiFeaturesTab flags={flags} updateFlags={updateFlags} monthlyBudgetCents={monthlyBudgetCents} budget={budget} />
       )}
+
+      {/* AI Dashboard Tab */}
+      {activeTab === "ai-dashboard" && <AiDashboardTab />}
 
       {/* Integrations Tab */}
       {activeTab === "integrations" && (

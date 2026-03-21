@@ -135,6 +135,7 @@ export const REGION_OPTIONS = (Object.entries(DATA_REGIONS) as [DataRegion, { na
 export const tabs = [
   { key: "general" as const, label: "General" },
   { key: "ai" as const, label: "AI Features" },
+  { key: "ai-dashboard" as const, label: "AI Dashboard" },
   { key: "integrations" as const, label: "Integrations" },
   { key: "billing" as const, label: "Billing" },
 ];

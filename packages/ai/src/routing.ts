@@ -22,7 +22,9 @@ import {
   getCircuitBreaker,
   getRateLimiter,
   getProviderRateLimitConfig,
+  getAllProviderHealth,
   type RequestLog,
+  type ProviderHealthStatus,
 } from "./providers/resilience";
 
 // ── Per-feature provider routing ──────────────────────────────────────────
@@ -421,3 +423,7 @@ export async function completeWithFallback(
   console.error(`[ai-router] ${feature}: all tiers exhausted, no response.`);
   return null;
 }
+
+// Re-export for dashboard
+export { getAllProviderHealth };
+export type { ProviderHealthStatus };
