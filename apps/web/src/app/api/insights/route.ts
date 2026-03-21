@@ -2,22 +2,29 @@
  * GET  /api/insights — Retrieve cached AI insights (works in show_cached mode).
  * POST /api/insights — Generate AI-powered insights for the current financial state.
  *
+ * Supports page-specific insights via the `page` body parameter:
+ *   - "dashboard" (default) — deterministic rule-based insights
+ *   - "expenses" / "revenue" / "scenarios" — LLM-generated page insights (fast tier)
+ *
  * POST caches results for later retrieval via GET.
  */
 
 import { NextResponse } from "next/server";
 import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { generateInsights } from "@burnless/ai";
+import { generateInsights, generatePageInsights, type InsightPage } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed, getAiFlags } from "@/lib/ai-feature-flags";
 import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
 
+const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios"] as const;
+type PageType = (typeof VALID_PAGES)[number];
+
 // ── GET: serve cached insights ─────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: Request) {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -28,13 +35,19 @@ export async function GET() {
     return NextResponse.json({ insights: [], reason: "AI insights are disabled" });
   }
 
+  // Support page query param for cached retrieval
+  const url = new URL(request.url);
+  const page = (url.searchParams.get("page") ?? "dashboard") as PageType;
+
+  const cacheType = page === "expenses" ? "expense" as const : page === "scenarios" ? "scenario" as const : page;
+
   const cached = await db
     .select()
     .from(aiInsightCache)
     .where(
       and(
         eq(aiInsightCache.companyId, ctx.companyId),
-        eq(aiInsightCache.type, "dashboard")
+        eq(aiInsightCache.type, cacheType)
       )
     )
     .limit(1);
@@ -63,17 +76,26 @@ export async function POST(request: Request) {
     const flags = await getAiFlags(ctx.companyId);
     const status = resolveFeatureStatus(flags, "insights");
     if (status.showCached) {
-      return GET();
+      return GET(request);
     }
     return NextResponse.json({ insights: [], reason: aiCheck.reason });
   }
 
   let scenarioId: string | undefined;
+  let page: PageType = "dashboard";
+  let pageData: Record<string, unknown> | undefined;
+
   try {
     const body = await request.json();
     scenarioId = body.scenarioId;
+    if (body.page && VALID_PAGES.includes(body.page)) {
+      page = body.page;
+    }
+    if (body.pageData && typeof body.pageData === "object") {
+      pageData = body.pageData;
+    }
   } catch {
-    // No body is fine — use default scenario
+    // No body is fine — use defaults
   }
 
   let scenario;
@@ -94,15 +116,31 @@ export async function POST(request: Request) {
     type: scenario.type,
   });
 
-  const insights = generateInsights(snapshot);
+  // Route to appropriate insight generator
+  let insights;
+  let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "general";
 
-  // Cache the generated insights for show_cached mode
+  if (page === "dashboard") {
+    insights = generateInsights(snapshot);
+    cacheType = "dashboard";
+  } else {
+    // LLM-powered page insights
+    const pageKey = page as InsightPage;
+    insights = await generatePageInsights({
+      page: pageKey,
+      snapshot,
+      pageData,
+    });
+    cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
+  }
+
+  // Cache the generated insights
   const cacheKey = `scenario:${scenario.id}`;
   await db
     .insert(aiInsightCache)
     .values({
       companyId: ctx.companyId,
-      type: "dashboard",
+      type: cacheType,
       key: cacheKey,
       content: insights,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
@@ -117,6 +155,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     insights,
+    page,
     scenario: {
       id: scenario.id,
       name: scenario.name,
