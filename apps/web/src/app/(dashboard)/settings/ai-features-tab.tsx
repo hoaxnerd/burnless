@@ -210,6 +210,7 @@ const PROVIDERS = [
   { value: "anthropic", label: "Anthropic", desc: "Claude models (default)" },
   { value: "openai", label: "OpenAI", desc: "GPT-4o, o4-mini, and more" },
   { value: "openrouter", label: "OpenRouter", desc: "Multi-provider routing" },
+  { value: "ollama", label: "Ollama", desc: "Local models — no API key needed" },
 ] as const;
 
 function ProviderSection({
@@ -261,8 +262,8 @@ function ProviderSection({
     setTestError("");
 
     const testKey = apiKey.trim() || undefined;
-    // Can't test without a real key — masked keys won't work
-    if (!testKey && !hasCustomKey) {
+    // Can't test without a real key — masked keys won't work (except Ollama, which needs none)
+    if (!testKey && !hasCustomKey && selectedProvider !== "ollama") {
       setTestStatus("error");
       setTestError("Enter an API key first");
       return;
@@ -339,8 +340,8 @@ function ProviderSection({
         ))}
       </div>
 
-      {/* API Key */}
-      <div className="space-y-3 mb-5">
+      {/* API Key — not needed for Ollama */}
+      {selectedProvider !== "ollama" && <div className="space-y-3 mb-5">
         <label className="block text-sm font-medium text-surface-700">
           API Key
         </label>
@@ -392,7 +393,17 @@ function ProviderSection({
             ? "Your API key is stored securely. Remove it to fall back to server defaults."
             : "Leave blank to use the server\u2019s default API key (if configured)."}
         </p>
-      </div>
+      </div>}
+
+      {/* Ollama hint */}
+      {selectedProvider === "ollama" && (
+        <div className="rounded-xl bg-surface-50 border border-surface-200 p-4 mb-5">
+          <p className="text-sm text-surface-600">
+            Ollama runs locally — no API key required. Make sure Ollama is running
+            and set the base URL below if it&apos;s not at the default address.
+          </p>
+        </div>
+      )}
 
       {/* Model override */}
       <div className="space-y-2 mb-5">
@@ -406,14 +417,14 @@ function ProviderSection({
             onChange={(e) => setModel(e.target.value)}
             onBlur={handleSaveModel}
             onKeyDown={(e) => e.key === "Enter" && handleSaveModel()}
-            placeholder={selectedProvider === "openai" ? "gpt-4o" : selectedProvider === "openrouter" ? "anthropic/claude-sonnet-4-20250514" : "claude-sonnet-4-20250514"}
+            placeholder={selectedProvider === "openai" ? "gpt-4o" : selectedProvider === "openrouter" ? "anthropic/claude-sonnet-4-20250514" : selectedProvider === "ollama" ? "gemma3:12b" : "claude-sonnet-4-20250514"}
             className="flex-1 px-3 py-2 rounded-lg border border-surface-300 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           />
         </div>
       </div>
 
-      {/* Base URL override (show for openrouter or always) */}
-      {selectedProvider === "openrouter" && (
+      {/* Base URL override (show for openrouter and ollama) */}
+      {(selectedProvider === "openrouter" || selectedProvider === "ollama") && (
         <div className="space-y-2 mb-5">
           <label className="block text-sm font-medium text-surface-700">
             Base URL <span className="text-surface-400 font-normal">(optional)</span>
@@ -424,7 +435,7 @@ function ProviderSection({
             onChange={(e) => setBaseUrl(e.target.value)}
             onBlur={handleSaveBaseUrl}
             onKeyDown={(e) => e.key === "Enter" && handleSaveBaseUrl()}
-            placeholder="https://openrouter.ai/api/v1"
+            placeholder={selectedProvider === "ollama" ? "http://localhost:11434/v1" : "https://openrouter.ai/api/v1"}
             className="w-full px-3 py-2 rounded-lg border border-surface-300 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
           />
         </div>
