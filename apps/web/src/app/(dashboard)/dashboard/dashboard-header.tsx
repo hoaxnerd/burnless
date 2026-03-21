@@ -8,6 +8,7 @@ import { LayoutGrid } from "lucide-react";
 import { ModeSwitcher } from "./mode-switcher";
 import { BoardMeetingMode } from "./board-meeting-mode";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 interface DashboardHeaderProps {
   companyName: string;
@@ -51,7 +52,9 @@ export function DashboardHeader({ companyName, hasData, boardData }: DashboardHe
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
-              <BoardMeetingMode data={boardData} />
+              <ErrorBoundary fallback={null}>
+                <BoardMeetingMode data={boardData} />
+              </ErrorBoundary>
             </>
           )}
         </div>
