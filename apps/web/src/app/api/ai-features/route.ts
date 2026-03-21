@@ -87,13 +87,17 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     .where(eq(aiFeatureFlags.companyId, ctx.companyId))
     .returning();
 
+  if (!updated) {
+    return errorResponse("Failed to update AI feature flags", 500);
+  }
+
   const budget = await getBudgetStatus(ctx.companyId);
 
   return NextResponse.json({
-    masterEnabled: updated!.masterEnabled,
-    dataMode: updated!.dataMode,
-    features: updated!.features,
-    monthlyBudgetCents: updated!.monthlyBudgetCents,
+    masterEnabled: updated.masterEnabled,
+    dataMode: updated.dataMode,
+    features: updated.features,
+    monthlyBudgetCents: updated.monthlyBudgetCents,
     budget,
   });
 });
@@ -128,9 +132,9 @@ async function getOrCreateFlags(companyId: string) {
     .returning();
 
   return {
-    masterEnabled: created!.masterEnabled,
-    dataMode: created!.dataMode as "full" | "show_cached" | "hide_all",
-    features: created!.features as AiFeatureConfig,
-    monthlyBudgetCents: created!.monthlyBudgetCents,
+    masterEnabled: created?.masterEnabled ?? DEFAULT_AI_FLAGS.masterEnabled,
+    dataMode: (created?.dataMode ?? DEFAULT_AI_FLAGS.dataMode) as "full" | "show_cached" | "hide_all",
+    features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
+    monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
   };
 }
