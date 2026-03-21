@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 type Step = "request" | "sent" | "reset" | "success";
 
@@ -102,9 +103,7 @@ function ResetPasswordContent() {
       <div className="w-full max-w-[400px] px-4 relative z-10">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8 group">
-            <div className="h-11 w-11 rounded-xl bg-brand-600 flex items-center justify-center shadow-md shadow-brand-600/25">
-              <span className="text-white font-bold text-lg">B</span>
-            </div>
+            <BrandLogo className="h-11 w-11" />
             <span className="text-lg font-bold text-surface-900">Burnless</span>
           </Link>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">

@@ -22,6 +22,7 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 import { AiPanel } from "@/components/ai/ai-panel";
 import { AiFeatureProvider, useAiFlags } from "@/components/ai/ai-feature-context";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
@@ -163,9 +164,7 @@ function DashboardContent({
           <Menu className="h-5 w-5" />
         </button>
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-brand-600 flex items-center justify-center">
-            <span className="text-white font-bold text-xs">B</span>
-          </div>
+          <BrandLogo className="h-7 w-7" />
           <span className="text-base font-semibold text-surface-900">Burnless</span>
         </Link>
         <div className="w-9" /> {/* Spacer for centering */}
@@ -192,9 +191,7 @@ function DashboardContent({
         >
           <div className="p-4 border-b border-surface-200 flex items-center justify-between">
             <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-              <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">B</span>
-              </div>
+              <BrandLogo className="h-8 w-8 flex-shrink-0" />
               {!sidebarCollapsed && (
                 <span className="text-lg font-semibold text-surface-900 truncate">
                   Burnless

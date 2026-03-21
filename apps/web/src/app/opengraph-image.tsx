@@ -20,22 +20,29 @@ export default function OGImage() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        {/* Logo mark */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 96,
-            height: 96,
-            borderRadius: 24,
-            backgroundColor: "#2563eb",
-            marginBottom: 32,
-            border: "3px solid rgba(255,255,255,0.2)",
-          }}
+        {/* Logo mark — flame SVG rendered inline for OG image compatibility */}
+        <svg
+          viewBox="0 0 32 32"
+          width="96"
+          height="96"
+          style={{ marginBottom: 32 }}
         >
-          <span style={{ fontSize: 56, fontWeight: 800, color: "white" }}>B</span>
-        </div>
+          <defs>
+            <linearGradient id="og-grad" x1="8" y1="28" x2="24" y2="4" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#60a5fa" />
+              <stop offset="1" stopColor="#93c5fd" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M16 2C16 2 10 10 10 16C10 19.3 12.7 22 16 22C19.3 22 22 19.3 22 16C22 10 16 2 16 2Z"
+            fill="url(#og-grad)"
+          />
+          <path
+            d="M16 12C16 12 13 16 13 18.5C13 20.2 14.3 21.5 16 21.5C17.7 21.5 19 20.2 19 18.5C19 16 16 12 16 12Z"
+            fill="#1e3a8a"
+          />
+          <circle cx="16" cy="28" r="2" fill="url(#og-grad)" opacity="0.6" />
+        </svg>
 
         {/* Title */}
         <div

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { trackEvent, identifyUser } from "@/lib/analytics";
+import { BrandLogo } from "@/components/brand-logo";
 import type { AuthStep, PasswordStrength } from "./_components/types";
 import { EmailStep } from "./_components/email-step";
 import { SignInStep } from "./_components/signin-step";
@@ -170,9 +171,7 @@ export default function LoginPage() {
         {/* Logo & heading */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8 group">
-            <div className="h-11 w-11 rounded-xl bg-brand-600 flex items-center justify-center shadow-md shadow-brand-600/25 group-hover:shadow-lg group-hover:shadow-brand-600/30 transition-shadow">
-              <span className="text-white font-bold text-lg">B</span>
-            </div>
+            <BrandLogo className="h-11 w-11" />
             <span className="text-lg font-bold text-surface-900">Burnless</span>
           </Link>
           <div

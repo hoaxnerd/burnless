@@ -1,12 +1,11 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-50 px-4">
       <div className="text-center max-w-md">
-        <div className="mx-auto h-16 w-16 rounded-2xl bg-brand-600 flex items-center justify-center mb-6">
-          <span className="text-white font-bold text-2xl">B</span>
-        </div>
+        <BrandLogo className="mx-auto h-16 w-16 mb-6" />
         <h1 className="text-4xl font-bold text-surface-900 mb-2">404</h1>
         <p className="text-lg text-surface-600 mb-8">
           This page doesn&apos;t exist or has been moved.

@@ -1,5 +1,6 @@
 import { RefObject } from "react";
 import { Globe, Sparkles, SkipForward } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 interface WebsiteStepProps {
   websiteUrl: string;
@@ -42,9 +43,7 @@ export function WebsiteStep({
           </button>
         </div>
 
-        <div className="h-14 w-14 rounded-2xl bg-brand-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <span className="text-white font-bold text-2xl">B</span>
-        </div>
+        <BrandLogo className="h-14 w-14 mx-auto mb-6" />
         <h1 className="text-3xl font-bold text-surface-900 dark:text-surface-50">
           Welcome to Burnless
         </h1>

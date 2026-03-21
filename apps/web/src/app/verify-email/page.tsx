@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSession, SessionProvider } from "next-auth/react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 type VerifyStep = "waiting" | "verifying" | "success" | "error";
 
@@ -182,9 +183,7 @@ export default function VerifyEmailPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8 group">
-            <div className="h-11 w-11 rounded-xl bg-brand-600 flex items-center justify-center shadow-md shadow-brand-600/25">
-              <span className="text-white font-bold text-lg">B</span>
-            </div>
+            <BrandLogo className="h-11 w-11" />
             <span className="text-lg font-bold text-surface-900">Burnless</span>
           </Link>
         </div>
