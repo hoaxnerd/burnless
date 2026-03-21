@@ -141,6 +141,9 @@ export function ReviewStep({
             placeholder={FIELD_PLACEHOLDERS.monthly_revenue}
             onChange={(v) => onUpdateField("monthly_revenue", v)}
             badge={<ConfidenceBadge {...fields.monthly_revenue} />}
+            type="number"
+            min="0"
+            step="1"
           />
           <FormField
             label={FIELD_LABELS.team_size}
@@ -148,6 +151,9 @@ export function ReviewStep({
             placeholder={FIELD_PLACEHOLDERS.team_size}
             onChange={(v) => onUpdateField("team_size", v)}
             badge={<ConfidenceBadge {...fields.team_size} />}
+            type="number"
+            min="0"
+            step="1"
           />
           <FormField
             label={FIELD_LABELS.funding}
@@ -155,6 +161,9 @@ export function ReviewStep({
             placeholder={FIELD_PLACEHOLDERS.funding}
             onChange={(v) => onUpdateField("funding", v)}
             badge={<ConfidenceBadge {...fields.funding} />}
+            type="number"
+            min="0"
+            step="1"
           />
           <FormField
             label={FIELD_LABELS.main_expenses}

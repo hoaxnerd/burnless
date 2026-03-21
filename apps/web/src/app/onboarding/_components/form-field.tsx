@@ -8,6 +8,9 @@ interface FormFieldProps {
   onChange: (value: string) => void;
   required?: boolean;
   badge?: ReactNode;
+  type?: "text" | "number";
+  min?: string;
+  step?: string;
 }
 
 export function FormField({
@@ -17,6 +20,9 @@ export function FormField({
   onChange,
   required,
   badge,
+  type = "text",
+  min,
+  step,
 }: FormFieldProps) {
   return (
     <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-4">
@@ -28,10 +34,12 @@ export function FormField({
         {badge}
       </div>
       <input
-        type="text"
+        type={type}
         value={field.value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        min={min}
+        step={step}
         className={`w-full rounded-lg border bg-surface-0 dark:bg-surface-900 px-3 py-2 text-sm text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${
           field.source === "ai"
             ? "border-brand-300 dark:border-brand-700"

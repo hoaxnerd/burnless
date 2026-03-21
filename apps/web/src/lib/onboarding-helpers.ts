@@ -9,9 +9,9 @@ export const onboardingSchema = z.object({
   company_name: z.string().min(1, "Company name is required"),
   stage: z.string().default("Pre-seed"),
   business_model: z.string().default("SaaS"),
-  monthly_revenue: z.string().optional().default("$0"),
+  monthly_revenue: z.string().optional().default("0"),
   team_size: z.string().optional().default("1"),
-  funding: z.string().optional().default("$0"),
+  funding: z.string().optional().default("0"),
   main_expenses: z.string().optional().default("General operations"),
 });
 

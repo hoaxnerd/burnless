@@ -240,9 +240,9 @@ describe("onboardingSchema", () => {
     expect(result.company_name).toBe("My Startup");
     expect(result.stage).toBe("Pre-seed");
     expect(result.business_model).toBe("SaaS");
-    expect(result.monthly_revenue).toBe("$0");
+    expect(result.monthly_revenue).toBe("0");
     expect(result.team_size).toBe("1");
-    expect(result.funding).toBe("$0");
+    expect(result.funding).toBe("0");
     expect(result.main_expenses).toBe("General operations");
   });
 
@@ -266,9 +266,9 @@ describe("onboardingSchema", () => {
       company_name: "My Company",
       stage: "Pre-seed",
       business_model: "SaaS",
-      monthly_revenue: "$0",
+      monthly_revenue: "0",
       team_size: "1",
-      funding: "$0",
+      funding: "0",
       main_expenses: "General operations",
     };
 
@@ -285,11 +285,11 @@ describe("onboardingSchema", () => {
       expect(parseBusinessModel(SKIP_DEFAULTS.business_model)).toBe("saas");
     });
 
-    it("parseMoneyAmount handles the default '$0' for revenue", () => {
+    it("parseMoneyAmount handles the default '0' for revenue", () => {
       expect(parseMoneyAmount(SKIP_DEFAULTS.monthly_revenue)).toBe(0);
     });
 
-    it("parseMoneyAmount handles the default '$0' for funding", () => {
+    it("parseMoneyAmount handles the default '0' for funding", () => {
       expect(parseMoneyAmount(SKIP_DEFAULTS.funding)).toBe(0);
     });
 

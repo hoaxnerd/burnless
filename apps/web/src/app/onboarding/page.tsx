@@ -6,6 +6,7 @@ import { trackEvent } from "@/lib/analytics";
 
 import type { OnboardingStep, CompanyFields } from "./_components/types";
 import { DEFAULTS } from "./_components/constants";
+import { parseMoneyAmount, parseTeamSize } from "@/lib/onboarding-helpers";
 import { WebsiteStep } from "./_components/website-step";
 import { EnrichingStep } from "./_components/enriching-step";
 import { ReviewStep } from "./_components/review-step";
@@ -81,10 +82,16 @@ export default function OnboardingPage() {
             } else if (event.type === "field") {
               const fieldName = event.field as keyof CompanyFields;
               if (fieldName in DEFAULTS) {
+                let normalizedValue = event.value;
+                if (fieldName === "monthly_revenue" || fieldName === "funding") {
+                  normalizedValue = String(parseMoneyAmount(event.value));
+                } else if (fieldName === "team_size") {
+                  normalizedValue = String(parseTeamSize(event.value));
+                }
                 setFields((prev) => ({
                   ...prev,
                   [fieldName]: {
-                    value: event.value,
+                    value: normalizedValue,
                     confidence: event.confidence,
                     source: "ai" as const,
                   },
