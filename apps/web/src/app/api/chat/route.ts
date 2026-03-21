@@ -10,7 +10,7 @@ import { db } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
-import { requireCompanyAccess, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tools";
@@ -24,7 +24,7 @@ const chatSchema = z.object({
   scenarioId: z.string().optional(),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -196,4 +196,4 @@ export async function POST(request: Request) {
       Connection: "keep-alive",
     },
   });
-}
+});

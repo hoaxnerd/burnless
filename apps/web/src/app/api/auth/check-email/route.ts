@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { withErrorHandler } from "@/lib/api-helpers";
 
 const schema = z.object({
   email: z.string().email(),
@@ -16,7 +17,7 @@ const schema = z.object({
  * Security: adds timing-safe delay to prevent enumeration via response timing.
  * The delay is random (50-150ms) regardless of whether the email exists.
  */
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());
@@ -42,4 +43,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ exists: !!existing });
-}
+});

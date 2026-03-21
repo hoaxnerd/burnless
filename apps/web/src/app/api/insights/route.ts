@@ -13,18 +13,19 @@ import { NextResponse } from "next/server";
 import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { generateInsights, generatePageInsights, type InsightPage } from "@burnless/ai";
-import { requireCompanyAccess, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed, getAiFlags } from "@/lib/ai-feature-flags";
 import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
+import { logger } from "@/lib/logger";
 
 const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios"] as const;
 type PageType = (typeof VALID_PAGES)[number];
 
 // ── GET: serve cached insights ─────────────────────────────────────────────
 
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -70,11 +71,11 @@ export async function GET(request: Request) {
     ageMs,
     canRefresh: status.canGenerate,
   });
-}
+});
 
 // ── POST: generate + cache insights ────────────────────────────────────────
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -142,8 +143,8 @@ export async function POST(request: Request) {
         pageData,
       });
     } catch (err) {
-      console.warn(
-        `[insights] generatePageInsights failed for page="${page}":`,
+      logger("insights").warn(
+        `generatePageInsights failed for page="${page}":`,
         err instanceof Error ? err.message : err
       );
       insights = [];
@@ -178,4 +179,4 @@ export async function POST(request: Request) {
       name: scenario.name,
     },
   });
-}
+});

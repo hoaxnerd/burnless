@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, users, verificationTokens } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { hashPassword } from "@/lib/password";
+import { withErrorHandler } from "@/lib/api-helpers";
 
 const schema = z.object({
   email: z.string().email(),
@@ -15,7 +16,7 @@ const schema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());
@@ -77,4 +78,4 @@ export async function POST(request: Request) {
     .where(eq(verificationTokens.identifier, normalizedEmail));
 
   return NextResponse.json({ message: "Password reset successfully." });
-}
+});

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import {
   db,
   users,
@@ -22,7 +23,7 @@ import {
   aiInsightCache,
 } from "@burnless/db";
 import { eq, inArray } from "drizzle-orm";
-import { getAuthUser, errorResponse } from "@/lib/api-helpers";
+import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 /**
  * GET /api/users/me/export
@@ -30,7 +31,7 @@ import { getAuthUser, errorResponse } from "@/lib/api-helpers";
  * GDPR "Right to Data Portability" — exports all user data as JSON.
  * Returns a comprehensive snapshot of everything stored about this user.
  */
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Unauthorized", 401);
 
@@ -242,10 +243,10 @@ export async function GET() {
 
     return buildExportResponse(exportData);
   } catch (error) {
-    console.error("User data export failed:", error);
+    logger("export").error("User data export failed:", error);
     return errorResponse("Failed to export user data. Please try again.", 500);
   }
-}
+});
 
 function buildExportResponse(data: unknown) {
   const json = JSON.stringify(data, null, 2);

@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { email } from "@/lib/email";
 import { passwordResetEmail } from "@/lib/email/templates";
+import { withErrorHandler } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 const TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -13,7 +15,7 @@ const schema = z.object({
   email: z.string().email(),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());
@@ -55,8 +57,8 @@ export async function POST(request: Request) {
   const template = passwordResetEmail(resetUrl);
 
   email.provider.send({ to: normalizedEmail, ...template }).catch((err) => {
-    console.error("[email] Failed to send password reset email:", err);
+    logger("email").error("Failed to send password reset email:", err);
   });
 
   return successResponse;
-}
+});

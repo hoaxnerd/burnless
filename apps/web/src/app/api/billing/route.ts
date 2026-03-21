@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { db, companies, scenarios, aiMessages, aiConversations, users } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
@@ -36,7 +36,7 @@ interface SubscriptionStatus {
   };
 }
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -123,9 +123,9 @@ export async function GET() {
   };
 
   return NextResponse.json(subscription);
-}
+});
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
@@ -265,4 +265,4 @@ export async function POST(request: Request) {
     const message = e instanceof Error ? e.message : "Billing error";
     return errorResponse(message, 500);
   }
-}
+});

@@ -6,6 +6,8 @@ import { randomBytes } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";
 import { verificationEmail } from "@/lib/email/templates";
+import { withErrorHandler } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -21,7 +23,7 @@ const registerSchema = z.object({
   name: z.string().min(1).optional(),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   let body: z.infer<typeof registerSchema>;
   try {
     body = registerSchema.parse(await request.json());
@@ -79,10 +81,10 @@ export async function POST(request: Request) {
       const template = verificationEmail(verifyUrl);
       // Email send is best-effort — token is persisted, user can re-request
       email.provider.send({ to: normalizedEmail, ...template }).catch((err: unknown) => {
-        console.error("[email] Failed to send verification email:", err);
+        logger("email").error("Failed to send verification email:", err);
       });
     } catch (err) {
-      console.error("[register] Failed to insert verification token:", err);
+      logger("register").error("Failed to insert verification token:", err);
       return NextResponse.json(
         { error: "Account created but verification failed. Please request a new verification email." },
         { status: 201 }
@@ -91,4 +93,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(user, { status: 201 });
-}
+});

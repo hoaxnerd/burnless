@@ -4,13 +4,15 @@ import { db, users, verificationTokens } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { email as emailService } from "@/lib/email";
 import { welcomeEmail } from "@/lib/email/templates";
+import { withErrorHandler } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 const schema = z.object({
   email: z.string().email(),
   token: z.string().min(1),
 });
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());
@@ -73,9 +75,9 @@ export async function POST(request: Request) {
   if (emailService.provider && user.email) {
     const template = welcomeEmail(user.name ?? "there");
     emailService.provider.send({ to: user.email, ...template }).catch((err: unknown) => {
-      console.error("[email] Failed to send welcome email:", err);
+      logger("email").error("Failed to send welcome email:", err);
     });
   }
 
   return NextResponse.json({ message: "Email verified successfully" });
-}
+});
