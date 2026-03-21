@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus } from "lucide-react";
+import { validateField, validateAll, hireFormSchema } from "@/lib/form-validation";
 
 interface Department {
   id: string;
@@ -20,6 +21,8 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const [title, setTitle] = useState("");
   const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
@@ -33,9 +36,40 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   });
 
+  function handleBlur(field: string, value: string) {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateField(hireFormSchema, field, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  }
+
+  function handleChangeValidated(field: string, value: string) {
+    if (touched[field]) {
+      const err = validateField(hireFormSchema, field, value);
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        if (err) next[field] = err;
+        else delete next[field];
+        return next;
+      });
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const errors = validateAll(hireFormSchema, { title, count, salary, benefitsRate, startDate });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setTouched({ title: true, count: true, salary: true, benefitsRate: true, startDate: true });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -109,9 +143,14 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Role / Title</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+            <input type="text" value={title}
+              onChange={(e) => { setTitle(e.target.value); handleChangeValidated("title", e.target.value); }}
+              onBlur={() => handleBlur("title", title)}
               placeholder="e.g. Senior Engineer, Product Manager" required
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              className={`w-full rounded-lg border ${touched.title && fieldErrors.title ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+            {touched.title && fieldErrors.title && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.title}</p>
+            )}
           </div>
 
           <div>
@@ -137,29 +176,50 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-1">Count</label>
-              <input type="number" value={count} onChange={(e) => setCount(e.target.value)}
+              <input type="number" value={count}
+                onChange={(e) => { setCount(e.target.value); handleChangeValidated("count", e.target.value); }}
+                onBlur={() => handleBlur("count", count)}
                 required min="1" step="1"
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                className={`w-full rounded-lg border ${touched.count && fieldErrors.count ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+              {touched.count && fieldErrors.count && (
+                <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.count}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-1">Annual Salary ($)</label>
-              <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)}
+              <input type="number" value={salary}
+                onChange={(e) => { setSalary(e.target.value); handleChangeValidated("salary", e.target.value); }}
+                onBlur={() => handleBlur("salary", salary)}
                 placeholder="120000" required min="0" step="1"
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                className={`w-full rounded-lg border ${touched.salary && fieldErrors.salary ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+              {touched.salary && fieldErrors.salary && (
+                <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.salary}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-1">Benefits Rate (%)</label>
-              <input type="number" value={benefitsRate} onChange={(e) => setBenefitsRate(e.target.value)}
+              <input type="number" value={benefitsRate}
+                onChange={(e) => { setBenefitsRate(e.target.value); handleChangeValidated("benefitsRate", e.target.value); }}
+                onBlur={() => handleBlur("benefitsRate", benefitsRate)}
                 placeholder="20" min="0" max="100" step="1"
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                className={`w-full rounded-lg border ${touched.benefitsRate && fieldErrors.benefitsRate ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+              {touched.benefitsRate && fieldErrors.benefitsRate && (
+                <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.benefitsRate}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-1">Start Date</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <input type="date" value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); handleChangeValidated("startDate", e.target.value); }}
+                onBlur={() => handleBlur("startDate", startDate)}
+                required
+                className={`w-full rounded-lg border ${touched.startDate && fieldErrors.startDate ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+              {touched.startDate && fieldErrors.startDate && (
+                <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.startDate}</p>
+              )}
             </div>
           </div>
 
@@ -177,7 +237,7 @@ export function AddHireForm({ scenarioId, departments }: AddHireFormProps) {
               className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={saving || !title || !salary}
+            <button type="submit" disabled={saving || !title || !salary || Object.keys(fieldErrors).length > 0}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
               {saving ? "Adding..." : "Add Member"}
             </button>

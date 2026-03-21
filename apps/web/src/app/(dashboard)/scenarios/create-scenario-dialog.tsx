@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { validateField, scenarioNameSchema } from "@/lib/form-validation";
 import {
   Plus,
   TrendingUp,
@@ -74,6 +75,13 @@ export function CreateScenarioDialog() {
   const [customName, setCustomName] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [nameTouched, setNameTouched] = useState(false);
+
+  useEffect(() => {
+    setNameError(null);
+    setNameTouched(false);
+  }, [showCustom]);
 
   const aiGenerate = async () => {
     setAiGenerating(true);
@@ -142,11 +150,25 @@ export function CreateScenarioDialog() {
               <input
                 type="text"
                 value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
+                onChange={(e) => {
+                  setCustomName(e.target.value);
+                  if (nameTouched) {
+                    const error = validateField(scenarioNameSchema, "name", e.target.value);
+                    setNameError(error);
+                  }
+                }}
+                onBlur={() => {
+                  setNameTouched(true);
+                  const error = validateField(scenarioNameSchema, "name", customName);
+                  setNameError(error);
+                }}
                 placeholder="e.g., Q3 Expansion Plan"
-                className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                className={`w-full rounded-xl border ${nameError && nameTouched ? "border-danger-500" : "border-surface-300"} bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500`}
                 autoFocus
               />
+              {nameError && (
+                <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{nameError}</p>
+              )}
             </div>
             <div className="flex items-center gap-3 pt-2">
               <button
@@ -157,7 +179,7 @@ export function CreateScenarioDialog() {
               </button>
               <button
                 onClick={() => customName.trim() && createScenario(customName.trim(), "custom", "")}
-                disabled={!customName.trim() || creating}
+                disabled={!customName.trim() || creating || !!nameError}
                 className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
               >
                 {creating ? "Creating..." : "Create"}

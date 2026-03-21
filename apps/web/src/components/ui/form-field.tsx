@@ -43,6 +43,9 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
     );
 
     const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
+    const errorId = `${fieldId}-error`;
+    const hintId = `${fieldId}-hint`;
+    const describedBy = error ? errorId : hint ? hintId : undefined;
 
     return (
       <div>
@@ -55,6 +58,8 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
           {...props}
           onChange={handleChange}
           onBlur={handleBlur}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={describedBy}
           className={`w-full rounded-xl border bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 transition-all ${
             error
               ? "border-danger-500 focus:ring-danger-500/40 focus:border-danger-500"
@@ -64,6 +69,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
         {/* Error message with slide-in animation */}
         {error && (
           <p
+            id={errorId}
             className="mt-1.5 text-xs font-medium text-danger-600 animate-slide-up"
             role="alert"
           >
@@ -72,7 +78,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
         )}
         {/* Hint text (only when no error) */}
         {hint && !error && (
-          <p className="mt-1.5 text-xs text-surface-400">{hint}</p>
+          <p id={hintId} className="mt-1.5 text-xs text-surface-400">{hint}</p>
         )}
       </div>
     );
@@ -139,6 +145,9 @@ export function CurrencyInput({
   };
 
   const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
+  const errorId = `${fieldId}-error`;
+  const hintId = `${fieldId}-hint`;
+  const describedBy = error ? errorId : hint ? hintId : undefined;
 
   return (
     <div>
@@ -157,6 +166,8 @@ export function CurrencyInput({
           onChange={handleChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={describedBy}
           className={`w-full rounded-xl border bg-surface-0 pl-8 pr-4 py-3 text-sm text-surface-900 tabular-nums placeholder:text-surface-400 focus:outline-none focus:ring-2 transition-all ${
             error
               ? "border-danger-500 focus:ring-danger-500/40 focus:border-danger-500"
@@ -165,12 +176,12 @@ export function CurrencyInput({
         />
       </div>
       {error && (
-        <p className="mt-1.5 text-xs font-medium text-danger-600 animate-slide-up" role="alert">
+        <p id={errorId} className="mt-1.5 text-xs font-medium text-danger-600 animate-slide-up" role="alert">
           {error}
         </p>
       )}
       {hint && !error && (
-        <p className="mt-1.5 text-xs text-surface-400">{hint}</p>
+        <p id={hintId} className="mt-1.5 text-xs text-surface-400">{hint}</p>
       )}
     </div>
   );

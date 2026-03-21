@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus } from "lucide-react";
+import { validateField, validateAll, fundingFormSchema } from "@/lib/form-validation";
 
 const ROUND_TYPES = [
   { value: "pre_seed", label: "Pre-Seed" },
@@ -20,6 +21,8 @@ export function AddFundingForm() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const [name, setName] = useState("");
   const [type, setType] = useState<string>("seed");
@@ -32,9 +35,52 @@ export function AddFundingForm() {
   const [dilutionPercent, setDilutionPercent] = useState("");
   const [isProjected, setIsProjected] = useState(false);
 
+  function handleBlur(field: string, value: string) {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateField(fundingFormSchema, field, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  }
+
+  function handleChangeWithValidation(field: string, value: string) {
+    if (touched[field]) {
+      const err = validateField(fundingFormSchema, field, value);
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        if (err) next[field] = err;
+        else delete next[field];
+        return next;
+      });
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const errors = validateAll(fundingFormSchema, {
+      name,
+      amount,
+      date,
+      preMoneyValuation,
+      dilutionPercent,
+    });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setTouched({
+        name: true,
+        amount: true,
+        date: true,
+        preMoneyValuation: true,
+        dilutionPercent: true,
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -91,9 +137,13 @@ export function AddFundingForm() {
 
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Round Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+            <input type="text" value={name} onChange={(e) => { setName(e.target.value); handleChangeWithValidation("name", e.target.value); }}
+              onBlur={() => handleBlur("name", name)}
               placeholder="e.g. Seed Round, AWS Activate Grant" required
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              className={`w-full rounded-lg border ${touched.name && fieldErrors.name ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+            {touched.name && fieldErrors.name && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div>
@@ -108,15 +158,23 @@ export function AddFundingForm() {
 
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Amount ($)</label>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+            <input type="number" value={amount} onChange={(e) => { setAmount(e.target.value); handleChangeWithValidation("amount", e.target.value); }}
+              onBlur={() => handleBlur("amount", amount)}
               placeholder="2000000" required min="0" step="1"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              className={`w-full rounded-lg border ${touched.amount && fieldErrors.amount ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+            {touched.amount && fieldErrors.amount && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.amount}</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="date" value={date} onChange={(e) => { setDate(e.target.value); handleChangeWithValidation("date", e.target.value); }}
+              onBlur={() => handleBlur("date", date)} required
+              className={`w-full rounded-lg border ${touched.date && fieldErrors.date ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+            {touched.date && fieldErrors.date && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.date}</p>
+            )}
           </div>
 
           {type !== "debt" && type !== "grant" && (
@@ -125,18 +183,26 @@ export function AddFundingForm() {
                 <label className="block text-sm font-medium text-surface-700 mb-1">
                   Pre-Money Valuation ($) <span className="text-surface-400 font-normal">(optional)</span>
                 </label>
-                <input type="number" value={preMoneyValuation} onChange={(e) => setPreMoneyValuation(e.target.value)}
+                <input type="number" value={preMoneyValuation} onChange={(e) => { setPreMoneyValuation(e.target.value); handleChangeWithValidation("preMoneyValuation", e.target.value); }}
+                  onBlur={() => handleBlur("preMoneyValuation", preMoneyValuation)}
                   placeholder="8000000" min="0" step="1"
-                  className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                  className={`w-full rounded-lg border ${touched.preMoneyValuation && fieldErrors.preMoneyValuation ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+                {touched.preMoneyValuation && fieldErrors.preMoneyValuation && (
+                  <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.preMoneyValuation}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1">
                   Dilution (%) <span className="text-surface-400 font-normal">(optional)</span>
                 </label>
-                <input type="number" value={dilutionPercent} onChange={(e) => setDilutionPercent(e.target.value)}
+                <input type="number" value={dilutionPercent} onChange={(e) => { setDilutionPercent(e.target.value); handleChangeWithValidation("dilutionPercent", e.target.value); }}
+                  onBlur={() => handleBlur("dilutionPercent", dilutionPercent)}
                   placeholder="20" min="0" max="100" step="0.01"
-                  className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                  className={`w-full rounded-lg border ${touched.dilutionPercent && fieldErrors.dilutionPercent ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`} />
+                {touched.dilutionPercent && fieldErrors.dilutionPercent && (
+                  <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.dilutionPercent}</p>
+                )}
               </div>
             </>
           )}
@@ -155,7 +221,7 @@ export function AddFundingForm() {
               className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={saving || !name || !amount}
+            <button type="submit" disabled={saving || !name || !amount || Object.keys(fieldErrors).length > 0}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
               {saving ? "Adding..." : "Add Round"}
             </button>

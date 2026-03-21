@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus, Sparkles, Check } from "lucide-react";
 import { categorizeTransaction } from "@burnless/engine";
+import { validateField, validateAll, expenseFormSchema } from "@/lib/form-validation";
 
 const CATEGORIES = [
   { value: "operating_expense", label: "Operating Expense" },
@@ -26,6 +27,8 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Form state
   const [name, setName] = useState("");
@@ -74,9 +77,44 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     (a) => a.category === "operating_expense" || a.category === "cogs"
   );
 
+  function handleBlur(field: string, value: string) {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateField(expenseFormSchema, field, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  }
+
+  function handleFieldChange(field: string, value: string) {
+    if (touched[field]) {
+      const err = validateField(expenseFormSchema, field, value);
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        if (err) next[field] = err;
+        else delete next[field];
+        return next;
+      });
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const errors = validateAll(expenseFormSchema, { name, amount, startDate });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setTouched((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(errors)) next[key] = true;
+        return next;
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -174,11 +212,18 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                handleFieldChange("name", e.target.value);
+              }}
+              onBlur={() => handleBlur("name", name)}
               placeholder="e.g. AWS Hosting, Office Rent"
               required
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={`w-full rounded-lg border ${touched.name && fieldErrors.name ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`}
             />
+            {touched.name && fieldErrors.name && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.name}</p>
+            )}
             {/* AI categorization suggestion */}
             {suggestion && !suggestionApplied && (
               <button
@@ -241,13 +286,20 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
             <input
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                handleFieldChange("amount", e.target.value);
+              }}
+              onBlur={() => handleBlur("amount", amount)}
               placeholder="5000"
               required
               min="0"
               step="0.01"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={`w-full rounded-lg border ${touched.amount && fieldErrors.amount ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500`}
             />
+            {touched.amount && fieldErrors.amount && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.amount}</p>
+            )}
           </div>
 
           <div>
@@ -282,10 +334,17 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                handleFieldChange("startDate", e.target.value);
+              }}
+              onBlur={() => handleBlur("startDate", startDate)}
               required
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={`w-full rounded-lg border ${touched.startDate && fieldErrors.startDate ? "border-danger-500" : "border-surface-300"} px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500`}
             />
+            {touched.startDate && fieldErrors.startDate && (
+              <p className="mt-1.5 text-xs font-medium text-danger-600" role="alert">{fieldErrors.startDate}</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -298,7 +357,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
             </button>
             <button
               type="submit"
-              disabled={saving || !name || !amount}
+              disabled={saving || !name || !amount || Object.keys(fieldErrors).length > 0}
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
             >
               {saving ? "Adding..." : "Add Expense"}

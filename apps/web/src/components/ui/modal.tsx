@@ -19,26 +19,72 @@ const sizeMap = {
   xl: "max-w-xl",
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      // Focus trap: cycle Tab within modal
+      if (e.key === "Tab" && contentRef.current) {
+        const focusable = contentRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (focusable.length === 0) return;
+
+        const first = focusable[0]!;
+        const last = focusable[focusable.length - 1]!;
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     },
     [onClose],
   );
 
   useEffect(() => {
     if (open) {
+      // Store previously focused element to restore on close
+      previousFocusRef.current = document.activeElement as HTMLElement;
       document.addEventListener("keydown", handleKey);
       document.body.style.overflow = "hidden";
-      // Focus the modal content for accessibility
-      contentRef.current?.focus();
+
+      // Focus the first focusable element inside the modal, or the modal itself
+      requestAnimationFrame(() => {
+        if (contentRef.current) {
+          const firstFocusable = contentRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+          if (firstFocusable) {
+            firstFocusable.focus();
+          } else {
+            contentRef.current.focus();
+          }
+        }
+      });
     }
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
+
+      // Restore focus to previously focused element
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === "function") {
+        previousFocusRef.current.focus();
+        previousFocusRef.current = null;
+      }
     };
   }, [open, handleKey]);
 
