@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@burnless/db";
+import { logger } from "@/lib/logger";
 import {
   companies,
   companyMembers,
@@ -193,7 +194,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong setting up your company";
-    console.error("[onboarding] Error:", message);
+    logger("onboarding").error("Error:", message);
     return errorResponse(message, 500);
   }
 });

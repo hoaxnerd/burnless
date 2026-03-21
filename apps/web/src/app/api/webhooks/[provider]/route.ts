@@ -9,6 +9,9 @@ import {
 } from "@/lib/email/templates";
 import { getProviderByType, planFromPlanId } from "@/lib/payment";
 import type { PaymentProviderType, NormalizedWebhookData } from "@burnless/engine";
+import { logger } from "@/lib/logger";
+
+const log = logger("webhook");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,7 +77,7 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
     if (addr) {
       const msg = subscriptionConfirmedEmail(plan);
       await email.provider.send({ to: addr, ...msg }).catch((e) =>
-        console.error("[webhook] Failed to send confirmation email:", e)
+        log.error("Failed to send confirmation email:", e)
       );
     }
   }
@@ -103,12 +106,12 @@ async function handleSubscriptionUpdated(data: NormalizedWebhookData) {
       const periodEnd = new Date(data.currentPeriodEnd * 1000);
       const msg = subscriptionCanceledEmail(periodEnd);
       await email.provider.send({ to: addr, ...msg }).catch((e) =>
-        console.error("[webhook] Failed to send cancellation email:", e)
+        log.error("Failed to send cancellation email:", e)
       );
     }
   }
 
-  console.warn(`[webhook] subscription.updated: company=${company.id} plan=${plan} cancel=${cancelAtPeriodEnd}`);
+  log.warn(`subscription.updated: company=${company.id} plan=${plan} cancel=${cancelAtPeriodEnd}`);
 }
 
 async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
@@ -124,7 +127,7 @@ async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
     })
     .where(eq(companies.id, company.id));
 
-  console.warn(`[webhook] subscription.deleted: company=${company.id} downgraded to free`);
+  log.warn(`subscription.deleted: company=${company.id} downgraded to free`);
 }
 
 async function handlePaymentFailed(data: NormalizedWebhookData) {
@@ -136,11 +139,11 @@ async function handlePaymentFailed(data: NormalizedWebhookData) {
   if (addr) {
     const msg = paymentFailedEmail();
     await email.provider.send({ to: addr, ...msg }).catch((e) =>
-      console.error("[webhook] Failed to send payment-failed email:", e)
+      log.error("Failed to send payment-failed email:", e)
     );
   }
 
-  console.error(`[webhook] payment_failed: company=${company.id} customer=${data.customerId}`);
+  log.error(`payment_failed: company=${company.id} customer=${data.customerId}`);
 }
 
 // ── Route Handler ────────────────────────────────────────────────────────────
@@ -196,13 +199,13 @@ export async function POST(
       if (handler) {
         await handler();
       } else {
-        console.warn(`[webhook] Unhandled ${providerName} event: ${event.type}`);
+        log.warn(`Unhandled ${providerName} event: ${event.type}`);
       }
 
       return NextResponse.json({ received: true, type: event.type });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Webhook verification failed";
-      console.error(`[webhook] ${providerName} verification error: ${message}`);
+      log.error(`${providerName} verification error: ${message}`);
       return NextResponse.json({ error: message }, { status: 400 });
     }
   }

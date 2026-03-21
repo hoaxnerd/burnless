@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, users, companies } from "@burnless/db";
+import { logger } from "@/lib/logger";
 import { eq } from "drizzle-orm";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
@@ -48,7 +49,7 @@ export const DELETE = withErrorHandler(async (request: Request) => {
       message: "All user data has been permanently deleted.",
     });
   } catch (error) {
-    console.error("User deletion failed:", error);
+    logger("user").error("User deletion failed:", error);
     return errorResponse("Failed to delete user data. Please try again.", 500);
   }
 });
