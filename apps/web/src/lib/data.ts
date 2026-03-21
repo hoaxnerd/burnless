@@ -1,9 +1,8 @@
 /**
  * Server-side data access layer. Used by server components to fetch data.
- * For MVP: works with or without auth. Falls back to first company.
  */
 
-import { db } from "@burnless/db";
+import { db, getCompanyForUser } from "@burnless/db";
 import {
   companies,
   scenarios,
@@ -16,11 +15,28 @@ import {
   fundingRounds,
 } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
+import { auth } from "./auth";
 
-/** Get the first company (MVP: single-tenant). */
-export async function getCompany() {
-  const [company] = await db.select().from(companies).limit(1);
+/** Get the company for a specific user via their membership. */
+export async function getCompanyForAuthUser(userId: string) {
+  const membership = await getCompanyForUser(userId);
+  if (!membership) return null;
+  const [company] = await db
+    .select()
+    .from(companies)
+    .where(eq(companies.id, membership.companyId))
+    .limit(1);
   return company ?? null;
+}
+
+/**
+ * Get company for the currently authenticated user.
+ * Used by server component pages inside the (dashboard) layout.
+ */
+export async function getCompany() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return getCompanyForAuthUser(session.user.id);
 }
 
 /** Get all scenarios for a company. */

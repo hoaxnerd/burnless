@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -26,16 +26,47 @@ const FOCUSABLE_SELECTOR =
 export function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const initialFocusSetRef = useRef(false);
   const [mounted, setMounted] = useState(false);
+
+  // Keep onClose ref current without causing effect re-runs
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => {
+  useEffect(() => {
+    if (!open) {
+      initialFocusSetRef.current = false;
+      return;
+    }
+
+    // Store previously focused element to restore on close
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    document.body.style.overflow = "hidden";
+
+    // Focus the first focusable element only on initial open
+    if (!initialFocusSetRef.current) {
+      initialFocusSetRef.current = true;
+      requestAnimationFrame(() => {
+        if (contentRef.current) {
+          const firstFocusable = contentRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+          if (firstFocusable) {
+            firstFocusable.focus();
+          } else {
+            contentRef.current.focus();
+          }
+        }
+      });
+    }
+
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -59,29 +90,10 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
           }
         }
       }
-    },
-    [onClose],
-  );
+    };
 
-  useEffect(() => {
-    if (open) {
-      // Store previously focused element to restore on close
-      previousFocusRef.current = document.activeElement as HTMLElement;
-      document.addEventListener("keydown", handleKey);
-      document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKey);
 
-      // Focus the first focusable element inside the modal, or the modal itself
-      requestAnimationFrame(() => {
-        if (contentRef.current) {
-          const firstFocusable = contentRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-          if (firstFocusable) {
-            firstFocusable.focus();
-          } else {
-            contentRef.current.focus();
-          }
-        }
-      });
-    }
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
@@ -92,7 +104,7 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
         previousFocusRef.current = null;
       }
     };
-  }, [open, handleKey]);
+  }, [open]);
 
   if (!open || !mounted) return null;
 

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getCompany } from "@/lib/data";
+import { getCompanyForAuthUser } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
 
@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   // Email verification temporarily disabled (BUR-161)
   // if (!session.user.isEmailVerified) redirect("/verify-email");
 
-  const company = await getCompany();
+  const company = await getCompanyForAuthUser(session.user.id!);
   if (!company) redirect("/onboarding");
 
   const user = {

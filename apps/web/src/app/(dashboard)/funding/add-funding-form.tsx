@@ -130,7 +130,7 @@ export function AddFundingForm() {
       <Modal open={open} onClose={() => setOpen(false)} title="Add Funding Round">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
               {error}
             </div>
           )}
