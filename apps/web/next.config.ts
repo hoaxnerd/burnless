@@ -7,6 +7,13 @@ const analyze = withBundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
+    ],
+  },
   // Point to monorepo root so Next.js doesn't infer /Users/X/ from a parent lockfile
   outputFileTracingRoot: path.join(__dirname, "../../"),
   headers: async () => [
