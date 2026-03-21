@@ -14,6 +14,13 @@ import {
   type AiFeatureConfig,
 } from "@burnless/ai";
 
+export interface CompanyProviderConfig {
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+}
+
 export interface AiFlagsWithBudget extends AiFeatureFlagsState {
   monthlyBudgetCents: number;
 }
@@ -125,4 +132,33 @@ export async function checkAiFeatureAllowed(
   }
 
   return { allowed: true, budgetStatus };
+}
+
+/**
+ * Get a company's custom AI provider config from DB.
+ * Returns undefined fields when no custom config is set (use env-var defaults).
+ */
+export async function getCompanyProviderConfig(
+  companyId: string
+): Promise<CompanyProviderConfig | undefined> {
+  const [row] = await db
+    .select({
+      aiProvider: aiFeatureFlags.aiProvider,
+      aiApiKey: aiFeatureFlags.aiApiKey,
+      aiModel: aiFeatureFlags.aiModel,
+      aiBaseUrl: aiFeatureFlags.aiBaseUrl,
+    })
+    .from(aiFeatureFlags)
+    .where(eq(aiFeatureFlags.companyId, companyId))
+    .limit(1);
+
+  // No custom config — use env var defaults
+  if (!row?.aiApiKey) return undefined;
+
+  return {
+    provider: row.aiProvider ?? undefined,
+    apiKey: row.aiApiKey,
+    model: row.aiModel ?? undefined,
+    baseUrl: row.aiBaseUrl ?? undefined,
+  };
 }

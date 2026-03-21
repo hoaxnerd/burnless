@@ -57,6 +57,13 @@
       "when": 1774063836418,
       "tag": "0007_warm_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774090186094,
+      "tag": "0008_add_ai_provider_config",
+      "breakpoints": true
     }
   ]
 }

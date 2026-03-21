@@ -93,8 +93,17 @@ export function AIDemoSection() {
         </div>
 
         {/* Chat mockup */}
-        <div className="max-w-2xl mx-auto">
-          <div className="rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm overflow-hidden shadow-2xl">
+        <div className="max-w-2xl mx-auto relative">
+          {/* Ambient glow behind chat */}
+          <div
+            className="absolute -inset-8 rounded-3xl opacity-0 blur-3xl transition-opacity duration-1000 pointer-events-none"
+            style={{
+              background: "radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, transparent 70%)",
+              opacity: stage >= 3 ? 0.6 : 0,
+            }}
+          />
+
+          <div className="relative rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm overflow-hidden shadow-2xl">
             {/* Chat header */}
             <div className="flex items-center gap-3 px-5 py-3 border-b border-surface-200/20 bg-surface-100/10">
               <div className="w-8 h-8 rounded-full bg-brand-500/20 flex items-center justify-center">
@@ -162,7 +171,7 @@ export function AIDemoSection() {
                           animation: `metricFloat 0.5s var(--ease-smooth) ${i * 0.15}s both`,
                         }}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-surface-200/15 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-surface-200/15 flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110">
                           <Icon className={`w-4 h-4 ${card.color}`} />
                         </div>
                         <div className="flex-1 min-w-0">

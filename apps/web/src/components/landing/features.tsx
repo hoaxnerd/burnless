@@ -82,22 +82,25 @@ export function FeatureBento() {
             return (
               <div
                 key={feature.title}
-                className={`${feature.span} group relative rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm p-6 sm:p-8 transition-all duration-500 hover:border-surface-200/50 hover:scale-[1.02] hover:shadow-xl ${
+                className={`${feature.span} group relative rounded-2xl border border-surface-200/30 bg-surface-50/5 backdrop-blur-sm p-6 sm:p-8 transition-all duration-500 hover:border-surface-200/50 hover:-translate-y-1 hover:shadow-xl ${
                   inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
                 style={{
-                  transitionDelay: inView ? `${i * 0.08}s` : "0s",
+                  transitionDelay: inView ? `${i * 0.1}s` : "0s",
                 }}
               >
                 {/* Gradient background on hover */}
                 <div
-                  className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${feature.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                  className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${feature.accent} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
                 />
+
+                {/* Subtle bottom edge glow on hover */}
+                <div className="absolute bottom-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-brand-400/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative">
                   {/* Icon */}
-                  <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4">
-                    <Icon className="w-5 h-5 text-brand-400" />
+                  <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                    <Icon className="w-5 h-5 text-brand-400 transition-colors duration-300 group-hover:text-brand-300" />
                   </div>
 
                   {/* Content */}

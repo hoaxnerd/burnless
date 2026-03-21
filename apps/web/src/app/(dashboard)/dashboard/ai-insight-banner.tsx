@@ -27,13 +27,19 @@ export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsight
         animate-slide-up
       `}
     >
-      {/* Ambient glow */}
-      <div className={`absolute inset-0 ${styles.glow} opacity-30 pointer-events-none`} />
+      {/* Ambient glow — breathing animation */}
+      <div
+        className={`absolute inset-0 ${styles.glow} pointer-events-none`}
+        style={{ animation: "ambientBreath 4s ease-in-out infinite" }}
+      />
 
       <div className="relative flex items-start gap-3 sm:gap-4">
-        {/* Icon badge */}
-        <div className={`flex-shrink-0 rounded-xl p-2 ${styles.iconBg}`}>
-          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${styles.iconColor}`} />
+        {/* Icon badge with pulse ring */}
+        <div className="relative flex-shrink-0">
+          <div className={`absolute inset-0 rounded-xl ${styles.iconBg} animate-ping opacity-20`} />
+          <div className={`relative rounded-xl p-2 ${styles.iconBg}`}>
+            <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${styles.iconColor}`} />
+          </div>
         </div>
 
         {/* Content */}

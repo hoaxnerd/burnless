@@ -10,6 +10,7 @@ import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
 import {
   getProvider,
+  createProvider,
   type LlmProvider,
   type LlmMessage,
   type ContentBlock,
@@ -18,12 +19,32 @@ import {
 import { getProviderForFeature } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
 
+/** Resolve the provider: use explicit config override if present, else routing. */
+function resolveProvider(options: ChatOptions): LlmProvider | null {
+  if (options.providerConfig?.apiKey) {
+    return createProvider({
+      provider: options.providerConfig.provider,
+      apiKey: options.providerConfig.apiKey,
+      model: options.providerConfig.model,
+      baseUrl: options.providerConfig.baseUrl,
+    });
+  }
+  return getProviderForFeature(options.feature ?? "chat") ?? getProvider();
+}
+
 interface ChatOptions {
   messages: ChatMessage[];
   financialContext: string;
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** AI feature name for model routing. Defaults to "chat". */
   feature?: string;
+  /** Override provider config (e.g., from per-company DB settings). */
+  providerConfig?: {
+    provider?: string;
+    apiKey?: string;
+    model?: string;
+    baseUrl?: string;
+  };
 }
 
 /** Non-streaming chat — sends message and returns complete response. */
@@ -31,7 +52,7 @@ export async function chat(options: ChatOptions): Promise<{
   response: string;
   toolResults: ToolCallResult[];
 }> {
-  const provider = getProviderForFeature(options.feature ?? "chat") ?? getProvider();
+  const provider = resolveProvider(options);
   if (!provider) {
     return {
       response: "AI is not configured. Please set an API key to enable the AI companion.",
@@ -100,7 +121,7 @@ export async function chat(options: ChatOptions): Promise<{
 
 /** Streaming chat — yields chunks as they arrive. */
 export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamChunk> {
-  const provider = getProviderForFeature(options.feature ?? "chat") ?? getProvider();
+  const provider = resolveProvider(options);
   if (!provider) {
     yield { type: "text", content: "AI is not configured. Please set an API key to enable the AI companion." };
     yield { type: "done" };

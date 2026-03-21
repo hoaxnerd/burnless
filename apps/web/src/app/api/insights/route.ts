@@ -14,7 +14,7 @@ import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { generateInsights, generatePageInsights, type InsightPage } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { checkAiFeatureAllowed, getAiFlags } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed, getAiFlags, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
@@ -137,10 +137,12 @@ export const POST = withErrorHandler(async (request: Request) => {
     // LLM-powered page insights — wrapped in try/catch so failures return empty insights
     const pageKey = page as InsightPage;
     try {
+      const companyProviderConfig = await getCompanyProviderConfig(ctx.companyId);
       insights = await generatePageInsights({
         page: pageKey,
         snapshot,
         pageData,
+        providerConfig: companyProviderConfig,
       });
     } catch (err) {
       logger("insights").warn(

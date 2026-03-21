@@ -167,9 +167,9 @@ function FloatingMetric({
       className={`absolute ${position} hidden lg:block`}
       style={{ animation: `metricFloat 0.6s var(--ease-smooth) ${delay} both` }}
     >
-      <div className="rounded-xl bg-surface-0/10 backdrop-blur-xl border border-surface-200/20 px-4 py-3 shadow-xl">
+      <div className="rounded-xl bg-surface-0/10 backdrop-blur-xl border border-surface-200/20 px-4 py-3 shadow-xl hover-lift">
         <div className="text-[10px] uppercase tracking-wider text-surface-500">{label}</div>
-        <div className="text-lg font-bold font-mono text-surface-900">{value}</div>
+        <div className="text-lg font-bold font-mono text-surface-900 tabular-nums">{value}</div>
       </div>
     </div>
   );
@@ -197,7 +197,7 @@ export function HeroSection() {
           >
             Know your runway.
             <br />
-            <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand-400 via-violet-400 to-brand-600 bg-clip-text text-transparent gradient-shimmer-text">
               Plan your future.
             </span>
           </h1>
@@ -218,7 +218,7 @@ export function HeroSection() {
             <Link
               href="/login"
               onClick={() => trackEvent("landing_hero_cta_clicked")}
-              className="rounded-xl bg-brand-500 px-8 py-3.5 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5"
+              className="rounded-xl bg-brand-500 px-8 py-3.5 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5 press-effect cta-glow"
             >
               See your runway →
             </Link>

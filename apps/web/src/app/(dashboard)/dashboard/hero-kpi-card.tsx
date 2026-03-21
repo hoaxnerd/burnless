@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wallet,
@@ -68,9 +69,73 @@ function Sparkline({
 /* ── Animated number counter ──────────────────────────────────────────────── */
 
 function AnimatedValue({ value }: { value: string }) {
+  const [displayed, setDisplayed] = useState(value);
+  const prevRef = useRef(value);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    // Only animate if it looks like a number (starts with $ or is numeric)
+    const numericMatch = value.match(/^(\$?)([\d,.]+)(.*)$/);
+    if (!numericMatch) {
+      setDisplayed(value);
+      prevRef.current = value;
+      return;
+    }
+
+    const [, prefix, numStr, suffix] = numericMatch;
+    const target = parseFloat(numStr!.replace(/,/g, ""));
+    if (isNaN(target)) {
+      setDisplayed(value);
+      prevRef.current = value;
+      return;
+    }
+
+    // Parse previous value for transition
+    const prevMatch = prevRef.current.match(/^(\$?)([\d,.]+)(.*)$/);
+    const start = prevMatch ? parseFloat(prevMatch[2]!.replace(/,/g, "")) : 0;
+    prevRef.current = value;
+
+    if (start === target) {
+      setDisplayed(value);
+      return;
+    }
+
+    const duration = 600;
+    const startTime = performance.now();
+    const hasDecimal = numStr!.includes(".");
+    const decimals = hasDecimal ? (numStr!.split(".")[1]?.length ?? 0) : 0;
+    // Check if original uses "k" or "M" suffix (compact format)
+    const isCompact = /[kM]$/.test(suffix ?? "");
+
+    function tick(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = start + (target - start) * eased;
+
+      if (isCompact && decimals > 0) {
+        setDisplayed(`${prefix}${current.toFixed(decimals)}${suffix}`);
+      } else if (hasDecimal) {
+        setDisplayed(`${prefix}${current.toFixed(decimals)}${suffix}`);
+      } else {
+        setDisplayed(`${prefix}${Math.round(current).toLocaleString("en-US")}${suffix}`);
+      }
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setDisplayed(value);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [value]);
+
   return (
     <span className="display-number tabular-nums transition-all duration-300">
-      {value}
+      {displayed}
     </span>
   );
 }
@@ -182,7 +247,7 @@ export function HeroKpiCard({
         animate-slide-up stagger-${stagger + 1}
         ${ghost
           ? "bg-surface-50/50 border-dashed border-surface-200/70 hover:border-surface-300"
-          : "bg-surface-0 border-surface-200 hover:border-surface-300 hover:shadow-lg"
+          : "bg-surface-0 border-surface-200 hover:border-surface-300 hover-lift"
         }
         ${celebrate ? "animate-celebrate" : ""}
       `}

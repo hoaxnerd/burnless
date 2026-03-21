@@ -208,6 +208,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
             px-3.5 py-2 sm:px-4 sm:py-2.5
             text-xs sm:text-sm font-medium
             transition-all duration-200
+            press-effect hover:-translate-y-0.5
           `;
 
           if (action.primary) {

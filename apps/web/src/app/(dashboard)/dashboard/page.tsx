@@ -263,7 +263,7 @@ export default async function DashboardPage({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Pinned Scenarios */}
             {pinnedScenarios.length > 0 && (
-              <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5">
+              <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
                   <Link
@@ -296,7 +296,7 @@ export default async function DashboardPage({
             )}
 
             {/* Key Metrics */}
-            <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6">
+            <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6 hover-lift">
               <h2 className="text-sm font-semibold text-surface-900 mb-4">Key Metrics</h2>
               <div className="space-y-1">
                 <MetricRow

@@ -10,9 +10,9 @@
  */
 
 import { z } from "zod";
-import { getProviderForFeature } from "@burnless/ai";
+import { getProviderForFeature, createProvider } from "@burnless/ai";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
 
 const enrichSchema = z.object({
@@ -104,7 +104,11 @@ export const POST = withErrorHandler(async (request: Request) => {
         // Step 2: Use AI to analyze the company
         send({ type: "status", message: "Learning about your company..." });
 
-        const provider = getProviderForFeature("onboarding_enrich");
+        // Use company-specific provider config if available, else fall back to default routing
+        const companyConfig = membership ? await getCompanyProviderConfig(membership.companyId) : undefined;
+        const provider = companyConfig
+          ? createProvider(companyConfig)
+          : getProviderForFeature("onboarding_enrich");
         if (!provider) {
           // No AI provider configured — return empty enrichment
           send({ type: "done", result: null });

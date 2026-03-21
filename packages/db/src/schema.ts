@@ -631,6 +631,11 @@ export const aiFeatureFlags = pgTable(
         autoCategorization: true,
         weeklyDigest: true,
       }),
+    // AI Provider config — per-company provider override (null = use env vars)
+    aiProvider: text("ai_provider"), // "anthropic" | "openai" | "openrouter"
+    aiApiKey: text("ai_api_key"), // user's own API key (masked in API responses)
+    aiModel: text("ai_model"), // custom model override
+    aiBaseUrl: text("ai_base_url"), // custom base URL (e.g., OpenRouter endpoint)
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

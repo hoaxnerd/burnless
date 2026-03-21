@@ -8,6 +8,7 @@
 
 import type { FinancialSnapshot, Insight, InsightType } from "./types";
 import { getProviderForFeature } from "./routing";
+import { createProvider, type CreateProviderOptions } from "./providers";
 
 // ── Page types ──────────────────────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ export interface PageInsightContext {
   snapshot: FinancialSnapshot;
   /** Page-specific data to give the LLM richer context */
   pageData?: Record<string, unknown>;
+  /** Override provider config (e.g., from per-company DB settings). */
+  providerConfig?: CreateProviderOptions;
 }
 
 export interface PageInsight {
@@ -190,7 +193,9 @@ Return ONLY the JSON array, no markdown fences.`;
 export async function generatePageInsights(
   context: PageInsightContext
 ): Promise<PageInsight[]> {
-  const provider = getProviderForFeature(FEATURE_KEY);
+  const provider = context.providerConfig?.apiKey
+    ? createProvider(context.providerConfig)
+    : getProviderForFeature(FEATURE_KEY);
   if (!provider) {
     return [];
   }

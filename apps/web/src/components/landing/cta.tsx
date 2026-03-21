@@ -26,7 +26,7 @@ export function CTASection() {
         <h2 className="text-3xl sm:text-5xl font-bold text-surface-900 tracking-tight leading-tight">
           Ready to stop
           <br />
-          <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-brand-400 via-violet-400 to-brand-600 bg-clip-text text-transparent gradient-shimmer-text">
             guessing your runway?
           </span>
         </h2>
@@ -38,7 +38,7 @@ export function CTASection() {
           <Link
             href="/login"
             onClick={() => trackEvent("landing_cta_signup_clicked")}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-8 py-4 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5 group"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-8 py-4 text-base font-semibold text-white hover:bg-brand-400 transition-all shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5 group press-effect cta-glow"
           >
             Start planning free
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />

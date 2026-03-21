@@ -28,6 +28,8 @@ export const GET = withErrorHandler(async (_request: Request) => {
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
 
+const VALID_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
+
 const patchSchema = z.object({
   masterEnabled: z.boolean().optional(),
   dataMode: z.enum(["full", "show_cached", "hide_all"]).optional(),
@@ -41,6 +43,11 @@ const patchSchema = z.object({
       autoCategorization: z.boolean().optional(),
     })
     .optional(),
+  // Provider config
+  aiProvider: z.enum(VALID_PROVIDERS).nullable().optional(),
+  aiApiKey: z.string().max(256).nullable().optional(),
+  aiModel: z.string().max(128).nullable().optional(),
+  aiBaseUrl: z.string().url().max(512).nullable().optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
@@ -76,6 +83,11 @@ export const PATCH = withErrorHandler(async (request: Request) => {
       ...body.features,
     };
   }
+  // Provider config — null clears to env-var fallback
+  if (body.aiProvider !== undefined) updates.aiProvider = body.aiProvider;
+  if (body.aiApiKey !== undefined) updates.aiApiKey = body.aiApiKey;
+  if (body.aiModel !== undefined) updates.aiModel = body.aiModel;
+  if (body.aiBaseUrl !== undefined) updates.aiBaseUrl = body.aiBaseUrl;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(existing);
@@ -98,6 +110,10 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     dataMode: updated.dataMode,
     features: updated.features,
     monthlyBudgetCents: updated.monthlyBudgetCents,
+    aiProvider: updated.aiProvider,
+    aiApiKey: maskApiKey(updated.aiApiKey),
+    aiModel: updated.aiModel,
+    aiBaseUrl: updated.aiBaseUrl,
     budget,
   });
 });
@@ -117,6 +133,10 @@ async function getOrCreateFlags(companyId: string) {
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
       features: existing.features as AiFeatureConfig,
       monthlyBudgetCents: existing.monthlyBudgetCents,
+      aiProvider: existing.aiProvider,
+      aiApiKey: maskApiKey(existing.aiApiKey),
+      aiModel: existing.aiModel,
+      aiBaseUrl: existing.aiBaseUrl,
     };
   }
 
@@ -136,5 +156,16 @@ async function getOrCreateFlags(companyId: string) {
     dataMode: (created?.dataMode ?? DEFAULT_AI_FLAGS.dataMode) as "full" | "show_cached" | "hide_all",
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
     monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
+    aiProvider: null,
+    aiApiKey: null,
+    aiModel: null,
+    aiBaseUrl: null,
   };
+}
+
+/** Mask an API key for safe display — show first 4 + last 4 chars. */
+function maskApiKey(key: string | null): string | null {
+  if (!key) return null;
+  if (key.length <= 12) return "••••••••";
+  return key.slice(0, 4) + "••••••••" + key.slice(-4);
 }

@@ -12,7 +12,7 @@ import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
-import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
@@ -123,6 +123,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     type: scenario.type,
   });
 
+  // Load company's custom AI provider config (if any)
+  const providerConfig = await getCompanyProviderConfig(ctx.companyId);
+
   // Stream response as SSE
   const encoder = new TextEncoder();
   let fullResponse = "";
@@ -133,6 +136,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         const chunks = chatStream({
           messages,
           financialContext: contextText,
+          providerConfig,
           onToolCall: async (toolName, input) => {
             return executeToolCall(toolName, input, {
               companyId: ctx.companyId,

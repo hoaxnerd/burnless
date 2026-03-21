@@ -34,27 +34,27 @@ export function LandingNav() {
           <nav className="hidden sm:flex items-center gap-8">
             <a
               href="#features"
-              className="text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5"
+              className="relative text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5 after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-brand-500 after:transition-all after:duration-300 hover:after:w-full"
             >
               Features
             </a>
             <a
               href="#ai-demo"
-              className="text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5"
+              className="relative text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5 after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-brand-500 after:transition-all after:duration-300 hover:after:w-full"
             >
               AI Companion
             </a>
             <Link
               href="/login"
               onClick={() => trackEvent("landing_nav_login_clicked")}
-              className="text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5"
+              className="relative text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5 after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-brand-500 after:transition-all after:duration-300 hover:after:w-full"
             >
               Log in
             </Link>
             <Link
               href="/login"
               onClick={() => trackEvent("landing_nav_signup_clicked")}
-              className="rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-400 transition-colors shadow-md shadow-brand-500/25"
+              className="rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-400 transition-all shadow-md shadow-brand-500/25 press-effect hover:-translate-y-0.5"
             >
               Start free
             </Link>

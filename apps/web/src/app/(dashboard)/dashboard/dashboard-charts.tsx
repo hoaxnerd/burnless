@@ -100,8 +100,8 @@ function DashboardChartCard({
         className={`
           rounded-2xl bg-surface-0 border border-surface-200
           p-5 sm:p-6
-          hover:border-surface-300 hover:shadow-md
-          transition-all duration-300
+          hover:border-surface-300
+          hover-lift
           animate-slide-up stagger-${stagger}
         `}
       >

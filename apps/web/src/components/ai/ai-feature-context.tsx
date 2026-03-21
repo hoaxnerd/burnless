@@ -26,6 +26,13 @@ export interface BudgetStatus {
   exceeded: boolean;
 }
 
+export interface AiProviderConfig {
+  aiProvider: string | null;
+  aiApiKey: string | null; // masked
+  aiModel: string | null;
+  aiBaseUrl: string | null;
+}
+
 // ── Context types ───────────────────────────────────────────────────────────
 
 interface AiFeatureContextValue {
@@ -36,13 +43,15 @@ interface AiFeatureContextValue {
   /** Check a specific feature's status */
   getFeature: (feature: AiFeatureName) => AiFeatureStatus;
   /** Update flags (calls PATCH /api/ai-features) */
-  updateFlags: (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number }>) => Promise<void>;
+  updateFlags: (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => Promise<void>;
   /** Convenience: is the master switch on? */
   masterEnabled: boolean;
   /** Monthly budget cap in cents */
   monthlyBudgetCents: number;
   /** Current budget status (spend, warning, exceeded) */
   budget: BudgetStatus | null;
+  /** AI provider configuration (masked API key) */
+  providerConfig: AiProviderConfig;
 }
 
 const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
@@ -53,6 +62,12 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [flags, setFlags] = useState<AiFeatureFlagsState>(DEFAULT_AI_FLAGS);
   const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(5000);
   const [budget, setBudget] = useState<BudgetStatus | null>(null);
+  const [providerConfig, setProviderConfig] = useState<AiProviderConfig>({
+    aiProvider: null,
+    aiApiKey: null,
+    aiModel: null,
+    aiBaseUrl: null,
+  });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -67,6 +82,12 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           });
           if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
           if (data.budget) setBudget(data.budget);
+          setProviderConfig({
+            aiProvider: data.aiProvider ?? null,
+            aiApiKey: data.aiApiKey ?? null,
+            aiModel: data.aiModel ?? null,
+            aiBaseUrl: data.aiBaseUrl ?? null,
+          });
         }
       })
       .catch(() => {})
@@ -81,7 +102,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   );
 
   const updateFlags = useCallback(
-    async (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number }>) => {
+    async (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => {
       const res = await fetch("/api/ai-features", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -96,6 +117,12 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         });
         if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
         if (updated.budget) setBudget(updated.budget);
+        setProviderConfig({
+          aiProvider: updated.aiProvider ?? null,
+          aiApiKey: updated.aiApiKey ?? null,
+          aiModel: updated.aiModel ?? null,
+          aiBaseUrl: updated.aiBaseUrl ?? null,
+        });
       }
     },
     []
@@ -111,6 +138,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         masterEnabled: flags.masterEnabled,
         monthlyBudgetCents,
         budget,
+        providerConfig,
       }}
     >
       {children}
