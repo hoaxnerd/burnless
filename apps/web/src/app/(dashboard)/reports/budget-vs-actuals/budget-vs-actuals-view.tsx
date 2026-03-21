@@ -45,7 +45,7 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <MetricCard label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} />
         <MetricCard label="Total Actual" value={formatCompactCurrency(totalActualSum)} />
         <MetricCard

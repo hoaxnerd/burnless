@@ -78,7 +78,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard
           label="Starting Cash"
           value={formatCompactCurrency(startingCash)}

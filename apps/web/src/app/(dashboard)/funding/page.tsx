@@ -66,9 +66,9 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
 
   return (
     <div>
-      <div className="mb-8 sm:mb-12 flex items-center justify-between">
+      <div className="mb-6 sm:mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-surface-900">Funding</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-surface-900">Funding</h1>
           <p className="mt-1 text-sm text-surface-500">
             Capital sources, fundraising history, and cap table
           </p>

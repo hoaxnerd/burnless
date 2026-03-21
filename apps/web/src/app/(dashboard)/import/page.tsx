@@ -235,14 +235,14 @@ export default function ImportPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Import Transactions</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50">Import Transactions</h1>
           <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
             Upload bank statements, connect accounts, or import spreadsheets
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Button variant="ghost" size="sm" icon={<History className="h-4 w-4" />}
             onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
             History
@@ -261,7 +261,7 @@ export default function ImportPage() {
       {showBankSync && <BankSyncPanel setShowBankSync={setShowBankSync} />}
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-2 mb-6 sm:mb-8 overflow-x-auto">
         {(["upload", "map", "preview", "result"] as Step[]).map((s, i) => {
           const labels = ["Upload", "Map Columns", "Preview & Edit", "Done"];
           const icons = [Upload, FileSpreadsheet, Sparkles, Check];

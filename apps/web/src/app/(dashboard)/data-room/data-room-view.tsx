@@ -225,6 +225,7 @@ export function DataRoomView({
       {fundingRounds.length > 0 && (
         <div className="rounded-xl bg-surface-0 border border-surface-200 p-6 mt-6">
           <h2 className="text-sm font-semibold text-surface-900 mb-4">Funding History</h2>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200">
@@ -251,6 +252,7 @@ export function DataRoomView({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

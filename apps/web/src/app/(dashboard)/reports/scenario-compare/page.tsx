@@ -16,7 +16,7 @@ export default async function ScenarioComparePage() {
           <span className="text-surface-300">/</span>
         </div>
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-surface-900">Scenario Comparison</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Scenario Comparison</h1>
         </div>
         <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
           <h3 className="text-lg font-semibold text-surface-900 mb-2">Need at least 2 scenarios</h3>
@@ -38,7 +38,7 @@ export default async function ScenarioComparePage() {
         <span className="text-surface-300">/</span>
       </div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-surface-900">Scenario Comparison</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Scenario Comparison</h1>
         <p className="mt-1 text-sm text-surface-500">{company.name}</p>
       </div>
       <ScenarioCompareView companyId={company.id} scenarios={scenarioList} />

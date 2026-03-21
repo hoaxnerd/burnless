@@ -60,8 +60,8 @@ export default async function ReportsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-surface-900">Reports</h1>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Reports</h1>
         <p className="mt-1 text-sm text-surface-500">
           Financial statements, analytics, and custom reports
           {scenario && (
@@ -72,7 +72,7 @@ export default async function ReportsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {reports.map((report) => (
           <Link
             key={report.title}

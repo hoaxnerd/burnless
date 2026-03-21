@@ -32,7 +32,7 @@ export default async function BudgetVsActualsPage() {
         <span className="text-surface-300">/</span>
       </div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-surface-900">Budget vs Actuals</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Budget vs Actuals</h1>
         <p className="mt-1 text-sm text-surface-500">
           {company.name} &mdash; {scenario.name} {budgetScenario ? "(budget)" : "(default scenario)"}
         </p>
