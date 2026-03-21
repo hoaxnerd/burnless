@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse } from "@/lib/api-helpers";
-import { db, companies, scenarios, aiMessages, aiConversations } from "@burnless/db";
+import { db, companies, scenarios, aiMessages, aiConversations, users } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
 import { env } from "@/lib/env";
@@ -224,9 +224,19 @@ export async function POST(request: Request) {
     // Ensure company has a billing customer
     let customerId = company?.stripeCustomerId;
     if (!customerId) {
+      const [user] = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, ctx.userId))
+        .limit(1);
+
+      if (!user?.email) {
+        return errorResponse("User email not found", 500);
+      }
+
       const customer = await provider.createCustomer(
-        ctx.userId, // email lookup happens in provider
-        null,
+        user.email,
+        user.name,
         currency,
       );
       customerId = customer.id;
