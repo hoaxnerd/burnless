@@ -39,9 +39,27 @@ async function ownerEmail(ownerId: string): Promise<string | null> {
 // ── Event Handlers (provider-agnostic) ───────────────────────────────────────
 
 async function handleCheckoutCompleted(data: Record<string, unknown>, providerType: PaymentProviderType) {
-  const companyId = (data.metadata as Record<string, string> | undefined)?.companyId;
-  const subscriptionId = data.subscription as string | undefined;
-  const customerId = data.customer as string | undefined;
+  let companyId: string | undefined;
+  let subscriptionId: string | undefined;
+  let customerId: string | undefined;
+  let userId: string | undefined;
+
+  if (providerType === "razorpay") {
+    // Razorpay payload shape: data = body.payload = { subscription: { entity: {...} } }
+    const entity = (data.subscription as { entity?: Record<string, unknown> } | undefined)?.entity;
+    const notes = entity?.notes as Record<string, string> | undefined;
+    companyId = notes?.companyId;
+    subscriptionId = entity?.id as string | undefined;
+    customerId = (entity?.customer_id as string | undefined);
+    userId = notes?.userId;
+  } else {
+    // Stripe payload shape: data = event.data.object (the checkout session)
+    const metadata = data.metadata as Record<string, string> | undefined;
+    companyId = metadata?.companyId;
+    subscriptionId = data.subscription as string | undefined;
+    customerId = data.customer as string | undefined;
+    userId = metadata?.userId;
+  }
 
   if (!companyId) return;
 
@@ -68,7 +86,6 @@ async function handleCheckoutCompleted(data: Record<string, unknown>, providerTy
     .where(eq(companies.id, companyId));
 
   // Send confirmation email to company owner
-  const userId = (data.metadata as Record<string, string> | undefined)?.userId;
   if (userId) {
     const addr = await ownerEmail(userId);
     if (addr) {

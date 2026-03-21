@@ -257,6 +257,7 @@ export async function POST(request: Request) {
       successUrl: `${env.APP_URL}/settings?tab=billing&billing=success`,
       cancelUrl: `${env.APP_URL}/settings?tab=billing&billing=canceled`,
       currency,
+      metadata: { companyId: ctx.companyId, userId: ctx.userId },
     });
 
     return NextResponse.json({ url: session.url });
