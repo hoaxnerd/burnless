@@ -12,7 +12,12 @@
     "db:push": "turbo db:push --filter=@burnless/db",
     "db:studio": "pnpm --filter @burnless/db db:studio",
     "db:seed": "turbo db:seed --filter=@burnless/db",
-    "setup": "pnpm install && pnpm db:push"
+    "setup": "pnpm install && pnpm db:push",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:dev": "./scripts/docker-dev.sh",
+    "docker:reset": "./scripts/docker-dev.sh --reset",
+    "cron:worker": "npx tsx scripts/cron-worker.ts"
   },
   "engines": {
     "node": ">=20"

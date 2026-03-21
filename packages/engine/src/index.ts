@@ -192,3 +192,22 @@ export type {
   BankSyncResult,
   LinkTokenOptions,
 } from "./bank-connectors";
+
+// Service abstractions — swappable local/production providers
+export {
+  createSearchService,
+  resetSearchService,
+  MeiliSearchProvider,
+  NoopSearchProvider,
+  createCrawlService,
+  resetCrawlService,
+  Crawl4AIProvider,
+  NoopCrawlProvider,
+  type SearchService,
+  type SearchDocument,
+  type SearchResult,
+  type SearchOptions,
+  type CrawlService,
+  type CrawlResult,
+  type CrawlOptions,
+} from "./services";

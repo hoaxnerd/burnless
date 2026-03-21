@@ -1,0 +1,123 @@
+# Burnless — Local Development Stack
+# Usage: docker compose up -d
+# All dependencies for local testing. Production uses managed services.
+
+services:
+  # ── Database ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: burnless
+      POSTGRES_PASSWORD: burnless
+      POSTGRES_DB: burnless
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U burnless"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Cache / Job Queue ───────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Local LLM (Ollama) ─────────────────────────────────────────────────────
+  # OpenAI-compatible API at http://localhost:11434/v1
+  # Pull model on first run: docker exec burnless-ollama ollama pull gemma3:12b
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Auto-pull the default model on first boot
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["ollama", "pull", "gemma3:12b"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+  # ── Search Engine (MeiliSearch) ─────────────────────────────────────────────
+  # REST API at http://localhost:7700
+  # Production: switch to Algolia, Typesense, or managed MeiliSearch
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: burnless-dev-key
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilidata:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Web Crawler (Crawl4AI) ─────────────────────────────────────────────────
+  # REST API at http://localhost:11235
+  # Production: switch to Firecrawl, ScrapingBee, or similar managed service
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    restart: unless-stopped
+    ports:
+      - "11235:11235"
+    environment:
+      CRAWL4AI_API_TOKEN: burnless-dev-token
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11235/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Email (Mailpit) ────────────────────────────────────────────────────────
+  # Web UI: http://localhost:8025
+  # SMTP: localhost:1025 (no auth required)
+  # Production: switch to Resend, SendGrid, or SES
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8025/api/v1/info || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
+  ollama_models:
+  meilidata:

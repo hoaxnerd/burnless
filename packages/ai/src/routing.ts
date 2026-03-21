@@ -285,12 +285,13 @@ function resolveProviderName(feature?: string): string {
     if (codeDefault) return codeDefault;
   }
 
-  // Global fallback
+  // Global fallback — check for configured providers in priority order
   return (
     process.env.AI_PROVIDER ??
     (process.env.ANTHROPIC_API_KEY ? "anthropic" : null) ??
     (process.env.OPENAI_API_KEY ? "openai" : null) ??
     (process.env.OPENROUTER_API_KEY ? "openrouter" : null) ??
+    (process.env.OLLAMA_BASE_URL ? "ollama" : null) ??
     "unknown"
   );
 }

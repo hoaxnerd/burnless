@@ -31,8 +31,14 @@ const PROVIDER_MAP: Record<string, ProviderFactory> = {
       ...config,
       baseUrl: config.baseUrl ?? "https://openrouter.ai/api/v1",
     }),
-  // Future providers:
-  // gemini: (config) => new GeminiProvider(config),
+  // Ollama — local LLM via OpenAI-compatible API (no API key needed)
+  // Default: http://localhost:11434/v1 (Docker: http://ollama:11434/v1)
+  ollama: (config) =>
+    new OpenAIProvider({
+      ...config,
+      apiKey: config.apiKey || "ollama", // Ollama doesn't validate keys
+      baseUrl: config.baseUrl ?? (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1"),
+    }),
 };
 
 // ── Default models per provider ─────────────────────────────────────────────
@@ -45,7 +51,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   anthropic: process.env.AI_MODEL_DEFAULT_ANTHROPIC ?? "claude-sonnet-4-20250514",
   openai: process.env.AI_MODEL_DEFAULT_OPENAI ?? "gpt-4o",
   openrouter: process.env.AI_MODEL_DEFAULT_OPENROUTER ?? "anthropic/claude-sonnet-4-20250514",
-  // gemini: process.env.AI_MODEL_DEFAULT_GEMINI ?? "gemini-2.0-flash",
+  ollama: process.env.AI_MODEL_DEFAULT_OLLAMA ?? "gemma3:12b",
 };
 
 // ── Tier → model mapping per provider ───────────────────────────────────────
@@ -65,6 +71,13 @@ const TIER_MODELS: Record<string, Record<ModelTier, string>> = {
     fast: process.env.AI_MODEL_OPENROUTER_FAST ?? "anthropic/claude-haiku-4-5-20251001",
     standard: process.env.AI_MODEL_OPENROUTER_STANDARD ?? "anthropic/claude-sonnet-4-20250514",
     deep: process.env.AI_MODEL_OPENROUTER_DEEP ?? "anthropic/claude-sonnet-4-20250514",
+  },
+  // Ollama uses the same model for all tiers (single local model)
+  // Override via AI_MODEL_OLLAMA_FAST etc. if running multiple models
+  ollama: {
+    fast: process.env.AI_MODEL_OLLAMA_FAST ?? "gemma3:12b",
+    standard: process.env.AI_MODEL_OLLAMA_STANDARD ?? "gemma3:12b",
+    deep: process.env.AI_MODEL_OLLAMA_DEEP ?? "gemma3:12b",
   },
 };
 
@@ -124,6 +137,18 @@ export function createProvider(
       `[ai] Unknown provider "${providerName}". Available: ${Object.keys(PROVIDER_MAP).join(", ")}`
     );
     return null;
+  }
+
+  // Ollama doesn't need an API key — skip the key check entirely
+  if (providerName === "ollama") {
+    const model =
+      options.model ?? process.env.AI_MODEL ?? DEFAULT_MODELS[providerName] ?? "gemma3:12b";
+    return factory({
+      apiKey: "ollama",
+      baseUrl: options.baseUrl ?? process.env.AI_BASE_URL,
+      model,
+      maxTokens: options.maxTokens ?? 4096,
+    });
   }
 
   const apiKey =

@@ -7,6 +7,8 @@ const analyze = withBundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker — bundles server + dependencies into .next/standalone
+  output: "standalone",
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
