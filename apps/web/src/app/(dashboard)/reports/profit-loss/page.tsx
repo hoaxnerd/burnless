@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { getCompany, getDefaultScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
+import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ProfitLossView } from "./profit-loss-view";
 
 export default async function ProfitLossPage() {
   const company = await getCompany();
-  if (!company) return <p>Set up your company first.</p>;
+  if (!company) return <SetupPrompt context="viewing reports" />;
   const scenario = await getDefaultScenario(company.id);
-  if (!scenario) return <p>Create a scenario first.</p>;
+  if (!scenario) return <ScenarioPrompt context="generate a Profit & Loss report" />;
 
   const data = await computeDashboardData(company.id, scenario.id);
 

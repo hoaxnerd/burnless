@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { getCompany, getScenarios } from "@/lib/data";
+import { SetupPrompt } from "@/components/ui/empty-state";
 import { ScenarioCompareView } from "./scenario-compare-view";
 
 export default async function ScenarioComparePage() {
   const company = await getCompany();
-  if (!company) return <p>Set up your company first.</p>;
+  if (!company) return <SetupPrompt context="comparing scenarios" />;
   const allScenarios = await getScenarios(company.id);
 
   if (allScenarios.length < 2) {

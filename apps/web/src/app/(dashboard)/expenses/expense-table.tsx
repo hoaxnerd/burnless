@@ -153,8 +153,9 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
             {selected.size} selected
           </span>
           <button
-            onClick={() => {/* bulk categorize placeholder */}}
-            className="inline-flex items-center gap-1 rounded-md bg-brand-100 px-2.5 py-1 text-[10px] font-medium text-brand-700 hover:bg-brand-200 transition-colors"
+            disabled
+            title="Bulk categorization coming soon"
+            className="inline-flex items-center gap-1 rounded-md bg-surface-100 px-2.5 py-1 text-[10px] font-medium text-surface-400 cursor-not-allowed"
           >
             <Tag className="h-3 w-3" /> Categorize
           </button>

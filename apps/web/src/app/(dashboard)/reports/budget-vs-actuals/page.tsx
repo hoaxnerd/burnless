@@ -9,30 +9,18 @@ import {
   type MonthlySeries,
   monthKey,
 } from "@burnless/engine";
+import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { BudgetVsActualsView } from "./budget-vs-actuals-view";
 
 export default async function BudgetVsActualsPage() {
   const company = await getCompany();
-  if (!company) return <p>Set up your company first.</p>;
+  if (!company) return <SetupPrompt context="viewing reports" />;
 
   const budgetScenario = await getBudgetScenario(company.id);
   const scenario = budgetScenario ?? (await getDefaultScenario(company.id));
 
   if (!scenario) {
-    return (
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Link href="/reports" className="text-sm text-surface-400 hover:text-surface-600">Reports</Link>
-          <span className="text-surface-300">/</span>
-        </div>
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-surface-900">Budget vs Actuals</h1>
-        </div>
-        <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
-          <p className="text-sm text-surface-500">Create a scenario first to compare budget vs actuals.</p>
-        </div>
-      </div>
-    );
+    return <ScenarioPrompt context="compare budget vs actuals" />;
   }
 
   const now = new Date();

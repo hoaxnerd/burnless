@@ -413,7 +413,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-start gap-4 p-4 rounded-xl bg-surface-50 border border-surface-100">
                 <div className="h-9 w-9 rounded-lg bg-success-50 flex items-center justify-center shrink-0">
-                  <Shield className="h-4.5 w-4.5 text-success-600" />
+                  <Shield className="h-[18px] w-[18px] text-success-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-surface-900">Data encrypted at rest & in transit</p>
@@ -422,7 +422,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-start gap-4 p-4 rounded-xl bg-surface-50 border border-surface-100">
                 <div className="h-9 w-9 rounded-lg bg-success-50 flex items-center justify-center shrink-0">
-                  <Lock className="h-4.5 w-4.5 text-success-600" />
+                  <Lock className="h-[18px] w-[18px] text-success-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-surface-900">SOC 2 Type II compliant architecture</p>
@@ -431,7 +431,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-start gap-4 p-4 rounded-xl bg-surface-50 border border-surface-100">
                 <div className="h-9 w-9 rounded-lg bg-success-50 flex items-center justify-center shrink-0">
-                  <Eye className="h-4.5 w-4.5 text-success-600" />
+                  <Eye className="h-[18px] w-[18px] text-success-600" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-surface-900">Your data is never used for AI training</p>
@@ -490,7 +490,7 @@ export default function SettingsPage() {
             <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
               <div className="flex items-center gap-4 mb-5">
                 <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
-                  <Database className="h-4.5 w-4.5 text-surface-600" />
+                  <Database className="h-[18px] w-[18px] text-surface-600" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-surface-900">
@@ -556,7 +556,7 @@ export default function SettingsPage() {
             <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
               <div className="flex items-center gap-4 mb-5">
                 <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
-                  <Sparkles className="h-4.5 w-4.5 text-surface-600" />
+                  <Sparkles className="h-[18px] w-[18px] text-surface-600" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold text-surface-900">
@@ -829,9 +829,9 @@ function BillingTab() {
     fetch("/api/billing")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setBilling(data))
-      .catch(() => {})
+      .catch(() => toastError("Failed to load billing information"))
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpgrade = async (plan: "pro" | "team") => {
     setActionLoading(plan);
