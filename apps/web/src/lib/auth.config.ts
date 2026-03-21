@@ -60,6 +60,17 @@ export const authConfig = {
     maxAge: 7 * 24 * 60 * 60, // 7 days — financial data app should have shorter sessions
   },
   callbacks: {
+    async signIn({ user, account }) {
+      // OAuth providers already verify emails — ensure emailVerified is set
+      // so users don't hit the verification wall after OAuth signup
+      if (account?.provider !== "credentials" && user.id) {
+        await db
+          .update(users)
+          .set({ emailVerified: new Date() })
+          .where(eq(users.id, user.id));
+      }
+      return true;
+    },
     async jwt({ token, user, trigger }) {
       if (user?.id) token.sub = user.id;
 
