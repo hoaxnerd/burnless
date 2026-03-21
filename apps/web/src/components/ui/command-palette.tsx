@@ -181,8 +181,9 @@ export function CommandPalette({
         <div
           className="pointer-events-auto w-full max-w-lg bg-surface-0 border border-surface-200 rounded-2xl shadow-xl overflow-hidden animate-scale-in"
           role="combobox"
-          aria-expanded="true"
+          aria-expanded={true}
           aria-haspopup="listbox"
+          aria-controls="command-palette-listbox"
           onKeyDown={handleKeyDown}
         >
           {/* Search input */}
@@ -211,6 +212,7 @@ export function CommandPalette({
             ref={listRef}
             className="max-h-80 overflow-y-auto py-2"
             role="listbox"
+            id="command-palette-listbox"
           >
             {flatItems.length === 0 ? (
               <div className="px-4 py-8 text-center">

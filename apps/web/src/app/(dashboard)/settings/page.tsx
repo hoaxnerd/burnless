@@ -32,7 +32,7 @@ export default function SettingsPage() {
 
   // Integrations state
   const [connectedIntegrations, setConnectedIntegrations] = useState<ConnectedIntegration[]>([]);
-  const [integrationsLoaded, setIntegrationsLoaded] = useState(false);
+  const [_integrationsLoaded, setIntegrationsLoaded] = useState(false);
   const [notifiedIntegrations, setNotifiedIntegrations] = useState<Set<string>>(new Set());
 
   // Load company profile
@@ -125,12 +125,12 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-surface-200 mb-8">
+      <div className="flex gap-1 border-b border-surface-200 mb-6 sm:mb-8 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               activeTab === tab.key
                 ? "border-brand-600 text-brand-700"
                 : "border-transparent text-surface-500 hover:text-surface-700"

@@ -32,7 +32,7 @@ vi.mock("@/lib/api-helpers", () => ({
       headers: { "Content-Type": "application/json" },
     });
   },
-  withErrorHandler: <T extends Function>(handler: T) => handler,
+  withErrorHandler: <T extends (...args: unknown[]) => unknown>(handler: T) => handler,
 }));
 
 import { DELETE } from "../me/route";

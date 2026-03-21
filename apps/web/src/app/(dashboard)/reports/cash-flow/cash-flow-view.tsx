@@ -9,7 +9,7 @@ import { ChartCard } from "@/components/ui";
 
 export function CashFlowView({
   cashFlow,
-  startingCash,
+  startingCash: _startingCash,
   companyName,
   scenarioName,
 }: {

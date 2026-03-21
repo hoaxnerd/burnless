@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, users, companies, sessions, accounts } from "@burnless/db";
+import { db, users, companies } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 

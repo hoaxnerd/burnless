@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
 import { AreaChartWidget, chartColors, formatCompactCurrency, formatPercent, formatNumber } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
 
 type MetricCategory = "revenue" | "saas" | "cash" | "profitability" | "growth" | "efficiency";
 

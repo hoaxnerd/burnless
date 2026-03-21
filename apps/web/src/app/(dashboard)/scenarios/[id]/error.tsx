@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 
 export default function ScenarioDetailError({
@@ -23,12 +24,12 @@ export default function ScenarioDetailError({
         variant={classifyError(error)}
         onRetry={reset}
       />
-      <a
+      <Link
         href="/scenarios"
         className="text-sm text-surface-500 hover:text-surface-700 transition-colors"
       >
         Back to Scenarios
-      </a>
+      </Link>
       {process.env.NODE_ENV === "development" && (
         <details className="w-full max-w-md">
           <summary className="text-xs text-surface-400 cursor-pointer">Error details</summary>

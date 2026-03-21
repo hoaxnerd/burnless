@@ -8,7 +8,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, scenarios, forecastLines, revenueStreams } from "@burnless/db";
-import { eq } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { computeDashboardData } from "@/lib/compute-dashboard";
@@ -40,7 +39,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   const dashboard = await computeDashboardData(ctx.companyId, baseScenario.id);
-  const m = dashboard.metrics;
+  const _m = dashboard.metrics;
 
   // Extract current metrics for scenario derivation
   const revArray = seriesToArray(dashboard.totalRevenue);
@@ -89,7 +88,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         adjusted.startAmount = ((params.startAmount as number) ?? lastRevenue) * 1.1;
       } else if (fl.method === "fixed") {
         // Reduce expense forecasts by 20%
-        const acct = fl.accountId;
+        const _acct = fl.accountId;
         // We don't know the account type from here, but reduce amounts conservatively
         adjusted.amount = ((params.amount as number) ?? 0) * 0.8;
       }

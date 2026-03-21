@@ -248,7 +248,7 @@ export function TeamDetails({
               <div className="absolute left-[15px] top-2 bottom-2 w-px bg-surface-200" />
 
               <div className="space-y-6">
-                {hiringTimeline.map((q, qi) => (
+                {hiringTimeline.map((q, _qi) => (
                   <div key={q.quarter} className="relative pl-10">
                     {/* Timeline dot */}
                     <div className="absolute left-2 top-1 h-3.5 w-3.5 rounded-full border-2 border-brand-500 bg-surface-0" />

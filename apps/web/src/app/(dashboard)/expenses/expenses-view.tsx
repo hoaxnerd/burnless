@@ -47,13 +47,13 @@ export function ExpensesView({
   summaryMetrics,
   expenseDetails,
   timeline,
-  opexTimeline,
-  cogsTimeline,
+  opexTimeline: _opexTimeline,
+  cogsTimeline: _cogsTimeline,
   budgetTimeline,
   scenarioId,
 }: ExpensesViewProps) {
   const [view, setView] = useState<"overview" | "budget">("overview");
-  const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount, cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
+  const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount: _opexAmount, cogsAmount: _cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
 
   // Budget comparison data
   const budgetCompareData = budgetTimeline

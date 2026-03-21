@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, aiUsageLogs } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 
 /**
  * GET /api/ai-costs — AI cost dashboard data.

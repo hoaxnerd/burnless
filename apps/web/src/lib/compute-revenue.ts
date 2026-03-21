@@ -8,7 +8,6 @@ import {
   seriesToArray,
   monthKey,
   type RevenueStreamInput,
-  type MonthlySeries,
   type MetricValue,
 } from "@burnless/engine";
 import { getRevenueStreams } from "./data";

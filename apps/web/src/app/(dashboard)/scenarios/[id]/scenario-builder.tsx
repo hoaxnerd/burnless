@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { ChartCard } from "@/components/ui/chart-card";
-import { generateRunwaySummaryPDF, downloadPDF } from "@/lib/pdf-export";
 
 import {
   type ScenarioBuilderProps, type WhatIfParams,
@@ -52,7 +51,7 @@ export function ScenarioBuilder({
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "z") {
       e.preventDefault();
-      e.shiftKey ? redo() : undo();
+      if (e.shiftKey) { redo(); } else { undo(); }
     }
   }, [undo, redo]);
 

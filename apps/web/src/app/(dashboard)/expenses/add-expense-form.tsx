@@ -159,7 +159,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
       // Learn: save merchant→category mapping when user manually categorizes
       // (either no suggestion existed, or user chose a different category)
       if (name.length >= 3 && targetAccountId) {
-        const subcatName = suggestion?.subcategory ?? name;
+        const _subcatName = suggestion?.subcategory ?? name;
         fetch("/api/merchant-mappings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

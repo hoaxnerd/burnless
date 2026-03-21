@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Download, FileText, Table, FolderOpen, Check, Loader2 } from "lucide-react";
 import type { ProfitAndLoss, CashFlowStatement, BalanceSheet } from "@burnless/engine";
 
@@ -138,9 +137,9 @@ export function DataRoomView({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Investor Data Room</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Investor Data Room</h1>
           <p className="mt-1 text-sm text-surface-500">
             One-click export of your financial data for investors &mdash; {companyName}, {scenarioName} scenario
           </p>
@@ -148,7 +147,7 @@ export function DataRoomView({
         <button
           onClick={handleExportAll}
           disabled={!!exporting}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors flex-shrink-0"
         >
           <Download className="w-4 h-4" />
           Download All

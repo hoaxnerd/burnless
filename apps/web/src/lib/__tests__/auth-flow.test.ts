@@ -21,10 +21,10 @@ let mockUsersTable: Array<{
 const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockWhere = vi.fn();
-const mockLimit = vi.fn();
+const _mockLimit = vi.fn();
 const mockInsert = vi.fn();
 const mockValues = vi.fn();
-const mockReturning = vi.fn();
+const _mockReturning = vi.fn();
 
 vi.mock("@burnless/db", () => ({
   db: {
@@ -44,7 +44,7 @@ vi.mock("@/lib/password", async (importOriginal) => {
 function setupMockChains() {
   mockSelect.mockImplementation(() => ({ from: mockFrom }));
   mockFrom.mockImplementation(() => ({ where: mockWhere }));
-  mockWhere.mockImplementation((condition: unknown) => ({
+  mockWhere.mockImplementation((_condition: unknown) => ({
     limit: (n: number) => {
       // Simple email-based lookup from mock table
       // The condition is opaque (drizzle eq()), so we use the last email set

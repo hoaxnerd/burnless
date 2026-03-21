@@ -6,10 +6,8 @@
 
 import {
   monthKey,
-  seriesToArray,
-  type MonthlySeries,
 } from "@burnless/engine";
-import { computeDashboardData, type DashboardData } from "./compute-dashboard";
+import { computeDashboardData } from "./compute-dashboard";
 import { computeExpenseDetails } from "./compute-expenses";
 import { computeRevenueDetails } from "./compute-revenue";
 import { getDefaultScenario } from "./data";
@@ -96,7 +94,7 @@ export async function computeWeeklyDigest(
     new Date(now.getFullYear(), now.getMonth() - 1, 1)
   );
 
-  const [dashboard, expenses, revenue] = await Promise.all([
+  const [dashboard, expenses, _revenue] = await Promise.all([
     computeDashboardData(companyId, scenario.id),
     computeExpenseDetails(companyId, scenario.id),
     computeRevenueDetails(companyId, scenario.id),

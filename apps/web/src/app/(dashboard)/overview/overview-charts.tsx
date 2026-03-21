@@ -1,6 +1,6 @@
 "use client";
 
-import { AreaChartWidget, BarChartWidget, MultiLineChart, chartColors, formatCompactCurrency, formatPercent, formatNumber } from "@/components/charts";
+import { AreaChartWidget, BarChartWidget, MultiLineChart, chartColors, formatCompactCurrency, formatNumber } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 
 interface MetricPoint {
@@ -84,7 +84,7 @@ export function MRRChart({ data }: { data: MetricPoint[] }) {
 
 export function OverviewCharts({
   revenueData,
-  expensesData,
+  expensesData: _expensesData,
   cashData,
   mrrData,
   burnRateData,

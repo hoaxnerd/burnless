@@ -14,7 +14,6 @@ import {
   type AiFeatureName,
   type AiFeatureFlagsState,
   type AiFeatureStatus,
-  type AiDataMode,
 } from "@burnless/ai";
 
 // ── Context types ───────────────────────────────────────────────────────────

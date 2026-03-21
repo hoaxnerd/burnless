@@ -7,9 +7,9 @@
 import { chat } from "@burnless/ai";
 import type { DigestMetrics } from "./compute-digest";
 import { buildDeterministicSummary } from "./compute-digest";
-import { getAiFlags, checkAiFeatureAllowed } from "./ai-feature-flags";
+import { checkAiFeatureAllowed } from "./ai-feature-flags";
 
-const DIGEST_SYSTEM_PROMPT = `You are the CFO of a startup. Write a concise weekly financial briefing for the founder.
+const _DIGEST_SYSTEM_PROMPT = `You are the CFO of a startup. Write a concise weekly financial briefing for the founder.
 
 Rules:
 - Be direct and data-driven. No filler.

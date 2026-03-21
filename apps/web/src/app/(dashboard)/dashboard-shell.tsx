@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
@@ -290,10 +291,12 @@ function DashboardContent({
           <div className="p-4 border-t border-surface-200">
             <div className={`flex items-center gap-3 ${sidebarCollapsed ? "justify-center" : ""}`}>
               {user?.image ? (
-                <img
+                <Image
                   src={user.image}
                   alt=""
-                  className="h-8 w-8 rounded-full flex-shrink-0"
+                  width={32}
+                  height={32}
+                  className="rounded-full flex-shrink-0"
                   referrerPolicy="no-referrer"
                 />
               ) : (

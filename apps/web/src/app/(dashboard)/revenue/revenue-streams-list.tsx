@@ -42,7 +42,7 @@ export function RevenueStreamsList({
   revenueTimeline,
   mrrTimeline,
   hasSaaS,
-  scenarioId,
+  scenarioId: _scenarioId,
 }: RevenueStreamsListProps) {
   return (
     <div className="space-y-6">
@@ -77,6 +77,7 @@ export function RevenueStreamsList({
             </p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-surface-200 bg-surface-50">
@@ -103,6 +104,7 @@ export function RevenueStreamsList({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

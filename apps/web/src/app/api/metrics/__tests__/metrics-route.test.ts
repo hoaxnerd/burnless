@@ -19,13 +19,13 @@ const { mockRequireCompanyAccess, mockErrorResponse } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   errorResponse: mockErrorResponse,
-  withErrorHandler: <T extends Function>(handler: T) => handler,
+  withErrorHandler: <T extends (...args: unknown[]) => unknown>(handler: T) => handler,
 }));
 
 // Mock DB — return minimal chain stubs
-const mockDbSelect = vi.fn();
-const mockDbFrom = vi.fn();
-const mockDbWhere = vi.fn();
+const _mockDbSelect = vi.fn();
+const _mockDbFrom = vi.fn();
+const _mockDbWhere = vi.fn();
 
 vi.mock("@burnless/db", () => ({
   db: { select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }) },

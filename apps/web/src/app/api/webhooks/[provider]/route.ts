@@ -108,7 +108,7 @@ async function handleSubscriptionUpdated(data: NormalizedWebhookData) {
     }
   }
 
-  console.log(`[webhook] subscription.updated: company=${company.id} plan=${plan} cancel=${cancelAtPeriodEnd}`);
+  console.warn(`[webhook] subscription.updated: company=${company.id} plan=${plan} cancel=${cancelAtPeriodEnd}`);
 }
 
 async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
@@ -124,7 +124,7 @@ async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
     })
     .where(eq(companies.id, company.id));
 
-  console.log(`[webhook] subscription.deleted: company=${company.id} downgraded to free`);
+  console.warn(`[webhook] subscription.deleted: company=${company.id} downgraded to free`);
 }
 
 async function handlePaymentFailed(data: NormalizedWebhookData) {
@@ -196,7 +196,7 @@ export async function POST(
       if (handler) {
         await handler();
       } else {
-        console.log(`[webhook] Unhandled ${providerName} event: ${event.type}`);
+        console.warn(`[webhook] Unhandled ${providerName} event: ${event.type}`);
       }
 
       return NextResponse.json({ received: true, type: event.type });

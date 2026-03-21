@@ -163,12 +163,6 @@ async function generateBoardPDF(data: BoardMeetingData, metrics: MetricDisplay[]
 
   // Metrics
   let y = 50;
-  const signalEmoji: Record<Signal, string> = {
-    green: "\u25CF", // filled circle
-    amber: "\u25CF",
-    red: "\u25CF",
-    neutral: "\u25CB", // empty circle
-  };
   const signalPdfColor: Record<Signal, [number, number, number]> = {
     green: [34, 197, 94],
     amber: [245, 158, 11],

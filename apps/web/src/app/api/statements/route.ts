@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, transactions, fundingRounds } from "@burnless/db";
+import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
@@ -54,7 +54,7 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   // Fetch forecast values for all lines
   const lineIds = fLines.map((l) => l.id);
-  const allValues = lineIds.length > 0
+  const _allValues = lineIds.length > 0
     ? await db.select().from(forecastValues).where(
         inArray(forecastValues.forecastLineId, lineIds)
       )

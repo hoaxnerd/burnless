@@ -100,7 +100,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [canRefresh, setCanRefresh] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const [slow, setSlow] = useState(false);
-  const insightFeature = useAiFeature("insights");
+  const _insightFeature = useAiFeature("insights");
 
   const fetchInsights = useCallback(
     async (forceGenerate = false) => {

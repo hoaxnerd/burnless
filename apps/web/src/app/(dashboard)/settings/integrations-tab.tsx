@@ -18,7 +18,7 @@ interface IntegrationsTabProps {
 }
 
 export function IntegrationsTab({
-  connectedIntegrations,
+  connectedIntegrations: _connectedIntegrations,
   notifiedIntegrations,
   setNotifiedIntegrations,
   disconnectIntegration,

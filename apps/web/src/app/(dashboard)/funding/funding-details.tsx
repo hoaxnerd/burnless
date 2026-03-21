@@ -60,7 +60,7 @@ const segmentColors = [
 export function FundingDetails({
   rounds,
   foundersOwnership,
-  currentCash,
+  currentCash: _currentCash,
   currentBurn,
   currentRunway,
 }: FundingDetailsProps) {

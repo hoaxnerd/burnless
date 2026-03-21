@@ -2,10 +2,6 @@
 
 import { Suspense, lazy, type ComponentType } from "react";
 
-interface LazyChartProps {
-  fallbackHeight?: string;
-}
-
 /**
  * Loading placeholder for charts — shows a subtle shimmer while
  * the chart component loads. Uses CSS animation, no JS overhead.

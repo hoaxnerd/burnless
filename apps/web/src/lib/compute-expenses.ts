@@ -15,7 +15,6 @@ import {
   monthKey,
   type ForecastLineInput,
   type HeadcountPlanInput,
-  type MonthlySeries,
 } from "@burnless/engine";
 import {
   getAccounts,
@@ -120,7 +119,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     endDate: fl.endDate,
   }));
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
-  const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
+  const _accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
 
   // Headcount costs
   const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({

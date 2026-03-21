@@ -7,12 +7,6 @@ import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
-
 export default async function ExpensesPage({
   searchParams,
 }: {
@@ -91,9 +85,9 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Expenses</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Expenses</h1>
           <p className="mt-1 text-sm text-surface-500">
             Intelligent spend management &mdash; AI categorized, anomaly tracked, fully searchable
           </p>

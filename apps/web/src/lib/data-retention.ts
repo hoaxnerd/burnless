@@ -1,4 +1,4 @@
-import { db, aiConversations, aiMessages, aiInsightCache } from "@burnless/db";
+import { db, aiConversations, aiInsightCache } from "@burnless/db";
 import { lt, inArray, and } from "drizzle-orm";
 
 /**

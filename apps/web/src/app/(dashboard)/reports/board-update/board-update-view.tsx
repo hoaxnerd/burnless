@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Download, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
+import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, MetricCard } from "@/components/ui";
 import { AiGate } from "@/components/ai/ai-gate";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
@@ -184,7 +184,7 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
   return (
     <div className="space-y-6 print:space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <Link
             href="/reports"
@@ -193,7 +193,7 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
             <ArrowLeft className="h-4 w-4 text-surface-500" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-surface-900">Board Update</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Board Update</h1>
             <p className="mt-0.5 text-sm text-surface-500">
               {d.companyName} &mdash; {formatMonthYear(d.reportMonth)}
             </p>

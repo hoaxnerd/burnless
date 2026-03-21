@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { db } from "@burnless/db";
 import { aiConversations, aiMessages } from "@burnless/db";
 import { eq, and, desc, asc, lt } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 export const GET = withErrorHandler(async (request: Request) => {

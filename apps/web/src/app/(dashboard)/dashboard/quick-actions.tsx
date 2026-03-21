@@ -10,7 +10,6 @@ import {
   Sparkles,
   Upload,
   FileText,
-  DollarSign,
 } from "lucide-react";
 
 interface QuickActionsProps {
@@ -25,7 +24,7 @@ interface QuickActionsProps {
   };
 }
 
-export function QuickActions({ scenarioId, accounts, context }: QuickActionsProps) {
+export function QuickActions({ scenarioId, accounts: _accounts, context }: QuickActionsProps) {
   const router = useRouter();
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [revenueOpen, setRevenueOpen] = useState(false);

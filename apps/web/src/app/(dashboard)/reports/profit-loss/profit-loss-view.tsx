@@ -2,9 +2,9 @@
 
 import type { ProfitAndLoss } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
-import { ExportCSVButton, statementToCSVRows } from "@/components/reports/export-button";
+import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
-import { MultiLineChart, chartColors, formatCompactCurrency, formatPercent } from "@/components/charts";
+import { MultiLineChart, chartColors, formatPercent } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 
 export function ProfitLossView({

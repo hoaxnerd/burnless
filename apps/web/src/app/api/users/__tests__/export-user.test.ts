@@ -79,7 +79,7 @@ describe("GET /api/users/me/export", () => {
     let callCount = 0;
     mockSelect.mockImplementation(() => ({
       from: () => ({
-        where: (cond: unknown) => {
+        where: (_cond: unknown) => {
           callCount++;
           if (callCount === 1) {
             // user profile

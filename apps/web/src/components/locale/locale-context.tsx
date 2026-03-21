@@ -3,7 +3,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import {
   type CurrencyCode,
-  type DataRegion,
   type LocaleSettings,
   DEFAULT_LOCALE_SETTINGS,
   CURRENCIES,

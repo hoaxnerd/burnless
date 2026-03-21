@@ -29,7 +29,7 @@ vi.mock("@/lib/password", () => ({
 
 // Make NextAuth providers simple passthroughs so authorize is directly accessible
 vi.mock("next-auth/providers/credentials", () => ({
-  default: (config: any) => ({ id: "credentials", name: "credentials", type: "credentials", ...config }),
+  default: (config: Record<string, unknown>) => ({ id: "credentials", name: "credentials", type: "credentials", ...config }),
 }));
 vi.mock("next-auth/providers/github", () => ({
   default: { id: "github", name: "github", type: "oauth" },
@@ -50,10 +50,10 @@ import { authConfig } from "../auth.config";
 
 // Extract the credentials provider's authorize function
 const credentialsProvider = authConfig.providers.find(
-  (p: any) => p.name === "credentials" || p.id === "credentials"
-) as any;
-const authorize: (credentials: Record<string, unknown>, req: any) => Promise<any> =
-  credentialsProvider?.authorize ?? credentialsProvider?.options?.authorize;
+  (p: unknown) => (p as { name?: string }).name === "credentials" || (p as { id?: string }).id === "credentials"
+) as { authorize?: (credentials: Record<string, unknown>, req: unknown) => Promise<unknown>; options?: { authorize?: (credentials: Record<string, unknown>, req: unknown) => Promise<unknown> } };
+const authorize: (credentials: Record<string, unknown>, req: unknown) => Promise<unknown> =
+  (credentialsProvider?.authorize ?? credentialsProvider?.options?.authorize) as (credentials: Record<string, unknown>, req: unknown) => Promise<unknown>;
 
 describe("auth.config credentials authorize", () => {
   beforeEach(() => {
@@ -65,17 +65,17 @@ describe("auth.config credentials authorize", () => {
   });
 
   it("returns null when email is missing", async () => {
-    const result = await authorize({ password: "test123" }, {} as any);
+    const result = await authorize({ password: "test123" }, {});
     expect(result).toBeNull();
   });
 
   it("returns null when password is missing", async () => {
-    const result = await authorize({ email: "test@example.com" }, {} as any);
+    const result = await authorize({ email: "test@example.com" }, {});
     expect(result).toBeNull();
   });
 
   it("returns null when both email and password are missing", async () => {
-    const result = await authorize({}, {} as any);
+    const result = await authorize({}, {});
     expect(result).toBeNull();
   });
 
@@ -84,7 +84,7 @@ describe("auth.config credentials authorize", () => {
 
     const result = await authorize(
       { email: "nobody@example.com", password: "password123" },
-      {} as any
+      {}
     );
     expect(result).toBeNull();
   });
@@ -96,7 +96,7 @@ describe("auth.config credentials authorize", () => {
 
     const result = await authorize(
       { email: "oauth@example.com", password: "password123" },
-      {} as any
+      {}
     );
     expect(result).toBeNull();
     expect(mockVerifyPassword).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe("auth.config credentials authorize", () => {
 
     const result = await authorize(
       { email: "user@example.com", password: "wrongpass" },
-      {} as any
+      {}
     );
     expect(result).toBeNull();
     expect(mockVerifyPassword).toHaveBeenCalledWith("wrongpass", "pbkdf2:100000:salt:hash");
@@ -130,7 +130,7 @@ describe("auth.config credentials authorize", () => {
 
     const result = await authorize(
       { email: "user@example.com", password: "correctpassword" },
-      {} as any
+      {}
     );
     expect(result).toEqual({
       id: "u1",
@@ -146,7 +146,7 @@ describe("auth.config credentials authorize", () => {
     ]);
     mockVerifyPassword.mockResolvedValue(true);
 
-    const result = await authorize({ email: "u@e.com", password: "correct" }, {} as any);
+    const result = await authorize({ email: "u@e.com", password: "correct" }, {});
     expect(result).not.toHaveProperty("passwordHash");
   });
 });
@@ -176,7 +176,7 @@ describe("auth.config signIn callback — OAuth emailVerified", () => {
   });
 
   it("sets emailVerified for Google OAuth users", async () => {
-    const result = await (authConfig.callbacks as any).signIn({
+    const result = await (authConfig.callbacks as unknown as { signIn: (args: { user: { id: string }; account: { provider: string } }) => Promise<boolean> }).signIn({
       user: { id: "user-1" },
       account: { provider: "google" },
     });
@@ -186,7 +186,7 @@ describe("auth.config signIn callback — OAuth emailVerified", () => {
   });
 
   it("sets emailVerified for GitHub OAuth users", async () => {
-    const result = await (authConfig.callbacks as any).signIn({
+    const result = await (authConfig.callbacks as unknown as { signIn: (args: { user: { id: string }; account: { provider: string } }) => Promise<boolean> }).signIn({
       user: { id: "user-2" },
       account: { provider: "github" },
     });
@@ -196,7 +196,7 @@ describe("auth.config signIn callback — OAuth emailVerified", () => {
   });
 
   it("does NOT set emailVerified for credentials sign-in", async () => {
-    const result = await (authConfig.callbacks as any).signIn({
+    const result = await (authConfig.callbacks as unknown as { signIn: (args: { user: { id: string }; account: { provider: string } }) => Promise<boolean> }).signIn({
       user: { id: "user-3" },
       account: { provider: "credentials" },
     });
@@ -205,7 +205,7 @@ describe("auth.config signIn callback — OAuth emailVerified", () => {
   });
 
   it("skips update when user.id is missing", async () => {
-    const result = await (authConfig.callbacks as any).signIn({
+    const result = await (authConfig.callbacks as unknown as { signIn: (args: { user: Record<string, unknown>; account: { provider: string } }) => Promise<boolean> }).signIn({
       user: {},
       account: { provider: "google" },
     });
@@ -223,20 +223,20 @@ describe("auth.config callbacks", () => {
 
     const token = { sub: undefined as string | undefined };
     const user = { id: "user-123" };
-    const result = await authConfig.callbacks!.jwt!({ token, user } as any);
+    const result = await authConfig.callbacks!.jwt!({ token, user } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]);
     expect(result).toMatchObject({ sub: "user-123" });
   });
 
   it("jwt callback preserves existing token when no user", async () => {
     const token = { sub: "existing-id" };
-    const result = await authConfig.callbacks!.jwt!({ token, user: undefined } as any);
+    const result = await authConfig.callbacks!.jwt!({ token, user: undefined } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]);
     expect(result).toMatchObject({ sub: "existing-id" });
   });
 
   it("session callback injects user id from token.sub", () => {
     const session = { user: { id: undefined as string | undefined } };
     const token = { sub: "user-456" };
-    const result = authConfig.callbacks!.session!({ session, token } as any);
-    expect((result as any).user.id).toBe("user-456");
+    const result = authConfig.callbacks!.session!({ session, token } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["session"]>[0]);
+    expect((result as unknown as { user: { id: string } }).user.id).toBe("user-456");
   });
 });

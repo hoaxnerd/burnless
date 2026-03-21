@@ -8,7 +8,6 @@ import {
   companies,
   scenarios,
   forecastLines,
-  forecastValues,
   financialAccounts,
   revenueStreams,
   headcountPlans,
@@ -16,7 +15,7 @@ import {
   departments,
   fundingRounds,
 } from "@burnless/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /** Get the first company (MVP: single-tenant). */
 export async function getCompany() {

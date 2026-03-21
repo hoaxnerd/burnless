@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canPerformAction, getPlanLimits, type Plan } from "../feature-gate";
+import { canPerformAction, getPlanLimits } from "../feature-gate";
 
 describe("feature-gate", () => {
   describe("getPlanLimits", () => {

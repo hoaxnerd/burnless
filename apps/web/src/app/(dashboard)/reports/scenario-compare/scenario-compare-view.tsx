@@ -22,7 +22,7 @@ interface ComparisonData {
 }
 
 export function ScenarioCompareView({
-  companyId,
+  companyId: _companyId,
   scenarios,
 }: {
   companyId: string;
@@ -39,7 +39,7 @@ export function ScenarioCompareView({
       return;
     }
 
-    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect -- fetch lifecycle: loading -> result
+    setLoading(true);
     fetch(`/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`)
       .then((r) => r.json())
       .then((data) => setComparison(data))
@@ -106,7 +106,7 @@ export function ScenarioCompareView({
 
             return (
               <div key={line.name} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <MetricCard label={`${baseName} — ${line.name}`} value={formatCompactCurrency(lastBase)} />
                   <MetricCard label={`${compareName} — ${line.name}`} value={formatCompactCurrency(lastCompare)} />
                   <MetricCard

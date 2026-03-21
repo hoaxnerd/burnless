@@ -45,7 +45,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
   const prevBurn = previous(data.netBurnRate);
   const mrr = current(data.mrr);
   const prevMrr = previous(data.mrr);
-  const cash = current(data.cashPosition);
+  const _cash = current(data.cashPosition);
 
   // ── Critical: Runway below 3 months ────────────────────────────────
   if (runway > 0 && runway < 3) {

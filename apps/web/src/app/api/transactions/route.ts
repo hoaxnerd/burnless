@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, transactions } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 const createSchema = z.object({

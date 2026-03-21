@@ -171,7 +171,7 @@ export function BillingTab() {
   }
 
   const currentPlan = billing?.plan ?? "free";
-  const isActive = billing?.status === "active" || billing?.status === "trialing";
+  const _isActive = billing?.status === "active" || billing?.status === "trialing";
   const isPastDue = billing?.status === "past_due";
 
   return (

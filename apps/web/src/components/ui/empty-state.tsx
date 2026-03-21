@@ -8,7 +8,6 @@ import {
   FileBarChart,
   FolderOpen,
   Sparkles,
-  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 

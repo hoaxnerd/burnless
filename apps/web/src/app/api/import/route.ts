@@ -193,7 +193,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // 4. Dry run — return preview with AI categorization
   if (dryRun) {
-    const preview = prepared.map(({ index, suggestedCategory, categoryConfidence, categorySource, importBatchId, ...rest }) => ({
+    const preview = prepared.map(({ index: _index, suggestedCategory, categoryConfidence, categorySource, importBatchId: _importBatchId, ...rest }) => ({
       ...rest,
       isDuplicate: existingDuplicates.has(rest.externalId) || false,
       suggestedCategory,
@@ -225,7 +225,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   try {
     const insertChunks = chunk(toInsert, 100);
     for (const batchChunk of insertChunks) {
-      const values = batchChunk.map(({ index, suggestedCategory, categoryConfidence, categorySource, ...rest }) => ({
+      const values = batchChunk.map(({ index: _index, suggestedCategory: _suggestedCategory, categoryConfidence: _categoryConfidence, categorySource: _categorySource, ...rest }) => ({
         ...rest,
         importBatchId: batch!.id,
       }));
