@@ -84,7 +84,7 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
 
   // Per-stream revenue computation
   const streamBreakdowns: StreamBreakdown[] = [];
-  const currentTotal = totalRevenue.get(currentMonth) ?? 0;
+  const currentTotal = Number(totalRevenue.get(currentMonth) ?? 0);
 
   for (const stream of streams) {
     const input: RevenueStreamInput = {
@@ -96,8 +96,8 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
 
     const values = computeRevenueStream(input, periodStart, periodEnd);
     const series = seriesToArray(values);
-    const current = values.get(currentMonth) ?? 0;
-    const prev = values.get(prevMonth) ?? 0;
+    const current = Number(values.get(currentMonth) ?? 0);
+    const prev = Number(values.get(prevMonth) ?? 0);
     const change = prev > 0 ? (current - prev) / prev : 0;
 
     streamBreakdowns.push({
@@ -136,8 +136,8 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
   const currentMrr = findMetricValue(metrics.mrr, currentMonth);
   const prevMrr = findMetricValue(metrics.mrr, prevMonth);
   const mrrGrowth = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
-  const currentRev = totalRevenue.get(currentMonth) ?? 0;
-  const prevRev = totalRevenue.get(prevMonth) ?? 0;
+  const currentRev = Number(totalRevenue.get(currentMonth) ?? 0);
+  const prevRev = Number(totalRevenue.get(prevMonth) ?? 0);
   const revGrowth = prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : 0;
 
   const quickRatio = findMetricValue(metrics.saasQuickRatio, currentMonth);

@@ -146,8 +146,8 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     if (!values) continue;
 
     const series = seriesToArray(values);
-    const currentAmount = values.get(currentMonth) ?? 0;
-    const prevAmount = values.get(prevMonth) ?? 0;
+    const currentAmount = Number(values.get(currentMonth) ?? 0);
+    const prevAmount = Number(values.get(prevMonth) ?? 0);
     const changePercent = prevAmount > 0 ? (currentAmount - prevAmount) / prevAmount : 0;
 
     // Derive subcategory from account name
@@ -179,8 +179,8 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   }
 
   // Add headcount as a synthetic line item if it has costs
-  const hcCurrent = headcountCosts.totalCost.get(currentMonth) ?? 0;
-  const hcPrev = headcountCosts.totalCost.get(prevMonth) ?? 0;
+  const hcCurrent = Number(headcountCosts.totalCost.get(currentMonth) ?? 0);
+  const hcPrev = Number(headcountCosts.totalCost.get(prevMonth) ?? 0);
   if (hcCurrent > 0 || hcPrev > 0) {
     const hcChange = hcPrev > 0 ? (hcCurrent - hcPrev) / hcPrev : 0;
     lineItems.push({

@@ -229,7 +229,7 @@ function computeOneTimeRevenue(
   const unitsPerMonth = params.unitsPerMonth ?? 0;
   const pricePerUnit = params.pricePerUnit ?? 0;
   if (unitsPerMonth === 0 && pricePerUnit === 0) {
-    for (const m of months) series.set(monthKey(m), D(0));
+    for (const m of months) series.set(monthKey(m), 0);
     return series;
   }
 
@@ -270,7 +270,7 @@ function computeServicesRevenue(
   const hoursPerMonth = params.hoursPerMonth ?? 0;
   const hourlyRate = params.hourlyRate ?? 0;
   if (hoursPerMonth === 0 && hourlyRate === 0) {
-    for (const m of months) series.set(monthKey(m), D(0));
+    for (const m of months) series.set(monthKey(m), 0);
     return series;
   }
 
