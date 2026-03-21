@@ -125,41 +125,41 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      {/* Hero KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+      {/* Hero KPI Cards — progressively populate as data arrives */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
         <HeroKpiCard
           variant="cash"
           label="Cash Position"
-          value={hasData ? formatCurrency(currentCash) : "$0"}
-          change={hasData ? pctChange(currentCash, prevCash) ?? undefined : undefined}
-          changeLabel="vs last month"
-          description={!hasData ? "Add funding to see cash" : undefined}
-          sparkData={hasData ? sparkline(metrics.cashPosition) : undefined}
+          value={hasFunding ? formatCurrency(currentCash) : "$---"}
+          change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
+          changeLabel={hasFunding ? "vs last month" : undefined}
+          description={!hasFunding ? "Add funding to see cash" : undefined}
+          sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
           stagger={0}
         />
         <HeroKpiCard
           variant="burn"
           label="Monthly Burn"
-          value={hasData ? formatCurrency(currentBurn) : "$0"}
-          change={hasData ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
-          changeLabel="vs last month"
-          description={!hasData ? "Add expenses to calculate" : undefined}
-          sparkData={hasData ? sparkline(metrics.netBurnRate) : undefined}
+          value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
+          change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
+          changeLabel={hasExpenses ? "vs last month" : undefined}
+          description={!hasExpenses ? "Add expenses to calculate" : undefined}
+          sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
           stagger={1}
         />
         <HeroKpiCard
           variant="runway"
           label="Runway"
           value={
-            hasData
+            hasFunding && hasExpenses
               ? currentRunway >= 999
                 ? "\u221e"
                 : `${Math.round(currentRunway)} mo`
               : "-- mo"
           }
-          description={hasData ? "At current burn rate" : "Based on cash and burn"}
+          description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
           sparkData={
-            hasData
+            hasFunding && hasExpenses
               ? sparkline(
                   metrics.cashRunwayMonths.map((m) => ({
                     ...m,
@@ -173,11 +173,11 @@ export default async function DashboardPage({
         <HeroKpiCard
           variant="revenue"
           label="MRR"
-          value={hasData ? formatCurrency(currentMrr) : "$0"}
-          change={hasData && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
-          changeLabel={hasData && prevMrr > 0 ? "MoM growth" : undefined}
-          description={!hasData ? "Add revenue streams" : undefined}
-          sparkData={hasData ? sparkline(metrics.mrr) : undefined}
+          value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
+          change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
+          changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
+          description={!hasRevenue ? "Add revenue streams" : undefined}
+          sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
           stagger={3}
         />
       </div>

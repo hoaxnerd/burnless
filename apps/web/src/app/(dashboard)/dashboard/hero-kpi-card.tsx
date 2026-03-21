@@ -141,6 +141,11 @@ interface HeroKpiCardProps {
   stagger?: number;
 }
 
+/** Returns true if the value is a placeholder (ghost state). */
+function isGhost(value: string): boolean {
+  return value === "$---" || value === "-- mo";
+}
+
 export function HeroKpiCard({
   variant,
   label,
@@ -154,6 +159,7 @@ export function HeroKpiCard({
   const config = variantConfig[variant];
   const Icon = config.icon;
   const router = useRouter();
+  const ghost = isGhost(value);
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -208,7 +214,7 @@ export function HeroKpiCard({
         </div>
 
         {/* Value */}
-        <div className="text-2xl sm:text-3xl font-bold text-surface-900 leading-none mb-2">
+        <div className={`text-2xl sm:text-3xl font-bold leading-none mb-2 ${ghost ? "text-surface-300" : "text-surface-900"}`}>
           <AnimatedValue value={value} />
         </div>
 
