@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookieSettingsButton } from "@/components/cookie-consent";
 
 const footerLinks = {
   Product: [
@@ -86,6 +87,11 @@ export function LandingFooter() {
                     </Link>
                   </li>
                 ))}
+                {category === "Legal" && (
+                  <li>
+                    <CookieSettingsButton />
+                  </li>
+                )}
               </ul>
             </div>
           ))}

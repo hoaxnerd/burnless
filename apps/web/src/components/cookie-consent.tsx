@@ -12,6 +12,40 @@ type CookiePreferences = {
 const CONSENT_KEY = "burnless-cookie-consent";
 const CONSENT_VERSION = "1"; // bump when cookie categories change
 
+type CookieInfo = {
+  name: string;
+  purpose: string;
+  duration: string;
+};
+
+const COOKIE_INVENTORY: Record<string, { description: string; cookies: CookieInfo[] }> = {
+  essential: {
+    description: "Required for the site to function. Cannot be disabled.",
+    cookies: [
+      { name: "next-auth.session-token", purpose: "Maintains your authenticated session", duration: "30 days" },
+      { name: "next-auth.csrf-token", purpose: "Protects against cross-site request forgery", duration: "Session" },
+      { name: "next-auth.callback-url", purpose: "Stores redirect URL after authentication", duration: "Session" },
+      { name: "burnless-cookie-consent", purpose: "Remembers your cookie preferences", duration: "1 year" },
+    ],
+  },
+  analytics: {
+    description: "Help us understand how you use Burnless to improve the product.",
+    cookies: [
+      { name: "_ga", purpose: "Distinguishes unique users for Google Analytics", duration: "2 years" },
+      { name: "_ga_*", purpose: "Maintains session state for Google Analytics", duration: "2 years" },
+    ],
+  },
+  marketing: {
+    description: "Deliver relevant content and measure campaign effectiveness.",
+    cookies: [
+      { name: "_fbp", purpose: "Identifies browsers for Facebook ad delivery", duration: "3 months" },
+      { name: "_gcl_au", purpose: "Stores ad click info for Google Ads conversion tracking", duration: "3 months" },
+    ],
+  },
+};
+
+const REOPEN_EVENT = "burnless-cookie-settings-open";
+
 function getStoredConsent(): CookiePreferences | null {
   try {
     const raw = localStorage.getItem(CONSENT_KEY);
@@ -50,12 +84,25 @@ export function CookieConsentBanner() {
   useEffect(() => {
     const stored = getStoredConsent();
     if (stored) {
+      setPreferences(stored);
       dispatchConsentEvent(stored);
     } else {
-      // Small delay so the banner doesn't flash on first paint
-      const timer = setTimeout(() => setVisible(true), 800);
+      // Delay banner to avoid competing with hero LCP element
+      const timer = setTimeout(() => setVisible(true), 2000);
       return () => clearTimeout(timer);
     }
+  }, []);
+
+  // Listen for re-open requests (e.g. from footer "Cookie Settings" link)
+  useEffect(() => {
+    const handleReopen = () => {
+      const stored = getStoredConsent();
+      if (stored) setPreferences(stored);
+      setShowDetails(true);
+      setVisible(true);
+    };
+    window.addEventListener(REOPEN_EVENT, handleReopen);
+    return () => window.removeEventListener(REOPEN_EVENT, handleReopen);
   }, []);
 
   const acceptAll = useCallback(() => {
@@ -110,95 +157,103 @@ export function CookieConsentBanner() {
 
           {/* Granular controls (expandable) */}
           {showDetails && (
-            <div className="mt-4 space-y-3 rounded-lg border border-surface-200/30 bg-surface-50/50 p-4 dark:bg-surface-900/50 dark:border-surface-700/20">
+            <div className="mt-4 space-y-4 rounded-lg border border-surface-200/30 bg-surface-50/50 p-4 dark:bg-surface-900/50 dark:border-surface-700/20 max-h-[60vh] overflow-y-auto">
               {/* Essential */}
-              <label className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium text-surface-900">
-                    Essential
-                  </span>
-                  <p className="text-xs text-surface-400">
-                    Authentication, security, and core functionality.
-                  </p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked
-                    disabled
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 rounded-full bg-brand-500 opacity-60 cursor-not-allowed" />
-                  <div className="absolute top-0.5 left-[18px] w-4 h-4 rounded-full bg-white shadow-sm" />
-                </div>
-              </label>
+              <div>
+                <label className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-surface-900">
+                      Essential
+                    </span>
+                    <p className="text-xs text-surface-400">
+                      {COOKIE_INVENTORY.essential.description}
+                    </p>
+                  </div>
+                  <div className="relative flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked
+                      disabled
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 rounded-full bg-brand-500 opacity-60 cursor-not-allowed" />
+                    <div className="absolute top-0.5 left-[18px] w-4 h-4 rounded-full bg-white shadow-sm" />
+                  </div>
+                </label>
+                <CookieTable cookies={COOKIE_INVENTORY.essential.cookies} />
+              </div>
 
               {/* Analytics */}
-              <label className="flex items-center justify-between cursor-pointer group">
-                <div>
-                  <span className="text-sm font-medium text-surface-900 group-hover:text-brand-600 transition-colors">
-                    Analytics
-                  </span>
-                  <p className="text-xs text-surface-400">
-                    Help us understand how you use Burnless to improve the
-                    product.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={preferences.analytics}
-                  onClick={() =>
-                    setPreferences((p) => ({ ...p, analytics: !p.analytics }))
-                  }
-                  className={`relative w-9 h-5 rounded-full transition-colors ${
-                    preferences.analytics
-                      ? "bg-brand-500"
-                      : "bg-surface-300 dark:bg-surface-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+              <div>
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <div>
+                    <span className="text-sm font-medium text-surface-900 group-hover:text-brand-600 transition-colors">
+                      Analytics
+                    </span>
+                    <p className="text-xs text-surface-400">
+                      {COOKIE_INVENTORY.analytics.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={preferences.analytics}
+                    onClick={() =>
+                      setPreferences((p) => ({ ...p, analytics: !p.analytics }))
+                    }
+                    className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
                       preferences.analytics
-                        ? "translate-x-[18px]"
-                        : "translate-x-0.5"
+                        ? "bg-brand-500"
+                        : "bg-surface-300 dark:bg-surface-600"
                     }`}
-                  />
-                </button>
-              </label>
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                        preferences.analytics
+                          ? "translate-x-[18px]"
+                          : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </label>
+                <CookieTable cookies={COOKIE_INVENTORY.analytics.cookies} />
+              </div>
 
               {/* Marketing */}
-              <label className="flex items-center justify-between cursor-pointer group">
-                <div>
-                  <span className="text-sm font-medium text-surface-900 group-hover:text-brand-600 transition-colors">
-                    Marketing
-                  </span>
-                  <p className="text-xs text-surface-400">
-                    Deliver relevant content and measure campaign effectiveness.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={preferences.marketing}
-                  onClick={() =>
-                    setPreferences((p) => ({ ...p, marketing: !p.marketing }))
-                  }
-                  className={`relative w-9 h-5 rounded-full transition-colors ${
-                    preferences.marketing
-                      ? "bg-brand-500"
-                      : "bg-surface-300 dark:bg-surface-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+              <div>
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <div>
+                    <span className="text-sm font-medium text-surface-900 group-hover:text-brand-600 transition-colors">
+                      Marketing
+                    </span>
+                    <p className="text-xs text-surface-400">
+                      {COOKIE_INVENTORY.marketing.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={preferences.marketing}
+                    onClick={() =>
+                      setPreferences((p) => ({ ...p, marketing: !p.marketing }))
+                    }
+                    className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
                       preferences.marketing
-                        ? "translate-x-[18px]"
-                        : "translate-x-0.5"
+                        ? "bg-brand-500"
+                        : "bg-surface-300 dark:bg-surface-600"
                     }`}
-                  />
-                </button>
-              </label>
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                        preferences.marketing
+                          ? "translate-x-[18px]"
+                          : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </label>
+                <CookieTable cookies={COOKIE_INVENTORY.marketing.cookies} />
+              </div>
             </div>
           )}
 
@@ -247,6 +302,31 @@ export function CookieConsentBanner() {
   );
 }
 
+function CookieTable({ cookies }: { cookies: CookieInfo[] }) {
+  return (
+    <div className="mt-2 overflow-x-auto">
+      <table className="w-full text-xs text-surface-500">
+        <thead>
+          <tr className="border-b border-surface-200/20 dark:border-surface-700/20">
+            <th className="text-left font-medium text-surface-600 pb-1.5 pr-3">Cookie</th>
+            <th className="text-left font-medium text-surface-600 pb-1.5 pr-3">Purpose</th>
+            <th className="text-left font-medium text-surface-600 pb-1.5">Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cookies.map((c) => (
+            <tr key={c.name} className="border-b border-surface-200/10 dark:border-surface-700/10 last:border-0">
+              <td className="py-1.5 pr-3 font-mono text-surface-600 whitespace-nowrap">{c.name}</td>
+              <td className="py-1.5 pr-3">{c.purpose}</td>
+              <td className="py-1.5 whitespace-nowrap">{c.duration}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /**
  * Hook for other components to check cookie consent status.
  * Returns null if consent hasn't been given yet.
@@ -254,4 +334,17 @@ export function CookieConsentBanner() {
 export function getCookieConsent(): CookiePreferences | null {
   if (typeof window === "undefined") return null;
   return getStoredConsent();
+}
+
+/** Client component button that re-opens the cookie consent banner */
+export function CookieSettingsButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new Event(REOPEN_EVENT))}
+      className="text-sm text-surface-500 hover:text-surface-900 transition-colors inline-block py-3"
+    >
+      Cookie Settings
+    </button>
+  );
 }

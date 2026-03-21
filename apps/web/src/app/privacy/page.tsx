@@ -166,28 +166,106 @@ export default function PrivacyPage() {
             </p>
           </section>
 
-          <section>
+          <section id="cookies">
             <h2 className="text-lg font-semibold text-surface-900 mb-3">
               7. Cookies and Tracking Technologies
             </h2>
             <p>We use the following types of cookies:</p>
-            <ul className="list-disc pl-6 mt-2 space-y-1">
-              <li>
-                <strong>Essential cookies:</strong> required for the Service to
-                function (authentication, security, preferences). These cannot
-                be disabled.
-              </li>
-              <li>
-                <strong>Analytics cookies:</strong> help us understand how users
-                interact with the Service. These are only set with your explicit
-                consent.
-              </li>
-              <li>
-                <strong>Marketing cookies:</strong> used to deliver relevant
-                content and measure campaign effectiveness. These are only set
-                with your explicit consent.
-              </li>
-            </ul>
+
+            <h3 className="text-base font-medium text-surface-800 mt-4 mb-2">
+              7.1 Essential Cookies
+            </h3>
+            <p>Required for the Service to function. These cannot be disabled.</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-surface-200/50">
+                    <th className="text-left font-medium py-2 pr-4">Cookie</th>
+                    <th className="text-left font-medium py-2 pr-4">Purpose</th>
+                    <th className="text-left font-medium py-2">Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="text-surface-600">
+                  <tr className="border-b border-surface-200/30">
+                    <td className="py-2 pr-4 font-mono text-xs">next-auth.session-token</td>
+                    <td className="py-2 pr-4">Maintains your authenticated session</td>
+                    <td className="py-2">30 days</td>
+                  </tr>
+                  <tr className="border-b border-surface-200/30">
+                    <td className="py-2 pr-4 font-mono text-xs">next-auth.csrf-token</td>
+                    <td className="py-2 pr-4">Protects against cross-site request forgery</td>
+                    <td className="py-2">Session</td>
+                  </tr>
+                  <tr className="border-b border-surface-200/30">
+                    <td className="py-2 pr-4 font-mono text-xs">next-auth.callback-url</td>
+                    <td className="py-2 pr-4">Stores redirect URL after authentication</td>
+                    <td className="py-2">Session</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 font-mono text-xs">burnless-cookie-consent</td>
+                    <td className="py-2 pr-4">Remembers your cookie preferences</td>
+                    <td className="py-2">1 year</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-base font-medium text-surface-800 mt-4 mb-2">
+              7.2 Analytics Cookies
+            </h3>
+            <p>Help us understand how users interact with the Service. Only set with your explicit consent.</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-surface-200/50">
+                    <th className="text-left font-medium py-2 pr-4">Cookie</th>
+                    <th className="text-left font-medium py-2 pr-4">Purpose</th>
+                    <th className="text-left font-medium py-2">Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="text-surface-600">
+                  <tr className="border-b border-surface-200/30">
+                    <td className="py-2 pr-4 font-mono text-xs">_ga</td>
+                    <td className="py-2 pr-4">Distinguishes unique users for Google Analytics</td>
+                    <td className="py-2">2 years</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 font-mono text-xs">_ga_*</td>
+                    <td className="py-2 pr-4">Maintains session state for Google Analytics</td>
+                    <td className="py-2">2 years</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-base font-medium text-surface-800 mt-4 mb-2">
+              7.3 Marketing Cookies
+            </h3>
+            <p>Used to deliver relevant content and measure campaign effectiveness. Only set with your explicit consent.</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-surface-200/50">
+                    <th className="text-left font-medium py-2 pr-4">Cookie</th>
+                    <th className="text-left font-medium py-2 pr-4">Purpose</th>
+                    <th className="text-left font-medium py-2">Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="text-surface-600">
+                  <tr className="border-b border-surface-200/30">
+                    <td className="py-2 pr-4 font-mono text-xs">_fbp</td>
+                    <td className="py-2 pr-4">Identifies browsers for Facebook ad delivery</td>
+                    <td className="py-2">3 months</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 font-mono text-xs">_gcl_au</td>
+                    <td className="py-2 pr-4">Stores ad click info for Google Ads conversion tracking</td>
+                    <td className="py-2">3 months</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <p className="mt-3">
               You can manage your cookie preferences at any time through the
               cookie consent banner or your browser settings.
