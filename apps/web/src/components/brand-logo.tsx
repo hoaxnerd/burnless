@@ -1,7 +1,9 @@
-let counter = 0;
+"use client";
+
+import { useId } from "react";
 
 export function BrandLogo({ className = "" }: { className?: string }) {
-  const gradId = `brand-logo-grad-${counter++}`;
+  const gradId = useId();
   return (
     <svg
       viewBox="0 0 32 32"
