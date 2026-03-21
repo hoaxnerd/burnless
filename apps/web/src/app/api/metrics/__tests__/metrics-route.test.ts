@@ -93,7 +93,7 @@ describe("GET /api/metrics", () => {
         getRequest({ scenarioId: "test-scenario" })
       );
 
-      expect(res.status).toBe(401);
+      expect(res!.status).toBe(401);
     });
 
     it("returns 403 when no company found", async () => {
@@ -107,7 +107,7 @@ describe("GET /api/metrics", () => {
         getRequest({ scenarioId: "test-scenario" })
       );
 
-      expect(res.status).toBe(403);
+      expect(res!.status).toBe(403);
     });
   });
 
@@ -122,8 +122,8 @@ describe("GET /api/metrics", () => {
 
     it("returns 400 when scenarioId is missing", async () => {
       const res = await GET(getRequest({}));
-      expect(res.status).toBe(400);
-      const data = await res.json();
+      expect(res!.status).toBe(400);
+      const data = await res!.json();
       expect(data.error).toBe("scenarioId required");
     });
   });

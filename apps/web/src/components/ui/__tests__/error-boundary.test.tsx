@@ -77,7 +77,7 @@ describe("ErrorBoundary", () => {
   });
 
   it("shows generic message when error has no message", () => {
-    function ThrowNull() {
+    function ThrowNull(): React.JSX.Element {
       throw new Error("");
     }
     render(
