@@ -8,7 +8,7 @@ import {
   subscriptionCanceledEmail,
 } from "@/lib/email/templates";
 import { getProviderByType, planFromPlanId } from "@/lib/payment";
-import type { PaymentProviderType } from "@burnless/engine";
+import type { PaymentProviderType, NormalizedWebhookData } from "@burnless/engine";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,30 +36,13 @@ async function ownerEmail(ownerId: string): Promise<string | null> {
   return user?.email ?? null;
 }
 
-// ── Event Handlers (provider-agnostic) ───────────────────────────────────────
+// ── Event Handlers (provider-agnostic, using normalized webhook data) ────────
 
-async function handleCheckoutCompleted(data: Record<string, unknown>, providerType: PaymentProviderType) {
-  let companyId: string | undefined;
-  let subscriptionId: string | undefined;
-  let customerId: string | undefined;
-  let userId: string | undefined;
-
-  if (providerType === "razorpay") {
-    // Razorpay payload shape: data = body.payload = { subscription: { entity: {...} } }
-    const entity = (data.subscription as { entity?: Record<string, unknown> } | undefined)?.entity;
-    const notes = entity?.notes as Record<string, string> | undefined;
-    companyId = notes?.companyId;
-    subscriptionId = entity?.id as string | undefined;
-    customerId = (entity?.customer_id as string | undefined);
-    userId = notes?.userId;
-  } else {
-    // Stripe payload shape: data = event.data.object (the checkout session)
-    const metadata = data.metadata as Record<string, string> | undefined;
-    companyId = metadata?.companyId;
-    subscriptionId = data.subscription as string | undefined;
-    customerId = data.customer as string | undefined;
-    userId = metadata?.userId;
-  }
+async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType: PaymentProviderType) {
+  const companyId = data.metadata?.companyId;
+  const subscriptionId = data.subscriptionId;
+  const customerId = data.customerId;
+  const userId = data.metadata?.userId;
 
   if (!companyId) return;
 
@@ -97,29 +80,27 @@ async function handleCheckoutCompleted(data: Record<string, unknown>, providerTy
   }
 }
 
-async function handleSubscriptionUpdated(data: Record<string, unknown>) {
-  const customerId = data.customer as string;
-  const company = await findCompanyByCustomerId(customerId);
+async function handleSubscriptionUpdated(data: NormalizedWebhookData) {
+  if (!data.customerId) return;
+  const company = await findCompanyByCustomerId(data.customerId);
   if (!company) return;
 
-  const subscriptionId = data.id as string;
-  const planId = ((data.items as { data?: Array<{ price?: { id: string } }> })?.data?.[0]?.price?.id) ?? undefined;
-  const plan = planFromPlanId(planId);
-  const cancelAtPeriodEnd = data.cancel_at_period_end === true;
+  const plan = planFromPlanId(data.planId);
+  const cancelAtPeriodEnd = data.cancelAtPeriodEnd === true;
 
   await db
     .update(companies)
     .set({
-      stripeSubscriptionId: subscriptionId,
+      stripeSubscriptionId: data.subscriptionId ?? null,
       stripePlan: plan,
     })
     .where(eq(companies.id, company.id));
 
   // Notify owner if they scheduled cancellation
-  if (cancelAtPeriodEnd) {
+  if (cancelAtPeriodEnd && data.currentPeriodEnd) {
     const addr = await ownerEmail(company.ownerId);
     if (addr) {
-      const periodEnd = new Date((data.current_period_end as number) * 1000);
+      const periodEnd = new Date(data.currentPeriodEnd * 1000);
       const msg = subscriptionCanceledEmail(periodEnd);
       await email.provider.send({ to: addr, ...msg }).catch((e) =>
         console.error("[webhook] Failed to send cancellation email:", e)
@@ -130,9 +111,9 @@ async function handleSubscriptionUpdated(data: Record<string, unknown>) {
   console.log(`[webhook] subscription.updated: company=${company.id} plan=${plan} cancel=${cancelAtPeriodEnd}`);
 }
 
-async function handleSubscriptionDeleted(data: Record<string, unknown>) {
-  const customerId = data.customer as string;
-  const company = await findCompanyByCustomerId(customerId);
+async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
+  if (!data.customerId) return;
+  const company = await findCompanyByCustomerId(data.customerId);
   if (!company) return;
 
   await db
@@ -146,9 +127,9 @@ async function handleSubscriptionDeleted(data: Record<string, unknown>) {
   console.log(`[webhook] subscription.deleted: company=${company.id} downgraded to free`);
 }
 
-async function handlePaymentFailed(data: Record<string, unknown>) {
-  const customerId = data.customer as string;
-  const company = await findCompanyByCustomerId(customerId);
+async function handlePaymentFailed(data: NormalizedWebhookData) {
+  if (!data.customerId) return;
+  const company = await findCompanyByCustomerId(data.customerId);
   if (!company) return;
 
   const addr = await ownerEmail(company.ownerId);
@@ -159,7 +140,7 @@ async function handlePaymentFailed(data: Record<string, unknown>) {
     );
   }
 
-  console.error(`[webhook] payment_failed: company=${company.id} customer=${customerId}`);
+  console.error(`[webhook] payment_failed: company=${company.id} customer=${data.customerId}`);
 }
 
 // ── Route Handler ────────────────────────────────────────────────────────────
@@ -169,6 +150,7 @@ async function handlePaymentFailed(data: Record<string, unknown>) {
  * POST /api/webhooks/{provider}
  *
  * Stripe and Razorpay webhooks are verified via the PaymentProvider abstraction.
+ * Both providers return normalized data — handlers are fully provider-agnostic.
  * Other providers return 200 acknowledgement (not yet implemented).
  */
 export async function POST(

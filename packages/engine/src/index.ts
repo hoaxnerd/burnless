@@ -153,6 +153,8 @@ export type {
   PaymentSubscription,
   CreateCheckoutOptions,
   CheckoutSession,
+  NormalizedWebhookData,
+  NormalizedWebhookEvent,
 } from "./payments";
 
 // Bank connectors — import directly from "@burnless/engine/bank-connectors" when needed.
