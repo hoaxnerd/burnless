@@ -189,6 +189,22 @@ export function resetProvider(): void {
 export { AnthropicProvider } from "./anthropic";
 export { OpenAIProvider } from "./openai";
 export { LlmProvider } from "./base";
+export {
+  ResilientProvider,
+  CircuitBreaker,
+  RateLimiter,
+  CircuitOpenError,
+  RateLimitExceededError,
+  resetAllResilience,
+} from "./resilience";
+export type {
+  RetryConfig,
+  CircuitBreakerConfig,
+  RateLimiterConfig,
+  ResilienceConfig,
+  RequestLog,
+  CircuitState,
+} from "./resilience";
 export type {
   ProviderConfig,
   CompletionRequest,

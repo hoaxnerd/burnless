@@ -16,6 +16,14 @@ import {
   createProviderForTier,
   getFallbackTiers,
 } from "./providers";
+import {
+  ResilientProvider,
+  CircuitOpenError,
+  getCircuitBreaker,
+  getRateLimiter,
+  getProviderRateLimitConfig,
+  type RequestLog,
+} from "./providers/resilience";
 
 // ── Feature → Tier mapping ──────────────────────────────────────────────────
 
@@ -195,10 +203,87 @@ class TrackedProvider extends LlmProvider {
   }
 }
 
+// ── Request logging ──────────────────────────────────────────────────────────
+
+type RequestLogListener = (log: RequestLog) => void;
+const requestLogListeners: RequestLogListener[] = [];
+
+/** Register a listener that receives structured request logs (for monitoring). */
+export function onRequestLog(listener: RequestLogListener): () => void {
+  requestLogListeners.push(listener);
+  return () => {
+    const idx = requestLogListeners.indexOf(listener);
+    if (idx >= 0) requestLogListeners.splice(idx, 1);
+  };
+}
+
+function emitRequestLog(log: RequestLog): void {
+  // Always log to console for observability
+  const status = log.success ? "OK" : `FAIL: ${log.error}`;
+  console.log(
+    `[ai] ${log.provider}/${log.model} ${log.feature ?? "unknown"} ${status} ${log.durationMs}ms` +
+    `${log.attempt > 0 ? ` (retry #${log.attempt})` : ""}` +
+    `${log.inputTokens ? ` tokens:${log.inputTokens}/${log.outputTokens}` : ""}` +
+    ` circuit:${log.circuitState} remaining:${log.rateLimitRemaining}`
+  );
+
+  for (const listener of requestLogListeners) {
+    try {
+      listener(log);
+    } catch {
+      // Don't let listener errors break the request
+    }
+  }
+}
+
+// ── Resolve provider name ────────────────────────────────────────────────────
+
+function resolveProviderName(): string {
+  return (
+    process.env.AI_PROVIDER ??
+    (process.env.ANTHROPIC_API_KEY ? "anthropic" : null) ??
+    (process.env.OPENAI_API_KEY ? "openai" : null) ??
+    (process.env.OPENROUTER_API_KEY ? "openrouter" : null) ??
+    "unknown"
+  );
+}
+
+// ── Wrap provider with resilience ────────────────────────────────────────────
+
+/**
+ * Wrap a raw provider with shared-per-provider circuit breaker and rate limiter,
+ * plus per-request retry with exponential backoff.
+ */
+function wrapWithResilience(
+  provider: LlmProvider,
+  providerName: string,
+  feature?: string
+): ResilientProvider {
+  const rateLimitConfig = getProviderRateLimitConfig(providerName);
+
+  return new ResilientProvider(
+    provider,
+    providerName,
+    {
+      circuitBreaker: { failureThreshold: 5, cooldownMs: 60_000, halfOpenSuccesses: 2 },
+      rateLimiter: rateLimitConfig,
+      onRequest: emitRequestLog,
+    },
+    feature
+  );
+}
+
 // ── Main routing API ────────────────────────────────────────────────────────
 
 /**
  * Get a provider instance routed to the appropriate model tier for a feature.
+ *
+ * The returned provider has:
+ *   - Retry with exponential backoff + jitter (3 retries)
+ *   - Circuit breaker (opens after 5 failures, 60s cooldown)
+ *   - Per-provider rate limiting
+ *   - Structured request logging
+ *   - Usage tracking (tokens, cost, duration)
  *
  * Usage:
  *   const provider = getProviderForFeature("chat");
@@ -211,11 +296,12 @@ export function getProviderForFeature(feature: string): LlmProvider | null {
   const provider = createProviderForTier(tier);
   if (!provider) return null;
 
-  const providerName =
-    process.env.AI_PROVIDER ??
-    (process.env.ANTHROPIC_API_KEY ? "anthropic" : "unknown");
+  const providerName = resolveProviderName();
 
-  return new TrackedProvider(provider, feature, tier, providerName);
+  // Stack: TrackedProvider → ResilientProvider → raw provider
+  // Resilience handles retries/circuit/rate, Tracked handles usage metrics
+  const resilient = wrapWithResilience(provider, providerName, feature);
+  return new TrackedProvider(resilient, feature, tier, providerName);
 }
 
 /**
@@ -223,14 +309,18 @@ export function getProviderForFeature(feature: string): LlmProvider | null {
  * Prefer getProviderForFeature() when the feature name is known.
  */
 export function getProviderForTier(tier: ModelTier): LlmProvider | null {
-  return createProviderForTier(tier);
+  const provider = createProviderForTier(tier);
+  if (!provider) return null;
+
+  const providerName = resolveProviderName();
+  return wrapWithResilience(provider, providerName);
 }
 
 /**
  * Execute a completion with automatic fallback on failure.
  *
- * Tries the preferred tier first. If it fails (rate limit, model unavailable),
- * falls back to alternative tiers in order.
+ * Tries the preferred tier first with full resilience (retry + circuit breaker).
+ * If all retries fail or circuit is open, falls back to alternative tiers.
  */
 export async function completeWithFallback(
   feature: string,
@@ -238,18 +328,28 @@ export async function completeWithFallback(
 ): Promise<LlmResponse | null> {
   const primaryTier = getFeatureTier(feature);
   const tiersToTry: ModelTier[] = [primaryTier, ...getFallbackTiers(primaryTier)];
+  const providerName = resolveProviderName();
 
   for (const tier of tiersToTry) {
     const provider = createProviderForTier(tier);
     if (!provider) continue;
 
+    const resilient = wrapWithResilience(provider, providerName, feature);
+
     try {
-      return await provider.complete(request);
+      return await resilient.complete(request);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[ai-router] ${feature} failed on tier "${tier}" (${provider.modelId}): ${msg}. Trying fallback...`
-      );
+      // Circuit open errors mean we should skip to next tier immediately
+      if (err instanceof CircuitOpenError) {
+        console.warn(
+          `[ai-router] ${feature}: circuit open for ${providerName}, skipping tier "${tier}"`
+        );
+      } else {
+        console.warn(
+          `[ai-router] ${feature} failed on tier "${tier}" (${provider.modelId}): ${msg}. Trying fallback...`
+        );
+      }
       continue;
     }
   }

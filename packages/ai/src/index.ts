@@ -52,6 +52,7 @@ export {
   completeWithFallback,
   estimateCostMicros,
   onUsage,
+  onRequestLog,
 } from "./routing";
 
 // Feature flags
