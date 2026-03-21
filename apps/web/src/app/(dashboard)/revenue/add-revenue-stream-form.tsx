@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus } from "lucide-react";
+import { z } from "zod";
 import {
   validateField,
   validateAll,
@@ -61,7 +62,7 @@ export function AddRevenueStreamForm({ scenarioId }: AddRevenueStreamFormProps) 
     usage_based: ["pricePerUnit", "expectedUnits"],
   };
 
-  function getParamsSchema(streamType: string) {
+  function getParamsSchema(streamType: string): z.AnyZodObject {
     switch (streamType) {
       case "subscription": return subscriptionParamsSchema;
       case "services": return servicesParamsSchema;

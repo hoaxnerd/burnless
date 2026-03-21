@@ -117,7 +117,7 @@ export async function POST(request: Request) {
   });
 
   // Route to appropriate insight generator
-  let insights;
+  let insights: unknown[];
   let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "general";
 
   if (page === "dashboard") {

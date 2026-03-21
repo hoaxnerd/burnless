@@ -107,7 +107,7 @@ export function validateField(
   value: string,
 ): string | null {
   if (!(field in schema.shape)) return null;
-  const fieldSchema = (schema.shape as Record<string, z.ZodTypeAny>)[field];
+  const fieldSchema = (schema.shape as Record<string, z.ZodTypeAny>)[field]!;
   const result = fieldSchema.safeParse(value);
   if (result.success) return null;
   return (result.error as z.ZodError).issues[0]?.message ?? "Invalid value";
