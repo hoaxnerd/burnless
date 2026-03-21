@@ -30,12 +30,13 @@ npm-debug.log*
 
 # Testing
 coverage/
-e2e/test-results/
-playwright-report/
-blob-report/
+**/test-results/
+**/playwright-report/
+**/blob-report/
 
 # Generated
 .contentlayer/
+*.tsbuildinfo
 
 # Agents internal
 agents/*/HEARTBEAT.md
