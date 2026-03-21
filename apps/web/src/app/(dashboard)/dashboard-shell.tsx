@@ -10,7 +10,6 @@ import {
   Landmark,
   Users,
   GitBranch,
-  FileBarChart,
   Sparkles,
   Settings,
   Command,
@@ -76,8 +75,6 @@ const coreNavItems: NavItem[] = [
   { id: "funding", href: "/funding", label: "Funding", icon: Landmark },
   { id: "team", href: "/team", label: "Team", icon: Users },
   { id: "scenarios", href: "/scenarios", label: "Scenarios", icon: GitBranch },
-  { id: "reports", href: "/reports", label: "Reports", icon: FileBarChart },
-  { id: "import", href: "/import", label: "Import", icon: Upload },
   { id: "data-room", href: "/data-room", label: "Data Room", icon: FolderOpen },
 ];
 
@@ -349,7 +346,7 @@ function DashboardContent({
       return [
         { id: "qa-add-expense", label: "Add expense", icon: Receipt, href: "/expenses" },
         { id: "qa-new-scenario", label: "New scenario", icon: GitBranch, href: "/scenarios/new" },
-        { id: "qa-import", label: "Import data", icon: Upload, href: "/import" },
+        { id: "qa-import", label: "Import data", icon: Upload, href: "/data-room?tab=import" },
       ];
     }
     return [
@@ -663,19 +660,19 @@ function SidebarInner({
           <button
             onClick={onToggleAI}
             className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all
-              bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-950/30 dark:to-purple-950/30
-              border border-brand-200/50 dark:border-brand-800/30
-              text-brand-700 dark:text-brand-300
-              hover:shadow-md hover:border-brand-300/70 dark:hover:border-brand-700/50
+              bg-gradient-to-r from-accent-50 to-accent-100 dark:from-accent-950 dark:to-accent-950
+              border border-accent-200/50 dark:border-accent-800/30
+              text-accent-700 dark:text-accent-300
+              hover:shadow-md hover:border-accent-300/70 dark:hover:border-accent-700/50
               ${collapsed ? "justify-center px-2" : ""}
             `}
             title={collapsed ? "AI Companion" : undefined}
           >
-            <Sparkles className="h-4 w-4 flex-shrink-0 text-brand-500" />
+            <Sparkles className="h-4 w-4 flex-shrink-0 text-accent-500" />
             {!collapsed && (
               <>
                 <span className="flex-1 text-left">AI Companion</span>
-                <span className="text-[10px] font-normal text-brand-400 bg-brand-100 dark:bg-brand-900/40 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] font-normal text-accent-400 bg-accent-100 dark:bg-accent-900/40 px-1.5 py-0.5 rounded-full">
                   Ask
                 </span>
               </>
@@ -700,7 +697,8 @@ function SidebarInner({
             {orderedNavItems.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                (item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
+                (item.id === "data-room" && (pathname.startsWith("/reports") || pathname.startsWith("/import")));
               return (
                 <SortableNavItem
                   key={item.id}

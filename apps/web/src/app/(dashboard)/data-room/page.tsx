@@ -61,6 +61,7 @@ async function DataRoomContent({ companyId, scenarioId, companyName, scenarioNam
     <DataRoomView
       companyName={companyName}
       scenarioName={scenarioName}
+      scenarioAvailable={true}
       profitAndLoss={data.profitAndLoss}
       cashFlow={data.cashFlow}
       balanceSheet={data.balanceSheet}
