@@ -2,8 +2,8 @@
  * GET/PATCH /api/ai-features — Read and update AI feature flags for the
  * authenticated user's company.
  *
- * GET  → returns the current AiFeatureFlagsState (creates defaults if none exist)
- * PATCH → updates master switch, data mode, and/or individual feature toggles
+ * GET  → returns the current AiFeatureFlagsState + budget info
+ * PATCH → updates master switch, data mode, budget, and/or individual feature toggles
  */
 
 import { NextResponse } from "next/server";
@@ -13,6 +13,7 @@ import { aiFeatureFlags } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
+import { getBudgetStatus } from "@/lib/ai-feature-flags";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,8 @@ export const GET = withErrorHandler(async (_request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const flags = await getOrCreateFlags(ctx.companyId);
-  return NextResponse.json(flags);
+  const budget = await getBudgetStatus(ctx.companyId);
+  return NextResponse.json({ ...flags, budget });
 });
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
@@ -29,6 +31,7 @@ export const GET = withErrorHandler(async (_request: Request) => {
 const patchSchema = z.object({
   masterEnabled: z.boolean().optional(),
   dataMode: z.enum(["full", "show_cached", "hide_all"]).optional(),
+  monthlyBudgetCents: z.number().int().min(0).max(1_000_000).optional(), // $0 – $10,000
   features: z
     .object({
       onboarding: z.boolean().optional(),
@@ -64,6 +67,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (body.dataMode !== undefined) {
     updates.dataMode = body.dataMode;
   }
+  if (body.monthlyBudgetCents !== undefined) {
+    updates.monthlyBudgetCents = body.monthlyBudgetCents;
+  }
   if (body.features) {
     updates.features = {
       ...(existing.features as AiFeatureConfig),
@@ -81,10 +87,14 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     .where(eq(aiFeatureFlags.companyId, ctx.companyId))
     .returning();
 
+  const budget = await getBudgetStatus(ctx.companyId);
+
   return NextResponse.json({
     masterEnabled: updated!.masterEnabled,
     dataMode: updated!.dataMode,
     features: updated!.features,
+    monthlyBudgetCents: updated!.monthlyBudgetCents,
+    budget,
   });
 });
 
@@ -102,6 +112,7 @@ async function getOrCreateFlags(companyId: string) {
       masterEnabled: existing.masterEnabled,
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
       features: existing.features as AiFeatureConfig,
+      monthlyBudgetCents: existing.monthlyBudgetCents,
     };
   }
 
@@ -120,5 +131,6 @@ async function getOrCreateFlags(companyId: string) {
     masterEnabled: created!.masterEnabled,
     dataMode: created!.dataMode as "full" | "show_cached" | "hide_all",
     features: created!.features as AiFeatureConfig,
+    monthlyBudgetCents: created!.monthlyBudgetCents,
   };
 }

@@ -620,6 +620,7 @@ export const aiFeatureFlags = pgTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     masterEnabled: boolean("master_enabled").notNull().default(true),
     dataMode: aiDataModeEnum("data_mode").notNull().default("full"),
+    monthlyBudgetCents: integer("monthly_budget_cents").notNull().default(5000), // $50 default
     features: jsonb("features")
       .notNull()
       .default({

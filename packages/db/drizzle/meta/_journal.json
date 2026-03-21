@@ -50,6 +50,13 @@
       "when": 1774058998469,
       "tag": "0006_careless_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774063836418,
+      "tag": "0007_warm_bloodscream",
+      "breakpoints": true
     }
   ]
 }

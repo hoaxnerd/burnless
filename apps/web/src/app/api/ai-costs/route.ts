@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, aiUsageLogs } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { getBudgetStatus } from "@/lib/ai-feature-flags";
 
 /**
  * GET /api/ai-costs — AI cost dashboard data.
@@ -58,11 +59,14 @@ export const GET = withErrorHandler(async (request: Request) => {
   const totalCostMicros = featureBreakdown.reduce((sum, f) => sum + (f.totalCostMicros ?? 0), 0);
   const totalRequests = featureBreakdown.reduce((sum, f) => sum + (f.requestCount ?? 0), 0);
 
+  const budget = await getBudgetStatus(ctx.companyId);
+
   return NextResponse.json({
     period: { days, since: since.toISOString() },
     totalCostMicros,
     totalCostUSD: totalCostMicros / 1_000_000,
     totalRequests,
+    budget,
     featureBreakdown: featureBreakdown.map((f) => ({
       ...f,
       costUSD: (f.totalCostMicros ?? 0) / 1_000_000,

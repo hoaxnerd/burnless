@@ -38,11 +38,12 @@ export const POST = withErrorHandler(async (request: Request) => {
     return errorResponse("Invalid request body", 400);
   }
 
-  // Feature gate: check AI feature flags (master switch + chat toggle + data mode)
+  // Feature gate: check AI feature flags (master switch + chat toggle + data mode + budget)
   const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "chat");
   if (!aiCheck.allowed) {
     return errorResponse(aiCheck.reason!, 403);
   }
+  const budgetWarning = aiCheck.budgetStatus?.warning;
 
   // Feature gate: check AI message limit
   const plan = await getCompanyPlan(ctx.companyId);
@@ -189,11 +190,14 @@ export const POST = withErrorHandler(async (request: Request) => {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  };
+  if (budgetWarning && aiCheck.budgetStatus) {
+    headers["X-AI-Budget-Warning"] = `${aiCheck.budgetStatus.percentUsed}% of monthly budget used`;
+  }
+
+  return new Response(stream, { headers });
 });

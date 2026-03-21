@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "general" | "ai" | "integrations" | "billing"
   >("general");
-  const { flags, updateFlags, loaded: aiLoaded } = useAiFlags();
+  const { flags, updateFlags, loaded: aiLoaded, monthlyBudgetCents, budget } = useAiFlags();
 
   // Company profile state
   const [company, setCompany] = useState<CompanyProfile>({
@@ -156,7 +156,7 @@ export default function SettingsPage() {
 
       {/* AI Features Tab */}
       {activeTab === "ai" && aiLoaded && (
-        <AiFeaturesTab flags={flags} updateFlags={updateFlags} />
+        <AiFeaturesTab flags={flags} updateFlags={updateFlags} monthlyBudgetCents={monthlyBudgetCents} budget={budget} />
       )}
 
       {/* Integrations Tab */}

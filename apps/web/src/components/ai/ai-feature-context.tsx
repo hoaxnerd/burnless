@@ -16,6 +16,16 @@ import {
   type AiFeatureStatus,
 } from "@burnless/ai";
 
+// ── Budget types ────────────────────────────────────────────────────────────
+
+export interface BudgetStatus {
+  spentCents: number;
+  budgetCents: number;
+  percentUsed: number;
+  warning: boolean;
+  exceeded: boolean;
+}
+
 // ── Context types ───────────────────────────────────────────────────────────
 
 interface AiFeatureContextValue {
@@ -26,9 +36,13 @@ interface AiFeatureContextValue {
   /** Check a specific feature's status */
   getFeature: (feature: AiFeatureName) => AiFeatureStatus;
   /** Update flags (calls PATCH /api/ai-features) */
-  updateFlags: (patch: Partial<AiFeatureFlagsState>) => Promise<void>;
+  updateFlags: (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number }>) => Promise<void>;
   /** Convenience: is the master switch on? */
   masterEnabled: boolean;
+  /** Monthly budget cap in cents */
+  monthlyBudgetCents: number;
+  /** Current budget status (spend, warning, exceeded) */
+  budget: BudgetStatus | null;
 }
 
 const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
@@ -37,13 +51,23 @@ const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
 
 export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [flags, setFlags] = useState<AiFeatureFlagsState>(DEFAULT_AI_FLAGS);
+  const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(5000);
+  const [budget, setBudget] = useState<BudgetStatus | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/ai-features")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data) setFlags(data);
+        if (data) {
+          setFlags({
+            masterEnabled: data.masterEnabled,
+            dataMode: data.dataMode,
+            features: data.features,
+          });
+          if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
+          if (data.budget) setBudget(data.budget);
+        }
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -57,7 +81,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   );
 
   const updateFlags = useCallback(
-    async (patch: Partial<AiFeatureFlagsState>) => {
+    async (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number }>) => {
       const res = await fetch("/api/ai-features", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -65,7 +89,13 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const updated = await res.json();
-        setFlags(updated);
+        setFlags({
+          masterEnabled: updated.masterEnabled,
+          dataMode: updated.dataMode,
+          features: updated.features,
+        });
+        if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
+        if (updated.budget) setBudget(updated.budget);
       }
     },
     []
@@ -79,6 +109,8 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         getFeature,
         updateFlags,
         masterEnabled: flags.masterEnabled,
+        monthlyBudgetCents,
+        budget,
       }}
     >
       {children}
