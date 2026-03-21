@@ -17,7 +17,7 @@
 
 import type { SubscriptionDetail } from "./revenue";
 import { DependencyGraph, CircularDependencyError } from "./dag";
-import { type MonthlySeries, round2, seriesToArray } from "./utils";
+import { type MonthlySeries, seriesToArray } from "./utils";
 import { D, Decimal, dDiv, dRound2, dMax } from "./decimal";
 
 // ── Input types ──────────────────────────────────────────────────────────────
@@ -342,9 +342,9 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
 
   // EBITDA = Operating Income + Depreciation & Amortization
   const ebitda = months.map((m, i) => {
-    const opInc = operatingIncome[i]?.value ?? 0;
-    const da = input.depreciationAmortization?.get(m) ?? 0;
-    return { month: m, value: round2(opInc + da) };
+    const opInc = D(operatingIncome[i]?.value ?? 0);
+    const da = D(input.depreciationAmortization?.get(m) ?? 0);
+    return { month: m, value: dRound2(opInc.plus(da)) };
   });
 
   // Growth rates (month-over-month)
