@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Wallet,
   Flame,
@@ -95,6 +96,7 @@ const variantConfig: Record<
     accentColor: string;
     sparkColor: string;
     glowClass: string;
+    href: string;
   }
 > = {
   cash: {
@@ -102,24 +104,28 @@ const variantConfig: Record<
     accentColor: "text-emerald-500",
     sparkColor: "#10b981",
     glowClass: "from-emerald-500/5 to-transparent",
+    href: "/funding",
   },
   burn: {
     icon: Flame,
     accentColor: "text-orange-500",
     sparkColor: "#f97316",
     glowClass: "from-orange-500/5 to-transparent",
+    href: "/expenses",
   },
   runway: {
     icon: Clock,
     accentColor: "text-brand-500",
     sparkColor: "#3b82f6",
     glowClass: "from-brand-500/5 to-transparent",
+    href: "/scenarios",
   },
   revenue: {
     icon: TrendingUp,
     accentColor: "text-violet-500",
     sparkColor: "#8b5cf6",
     glowClass: "from-violet-500/5 to-transparent",
+    href: "/revenue",
   },
 };
 
@@ -147,6 +153,7 @@ export function HeroKpiCard({
 }: HeroKpiCardProps) {
   const config = variantConfig[variant];
   const Icon = config.icon;
+  const router = useRouter();
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -166,8 +173,12 @@ export function HeroKpiCard({
 
   return (
     <div
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(config.href)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(config.href); }}
       className={`
-        group relative overflow-hidden
+        group relative overflow-hidden cursor-pointer
         rounded-2xl bg-surface-0 border border-surface-200
         p-5 sm:p-6
         hover:border-surface-300 hover:shadow-lg

@@ -82,6 +82,18 @@ export default async function DashboardPage({
     expenses: expensesArr[i]?.value ?? 0,
   }));
 
+  /* ── Key metrics: current and previous for MoM ────────────────── */
+  const currentGrossMargin = metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0;
+  const prevGrossMargin = metrics.grossMarginPercent.find((m) => m.month === prevMonth)?.value ?? 0;
+  const currentHeadcount = Math.round(data.headcountSeries.get(currentMonth) ?? 0);
+  const prevHeadcount = Math.round(data.headcountSeries.get(prevMonth) ?? 0);
+  const currentRevPerEmp = metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0;
+  const currentEbitda = metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0;
+  const prevEbitda = metrics.ebitda.find((m) => m.month === prevMonth)?.value ?? 0;
+  const currentRuleOf40 = metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0;
+  const prevRuleOf40 = metrics.ruleOf40.find((m) => m.month === prevMonth)?.value ?? 0;
+  const currentBurnMultiple = metrics.burnMultiple.find((m) => m.month === currentMonth)?.value ?? 0;
+
   /* ── Context flags for empty state & quick actions ──────────────── */
   const hasExpenses = data.totalExpenses.size > 0 && Array.from(data.totalExpenses.values()).some((v) => v > 0);
   const hasRevenue = revenueStreams.length > 0;
@@ -248,30 +260,41 @@ export default async function DashboardPage({
             <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6">
               <h2 className="text-sm font-semibold text-surface-900 mb-4">Key Metrics</h2>
               <div className="space-y-1">
-                <MetricRow label="ARR" value={formatCurrency(currentMrr * 12)} />
+                <MetricRow
+                  label="ARR"
+                  value={formatCurrency(currentMrr * 12)}
+                  change={prevMrr > 0 ? pctChange(currentMrr * 12, prevMrr * 12) : null}
+                />
                 <MetricRow
                   label="Gross Margin"
-                  value={`${(metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0).toFixed(1)}%`}
+                  value={`${currentGrossMargin.toFixed(1)}%`}
+                  change={prevGrossMargin > 0 ? `${(currentGrossMargin - prevGrossMargin) >= 0 ? "+" : ""}${(currentGrossMargin - prevGrossMargin).toFixed(1)}pp` : null}
+                  benchmark={{ label: "Median 65%", status: currentGrossMargin >= 65 ? "good" : currentGrossMargin >= 50 ? "warn" : "bad" }}
                 />
                 <MetricRow
                   label="Headcount"
-                  value={`${Math.round(data.headcountSeries.get(currentMonth) ?? 0)}`}
+                  value={`${currentHeadcount}`}
+                  change={prevHeadcount > 0 && currentHeadcount !== prevHeadcount ? `${currentHeadcount > prevHeadcount ? "+" : ""}${currentHeadcount - prevHeadcount}` : null}
                 />
                 <MetricRow
                   label="Rev/Employee"
-                  value={formatCurrency(
-                    metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0
-                  )}
+                  value={formatCurrency(currentRevPerEmp)}
                 />
                 <MetricRow
                   label="EBITDA"
-                  value={formatCurrency(
-                    metrics.ebitda.find((m) => m.month === currentMonth)?.value ?? 0
-                  )}
+                  value={formatCurrency(currentEbitda)}
+                  change={prevEbitda !== 0 ? pctChange(currentEbitda, prevEbitda) : null}
                 />
                 <MetricRow
                   label="Rule of 40"
-                  value={`${(metrics.ruleOf40.find((m) => m.month === currentMonth)?.value ?? 0).toFixed(0)}`}
+                  value={`${currentRuleOf40.toFixed(0)}`}
+                  change={prevRuleOf40 !== 0 ? `${(currentRuleOf40 - prevRuleOf40) >= 0 ? "+" : ""}${(currentRuleOf40 - prevRuleOf40).toFixed(0)}` : null}
+                  benchmark={{ label: "Target: 40", status: currentRuleOf40 >= 40 ? "good" : currentRuleOf40 >= 30 ? "warn" : "bad" }}
+                />
+                <MetricRow
+                  label="Burn Multiple"
+                  value={`${currentBurnMultiple.toFixed(1)}x`}
+                  benchmark={{ label: "Good < 2x", status: currentBurnMultiple <= 2 ? "good" : currentBurnMultiple <= 3 ? "warn" : "bad" }}
                 />
               </div>
             </div>
@@ -284,11 +307,30 @@ export default async function DashboardPage({
 
 /* ── Supporting Components ────────────────────────────────────────────────── */
 
-function MetricRow({ label, value }: { label: string; value: string }) {
+function MetricRow({ label, value, change, benchmark }: {
+  label: string;
+  value: string;
+  change?: string | null;
+  benchmark?: { label: string; status: "good" | "warn" | "bad" } | null;
+}) {
   return (
     <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3">
       <span className="text-sm text-surface-500">{label}</span>
-      <span className="text-sm font-semibold text-surface-900 tabular-nums">{value}</span>
+      <div className="flex items-center gap-3">
+        {change && (
+          <span className={`text-xs font-medium tabular-nums ${
+            change.startsWith("+") ? "text-success-500" : change.startsWith("-") ? "text-danger-500" : "text-surface-400"
+          }`}>{change}</span>
+        )}
+        {benchmark && (
+          <span className={`text-xs tabular-nums ${
+            benchmark.status === "good" ? "text-success-500"
+            : benchmark.status === "warn" ? "text-warning-500"
+            : "text-danger-500"
+          }`}>{benchmark.label}</span>
+        )}
+        <span className="text-sm font-semibold text-surface-900 tabular-nums">{value}</span>
+      </div>
     </div>
   );
 }
