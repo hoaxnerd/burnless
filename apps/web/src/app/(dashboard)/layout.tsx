@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { getCompany } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
 
@@ -14,6 +15,9 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (!session.user.isEmailVerified) redirect("/verify-email");
+
+  const company = await getCompany();
+  if (!company) redirect("/onboarding");
 
   const user = {
     name: session.user.name ?? null,

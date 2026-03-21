@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, SessionProvider } from "next-auth/react";
 import Link from "next/link";
 
 type VerifyStep = "waiting" | "verifying" | "success" | "error";
@@ -189,14 +189,16 @@ export default function VerifyEmailPage() {
           </Link>
         </div>
 
-        <Suspense fallback={
-          <div className="bg-surface-0 rounded-2xl shadow-lg border border-surface-200/80 p-8 text-center py-8">
-            <div className="mx-auto mb-5 h-10 w-10 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" />
-            <p className="text-sm text-surface-500">Loading...</p>
-          </div>
-        }>
-          <VerifyEmailContent />
-        </Suspense>
+        <SessionProvider>
+          <Suspense fallback={
+            <div className="bg-surface-0 rounded-2xl shadow-lg border border-surface-200/80 p-8 text-center py-8">
+              <div className="mx-auto mb-5 h-10 w-10 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" />
+              <p className="text-sm text-surface-500">Loading...</p>
+            </div>
+          }>
+            <VerifyEmailContent />
+          </Suspense>
+        </SessionProvider>
       </div>
     </div>
   );
