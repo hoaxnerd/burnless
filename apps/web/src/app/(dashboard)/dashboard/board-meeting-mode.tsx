@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Download, Copy, Check, Presentation } from "lucide-react";
 import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
 
@@ -241,10 +242,14 @@ export function BoardMeetingOverlay({
   }, [onClose]);
 
   const handleCopy = useCallback(async () => {
-    const text = toClipboardText(data, metrics);
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      const text = toClipboardText(data, metrics);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may not be available in non-HTTPS contexts
+    }
   }, [data, metrics]);
 
   const handleExportPDF = useCallback(async () => {
@@ -256,7 +261,9 @@ export function BoardMeetingOverlay({
     }
   }, [data, metrics]);
 
-  return (
+  // Portal to document.body to escape any parent CSS transform containing blocks
+  // (e.g. animate-page-enter uses transform which breaks position:fixed)
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -271,7 +278,10 @@ export function BoardMeetingOverlay({
         aria-modal="true"
         aria-label="Board Meeting Mode"
       >
-        <div className="bg-surface-0 rounded-2xl shadow-2xl border border-surface-200 w-full max-w-lg animate-scale-in">
+        <div
+          className="bg-surface-0 rounded-2xl shadow-2xl border border-surface-200 w-full max-w-lg animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-surface-100">
             <div>
@@ -347,7 +357,8 @@ export function BoardMeetingOverlay({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
