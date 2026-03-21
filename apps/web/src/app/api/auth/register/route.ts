@@ -26,8 +26,11 @@ export async function POST(request: Request) {
   try {
     body = registerSchema.parse(await request.json());
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Invalid request body";
-    return NextResponse.json({ error: message }, { status: 400 });
+    if (e instanceof z.ZodError) {
+      const message = e.errors.map((err) => err.message).join(". ");
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   // Check if user already exists
@@ -59,26 +62,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }
 
-  // Send verification email (fire-and-forget — don't block registration)
+  // Send verification email — await token insert so we know verification is possible
   if (email.provider && user.email) {
     const normalizedEmail = user.email.toLowerCase().trim();
     const token = randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + TOKEN_EXPIRY_MS);
 
-    db.insert(verificationTokens)
-      .values({
+    try {
+      await db.insert(verificationTokens).values({
         identifier: `verify:${normalizedEmail}`,
         token,
         expires,
-      })
-      .then(() => {
-        const verifyUrl = `${BASE_URL}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
-        const template = verificationEmail(verifyUrl);
-        return email.provider.send({ to: normalizedEmail, ...template });
-      })
-      .catch((err: unknown) => {
+      });
+
+      const verifyUrl = `${BASE_URL}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+      const template = verificationEmail(verifyUrl);
+      // Email send is best-effort — token is persisted, user can re-request
+      email.provider.send({ to: normalizedEmail, ...template }).catch((err: unknown) => {
         console.error("[email] Failed to send verification email:", err);
       });
+    } catch (err) {
+      console.error("[register] Failed to insert verification token:", err);
+      return NextResponse.json(
+        { error: "Account created but verification failed. Please request a new verification email." },
+        { status: 201 }
+      );
+    }
   }
 
   return NextResponse.json(user, { status: 201 });

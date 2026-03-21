@@ -49,7 +49,9 @@ export function middleware(request: NextRequest) {
     !pathname.startsWith("/api/auth/register") &&
     !pathname.startsWith("/api/auth/check-email") &&
     !pathname.startsWith("/api/auth/forgot-password") &&
-    !pathname.startsWith("/api/auth/reset-password")
+    !pathname.startsWith("/api/auth/reset-password") &&
+    !pathname.startsWith("/api/auth/send-verification") &&
+    !pathname.startsWith("/api/auth/verify-email")
   ) {
     return NextResponse.next();
   }
@@ -64,7 +66,13 @@ export function middleware(request: NextRequest) {
     const source = origin ?? (referer ? new URL(referer).origin : null);
     const allowed = getAllowedOrigins();
 
-    // If we have allowed origins configured and the request has an origin, verify it
+    // In production, block if no origins are configured (misconfiguration) or origin doesn't match
+    if (process.env.NODE_ENV === "production" && allowed.size === 0) {
+      return NextResponse.json(
+        { error: "Forbidden: server origin not configured" },
+        { status: 403 }
+      );
+    }
     if (allowed.size > 0 && source && !allowed.has(source)) {
       return NextResponse.json(
         { error: "Forbidden: invalid origin" },
@@ -118,7 +126,9 @@ function resolveRateLimitTier(pathname: string, method: string) {
     pathname.startsWith("/api/auth/register") ||
     pathname.startsWith("/api/auth/check-email") ||
     pathname.startsWith("/api/auth/forgot-password") ||
-    pathname.startsWith("/api/auth/reset-password")
+    pathname.startsWith("/api/auth/reset-password") ||
+    pathname.startsWith("/api/auth/send-verification") ||
+    pathname.startsWith("/api/auth/verify-email")
   ) {
     return RATE_LIMITS.auth!;
   }
