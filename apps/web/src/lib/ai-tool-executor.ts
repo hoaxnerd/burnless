@@ -1,6 +1,9 @@
 /**
  * Executes AI tool calls against the database. Maps tool names from
  * @burnless/ai to actual DB mutations and engine computations.
+ *
+ * All tool inputs are validated with Zod schemas before execution to
+ * prevent data corruption from malformed LLM outputs (BUR-121).
  */
 
 import { db } from "@burnless/db";
@@ -15,6 +18,7 @@ import {
   transactions,
 } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { computeDashboardData } from "./compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
 
@@ -22,6 +26,199 @@ interface ToolContext {
   companyId: string;
   scenarioId: string;
   userId: string;
+}
+
+// ── Validation helpers ──────────────────────────────────────────────────────
+
+/** Safely name strings — non-empty, bounded length. */
+const nameString = z.string().min(1, "Name is required").max(200, "Name too long (max 200 chars)");
+
+/** Optional description string, bounded length. */
+const descriptionString = z.string().max(2000, "Description too long").optional().nullable();
+
+/** UUID or cuid-style identifier. */
+const idString = z.string().min(1, "ID is required").max(100);
+
+/** Optional ID — falls back to context. */
+const optionalId = z.string().min(1).max(100).optional();
+
+/** Financial amount — must be non-negative, capped at $100B to prevent absurd values. */
+const financialAmount = z.number().nonnegative("Amount must be >= 0").max(100_000_000_000, "Amount exceeds $100B limit");
+
+/** Growth/interest rate — bounded between -100% and 10,000% (100x). */
+const rateValue = z.number().min(-1, "Rate cannot be below -100%").max(100, "Rate cannot exceed 10,000%");
+
+/** Percentage 0-1 range. */
+const percentFraction = z.number().min(0, "Percentage must be >= 0").max(1, "Percentage must be <= 100%");
+
+/** Headcount — positive integer, bounded. */
+const headcount = z.number().int("Count must be a whole number").min(1, "Count must be >= 1").max(100_000, "Count exceeds 100,000 limit");
+
+/** Salary — positive, bounded. */
+const salaryAmount = z.number().positive("Salary must be > 0").max(100_000_000, "Salary exceeds $100M limit");
+
+/** Benefits rate — 0 to 200% (some roles have very high benefits). */
+const benefitsRate = z.number().min(0, "Benefits rate must be >= 0").max(2, "Benefits rate cannot exceed 200%").default(0.2);
+
+/** ISO date string (YYYY-MM-DD or full ISO). */
+const dateString = z.string().min(1, "Date is required").refine(
+  (v) => !isNaN(Date.parse(v)),
+  "Invalid date format"
+);
+
+/** Optional date string. */
+const optionalDate = z.string().refine((v) => !isNaN(Date.parse(v)), "Invalid date format").optional().nullable();
+
+/** Month count — positive integer, bounded. */
+const monthCount = z.number().int().min(1, "Months must be >= 1").max(120, "Cannot forecast more than 10 years").default(12);
+
+// ── Tool input schemas ──────────────────────────────────────────────────────
+
+const createScenarioSchema = z.object({
+  name: nameString,
+  type: z.enum(["base", "best", "worst", "custom"]),
+  description: descriptionString,
+});
+
+const createForecastLineSchema = z.object({
+  scenarioId: optionalId,
+  accountId: idString,
+  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]),
+  parameters: z.record(z.unknown()).default({}),
+  startDate: dateString,
+  endDate: optionalDate,
+});
+
+const addHeadcountSchema = z.object({
+  scenarioId: optionalId,
+  departmentId: idString,
+  title: nameString,
+  count: headcount,
+  salary: salaryAmount,
+  startDate: dateString,
+  endDate: optionalDate,
+  benefitsRate: benefitsRate,
+});
+
+const addRevenueStreamSchema = z.object({
+  scenarioId: optionalId,
+  name: nameString,
+  type: z.enum(["subscription", "one_time", "usage_based", "services"]),
+  parameters: z.record(z.unknown()).default({}),
+});
+
+const compareScenarioSchema = z.object({
+  baseScenarioId: idString,
+  compareScenarioId: idString,
+});
+
+const computeMetricsSchema = z.object({
+  scenarioId: optionalId,
+});
+
+const generateStatementsSchema = z.object({
+  scenarioId: optionalId,
+});
+
+const addFundingRoundSchema = z.object({
+  name: nameString,
+  type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
+  amount: financialAmount.refine((v) => v > 0, "Funding amount must be > 0"),
+  date: dateString,
+  preMoneyValuation: financialAmount.optional().nullable(),
+  dilutionPercent: percentFraction.optional().nullable(),
+  isProjected: z.boolean().default(true),
+});
+
+const createAccountSchema = z.object({
+  name: nameString,
+  type: z.enum(["income", "expense", "asset", "liability", "equity"]),
+  category: z.enum(["revenue", "cogs", "operating_expense", "other_income", "other_expense", "asset", "liability", "equity"]),
+});
+
+const createDepartmentSchema = z.object({
+  name: nameString,
+});
+
+const categorizeTransactionsSchema = z.object({
+  transactions: z.array(z.object({
+    id: z.string().optional(),
+    description: z.string().min(1).max(500),
+    amount: z.number(),
+    date: z.string().optional(),
+  })).min(1, "At least one transaction required").max(1000, "Too many transactions (max 1000)"),
+});
+
+const generateReportNarrativeSchema = z.object({
+  reportType: z.string().min(1).max(100),
+  tone: z.string().max(50).default("formal"),
+  highlights: z.array(z.string().max(500)).max(20).default([]),
+});
+
+const suggestCostCutsSchema = z.object({
+  scenarioId: optionalId,
+  excludeCategories: z.array(z.string()).max(50).default([]),
+  targetSavingsPercent: z.number().min(0).max(1).optional(),
+});
+
+const benchmarkMetricsSchema = z.object({
+  stage: z.enum(["seed", "series_a", "series_b"]).default("seed"),
+  metrics: z.array(z.string()).optional(),
+});
+
+const modelDilutionSchema = z.object({
+  roundAmount: financialAmount.refine((v) => v > 0, "Round amount must be > 0"),
+  preMoneyValuation: financialAmount.refine((v) => v > 0, "Pre-money valuation must be > 0"),
+  existingOwnershipPercent: percentFraction.default(1.0),
+  optionPoolPercent: percentFraction.default(0),
+  existingRounds: z.array(z.object({
+    name: z.string(),
+    amount: z.number(),
+    ownership: z.number(),
+  })).default([]),
+});
+
+const forecastRevenueSchema = z.object({
+  scenarioId: optionalId,
+  months: monthCount,
+  method: z.enum(["auto", "linear", "exponential", "conservative"]).default("auto"),
+  includeConfidenceIntervals: z.boolean().default(true),
+});
+
+/** Maps tool names to their Zod schemas. */
+const toolSchemas: Record<string, z.ZodType> = {
+  create_scenario: createScenarioSchema,
+  create_forecast_line: createForecastLineSchema,
+  add_headcount: addHeadcountSchema,
+  add_revenue_stream: addRevenueStreamSchema,
+  compare_scenarios: compareScenarioSchema,
+  compute_metrics: computeMetricsSchema,
+  generate_financial_statements: generateStatementsSchema,
+  add_funding_round: addFundingRoundSchema,
+  create_account: createAccountSchema,
+  create_department: createDepartmentSchema,
+  categorize_transactions: categorizeTransactionsSchema,
+  generate_report_narrative: generateReportNarrativeSchema,
+  suggest_cost_cuts: suggestCostCutsSchema,
+  benchmark_metrics: benchmarkMetricsSchema,
+  model_dilution: modelDilutionSchema,
+  forecast_revenue: forecastRevenueSchema,
+};
+
+/** Validate tool input and return a structured error message if invalid. */
+function validateToolInput(toolName: string, input: Record<string, unknown>): { success: true; data: Record<string, unknown> } | { success: false; error: string } {
+  const schema = toolSchemas[toolName];
+  if (!schema) {
+    return { success: false, error: `Unknown tool: ${toolName}` };
+  }
+  const result = schema.safeParse(input);
+  if (!result.success) {
+    const issues = result.error.issues.map(
+      (issue) => `${issue.path.join(".")}: ${issue.message}`
+    ).join("; ");
+    return { success: false, error: `Invalid input for ${toolName}: ${issues}` };
+  }
+  return { success: true, data: result.data as Record<string, unknown> };
 }
 
 /** Sum all values in a StatementLineItem's values array. */
@@ -41,39 +238,46 @@ export async function executeToolCall(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  // Validate input before execution
+  const validation = validateToolInput(toolName, input);
+  if (!validation.success) {
+    return JSON.stringify({ error: validation.error });
+  }
+  const data = validation.data;
+
   switch (toolName) {
     case "create_scenario":
-      return createScenario(input, context);
+      return createScenario(data, context);
     case "create_forecast_line":
-      return createForecastLine(input, context);
+      return createForecastLine(data, context);
     case "add_headcount":
-      return addHeadcount(input, context);
+      return addHeadcount(data, context);
     case "add_revenue_stream":
-      return addRevenueStream(input, context);
+      return addRevenueStream(data, context);
     case "compare_scenarios":
-      return compareScenariosTool(input, context);
+      return compareScenariosTool(data, context);
     case "compute_metrics":
-      return computeMetrics(input, context);
+      return computeMetrics(data, context);
     case "generate_financial_statements":
-      return generateStatements(input, context);
+      return generateStatements(data, context);
     case "add_funding_round":
-      return addFundingRound(input, context);
+      return addFundingRound(data, context);
     case "create_account":
-      return createAccount(input, context);
+      return createAccount(data, context);
     case "create_department":
-      return createDepartment(input, context);
+      return createDepartment(data, context);
     case "categorize_transactions":
-      return categorizeTransactions(input, context);
+      return categorizeTransactions(data, context);
     case "generate_report_narrative":
-      return generateReportNarrative(input, context);
+      return generateReportNarrative(data, context);
     case "suggest_cost_cuts":
-      return suggestCostCuts(input, context);
+      return suggestCostCuts(data, context);
     case "benchmark_metrics":
-      return benchmarkMetrics(input, context);
+      return benchmarkMetrics(data, context);
     case "model_dilution":
-      return modelDilution(input, context);
+      return modelDilution(data, context);
     case "forecast_revenue":
-      return forecastRevenue(input, context);
+      return forecastRevenue(data, context);
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
@@ -83,13 +287,14 @@ async function createScenario(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof createScenarioSchema>;
   const [row] = await db
     .insert(scenarios)
     .values({
       companyId: context.companyId,
-      name: input.name as string,
-      type: input.type as "base" | "best" | "worst" | "custom",
-      description: (input.description as string) ?? null,
+      name: data.name,
+      type: data.type,
+      description: data.description ?? null,
     })
     .returning();
 
@@ -104,24 +309,25 @@ async function createForecastLine(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof createForecastLineSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
 
   const [row] = await db
     .insert(forecastLines)
     .values({
       scenarioId,
-      accountId: input.accountId as string,
-      method: input.method as "fixed" | "growth_rate" | "per_unit" | "percentage_of" | "custom_formula",
-      parameters: input.parameters as Record<string, unknown>,
-      startDate: new Date(input.startDate as string),
-      endDate: input.endDate ? new Date(input.endDate as string) : null,
+      accountId: data.accountId,
+      method: data.method,
+      parameters: data.parameters,
+      startDate: new Date(data.startDate),
+      endDate: data.endDate ? new Date(data.endDate) : null,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     forecastLineId: row!.id,
-    message: `Created forecast line for account ${input.accountId} using ${input.method} method.`,
+    message: `Created forecast line for account ${data.accountId} using ${data.method} method.`,
   });
 }
 
@@ -129,28 +335,29 @@ async function addHeadcount(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof addHeadcountSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
 
   const [row] = await db
     .insert(headcountPlans)
     .values({
       scenarioId,
-      departmentId: input.departmentId as string,
-      title: input.title as string,
-      count: input.count as number,
-      salary: String(input.salary),
-      startDate: new Date(input.startDate as string),
-      endDate: input.endDate ? new Date(input.endDate as string) : null,
-      benefitsRate: String((input.benefitsRate as number) ?? 0.2),
+      departmentId: data.departmentId,
+      title: data.title,
+      count: data.count,
+      salary: String(data.salary),
+      startDate: new Date(data.startDate),
+      endDate: data.endDate ? new Date(data.endDate) : null,
+      benefitsRate: String(data.benefitsRate),
     })
     .returning();
 
-  const totalCost = (input.count as number) * (input.salary as number) * (1 + ((input.benefitsRate as number) ?? 0.2));
+  const totalCost = data.count * data.salary * (1 + data.benefitsRate);
 
   return JSON.stringify({
     success: true,
     headcountPlanId: row!.id,
-    message: `Added ${input.count}x ${input.title} at $${(input.salary as number).toLocaleString()}/year each. Total annual cost: $${totalCost.toLocaleString()} (including benefits).`,
+    message: `Added ${data.count}x ${data.title} at $${data.salary.toLocaleString()}/year each. Total annual cost: $${totalCost.toLocaleString()} (including benefits).`,
   });
 }
 
@@ -158,22 +365,23 @@ async function addRevenueStream(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof addRevenueStreamSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
 
   const [row] = await db
     .insert(revenueStreams)
     .values({
       scenarioId,
-      name: input.name as string,
-      type: input.type as "subscription" | "one_time" | "usage_based" | "services",
-      parameters: input.parameters as Record<string, unknown>,
+      name: data.name,
+      type: data.type,
+      parameters: data.parameters,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     revenueStreamId: row!.id,
-    message: `Created revenue stream "${input.name}" (${input.type}).`,
+    message: `Created revenue stream "${data.name}" (${data.type}).`,
   });
 }
 
@@ -181,8 +389,9 @@ async function compareScenariosTool(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const baseId = input.baseScenarioId as string;
-  const compareId = input.compareScenarioId as string;
+  const data = input as z.infer<typeof compareScenarioSchema>;
+  const baseId = data.baseScenarioId;
+  const compareId = data.compareScenarioId;
 
   const [baseDash, compareDash] = await Promise.all([
     computeDashboardData(context.companyId, baseId),
@@ -211,7 +420,8 @@ async function computeMetrics(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof computeMetricsSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
   const dashboard = await computeDashboardData(context.companyId, scenarioId);
 
   const m = dashboard.metrics;
@@ -249,7 +459,8 @@ async function generateStatements(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof generateStatementsSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
   const dashboard = await computeDashboardData(context.companyId, scenarioId);
 
   const pnl = dashboard.profitAndLoss;
@@ -277,24 +488,25 @@ async function addFundingRound(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof addFundingRoundSchema>;
   const [row] = await db
     .insert(fundingRounds)
     .values({
       companyId: context.companyId,
-      name: input.name as string,
-      type: input.type as "pre_seed" | "seed" | "series_a" | "series_b" | "series_c_plus" | "debt" | "grant",
-      amount: String(input.amount),
-      date: new Date(input.date as string),
-      preMoneyValuation: input.preMoneyValuation ? String(input.preMoneyValuation) : null,
-      dilutionPercent: input.dilutionPercent ? String(input.dilutionPercent) : null,
-      isProjected: (input.isProjected as boolean) ?? true,
+      name: data.name,
+      type: data.type,
+      amount: String(data.amount),
+      date: new Date(data.date),
+      preMoneyValuation: data.preMoneyValuation ? String(data.preMoneyValuation) : null,
+      dilutionPercent: data.dilutionPercent ? String(data.dilutionPercent) : null,
+      isProjected: data.isProjected,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     fundingRoundId: row!.id,
-    message: `Added ${input.name} funding round: $${(input.amount as number).toLocaleString()} on ${input.date}.`,
+    message: `Added ${data.name} funding round: $${data.amount.toLocaleString()} on ${data.date}.`,
   });
 }
 
@@ -302,20 +514,21 @@ async function createAccount(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof createAccountSchema>;
   const [row] = await db
     .insert(financialAccounts)
     .values({
       companyId: context.companyId,
-      name: input.name as string,
-      type: input.type as "income" | "expense" | "asset" | "liability" | "equity",
-      category: input.category as "revenue" | "cogs" | "operating_expense" | "other_income" | "other_expense" | "asset" | "liability" | "equity",
+      name: data.name,
+      type: data.type,
+      category: data.category,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     accountId: row!.id,
-    message: `Created account "${input.name}" (${input.category}). ID: ${row!.id}`,
+    message: `Created account "${data.name}" (${data.category}). ID: ${row!.id}`,
   });
 }
 
@@ -323,18 +536,19 @@ async function createDepartment(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof createDepartmentSchema>;
   const [row] = await db
     .insert(departments)
     .values({
       companyId: context.companyId,
-      name: input.name as string,
+      name: data.name,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     departmentId: row!.id,
-    message: `Created department "${input.name}". ID: ${row!.id}`,
+    message: `Created department "${data.name}". ID: ${row!.id}`,
   });
 }
 
@@ -350,12 +564,8 @@ async function categorizeTransactions(
     .from(financialAccounts)
     .where(eq(financialAccounts.companyId, context.companyId));
 
-  const txns = input.transactions as Array<{
-    id?: string;
-    description: string;
-    amount: number;
-    date?: string;
-  }>;
+  const data = input as z.infer<typeof categorizeTransactionsSchema>;
+  const txns = data.transactions;
 
   // Build category map from existing accounts
   const categoryMap = accounts.map((a) => ({
@@ -383,6 +593,7 @@ async function generateReportNarrative(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof generateReportNarrativeSchema>;
   const dashboard = await computeDashboardData(context.companyId, context.scenarioId);
 
   const m = dashboard.metrics;
@@ -405,9 +616,9 @@ async function generateReportNarrative(
 
   return JSON.stringify({
     success: true,
-    reportType: input.reportType as string,
-    tone: (input.tone as string) ?? "formal",
-    highlights: (input.highlights as string[]) ?? [],
+    reportType: data.reportType,
+    tone: data.tone,
+    highlights: data.highlights,
     financialData: {
       metrics: {
         mrr: latest(m.mrr),
@@ -433,7 +644,7 @@ async function generateReportNarrative(
         recentCash: recentCash.map((v) => ({ month: v.month, value: v.value })),
       },
     },
-    message: `Financial data assembled for ${input.reportType} report. Generate the narrative based on this data.`,
+    message: `Financial data assembled for ${data.reportType} report. Generate the narrative based on this data.`,
   });
 }
 
@@ -441,11 +652,12 @@ async function suggestCostCuts(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
+  const data = input as z.infer<typeof suggestCostCutsSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
   const dashboard = await computeDashboardData(context.companyId, scenarioId);
 
-  const excludeCategories = (input.excludeCategories as string[]) ?? [];
-  const targetSavingsPercent = input.targetSavingsPercent as number | undefined;
+  const excludeCategories = data.excludeCategories;
+  const targetSavingsPercent = data.targetSavingsPercent;
 
   // Get expense accounts with their forecast amounts
   const accounts = await db
@@ -529,11 +741,12 @@ async function benchmarkMetrics(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const data = input as z.infer<typeof benchmarkMetricsSchema>;
   const dashboard = await computeDashboardData(context.companyId, context.scenarioId);
   const m = dashboard.metrics;
 
   // Determine stage
-  const stage = (input.stage as string) ?? "seed";
+  const stage = data.stage;
   const benchmarkStage = BENCHMARKS[stage] ?? BENCHMARKS["seed"]!;
 
   // Company's actual metrics
@@ -549,7 +762,7 @@ async function benchmarkMetrics(
     magic_number: latest(m.magicNumber),
   };
 
-  const requestedMetrics = (input.metrics as string[]) ?? Object.keys(benchmarkStage);
+  const requestedMetrics = data.metrics ?? Object.keys(benchmarkStage);
 
   const results = requestedMetrics
     .filter((name) => benchmarkStage[name])
@@ -588,10 +801,11 @@ async function modelDilution(
   input: Record<string, unknown>,
   _context: ToolContext
 ): Promise<string> {
-  const roundAmount = input.roundAmount as number;
-  const preMoneyValuation = input.preMoneyValuation as number;
-  const existingOwnership = (input.existingOwnershipPercent as number) ?? 1.0;
-  const optionPool = (input.optionPoolPercent as number) ?? 0;
+  const data = input as z.infer<typeof modelDilutionSchema>;
+  const roundAmount = data.roundAmount;
+  const preMoneyValuation = data.preMoneyValuation;
+  const existingOwnership = data.existingOwnershipPercent;
+  const optionPool = data.optionPoolPercent;
 
   const postMoneyValuation = preMoneyValuation + roundAmount;
   const newInvestorOwnership = roundAmount / postMoneyValuation;
@@ -619,7 +833,7 @@ async function modelDilution(
   };
 
   // Model existing rounds context
-  const existingRounds = (input.existingRounds as Array<{ name: string; amount: number; ownership: number }>) ?? [];
+  const existingRounds = data.existingRounds;
 
   return JSON.stringify({
     success: true,
@@ -639,10 +853,11 @@ async function forecastRevenue(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const scenarioId = (input.scenarioId as string) || context.scenarioId;
-  const months = Math.min(Math.max((input.months as number) ?? 12, 1), 36);
-  const method = (input.method as string) ?? "auto";
-  const includeCI = (input.includeConfidenceIntervals as boolean) ?? true;
+  const data = input as z.infer<typeof forecastRevenueSchema>;
+  const scenarioId = data.scenarioId || context.scenarioId;
+  const months = Math.min(data.months, 36);
+  const method = data.method;
+  const includeCI = data.includeConfidenceIntervals;
 
   const dashboard = await computeDashboardData(context.companyId, scenarioId);
   const revArray = seriesToArray(dashboard.totalRevenue);
