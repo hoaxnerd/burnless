@@ -67,7 +67,7 @@ function ResetPasswordContent() {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailParam, token: tokenParam, password }),
+        body: JSON.stringify({ email, token: tokenParam, password }),
       });
 
       if (!res.ok) {
@@ -118,7 +118,7 @@ function ResetPasswordContent() {
               "Enter your email and we'll send a reset link."}
             {step === "sent" &&
               "If an account exists, we sent a reset link."}
-            {step === "reset" && emailParam}
+            {step === "reset" && email}
             {step === "success" &&
               "You can now sign in with your new password."}
           </p>

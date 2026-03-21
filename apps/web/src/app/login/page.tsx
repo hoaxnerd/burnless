@@ -60,20 +60,26 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      trackEvent("auth_signin_error", { method: "credentials" });
-      setError("Wrong password. Please try again.");
+      if (result?.error) {
+        trackEvent("auth_signin_error", { method: "credentials" });
+        setError("Wrong password. Please try again.");
+        setIsLoading(false);
+      } else {
+        trackEvent("auth_signin_success", { method: "credentials" });
+        identifyUser(email);
+        window.location.href = "/dashboard";
+      }
+    } catch {
+      setError("Unable to connect. Please try again.");
+    } finally {
       setIsLoading(false);
-    } else {
-      trackEvent("auth_signin_success", { method: "credentials" });
-      identifyUser(email);
-      window.location.href = "/dashboard";
     }
   }
 

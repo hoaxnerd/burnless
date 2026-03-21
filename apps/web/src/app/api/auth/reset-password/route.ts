@@ -7,7 +7,12 @@ import { hashPassword } from "@/lib/password";
 const schema = z.object({
   email: z.string().email(),
   token: z.string().min(1),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
 export async function POST(request: Request) {
@@ -15,8 +20,11 @@ export async function POST(request: Request) {
   try {
     body = schema.parse(await request.json());
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Invalid request";
-    return NextResponse.json({ error: message }, { status: 400 });
+    if (e instanceof z.ZodError) {
+      const message = e.errors.map((err) => err.message).join(". ");
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
   const normalizedEmail = body.email.toLowerCase().trim();
