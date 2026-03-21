@@ -77,6 +77,7 @@ export function CreateScenarioDialog() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setNameError(null);
@@ -85,22 +86,25 @@ export function CreateScenarioDialog() {
 
   const aiGenerate = async () => {
     setAiGenerating(true);
+    setError(null);
     try {
       const res = await fetch("/api/scenarios/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "best_worst" }),
       });
-      if (!res.ok) throw new Error("Failed to generate scenarios");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to generate scenarios");
+      }
       const result = await res.json();
       setOpen(false);
       router.refresh();
-      // Navigate to the first created scenario
       if (result.created?.[0]) {
         router.push(`/scenarios/${result.created[0].id}`);
       }
-    } catch {
-      // Fallback — user sees no navigation
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate scenarios");
     } finally {
       setAiGenerating(false);
     }
@@ -108,19 +112,23 @@ export function CreateScenarioDialog() {
 
   const createScenario = async (name: string, type: string, description: string) => {
     setCreating(true);
+    setError(null);
     try {
       const res = await fetch("/api/scenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, type, description }),
       });
-      if (!res.ok) throw new Error("Failed to create scenario");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to create scenario");
+      }
       const scenario = await res.json();
       setOpen(false);
       router.refresh();
       router.push(`/scenarios/${scenario.id}`);
-    } catch {
-      // Error is handled implicitly — user sees no navigation
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create scenario");
     } finally {
       setCreating(false);
     }
@@ -141,6 +149,11 @@ export function CreateScenarioDialog() {
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create Scenario" size="lg">
+        {error && (
+          <div className="mb-4 rounded-xl bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
+            {error}
+          </div>
+        )}
         {showCustom ? (
           <div className="space-y-4">
             <div>

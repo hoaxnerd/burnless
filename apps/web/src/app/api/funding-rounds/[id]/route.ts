@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, fundingRounds } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { positiveAmount, percentage } from "@/lib/financial-validation";
 
@@ -35,7 +35,7 @@ export const PATCH = withErrorHandler(async (
   if (parsed.data.dilutionPercent !== undefined)
     updates.dilutionPercent = parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null;
 
-  const [row] = await db.update(fundingRounds).set(updates).where(eq(fundingRounds.id, id)).returning();
+  const [row] = await db.update(fundingRounds).set(updates).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   return NextResponse.json(row);
 });
@@ -50,7 +50,7 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await context.params;
 
-  const [row] = await db.delete(fundingRounds).where(eq(fundingRounds.id, id)).returning();
+  const [row] = await db.delete(fundingRounds).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   return NextResponse.json({ deleted: true });
 });

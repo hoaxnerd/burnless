@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useEffect, useCallback, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -25,6 +26,11 @@ const FOCUSABLE_SELECTOR =
 export function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -88,9 +94,11 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
     };
   }, [open, handleKey]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  // Portal to document.body so that CSS transforms on ancestor elements
+  // (e.g. animate-page-enter) don't break position:fixed centering.
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -122,6 +130,7 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
           <div className="px-6 py-4">{children}</div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

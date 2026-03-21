@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, headcountPlans } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { db, headcountPlans, scenarios } from "@burnless/db";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { positiveAmount, ratio } from "@/lib/financial-validation";
 
@@ -13,6 +13,11 @@ const updateSchema = z.object({
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
   benefitsRate: ratio().optional(),
 });
+
+/** Subquery: scenario IDs belonging to the authenticated company */
+function companyScenarioIds(companyId: string) {
+  return db.select({ id: scenarios.id }).from(scenarios).where(eq(scenarios.companyId, companyId));
+}
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -31,7 +36,7 @@ export const PATCH = withErrorHandler(async (
   if (parsed.data.salary !== undefined) updates.salary = String(parsed.data.salary);
   if (parsed.data.benefitsRate !== undefined) updates.benefitsRate = String(parsed.data.benefitsRate);
 
-  const [row] = await db.update(headcountPlans).set(updates).where(eq(headcountPlans.id, id)).returning();
+  const [row] = await db.update(headcountPlans).set(updates).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   return NextResponse.json(row);
 });
@@ -46,7 +51,7 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(headcountPlans).where(eq(headcountPlans.id, id)).returning();
+  const [row] = await db.delete(headcountPlans).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   return NextResponse.json({ deleted: true });
 });

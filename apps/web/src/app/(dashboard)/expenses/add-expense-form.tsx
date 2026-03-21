@@ -129,7 +129,10 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
             category,
           }),
         });
-        if (!acctRes.ok) throw new Error("Failed to create account");
+        if (!acctRes.ok) {
+          const errData = await acctRes.json().catch(() => ({}));
+          throw new Error(errData.error ?? "Failed to create account");
+        }
         const acct = await acctRes.json();
         targetAccountId = acct.id;
       }

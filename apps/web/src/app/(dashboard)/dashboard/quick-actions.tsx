@@ -52,7 +52,10 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: expName, type: "expense", category: expCategory }),
       });
-      if (!acctRes.ok) throw new Error("Failed to create account");
+      if (!acctRes.ok) {
+        const errData = await acctRes.json().catch(() => ({}));
+        throw new Error(errData.error ?? "Failed to create account");
+      }
       const acct = await acctRes.json();
 
       const now = new Date();
@@ -67,7 +70,10 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
           startDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
         }),
       });
-      if (!res.ok) throw new Error("Failed to add expense");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error ?? "Failed to add expense");
+      }
 
       setExpName("");
       setExpAmount("");
@@ -100,7 +106,10 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenarioId, name: revName, type: revType, parameters: params }),
       });
-      if (!res.ok) throw new Error("Failed to add revenue stream");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error ?? "Failed to add revenue stream");
+      }
 
       setRevName("");
       setRevPrice("");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, forecastLines } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { db, forecastLines, scenarios } from "@burnless/db";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
@@ -10,6 +10,11 @@ const updateSchema = z.object({
   startDate: z.string().transform((s) => new Date(s)).optional(),
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
 });
+
+/** Subquery: scenario IDs belonging to the authenticated company */
+function companyScenarioIds(companyId: string) {
+  return db.select({ id: scenarios.id }).from(scenarios).where(eq(scenarios.companyId, companyId));
+}
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -27,7 +32,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db
     .update(forecastLines)
     .set(parsed.data)
-    .where(eq(forecastLines.id, id))
+    .where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId))))
     .returning();
 
   if (!row) return errorResponse("Forecast line not found", 404);
@@ -44,7 +49,7 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(forecastLines).where(eq(forecastLines.id, id)).returning();
+  const [row] = await db.delete(forecastLines).where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Forecast line not found", 404);
   return NextResponse.json({ deleted: true });
 });
