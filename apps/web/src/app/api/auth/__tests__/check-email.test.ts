@@ -19,6 +19,10 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
 }));
 
+vi.mock("@/lib/api-helpers", () => ({
+  withErrorHandler: (fn: Function) => fn,
+}));
+
 import { POST } from "../check-email/route";
 
 function jsonRequest(body: unknown): Request {

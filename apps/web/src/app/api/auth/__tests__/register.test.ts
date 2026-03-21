@@ -47,6 +47,14 @@ vi.mock("@/lib/email/templates", () => ({
   welcomeEmail: vi.fn().mockReturnValue({ subject: "Welcome", html: "<p>Hi</p>" }),
 }));
 
+vi.mock("@/lib/api-helpers", () => ({
+  withErrorHandler: (fn: Function) => fn,
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }),
+}));
+
 // Chain: db.select(...).from(...).where(...).limit(1)
 mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });

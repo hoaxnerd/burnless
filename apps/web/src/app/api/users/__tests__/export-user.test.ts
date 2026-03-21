@@ -52,6 +52,7 @@ vi.mock("@/lib/api-helpers", () => ({
       headers: { "Content-Type": "application/json" },
     });
   },
+  withErrorHandler: (fn: Function) => fn,
 }));
 
 import { GET } from "../me/export/route";
