@@ -13,6 +13,7 @@ import { headcountSchemas, headcountHandlers } from "./headcount";
 import { revenueSchemas, revenueHandlers } from "./revenue";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
+import { webSearchSchemas, webSearchHandlers } from "./web-search";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...revenueSchemas,
   ...forecastingSchemas,
   ...analyticsSchemas,
+  ...webSearchSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -30,6 +32,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...revenueHandlers,
   ...forecastingHandlers,
   ...analyticsHandlers,
+  ...webSearchHandlers,
 };
 
 // ── Validation ───────────────────────────────────────────────────────────────
