@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { useToast } from "@/components/ui/toast";
 import type { FinancialAlert, AlertSeverity } from "@/lib/alerts";
 
@@ -80,9 +81,7 @@ export function useProactiveAlerts() {
       } catch (err) {
         // Alerts are non-critical, but log for visibility
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          import("@sentry/nextjs")
-            .then((Sentry) => Sentry.captureMessage("Proactive alerts load failed", { level: "warning", extra: { error: String(err) } }))
-            .catch(() => {});
+          captureException(err);
         }
       }
     })();

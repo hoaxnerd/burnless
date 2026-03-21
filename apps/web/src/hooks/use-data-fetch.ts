@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { classifyError, type ErrorVariant } from "@/components/ui/data-load-error";
 
 // Re-export for convenience
@@ -87,10 +88,8 @@ export function useDataFetch<T = unknown>(
             setError(msg);
             setErrorVariant(variant);
           }
-          // Log to Sentry
-          import("@sentry/nextjs")
-            .then((Sentry) => Sentry.captureMessage(`Data load failed: ${url} (${res.status})`, { level: "warning" }))
-            .catch(() => {});
+          // Log error
+          captureException(new Error(`Data load failed: ${url} (${res.status})`));
           return;
         }
 
@@ -109,11 +108,9 @@ export function useDataFetch<T = unknown>(
           setErrorVariant(variant);
         }
 
-        // Log to Sentry
+        // Log error
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          import("@sentry/nextjs")
-            .then((Sentry) => Sentry.captureException(err, { extra: { url } }))
-            .catch(() => {});
+          captureException(err);
         }
       } finally {
         if (mountedRef.current) {

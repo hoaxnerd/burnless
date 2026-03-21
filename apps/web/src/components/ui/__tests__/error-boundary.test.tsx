@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ErrorBoundary } from "../error-boundary";
 
-// Mock Sentry to prevent actual error reporting
-vi.mock("@sentry/nextjs", () => ({
+// Mock error-reporting module
+vi.mock("@/lib/error-reporting", () => ({
   captureException: vi.fn(),
+  setUser: vi.fn(),
+  setTag: vi.fn(),
 }));
 
 function ThrowingComponent({ shouldThrow }: { shouldThrow: boolean }) {
@@ -59,21 +61,14 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 
-  it("reports error to Sentry", async () => {
-    const Sentry = await import("@sentry/nextjs");
+  it("reports error to error-reporting module", async () => {
+    const { captureException } = await import("@/lib/error-reporting");
     render(
       <ErrorBoundary>
         <ThrowingComponent shouldThrow={true} />
       </ErrorBoundary>
     );
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        contexts: expect.objectContaining({
-          react: expect.any(Object),
-        }),
-      })
-    );
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error));
   });
 
   it("shows generic message when error has no message", () => {

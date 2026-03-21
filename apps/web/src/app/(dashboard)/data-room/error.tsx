@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { RefreshCw, WifiOff, Clock, AlertTriangle } from "lucide-react";
 
 function classifyError(error: Error) {
@@ -14,7 +15,7 @@ function classifyError(error: Error) {
 
 export default function DataRoomError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    import("@sentry/nextjs").then((S) => S.captureException(error)).catch(() => {});
+    captureException(error);
   }, [error]);
 
   const { icon: Icon, title, message } = useMemo(() => classifyError(error), [error]);

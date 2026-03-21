@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -27,11 +28,9 @@ export function WeeklyDigestBanner() {
         if (data.digest) setDigest(data.digest);
       })
       .catch((err) => {
-        // Log to Sentry — digest is non-critical but we want visibility
+        // Log — digest is non-critical but we want visibility
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          import("@sentry/nextjs")
-            .then((Sentry) => Sentry.captureMessage("Weekly digest load failed", { level: "warning", extra: { error: String(err) } }))
-            .catch(() => {});
+          captureException(err);
         }
       })
       .finally(() => clearTimeout(timer));

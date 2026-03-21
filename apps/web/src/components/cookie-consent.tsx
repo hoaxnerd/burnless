@@ -18,7 +18,7 @@ type CookieInfo = {
   duration: string;
 };
 
-const COOKIE_INVENTORY: Record<string, { description: string; cookies: CookieInfo[] }> = {
+const COOKIE_INVENTORY: Record<"essential" | "analytics" | "marketing", { description: string; cookies: CookieInfo[] }> = {
   essential: {
     description: "Required for the site to function. Cannot be disabled.",
     cookies: [

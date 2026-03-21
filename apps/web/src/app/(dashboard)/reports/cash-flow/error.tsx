@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 
 export default function CashFlowError({
@@ -11,9 +12,7 @@ export default function CashFlowError({
   reset: () => void;
 }) {
   useEffect(() => {
-    import("@sentry/nextjs")
-      .then((Sentry) => Sentry.captureException(error))
-      .catch(() => {});
+    captureException(error);
   }, [error]);
 
   return (

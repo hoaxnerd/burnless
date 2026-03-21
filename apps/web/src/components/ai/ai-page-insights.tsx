@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { captureException } from "@/lib/error-reporting";
 import {
   Sparkles,
   TrendingUp,
@@ -151,11 +152,9 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
       } catch (err) {
         setError(true);
         setErrorVariant(classifyError(err));
-        // Log to Sentry
+        // Log error
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          import("@sentry/nextjs")
-            .then((Sentry) => Sentry.captureException(err, { extra: { page, scenarioId } }))
-            .catch(() => {});
+          captureException(err);
         }
       } finally {
         setLoading(false);

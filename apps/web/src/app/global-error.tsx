@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 export default function GlobalError({
   error,
   reset,
@@ -9,12 +7,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // Dynamic import avoids pulling @sentry/nextjs server deps into client bundle
-    import("@sentry/nextjs")
-      .then((Sentry) => Sentry.captureException(error))
-      .catch(() => {});
-  }, [error]);
+  // Error is reported server-side via instrumentation.ts; no client-side Sentry import needed
+  void error;
 
   return (
     <html lang="en">

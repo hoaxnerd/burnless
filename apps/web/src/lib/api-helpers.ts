@@ -29,13 +29,7 @@ export async function requireCompanyAccess() {
   const membership = await getCompanyForUser(userId);
   if (!membership) return { error: errorResponse("No company found", 403) } as const;
 
-  // Set Sentry user context (dynamic import avoids breaking webpack dev mode)
-  import("@sentry/nextjs")
-    .then((Sentry) => {
-      Sentry.setUser({ id: userId, email: user.email ?? undefined });
-      Sentry.setTag("companyId", membership.companyId);
-    })
-    .catch(() => {});
+  // Sentry user context is set via instrumentation.ts at runtime
 
   return {
     userId,
@@ -103,10 +97,6 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
       const request = args[0] as Request;
       const pathname = new URL(request.url).pathname;
       console.error(`[API Error] ${request.method} ${pathname}:`, error);
-
-      import("@sentry/nextjs")
-        .then((Sentry) => Sentry.captureException(error))
-        .catch(() => {});
 
       return NextResponse.json(
         { error: "Internal server error" },

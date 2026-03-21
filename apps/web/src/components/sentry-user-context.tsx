@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { setUser } from "@/lib/error-reporting";
 
 interface SentryUserContextProps {
   userId?: string | null;
@@ -9,20 +10,9 @@ interface SentryUserContextProps {
 
 export function SentryUserContext({ userId, email }: SentryUserContextProps) {
   useEffect(() => {
-    import("@sentry/nextjs")
-      .then((Sentry) => {
-        if (userId) {
-          Sentry.setUser({ id: userId, email: email ?? undefined });
-        } else {
-          Sentry.setUser(null);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      import("@sentry/nextjs")
-        .then((Sentry) => Sentry.setUser(null))
-        .catch(() => {});
-    };
+    if (userId) {
+      setUser({ id: userId, email: email ?? undefined });
+    }
   }, [userId, email]);
 
   return null;

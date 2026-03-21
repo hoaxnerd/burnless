@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { captureException } from "@/lib/error-reporting";
 import { RefreshCw, WifiOff, Clock, AlertTriangle } from "lucide-react";
 
 function classifyPageError(error: Error): {
@@ -39,9 +40,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    import("@sentry/nextjs")
-      .then((Sentry) => Sentry.captureException(error))
-      .catch(() => {});
+    captureException(error);
   }, [error]);
 
   const { icon: Icon, title, message } = useMemo(() => classifyPageError(error), [error]);
