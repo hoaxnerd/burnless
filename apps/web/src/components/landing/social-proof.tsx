@@ -193,7 +193,10 @@ export function SocialProofBar() {
           ref={scrollRef}
           className="flex gap-4"
           style={{
-            animation: inView ? "logoScroll 35s linear infinite" : "none",
+            animationName: inView ? "logoScroll" : "none",
+            animationDuration: "35s",
+            animationTimingFunction: "linear",
+            animationIterationCount: "infinite",
             animationPlayState: hovered ? "paused" : "running",
             width: "max-content",
           }}
