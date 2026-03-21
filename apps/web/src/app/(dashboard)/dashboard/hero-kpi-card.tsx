@@ -205,7 +205,9 @@ export function HeroKpiCard({
             </span>
           </div>
           {!ghost && sparkData && sparkData.length >= 2 && (
-            <Sparkline data={sparkData} color={config.sparkColor} />
+            <div className="hidden sm:block">
+              <Sparkline data={sparkData} color={config.sparkColor} />
+            </div>
           )}
         </div>
 

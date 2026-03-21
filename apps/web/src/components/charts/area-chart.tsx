@@ -9,7 +9,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
+import { chartDefaults, formatMonth, formatCompactCurrency } from "./chart-theme";
+import { SingleMoMTooltip } from "./chart-tooltip";
 
 interface AreaChartProps {
   data: Array<{ month: string; value: number }>;
@@ -70,9 +71,13 @@ export function AreaChartWidget({
             width={50}
           />
           <Tooltip
-            formatter={(value) => [formatValue(Number(value)), ""]}
-            labelFormatter={(label) => formatMonth(String(label))}
-            contentStyle={tooltipStyle}
+            content={
+              <SingleMoMTooltip
+                data={data}
+                color={color}
+                formatValue={formatValue}
+              />
+            }
             cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: "4 4" }}
           />
           <Area

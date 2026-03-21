@@ -11,6 +11,7 @@ import {
   Cell,
 } from "recharts";
 import { chartColors, chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
+import { MoMTooltipContent } from "./chart-tooltip";
 
 interface BarChartProps {
   data: Array<Record<string, unknown>>;
@@ -67,12 +68,17 @@ export function BarChartWidget({
             width={50}
           />
           <Tooltip
-            formatter={(value, name) => {
-              const bar = bars.find((b) => b.dataKey === name);
-              return [formatValue(Number(value)), bar?.label ?? String(name)];
-            }}
-            labelFormatter={(label) => formatMonth(String(label))}
-            contentStyle={tooltipStyle}
+            content={
+              <MoMTooltipContent
+                data={data as Array<Record<string, unknown>>}
+                entries={bars.map((b) => ({
+                  dataKey: b.dataKey,
+                  label: b.label,
+                  color: b.color,
+                }))}
+                formatValue={formatValue}
+              />
+            }
             cursor={{ fill: "rgba(0,0,0,0.03)", radius: 4 }}
           />
           {bars.map((bar) => (

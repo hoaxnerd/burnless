@@ -9,7 +9,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { chartColors, chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
+import { chartColors, chartDefaults, formatMonth, formatCompactCurrency } from "./chart-theme";
+import { MoMTooltipContent } from "./chart-tooltip";
 
 interface MultiLineChartProps {
   data: Array<Record<string, unknown>>;
@@ -83,12 +84,17 @@ export function MultiLineChart({
             width={55}
           />
           <Tooltip
-            formatter={(value, name) => {
-              const line = lines.find((l) => l.dataKey === name);
-              return [formatValue(Number(value)), line?.label ?? String(name)];
-            }}
-            labelFormatter={(label) => formatMonth(String(label))}
-            contentStyle={tooltipStyle}
+            content={
+              <MoMTooltipContent
+                data={data as Array<Record<string, unknown>>}
+                entries={lines.map((l, i) => ({
+                  dataKey: l.dataKey,
+                  label: l.label,
+                  color: l.color ?? chartColors.palette[i % chartColors.palette.length]!,
+                }))}
+                formatValue={formatValue}
+              />
+            }
           />
           {lines.map((line, i) => (
             <Line
