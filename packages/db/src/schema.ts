@@ -254,21 +254,27 @@ export const companyMembers = pgTable(
   ]
 );
 
-export const departments = pgTable("departments", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  companyId: text("company_id")
-    .notNull()
-    .references(() => companies.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  parentId: text("parent_id"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date()),
-});
+export const departments = pgTable(
+  "departments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    parentId: text("parent_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("departments_company_idx").on(table.companyId),
+  ]
+);
 
 // ── Chart of Accounts ─────────────────────────────────────────────────────────
 

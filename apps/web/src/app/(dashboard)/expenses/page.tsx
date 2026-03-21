@@ -41,13 +41,19 @@ export default async function ExpensesPage({
 }
 
 async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
-  // Fetch everything in parallel — including budget scenario (was previously a waterfall)
+  // Step 1: fetch budget scenario ID alongside main data (cheap cached lookup)
   const [data, accounts, expenseDetails, budgetScenario] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),
     computeExpenseDetails(companyId, scenarioId),
     getBudgetScenario(companyId),
   ]);
+
+  // Step 2: if budget scenario exists, compute its data (may already be cached via unstable_cache)
+  const budgetDataPromise =
+    budgetScenario && budgetScenario.id !== scenarioId
+      ? computeDashboardData(companyId, budgetScenario.id)
+      : null;
 
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
   const totalExpenseAmount = totalExpenses.get(currentMonth) ?? 0;
@@ -60,10 +66,10 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
-  // Budget vs actuals data (budget scenario was fetched in parallel above)
+  // Budget vs actuals data (computation started above, await here)
   let budgetTimeline: { month: string; value: number }[] | null = null;
-  if (budgetScenario && budgetScenario.id !== scenarioId) {
-    const budgetData = await computeDashboardData(companyId, budgetScenario.id);
+  if (budgetDataPromise) {
+    const budgetData = await budgetDataPromise;
     budgetTimeline = seriesToArray(budgetData.totalExpenses);
   }
 

@@ -85,6 +85,13 @@
       "when": 1774121669805,
       "tag": "0011_dashboard-preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1774123821347,
+      "tag": "0012_fine_junta",
+      "breakpoints": true
     }
   ]
 }

@@ -5,8 +5,6 @@ import { getCompanyForAuthUser } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
 
-export const dynamic = "force-dynamic";
-
 export default async function DashboardLayout({
   children,
 }: {

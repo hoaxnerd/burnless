@@ -5,6 +5,7 @@
  * Cache tags allow targeted invalidation when data is mutated via API routes.
  */
 
+import { cache } from "react";
 import { db, getCompanyForUser } from "@burnless/db";
 import {
   companies,
@@ -36,13 +37,14 @@ export async function getCompanyForAuthUser(userId: string) {
 
 /**
  * Get company for the currently authenticated user.
- * Used by server component pages inside the (dashboard) layout.
+ * Wrapped with React cache() so multiple server components calling this
+ * in the same request only trigger one auth() + DB query.
  */
-export async function getCompany() {
+export const getCompany = cache(async function getCompany() {
   const session = await auth();
   if (!session?.user?.id) return null;
   return getCompanyForAuthUser(session.user.id);
-}
+});
 
 /** Get all scenarios for a company. */
 export const getScenarios = unstable_cache(
@@ -169,7 +171,7 @@ export async function getTransactions(companyId: string) {
 }
 
 /** Get dashboard preferences for the current user and company. */
-export async function getDashboardPreferences() {
+export const getDashboardPreferences = cache(async function getDashboardPreferences() {
   const session = await auth();
   if (!session?.user?.id) return null;
   const membership = await getCompanyForUser(session.user.id);
@@ -185,4 +187,4 @@ export async function getDashboardPreferences() {
     )
     .limit(1);
   return prefs ?? null;
-}
+});
