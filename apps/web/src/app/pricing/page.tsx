@@ -112,6 +112,14 @@ const faqs = [
     q: "What's included in the AI Financial Companion?",
     a: "Our AI analyzes your financial data to surface insights, forecast runway, detect anomalies, and answer questions about your finances — like having a CFO on call 24/7.",
   },
+  {
+    q: "How does the Team plan work? Are there seat limits?",
+    a: "The Team plan lets you invite unlimited team members at no extra per-seat cost. Everyone shares the same financial workspace with role-based access. Perfect for co-founders, finance leads, and advisors who need real-time visibility.",
+  },
+  {
+    q: "How does billing work? When am I charged?",
+    a: "You're charged at the start of each billing cycle — monthly or annually. Annual plans are billed upfront for the full year at a 17% discount. You can view invoices and manage your subscription anytime from Settings.",
+  },
 ];
 
 function FAQItem({ q, a }: { q: string; a: string }) {
