@@ -118,8 +118,8 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     accountId: fl.accountId,
     method: fl.method,
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
-    startDate: fl.startDate,
-    endDate: fl.endDate,
+    startDate: new Date(fl.startDate),
+    endDate: fl.endDate ? new Date(fl.endDate) : null,
   }));
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
   const _accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
@@ -131,8 +131,8 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     title: hp.title,
     count: hp.count,
     salary: Number(hp.salary),
-    startDate: hp.startDate,
-    endDate: hp.endDate,
+    startDate: new Date(hp.startDate),
+    endDate: hp.endDate ? new Date(hp.endDate) : null,
     benefitsRate: Number(hp.benefitsRate),
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);

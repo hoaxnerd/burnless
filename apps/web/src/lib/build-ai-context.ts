@@ -81,7 +81,7 @@ export async function buildAiContext(
       name: f.name,
       type: f.type,
       amount: Number(f.amount),
-      date: f.date.toISOString().slice(0, 10),
+      date: new Date(f.date).toISOString().slice(0, 10),
       isProjected: f.isProjected,
     })),
   });

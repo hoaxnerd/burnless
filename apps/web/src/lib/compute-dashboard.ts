@@ -90,8 +90,8 @@ export const computeDashboardData = cache(async function computeDashboardData(
     accountId: fl.accountId,
     method: fl.method,
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
-    startDate: fl.startDate,
-    endDate: fl.endDate,
+    startDate: new Date(fl.startDate),
+    endDate: fl.endDate ? new Date(fl.endDate) : null,
   }));
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
   const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
@@ -122,8 +122,8 @@ export const computeDashboardData = cache(async function computeDashboardData(
     title: hp.title,
     count: hp.count,
     salary: Number(hp.salary),
-    startDate: hp.startDate,
-    endDate: hp.endDate,
+    startDate: new Date(hp.startDate),
+    endDate: hp.endDate ? new Date(hp.endDate) : null,
     benefitsRate: Number(hp.benefitsRate),
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
@@ -203,8 +203,9 @@ export const computeDashboardData = cache(async function computeDashboardData(
 
   const fundingInflows: MonthlySeries = new Map();
   for (const round of funding) {
-    if (round.isProjected || round.date >= periodStart) {
-      const key = monthKey(round.date);
+    const roundDate = new Date(round.date);
+    if (round.isProjected || roundDate >= periodStart) {
+      const key = monthKey(roundDate);
       fundingInflows.set(key, (fundingInflows.get(key) ?? 0) + Number(round.amount));
     }
   }
