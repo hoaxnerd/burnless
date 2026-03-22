@@ -6,6 +6,8 @@ const analyze = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   // Standalone output for Docker — bundles server + dependencies into .next/standalone
   output: "standalone",
@@ -34,7 +36,7 @@ const nextConfig: NextConfig = {
           key: "Content-Security-Policy",
           value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://lh3.googleusercontent.com https://avatars.githubusercontent.com",
             "font-src 'self'",

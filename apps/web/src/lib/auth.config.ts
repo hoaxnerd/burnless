@@ -57,7 +57,7 @@ export const authConfig = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60, // 7 days — financial data app should have shorter sessions
+    maxAge: 24 * 60 * 60, // 24 hours — short sessions for financial data security
   },
   callbacks: {
     async signIn({ user, account }) {
