@@ -128,7 +128,10 @@ export default function AiCompanionPage() {
   async function loadConversations() {
     try {
       const res = await fetch("/api/chat/history");
-      if (res.ok) setConversations(await res.json());
+      if (res.ok) {
+        const json = await res.json();
+        setConversations(Array.isArray(json) ? json : json.data ?? []);
+      }
     } catch {
       /* non-critical */
     }
