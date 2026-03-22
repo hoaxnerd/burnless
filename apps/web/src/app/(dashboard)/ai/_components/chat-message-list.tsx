@@ -1,6 +1,6 @@
 import React from "react";
 import { Bot, User, Copy, Check, Sparkles } from "lucide-react";
-import { FormattedContent } from "./formatted-content";
+import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
 import type { Message } from "./types";
 
@@ -77,7 +77,7 @@ export function ChatMessageList({
                       : "bg-surface-0 border border-surface-200 text-surface-800 rounded-bl-md shadow-sm"
                   }`}
                 >
-                  <FormattedContent content={msg.content} />
+                  <MarkdownRenderer content={msg.content} />
 
                   {/* Typing indicator — shown when streaming with no content yet */}
                   {msg.isStreaming && !msg.content && (

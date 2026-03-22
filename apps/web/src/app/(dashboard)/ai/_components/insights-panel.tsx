@@ -1,5 +1,6 @@
 import { AlertTriangle, TrendingUp, Lightbulb } from "lucide-react";
 import type { Insight } from "./types";
+import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 
 function severityIcon(severity: string) {
   switch (severity) {
@@ -48,9 +49,11 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
                 <h3 className="text-sm font-medium text-surface-900">
                   {insight.title}
                 </h3>
-                <p className="mt-1 text-xs text-surface-600 leading-relaxed">
-                  {insight.summary}
-                </p>
+                <MarkdownRenderer
+                  content={insight.summary}
+                  variant="compact"
+                  className="mt-1"
+                />
               </div>
             </div>
           </div>

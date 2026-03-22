@@ -17,6 +17,7 @@ import {
 import { AiGate } from "./ai-gate";
 import { useAiFeature } from "./ai-feature-context";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
+import { MarkdownRenderer } from "./markdown-renderer";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -290,9 +291,11 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
                       <p className="text-sm font-semibold text-surface-900 leading-snug">
                         {insight.title}
                       </p>
-                      <p className="text-xs text-surface-500 mt-1 leading-relaxed">
-                        {insight.summary}
-                      </p>
+                      <MarkdownRenderer
+                        content={insight.summary}
+                        variant="compact"
+                        className="mt-1"
+                      />
                     </div>
                     <div className={`flex-shrink-0 h-2 w-2 rounded-full mt-1.5 ${style.dot}`} />
                   </div>
