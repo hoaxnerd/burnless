@@ -24,6 +24,7 @@ const SUBCAT_COLORS: Record<string, string> = {
   "Insurance": "#10b981",
   "Cost of Goods Sold": "#f97316",
   "Payroll": "#a855f7",
+  "Uncategorized": "#94a3b8",
   "Other": "#94a3b8",
 };
 

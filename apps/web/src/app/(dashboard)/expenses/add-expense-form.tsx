@@ -7,10 +7,25 @@ import { Plus, Sparkles, Check } from "lucide-react";
 import { categorizeTransaction } from "@burnless/engine";
 import { validateField, validateAll, expenseFormSchema } from "@/lib/form-validation";
 
-const CATEGORIES = [
-  { value: "operating_expense", label: "Operating Expense" },
-  { value: "cogs", label: "Cost of Goods Sold" },
+// User-selectable expense subcategories, each mapped to a parent AccountCategory
+const EXPENSE_SUBCATEGORIES = [
+  { value: "Software & Tools", label: "Software & Tools", parent: "operating_expense" },
+  { value: "Payroll", label: "Payroll", parent: "operating_expense" },
+  { value: "Office & Facilities", label: "Office & Facilities", parent: "operating_expense" },
+  { value: "Marketing", label: "Marketing", parent: "operating_expense" },
+  { value: "Payment Processing", label: "Payment Processing", parent: "operating_expense" },
+  { value: "Legal & Compliance", label: "Legal & Compliance", parent: "operating_expense" },
+  { value: "Travel & Entertainment", label: "Travel & Entertainment", parent: "operating_expense" },
+  { value: "Insurance", label: "Insurance", parent: "operating_expense" },
+  { value: "Professional Services", label: "Professional Services", parent: "operating_expense" },
+  { value: "Cost of Goods Sold", label: "Cost of Goods Sold", parent: "cogs" },
+  { value: "Other Operating Expense", label: "Other Operating Expense", parent: "operating_expense" },
 ] as const;
+
+function parentCategoryFromSubcategory(subcategory: string): "operating_expense" | "cogs" {
+  const match = EXPENSE_SUBCATEGORIES.find((c) => c.value === subcategory);
+  return (match?.parent as "operating_expense" | "cogs") ?? "operating_expense";
+}
 
 const METHODS = [
   { value: "fixed", label: "Fixed Amount" },
@@ -33,7 +48,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
   // Form state
   const [name, setName] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [category, setCategory] = useState<string>("operating_expense");
+  const [subcategory, setSubcategory] = useState<string>("Software & Tools");
   const [method, setMethod] = useState("fixed");
   const [amount, setAmount] = useState("");
   const [growthRate, setGrowthRate] = useState("");
@@ -67,12 +82,12 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
 
   const applySuggestion = () => {
     if (!suggestion) return;
-    // Map the engine category to our form category
-    if (suggestion.category === "cogs") setCategory("cogs");
-    else setCategory("operating_expense");
+    // Set the subcategory directly from the engine suggestion
+    setSubcategory(suggestion.subcategory);
     setSuggestionApplied(true);
   };
 
+  const parentCategory = parentCategoryFromSubcategory(subcategory);
   const expenseAccounts = accounts.filter(
     (a) => a.category === "operating_expense" || a.category === "cogs"
   );
@@ -126,7 +141,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
           body: JSON.stringify({
             name,
             type: "expense",
-            category,
+            category: parentCategory,
           }),
         });
         if (!acctRes.ok) {
@@ -160,17 +175,15 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
       }
 
       // Learn: save merchant→category mapping when user manually categorizes
-      // (either no suggestion existed, or user chose a different category)
       if (name.length >= 3 && targetAccountId) {
-        const _subcatName = suggestion?.subcategory ?? name;
         fetch("/api/merchant-mappings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             description: name,
             accountId: targetAccountId,
-            category,
-            subcategory: suggestionApplied ? suggestion?.subcategory ?? name : name,
+            category: parentCategory,
+            subcategory,
           }),
         }).catch(() => {}); // fire-and-forget, don't block UX
       }
@@ -256,11 +269,11 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Category</label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={subcategory}
+              onChange={(e) => setSubcategory(e.target.value)}
               className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              {CATEGORIES.map((c) => (
+              {EXPENSE_SUBCATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>

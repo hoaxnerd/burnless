@@ -6,6 +6,20 @@ import { Modal } from "@/components/ui";
 import { validateField, validateAll, expenseFormSchema } from "@/lib/form-validation";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
 
+const EXPENSE_SUBCATEGORIES = [
+  { value: "Software & Tools", label: "Software & Tools", parent: "operating_expense" },
+  { value: "Payroll", label: "Payroll", parent: "operating_expense" },
+  { value: "Office & Facilities", label: "Office & Facilities", parent: "operating_expense" },
+  { value: "Marketing", label: "Marketing", parent: "operating_expense" },
+  { value: "Payment Processing", label: "Payment Processing", parent: "operating_expense" },
+  { value: "Legal & Compliance", label: "Legal & Compliance", parent: "operating_expense" },
+  { value: "Travel & Entertainment", label: "Travel & Entertainment", parent: "operating_expense" },
+  { value: "Insurance", label: "Insurance", parent: "operating_expense" },
+  { value: "Professional Services", label: "Professional Services", parent: "operating_expense" },
+  { value: "Cost of Goods Sold", label: "Cost of Goods Sold", parent: "cogs" },
+  { value: "Other Operating Expense", label: "Other Operating Expense", parent: "operating_expense" },
+] as const;
+
 const METHODS = [
   { value: "fixed", label: "Fixed Amount" },
   { value: "growth_rate", label: "Growth Rate" },
@@ -25,6 +39,13 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Pre-populate from existing item
+  const [subcategory, setSubcategory] = useState(() => {
+    // Map known subcategories, handle legacy "Other" values
+    const current = item.subcategory;
+    if (current === "Other" || current === "Uncategorized") return "Other Operating Expense";
+    const match = EXPENSE_SUBCATEGORIES.find((c) => c.value === current);
+    return match ? current : "Other Operating Expense";
+  });
   const [method, setMethod] = useState(item.method);
   const [amount, setAmount] = useState(
     String(item.parameters.amount ?? item.currentAmount)
@@ -97,6 +118,34 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
         throw new Error(data.error ?? "Failed to update expense");
       }
 
+      // Update account category + save subcategory via merchant mapping if changed
+      if (subcategory !== item.subcategory) {
+        const parentCategory = EXPENSE_SUBCATEGORIES.find((c) => c.value === subcategory)?.parent ?? "operating_expense";
+
+        // Update the account's category if parent changed (operating_expense <-> cogs)
+        if (parentCategory !== item.accountCategory) {
+          await fetch(`/api/accounts/${item.accountId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category: parentCategory }),
+          });
+        }
+
+        // Save merchant mapping for future auto-categorization
+        if (item.accountName.length >= 3) {
+          fetch("/api/merchant-mappings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              description: item.accountName,
+              accountId: item.accountId,
+              category: parentCategory,
+              subcategory,
+            }),
+          }).catch(() => {}); // fire-and-forget
+        }
+      }
+
       onClose();
       router.refresh();
     } catch (err) {
@@ -126,6 +175,19 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
           <p className="mt-1 text-xs text-surface-400">
             Name is tied to the account and cannot be changed here.
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-surface-700 mb-1">Category</label>
+          <select
+            value={subcategory}
+            onChange={(e) => setSubcategory(e.target.value)}
+            className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            {EXPENSE_SUBCATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
         </div>
 
         <div>

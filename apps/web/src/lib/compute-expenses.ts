@@ -87,7 +87,7 @@ function deriveSubcategory(
   }
 
   // Generic operating expense fallback
-  return { subcategory: "Other", confidence: 0.3, source: "manual" };
+  return { subcategory: "Uncategorized", confidence: 0.3, source: "manual" };
 }
 
 // ── Main computation ─────────────────────────────────────────────────────────
