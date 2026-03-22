@@ -19,10 +19,15 @@ import { weeklyDigestEmail } from "@/lib/email/templates";
 import { getAiFlags } from "@/lib/ai-feature-flags";
 
 const CRON_SECRET = process.env.CRON_SECRET;
+const IS_DEV = process.env.NODE_ENV === "development";
 
 export async function GET(request: Request) {
-  // Verify Vercel Cron secret (or skip in dev)
-  if (CRON_SECRET) {
+  // Verify Vercel Cron secret — required in production
+  if (!IS_DEV) {
+    if (!CRON_SECRET) {
+      console.error("CRON_SECRET is not configured");
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+    }
     const authHeader = request.headers.get("authorization");
     if (authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
