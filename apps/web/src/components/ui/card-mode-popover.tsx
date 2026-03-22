@@ -124,7 +124,7 @@ export function CardModePopover({
           p-1.5 rounded-full transition-all duration-200 shadow-sm border
           ${open || hovered
             ? "opacity-100 bg-surface-0 border-surface-300 text-surface-600 scale-100"
-            : "opacity-0 scale-90 bg-surface-0 border-surface-200 text-surface-300"
+            : "opacity-30 group-hover:opacity-70 scale-95 bg-surface-0 border-surface-200 text-surface-400"
           }
         `}
         title="Card mode settings"
