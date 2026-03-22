@@ -19,8 +19,14 @@ import {
   type ComputedMetrics,
 } from "@burnless/engine";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
-import { CardModePopover } from "@/components/ui/card-mode-popover";
+import { CardSettingsModal } from "@/components/ui/card-settings-modal";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
+import {
+  CATEGORY_META,
+  getMetricDef as getMetricDefFn,
+  getMetricDependencyTree,
+  getMetricDependents,
+} from "@burnless/engine";
 
 interface CustomizableMetricsProps {
   metrics: ComputedMetrics;
@@ -85,12 +91,32 @@ function MetricRowDynamic({
   prevMonth: string;
   headcount?: { current: number; previous: number };
 }) {
-  const { openFormulaViewer, getCardMode, setCardMode, mode: globalMode } = useDashboardIntelligence();
+  const {
+    openFormulaViewer, getCardMode, setCardMode, mode: globalMode,
+    registry, heroCards, secondaryMetrics,
+    addSecondaryMetric, removeSecondaryMetric,
+  } = useDashboardIntelligence();
   const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
   if (!def) return null;
   const cardMode = getCardMode(slug);
   const isOverride = cardMode !== globalMode;
+  const allUsedSlugs = useMemo(
+    () => new Set([...heroCards, ...secondaryMetrics]),
+    [heroCards, secondaryMetrics]
+  );
+  const catalogProps = useMemo(() => ({
+    registry,
+    usedSlugs: allUsedSlugs,
+    heroSlugs: heroCards,
+    onSelect: addSecondaryMetric,
+    onRemove: removeSecondaryMetric,
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDefFn as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
 
@@ -184,12 +210,12 @@ function MetricRowDynamic({
         {def.name}
       </span>
       <div className="flex items-center gap-2">
-        <CardModePopover
+        <CardSettingsModal
           currentMode={cardMode}
           onModeChange={(mode) => setCardMode(slug, mode)}
           isOverride={isOverride}
           aiEnabled={aiEnabled}
-          align="right"
+          catalogProps={catalogProps}
         />
         <div className="flex items-center gap-3">
           {change && (

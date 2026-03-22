@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Wallet,
@@ -9,9 +9,15 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import { CardModePopover, type CardMode } from "@/components/ui/card-mode-popover";
+import { CardSettingsModal, type CardMode } from "@/components/ui/card-settings-modal";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
+import {
+  CATEGORY_META,
+  getMetricDef,
+  getMetricDependencyTree,
+  getMetricDependents,
+} from "@burnless/engine";
 
 /* ── Mini sparkline — pure SVG, zero dependencies ─────────────────────────── */
 
@@ -224,11 +230,31 @@ export function HeroKpiCard({
   const ghost = isGhost(value);
 
   // Per-card mode from intelligence context
-  const { getCardMode, setCardMode, mode: globalMode } = useDashboardIntelligence();
+  const {
+    getCardMode, setCardMode, mode: globalMode,
+    registry, heroCards, secondaryMetrics,
+    addSecondaryMetric, removeSecondaryMetric, openFormulaViewer,
+  } = useDashboardIntelligence();
   const { masterEnabled: aiEnabled } = useAiFlags();
   const cardSlug = slug ?? variant;
   const cardMode = getCardMode(cardSlug);
   const isOverride = cardMode !== globalMode;
+  const allUsedSlugs = useMemo(
+    () => new Set([...heroCards, ...secondaryMetrics]),
+    [heroCards, secondaryMetrics]
+  );
+  const catalogProps = useMemo(() => ({
+    registry,
+    usedSlugs: allUsedSlugs,
+    heroSlugs: heroCards,
+    onSelect: addSecondaryMetric,
+    onRemove: removeSecondaryMetric,
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDef as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -287,11 +313,12 @@ export function HeroKpiCard({
           className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
           onMouseDown={() => { settingsActiveRef.current = true; }}
         >
-          <CardModePopover
+          <CardSettingsModal
             currentMode={cardMode}
             onModeChange={(mode) => setCardMode(cardSlug, mode)}
             isOverride={isOverride}
             aiEnabled={aiEnabled}
+            catalogProps={catalogProps}
           />
         </div>
       )}
