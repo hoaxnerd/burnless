@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, RotateCcw } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useMemo, useState } from "react";
 import { useDashboardIntelligence, type WidgetLayout } from "./dashboard-intelligence-context";
 
 // ── Widget definitions ────────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ function SortableWidget({
     <div ref={setNodeRef} style={style}>
       {isDragMode && (
         <button
+          key="drag-handle"
           {...attributes}
           {...listeners}
           className="absolute -left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-lg bg-surface-0 border border-surface-200 shadow-sm text-surface-400 hover:text-surface-600 hover:bg-surface-50 cursor-grab active:cursor-grabbing transition-colors"
@@ -86,9 +87,9 @@ function SortableWidget({
         </button>
       )}
       {isDragMode && (
-        <div className="absolute inset-0 rounded-2xl border-2 border-dashed border-brand-200 pointer-events-none z-20" />
+        <div key="drag-overlay" className="absolute inset-0 rounded-2xl border-2 border-dashed border-brand-200 pointer-events-none z-20" />
       )}
-      {children}
+      <Fragment key="content">{children}</Fragment>
     </div>
   );
 }
