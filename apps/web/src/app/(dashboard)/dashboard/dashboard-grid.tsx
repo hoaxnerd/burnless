@@ -103,22 +103,29 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
-  const { layout, reorderLayout } = useDashboardIntelligence();
+  const { layout, reorderLayout, isLoading } = useDashboardIntelligence();
   const [isDragMode, setIsDragMode] = useState(false);
 
-  // Compute effective widget order from saved layout or defaults
+  // Compute effective widget order from saved layout or defaults.
+  // Deduplicates IDs and filters to only valid widget IDs to prevent React key errors.
   const widgetOrder = useMemo(() => {
+    const validIds = new Set(Object.keys(widgets) as WidgetId[]);
+    const hiddenSet = new Set(hiddenWidgets);
+    const seen = new Set<WidgetId>();
+
+    const dedup = (ids: WidgetId[]) =>
+      ids.filter((id) => {
+        if (seen.has(id) || hiddenSet.has(id) || !validIds.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+
     if (layout.length > 0) {
-      // Use saved order, adding any new widgets that might not be in the saved layout
       const savedOrder = layout.map((l) => l.widgetId as WidgetId);
       const missing = DEFAULT_WIDGET_ORDER.filter((id) => !savedOrder.includes(id));
-      return [...savedOrder, ...missing].filter(
-        (id) => !hiddenWidgets.includes(id) && id in widgets
-      );
+      return dedup([...savedOrder, ...missing]);
     }
-    return DEFAULT_WIDGET_ORDER.filter(
-      (id) => !hiddenWidgets.includes(id) && id in widgets
-    );
+    return dedup([...DEFAULT_WIDGET_ORDER]);
   }, [layout, hiddenWidgets, widgets]);
 
   const sensors = useSensors(
@@ -158,6 +165,21 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     reorderLayout([]);
     setIsDragMode(false);
   }, [reorderLayout]);
+
+  // Show skeleton while loading to prevent flash of default layout
+  if (isLoading) {
+    return (
+      <div className="space-y-6 sm:space-y-8">
+        {DEFAULT_WIDGET_ORDER.filter((id) => !hiddenWidgets.includes(id)).map((id) => (
+          <div
+            key={id}
+            className="rounded-2xl bg-surface-50 animate-pulse"
+            style={{ height: id === "hero-kpis" ? 180 : id === "charts" ? 320 : 120 }}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div>
