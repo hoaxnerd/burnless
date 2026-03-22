@@ -3,72 +3,78 @@
  *
  * When data functions are wrapped with Next.js unstable_cache, Date objects
  * get serialized to JSON strings during caching and deserialized as strings
- * (not Date objects). This causes crashes in engine functions that call
- * .getFullYear(), .getMonth(), etc.
- *
- * This test verifies that engine functions handle both Date objects and
- * ISO string dates, catching the regression introduced by BUR-176/BUR-188.
+ * (not Date objects). All engine functions now accept both Date objects and
+ * ISO string dates via the toDate() coercion helper.
  */
 
 import { describe, it, expect } from "vitest";
-import { monthKey, monthRange, isActiveInMonth, proratedFraction } from "../utils";
+import { monthKey, monthRange, isActiveInMonth, proratedFraction, toDate } from "../utils";
 import { computeAllForecastLines, type ForecastLineInput } from "../forecasting";
 import { computeAllHeadcountCosts, type HeadcountPlanInput } from "../headcount";
 
 describe("Date serialization regression (BUR-200)", () => {
+  describe("toDate coercion", () => {
+    it("passes through Date objects unchanged", () => {
+      const d = new Date(2025, 0, 1);
+      expect(toDate(d)).toBe(d);
+    });
+
+    it("coerces ISO strings to Date objects", () => {
+      const result = toDate("2025-01-01T00:00:00.000Z");
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getFullYear()).toBe(2025);
+    });
+
+    it("coerces numeric timestamps to Date objects", () => {
+      const ts = new Date(2025, 0, 1).getTime();
+      const result = toDate(ts);
+      expect(result).toBeInstanceOf(Date);
+      expect(result.getTime()).toBe(ts);
+    });
+  });
+
   describe("utils functions with string dates", () => {
-    it("monthKey should handle Date objects", () => {
-      const result = monthKey(new Date(2025, 0, 1));
-      expect(result).toBe("2025-01");
+    it("monthKey handles Date objects", () => {
+      expect(monthKey(new Date(2025, 0, 1))).toBe("2025-01");
     });
 
-    it("monthKey crashes with ISO string input (demonstrates the bug)", () => {
-      // This simulates what happens when unstable_cache returns a date
-      const isoString = "2025-01-01T00:00:00.000Z";
-      // @ts-expect-error - testing runtime behavior with wrong type
-      expect(() => monthKey(isoString)).toThrow();
+    it("monthKey handles ISO string input", () => {
+      expect(monthKey("2025-01-01T00:00:00.000Z")).toBe("2025-01");
     });
 
-    it("monthRange crashes with ISO string inputs (demonstrates the bug)", () => {
-      const startStr = "2025-01-01T00:00:00.000Z";
-      const endStr = "2025-12-01T00:00:00.000Z";
-      // @ts-expect-error - testing runtime behavior with wrong type
-      expect(() => monthRange(startStr, endStr)).toThrow();
+    it("monthRange handles ISO string inputs", () => {
+      const result = monthRange("2025-01-01T00:00:00.000Z", "2025-03-01T00:00:00.000Z");
+      expect(result).toHaveLength(3);
+      expect(result[0]!.getMonth()).toBe(0);
+      expect(result[2]!.getMonth()).toBe(2);
     });
 
-    it("isActiveInMonth crashes with ISO string startDate (demonstrates the bug)", () => {
+    it("isActiveInMonth handles ISO string startDate", () => {
       const month = new Date(2025, 5, 1);
-      const startStr = "2025-01-01T00:00:00.000Z";
-      // @ts-expect-error - testing runtime behavior with wrong type
-      expect(() => isActiveInMonth(month, startStr, null)).toThrow();
+      expect(isActiveInMonth(month, "2025-01-01T00:00:00.000Z", null)).toBe(true);
     });
 
-    it("proratedFraction returns wrong result with ISO string startDate (silent corruption)", () => {
+    it("proratedFraction handles ISO string startDate correctly", () => {
       const month = new Date(2025, 5, 1); // June 2025
-      const startStr = "2025-06-15T00:00:00.000Z";
 
       // With proper Date: should return ~0.53 (16 of 30 days)
-      const correctResult = proratedFraction(month, new Date(2025, 5, 15), null);
-      expect(correctResult).toBeCloseTo(16 / 30, 1);
+      const dateResult = proratedFraction(month, new Date(2025, 5, 15), null);
+      expect(dateResult).toBeCloseTo(16 / 30, 1);
 
-      // With string: doesn't crash but may produce wrong result
-      // @ts-expect-error - testing runtime behavior with wrong type
-      const brokenResult = proratedFraction(month, startStr, null);
-      // This is a silent data corruption bug — it either returns wrong
-      // prorated fraction or 1.0 (full month) depending on comparison coercion
-      expect(typeof brokenResult).toBe("number");
+      // With string: should produce same result
+      const stringResult = proratedFraction(month, "2025-06-15T00:00:00.000Z", null);
+      expect(stringResult).toBeCloseTo(16 / 30, 1);
     });
   });
 
   describe("forecasting with string dates (unstable_cache simulation)", () => {
-    it("computeAllForecastLines crashes when startDate is a string", () => {
+    it("computeAllForecastLines works when startDate is a string", () => {
       const inputs: ForecastLineInput[] = [
         {
           id: "fl-1",
           accountId: "acc-1",
           method: "fixed",
           parameters: { amount: 5000 },
-          // Simulate what unstable_cache returns
           startDate: "2025-01-01T00:00:00.000Z" as unknown as Date,
           endDate: null,
         },
@@ -77,8 +83,9 @@ describe("Date serialization regression (BUR-200)", () => {
       const start = new Date(2025, 0, 1);
       const end = new Date(2025, 11, 1);
 
-      // This should crash because startDate is a string, not a Date
-      expect(() => computeAllForecastLines(inputs, start, end)).toThrow();
+      const results = computeAllForecastLines(inputs, start, end);
+      expect(results.size).toBe(1);
+      expect(results.get("fl-1")?.size).toBeGreaterThan(0);
     });
 
     it("computeAllForecastLines works with proper Date objects", () => {
@@ -103,7 +110,7 @@ describe("Date serialization regression (BUR-200)", () => {
   });
 
   describe("headcount with string dates (unstable_cache simulation)", () => {
-    it("computeAllHeadcountCosts crashes when startDate is a string", () => {
+    it("computeAllHeadcountCosts works when startDate is a string", () => {
       const inputs: HeadcountPlanInput[] = [
         {
           id: "hp-1",
@@ -111,7 +118,6 @@ describe("Date serialization regression (BUR-200)", () => {
           title: "Engineer",
           count: 2,
           salary: 120000,
-          // Simulate what unstable_cache returns
           startDate: "2025-01-01T00:00:00.000Z" as unknown as Date,
           endDate: null,
           benefitsRate: 0.2,
@@ -121,7 +127,8 @@ describe("Date serialization regression (BUR-200)", () => {
       const start = new Date(2025, 0, 1);
       const end = new Date(2025, 11, 1);
 
-      expect(() => computeAllHeadcountCosts(inputs, start, end)).toThrow();
+      const result = computeAllHeadcountCosts(inputs, start, end);
+      expect(result.totalCost.size).toBeGreaterThan(0);
     });
 
     it("computeAllHeadcountCosts works with proper Date objects", () => {
@@ -143,26 +150,6 @@ describe("Date serialization regression (BUR-200)", () => {
 
       const result = computeAllHeadcountCosts(inputs, start, end);
       expect(result.totalCost.size).toBeGreaterThan(0);
-    });
-  });
-
-  describe("fix validation: compute-dashboard should coerce dates", () => {
-    it("new Date(isoString) produces a valid Date from JSON-serialized output", () => {
-      // This is the fix: wrap with new Date() to coerce strings back to Dates
-      const isoString = "2025-01-01T00:00:00.000Z";
-      const coerced = new Date(isoString);
-
-      expect(coerced).toBeInstanceOf(Date);
-      expect(coerced.getFullYear()).toBe(2025);
-      expect(coerced.getMonth()).toBe(0);
-      expect(coerced.getDate()).toBe(1);
-    });
-
-    it("new Date(Date) is idempotent (safe to always coerce)", () => {
-      const original = new Date(2025, 5, 15);
-      const coerced = new Date(original);
-
-      expect(coerced.getTime()).toBe(original.getTime());
     });
   });
 });

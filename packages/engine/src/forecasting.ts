@@ -17,6 +17,7 @@ import {
   monthKey,
   round2,
   isActiveInMonth,
+  toDate,
 } from "./utils";
 import { D, dPow, dRound2 } from "./decimal";
 import {
@@ -107,7 +108,8 @@ export function computeForecastLine(
     }
 
     // Calculate months elapsed since this line's start
-    const lineStart = new Date(line.startDate.getFullYear(), line.startDate.getMonth(), 1);
+    const sd = toDate(line.startDate);
+    const lineStart = new Date(sd.getFullYear(), sd.getMonth(), 1);
     const monthsElapsed = (month.getFullYear() - lineStart.getFullYear()) * 12
       + (month.getMonth() - lineStart.getMonth());
 

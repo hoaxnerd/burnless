@@ -6,11 +6,20 @@
 
 import { D, dRound2, dSum } from "./decimal";
 
+/** Coerce a Date-like value (Date, string, number) to a proper Date object.
+ *  Handles the common case where Drizzle/PostgreSQL returns ISO strings instead of Date objects. */
+export function toDate(value: Date | string | number): Date {
+  if (value instanceof Date) return value;
+  return new Date(value);
+}
+
 /** Generate an array of first-of-month dates between start and end (inclusive). */
-export function monthRange(start: Date, end: Date): Date[] {
+export function monthRange(start: Date | string, end: Date | string): Date[] {
+  const s = toDate(start);
+  const e = toDate(end);
   const months: Date[] = [];
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+  const last = new Date(e.getFullYear(), e.getMonth(), 1);
   while (cur <= last) {
     months.push(new Date(cur));
     cur.setMonth(cur.getMonth() + 1);
@@ -19,9 +28,10 @@ export function monthRange(start: Date, end: Date): Date[] {
 }
 
 /** Format a date as YYYY-MM for use as a map key. */
-export function monthKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
+export function monthKey(date: Date | string): string {
+  const d = toDate(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
 
@@ -40,16 +50,19 @@ export function round2(n: number): number {
 
 /** Check if a date falls within a month (inclusive of start, exclusive of end). */
 export function isActiveInMonth(
-  month: Date,
-  startDate: Date,
-  endDate: Date | null
+  month: Date | string,
+  startDate: Date | string,
+  endDate: Date | string | null
 ): boolean {
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0); // last day
-  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const m = toDate(month);
+  const sd = toDate(startDate);
+  const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
+  const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0); // last day
+  const start = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
   if (start > monthEnd) return false;
   if (endDate) {
-    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    const ed = toDate(endDate);
+    const end = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
     if (end < monthStart) return false;
   }
   return true;
@@ -57,16 +70,19 @@ export function isActiveInMonth(
 
 /** Calculate prorated fraction of a month for a start/end date. Returns 0-1. */
 export function proratedFraction(
-  month: Date,
-  startDate: Date,
-  endDate: Date | null
+  month: Date | string,
+  startDate: Date | string,
+  endDate: Date | string | null
 ): number {
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const m = toDate(month);
+  const sd = toDate(startDate);
+  const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
+  const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
 
-  const effectiveStart = startDate > monthStart ? startDate : monthStart;
-  const effectiveEnd = endDate && endDate < monthEnd ? endDate : monthEnd;
+  const effectiveStart = sd > monthStart ? sd : monthStart;
+  const ed = endDate ? toDate(endDate) : null;
+  const effectiveEnd = ed && ed < monthEnd ? ed : monthEnd;
 
   if (effectiveStart > effectiveEnd) return 0;
 
@@ -84,7 +100,7 @@ export function sum(values: number[]): number {
 export type MonthlySeries = Map<string, number>;
 
 /** Create an empty monthly series for a date range. */
-export function emptySeries(start: Date, end: Date): MonthlySeries {
+export function emptySeries(start: Date | string, end: Date | string): MonthlySeries {
   const series: MonthlySeries = new Map();
   for (const m of monthRange(start, end)) {
     series.set(monthKey(m), 0);

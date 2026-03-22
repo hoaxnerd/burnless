@@ -7,6 +7,7 @@ export { D, dRound2, dSum, dMul, dDiv, dAdd, dSub, dPow, Decimal } from "./decim
 
 // Utilities
 export {
+  toDate,
   monthRange,
   monthKey,
   parseMonthKey,
