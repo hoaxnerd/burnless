@@ -77,6 +77,9 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+
 import { PATCH, DELETE } from "../[id]/route";
 
 function jsonRequest(url: string, method: string, body?: unknown): Request {

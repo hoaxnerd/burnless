@@ -80,4 +80,27 @@ test.describe("AI Companion UI (requires auth)", () => {
     await page.getByRole("button", { name: "History" }).click();
     await expect(page.getByText("Recent Conversations")).toBeVisible();
   });
+
+  test("template cards are visible on empty state", async ({ page }) => {
+    await page.goto("/ai");
+    // Should show all 6 quick-start templates
+    await expect(page.getByText("Monthly Briefing")).toBeVisible();
+    await expect(page.getByText("Scenario Builder")).toBeVisible();
+    await expect(page.getByText("Funding Analysis")).toBeVisible();
+    await expect(page.getByText("Revenue Forecast")).toBeVisible();
+    await expect(page.getByText("Hiring Impact")).toBeVisible();
+    await expect(page.getByText("Board Prep")).toBeVisible();
+  });
+
+  test("clicking a template card fills the input", async ({ page }) => {
+    await page.goto("/ai");
+    // Click the Monthly Briefing template
+    await page.getByText("Monthly Briefing").click();
+    // Input should now contain the template prompt
+    const input = page.getByPlaceholder(
+      "Ask about your financials, build a scenario, get advice..."
+    );
+    const value = await input.inputValue();
+    expect(value).toContain("financial briefing");
+  });
 });

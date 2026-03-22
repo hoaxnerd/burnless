@@ -59,6 +59,23 @@ test.describe("Settings page UI (requires auth)", () => {
     await expect(page.getByText(/master|enable ai/i)).toBeVisible();
   });
 
+  test("AI Features tab shows provider selection", async ({ page }) => {
+    await page.goto("/settings");
+    await page.getByRole("tab", { name: /ai features/i }).click();
+    // Should show provider options
+    await expect(page.getByText("Anthropic")).toBeVisible();
+    await expect(page.getByText("OpenAI")).toBeVisible();
+    await expect(page.getByText("OpenRouter")).toBeVisible();
+  });
+
+  test("AI Features tab shows feature toggles", async ({ page }) => {
+    await page.goto("/settings");
+    await page.getByRole("tab", { name: /ai features/i }).click();
+    // Should show individual feature toggles
+    await expect(page.getByText("AI Chat Companion")).toBeVisible();
+    await expect(page.getByText("AI Insights")).toBeVisible();
+  });
+
   test("switching to Integrations tab shows integration list", async ({
     page,
   }) => {

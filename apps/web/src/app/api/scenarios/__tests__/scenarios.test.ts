@@ -67,7 +67,11 @@ vi.mock("@burnless/db", () => ({
     type: "type",
     createdAt: "createdAt",
   },
+  financialAuditLogs: {},
 }));
+
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
 
 vi.mock("@/lib/feature-gate", () => ({
   canPerformAction: mockCanPerformAction,

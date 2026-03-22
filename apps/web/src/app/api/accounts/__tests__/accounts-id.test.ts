@@ -56,6 +56,9 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+
 import { GET, PATCH, DELETE } from "../[id]/route";
 
 function makeRequest(url: string, options?: RequestInit): Request {

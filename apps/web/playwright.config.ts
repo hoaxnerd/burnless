@@ -45,7 +45,7 @@ export default defineConfig({
       name: "authenticated",
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
-      testMatch: /critical-user-flows\.spec\.ts/,
+      testMatch: /critical-user-flows\.spec\.ts|sidebar-floating\.spec\.ts|data-room-hub\.spec\.ts|edit-delete-entries\.spec\.ts|ai-ux\.spec\.ts|comprehensive-crud\.spec\.ts/,
     },
   ],
 

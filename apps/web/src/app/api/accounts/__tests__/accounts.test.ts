@@ -68,6 +68,9 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+
 // Chain: db.select().from(financialAccounts).where(eq(...)).orderBy(financialAccounts.sortOrder)
 mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });
