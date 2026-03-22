@@ -106,7 +106,7 @@ export interface ToolCallResult {
 // ── Streaming types ─────────────────────────────────────────────────────────
 
 export interface StreamChunk {
-  type: "text" | "tool_use" | "tool_result" | "done" | "error";
+  type: "text" | "thinking" | "tool_use" | "tool_result" | "done" | "error";
   content?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;

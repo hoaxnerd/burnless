@@ -150,6 +150,8 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     for await (const event of events) {
       if (event.type === "text_delta") {
         yield { type: "text", content: event.text };
+      } else if (event.type === "thinking_delta") {
+        yield { type: "thinking", content: event.text };
       } else if (event.type === "tool_use") {
         yield { type: "tool_use", toolName: event.name, toolInput: event.input };
       } else if (event.type === "done") {

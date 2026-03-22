@@ -160,9 +160,10 @@ export class AnthropicProvider extends LlmProvider {
     for await (const event of anthropicStream) {
       if (event.type === "content_block_delta") {
         const delta = event.delta as Record<string, unknown>;
-        // Only yield text deltas, skip thinking deltas
         if (delta.type === "text_delta" && typeof delta.text === "string") {
           yield { type: "text_delta", text: delta.text };
+        } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
+          yield { type: "thinking_delta", text: delta.thinking };
         }
       } else if (event.type === "message_stop") {
         const msg = await anthropicStream.finalMessage();

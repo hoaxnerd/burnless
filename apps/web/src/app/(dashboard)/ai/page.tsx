@@ -257,7 +257,17 @@ export default function AiCompanionPage() {
           try {
             const event = JSON.parse(jsonStr);
 
-            if (event.type === "text") {
+            if (event.type === "thinking") {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1]!;
+                updated[updated.length - 1] = {
+                  ...last,
+                  thinking: (last.thinking ?? "") + event.content,
+                };
+                return updated;
+              });
+            } else if (event.type === "text") {
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1]!;

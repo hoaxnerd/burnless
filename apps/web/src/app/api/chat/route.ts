@@ -169,6 +169,10 @@ export const POST = withErrorHandler(async (request: Request) => {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "text", content: chunk.content })}\n\n`)
             );
+          } else if (chunk.type === "thinking" && chunk.content) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`)
+            );
           } else if (chunk.type === "tool_use") {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "tool_use", tool: chunk.toolName })}\n\n`)

@@ -66,6 +66,11 @@ export interface StreamTextDelta {
   text: string;
 }
 
+export interface StreamThinkingDelta {
+  type: "thinking_delta";
+  text: string;
+}
+
 export interface StreamToolUse {
   type: "tool_use";
   id: string;
@@ -83,7 +88,7 @@ export interface StreamError {
   error: Error;
 }
 
-export type StreamEvent = StreamTextDelta | StreamToolUse | StreamDone | StreamError;
+export type StreamEvent = StreamTextDelta | StreamThinkingDelta | StreamToolUse | StreamDone | StreamError;
 
 // ── Model tiers ─────────────────────────────────────────────────────────────
 

@@ -1,12 +1,42 @@
-import React from "react";
-import { Bot, User, Copy, Check, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { Bot, User, Copy, Check, Sparkles, ChevronRight, Brain } from "lucide-react";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
 import type { Message } from "./types";
 
-/** Strip model thinking tags (e.g. <think>...</think>) from response text. */
+/** Strip model thinking tags (e.g. <think>...</think>) from response text — fallback defense. */
 function stripThinkingTags(text: string): string {
   return text.replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "").trim();
+}
+
+/** Collapsible thinking block — shows model reasoning in a subtle expandable section. */
+function ThinkingBlock({ thinking, isStreaming }: { thinking: string; isStreaming?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-600 transition-colors py-1"
+      >
+        <ChevronRight
+          className={`h-3 w-3 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+        />
+        <Brain className="h-3 w-3" />
+        <span>
+          {isStreaming && !thinking ? "Thinking..." : "Thought process"}
+        </span>
+        {isStreaming && thinking && (
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-400 animate-pulse" />
+        )}
+      </button>
+      {expanded && thinking && (
+        <div className="mt-1 ml-5 rounded-lg bg-surface-50 border border-surface-100 px-3 py-2 text-xs text-surface-500 leading-relaxed max-h-60 overflow-auto">
+          <MarkdownRenderer content={thinking} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -74,6 +104,11 @@ export function ChatMessageList({
                   <ToolResultDisplay toolCalls={msg.toolCalls} />
                 )}
 
+                {/* Thinking block — shown above response for assistant messages when thinking data exists */}
+                {!isUser && msg.thinking && (
+                  <ThinkingBlock thinking={msg.thinking} isStreaming={msg.isStreaming} />
+                )}
+
                 {/* Message bubble */}
                 <div
                   className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
@@ -84,7 +119,7 @@ export function ChatMessageList({
                 >
                   <MarkdownRenderer content={isUser ? msg.content : stripThinkingTags(msg.content)} />
 
-                  {/* Typing indicator — shown when streaming with no content yet */}
+                  {/* Typing indicator — shown when streaming with no response content yet */}
                   {msg.isStreaming && !msg.content && (
                     <div className="flex items-center gap-2 py-1">
                       <span className="flex gap-1">
