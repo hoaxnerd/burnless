@@ -217,8 +217,8 @@ export function CardSettingsModal({
             </div>
           </div>
 
-          {/* Inline catalog when Custom mode is active */}
-          {currentMode === "custom" && catalogProps && (
+          {/* Inline catalog: shown in Custom mode, or always when swapping a hero card */}
+          {catalogProps && (currentMode === "custom" || catalogProps.swapMode) && (
             <InlineCatalog {...catalogProps} />
           )}
 
