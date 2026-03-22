@@ -45,6 +45,7 @@ export function parseMonthKey(key: string): Date {
 
 /** Round to 2 decimal places (round half away from zero — standard financial rounding). */
 export function round2(n: number): number {
+  if (n == null || Number.isNaN(n)) return 0;
   return dRound2(n);
 }
 

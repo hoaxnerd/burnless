@@ -53,7 +53,7 @@ async function DataRoomContent({ companyId, scenarioId, companyName, scenarioNam
   const fundingData = fundingRounds.map((r) => ({
     round: r.type,
     amount: Number(r.amount),
-    date: r.date.toISOString().slice(0, 10),
+    date: r.date ? (typeof r.date === "string" ? r.date : r.date.toISOString()).slice(0, 10) : "",
     valuation: r.preMoneyValuation ? Number(r.preMoneyValuation) : null,
   }));
 

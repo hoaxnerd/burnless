@@ -58,7 +58,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
     name: r.name,
     type: r.type,
     amount: Number(r.amount),
-    date: r.date.toISOString(),
+    date: r.date ? (typeof r.date === "string" ? r.date : r.date.toISOString()) : new Date().toISOString(),
     preMoneyValuation: r.preMoneyValuation ? Number(r.preMoneyValuation) : null,
     dilutionPercent: r.dilutionPercent ? Number(r.dilutionPercent) : null,
     isProjected: r.isProjected,
