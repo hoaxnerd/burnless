@@ -1,9 +1,13 @@
 "use client";
 
-import React, { memo } from "react";
+import React, { memo, createContext, useContext } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+
+// ── List context to distinguish ul vs ol children ───────────────────────────
+
+const ListTypeContext = createContext<"ul" | "ol">("ul");
 
 // ── Custom components for premium markdown rendering ────────────────────────
 
@@ -50,19 +54,33 @@ const components: Components = {
     </a>
   ),
   ul: ({ children }) => (
-    <ul className="space-y-1 my-2">{children}</ul>
+    <ListTypeContext.Provider value="ul">
+      <ul className="space-y-1 my-2">{children}</ul>
+    </ListTypeContext.Provider>
   ),
   ol: ({ children }) => (
-    <ol className="space-y-1 my-2 list-decimal list-inside marker:text-surface-400 marker:text-xs">
-      {children}
-    </ol>
+    <ListTypeContext.Provider value="ol">
+      <ol className="space-y-1 my-2 list-decimal pl-5 marker:text-surface-400 marker:font-medium">
+        {children}
+      </ol>
+    </ListTypeContext.Provider>
   ),
-  li: ({ children }) => (
-    <li className="flex gap-2 text-sm leading-relaxed text-surface-700">
-      <span className="text-surface-400 mt-0.5 shrink-0">•</span>
-      <span className="flex-1">{children}</span>
-    </li>
-  ),
+  li: function Li({ children }) {
+    const listType = useContext(ListTypeContext);
+    if (listType === "ol") {
+      return (
+        <li className="text-sm leading-relaxed text-surface-700 pl-1">
+          {children}
+        </li>
+      );
+    }
+    return (
+      <li className="flex gap-2 text-sm leading-relaxed text-surface-700">
+        <span className="text-surface-400 mt-0.5 shrink-0">•</span>
+        <span className="flex-1">{children}</span>
+      </li>
+    );
+  },
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-brand-300 pl-3 my-2 text-surface-600 italic">
       {children}
@@ -122,14 +140,26 @@ const compactComponents: Components = {
     <strong className="font-semibold text-surface-800">{children}</strong>
   ),
   ul: ({ children }) => (
-    <ul className="space-y-0.5 my-1">{children}</ul>
+    <ListTypeContext.Provider value="ul">
+      <ul className="space-y-0.5 my-1">{children}</ul>
+    </ListTypeContext.Provider>
   ),
-  li: ({ children }) => (
-    <li className="flex gap-1.5 text-xs leading-relaxed text-surface-600">
-      <span className="text-surface-400 mt-0.5 shrink-0">•</span>
-      <span className="flex-1">{children}</span>
-    </li>
-  ),
+  li: function CompactLi({ children }) {
+    const listType = useContext(ListTypeContext);
+    if (listType === "ol") {
+      return (
+        <li className="text-xs leading-relaxed text-surface-600 pl-0.5">
+          {children}
+        </li>
+      );
+    }
+    return (
+      <li className="flex gap-1.5 text-xs leading-relaxed text-surface-600">
+        <span className="text-surface-400 mt-0.5 shrink-0">•</span>
+        <span className="flex-1">{children}</span>
+      </li>
+    );
+  },
 };
 
 // ── Exported component ──────────────────────────────────────────────────────
