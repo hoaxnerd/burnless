@@ -4,9 +4,13 @@
  * CardModePopover — per-card/per-widget mode selector.
  * Shows a settings gear on hover; clicking opens a popover to choose
  * Intelligence / Dynamic / Custom mode for that specific card.
+ *
+ * Uses createPortal to render the dropdown at document.body,
+ * escaping all parent stacking contexts (z-index traps).
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Settings, Brain, Zap, SlidersHorizontal, RotateCcw } from "lucide-react";
 
 export type CardMode = "intelligence" | "dynamic" | "custom";
@@ -60,6 +64,36 @@ export function CardModePopover({
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Position the portal-rendered popover relative to the trigger button
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPopoverPos({
+      top: rect.bottom + 4,
+      left: align === "right" ? rect.right - 192 : rect.left, // 192 = w-48
+    });
+  }, [open, align]);
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!open) return;
+    function reposition() {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPopoverPos({
+        top: rect.bottom + 4,
+        left: align === "right" ? rect.right - 192 : rect.left,
+      });
+    }
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [open, align]);
 
   // Close on outside click
   useEffect(() => {
@@ -107,9 +141,80 @@ export function CardModePopover({
 
   const [hovered, setHovered] = useState(false);
 
+  const popoverMenu = open && popoverPos && createPortal(
+    <div
+      ref={popoverRef}
+      style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 9999 }}
+      className="w-48 rounded-xl bg-surface-0 border border-surface-200 shadow-lg shadow-black/5 py-1 animate-scale-in origin-top-right"
+      role="menu"
+    >
+      <div className="px-3 py-1.5 border-b border-surface-100">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
+          Card Mode
+        </span>
+      </div>
+
+      {MODES.map((m) => {
+        const Icon = m.icon;
+        const isActive = currentMode === m.value;
+        const isDisabled = m.value === "intelligence" && !aiEnabled;
+
+        return (
+          <button
+            key={m.value}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isDisabled) handleSelect(m.value);
+            }}
+            disabled={isDisabled}
+            className={`
+              w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors
+              ${isActive
+                ? "bg-brand-50 text-brand-700"
+                : isDisabled
+                  ? "text-surface-300 cursor-not-allowed"
+                  : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+              }
+            `}
+            role="menuitem"
+          >
+            <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? "text-brand-600" : ""}`} />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-medium block">{m.label}</span>
+              <span className="text-[10px] text-surface-400 block">
+                {isDisabled ? "Requires AI" : m.description}
+              </span>
+            </div>
+            {isActive && (
+              <div className="h-1.5 w-1.5 rounded-full bg-brand-500 flex-shrink-0" />
+            )}
+          </button>
+        );
+      })}
+
+      {isOverride && (
+        <>
+          <div className="border-t border-surface-100 my-1" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleReset();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
+            role="menuitem"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset to default</span>
+          </button>
+        </>
+      )}
+    </div>,
+    document.body
+  );
+
   return (
     <div
-      className={`relative ${open ? "z-[100]" : "z-20"}`}
+      className="relative"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { if (!open) setHovered(false); }}
     >
@@ -134,80 +239,7 @@ export function CardModePopover({
         <Settings className="h-3 w-3" />
       </button>
 
-      {open && (
-        <div
-          ref={popoverRef}
-          className={`
-            absolute z-50 top-full mt-1
-            ${align === "right" ? "right-0" : "left-0"}
-            w-48 rounded-xl bg-surface-0 border border-surface-200
-            shadow-lg shadow-black/5 py-1
-            animate-scale-in origin-top-right
-          `}
-          role="menu"
-        >
-          <div className="px-3 py-1.5 border-b border-surface-100">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
-              Card Mode
-            </span>
-          </div>
-
-          {MODES.map((m) => {
-            const Icon = m.icon;
-            const isActive = currentMode === m.value;
-            const isDisabled = m.value === "intelligence" && !aiEnabled;
-
-            return (
-              <button
-                key={m.value}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isDisabled) handleSelect(m.value);
-                }}
-                disabled={isDisabled}
-                className={`
-                  w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors
-                  ${isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : isDisabled
-                      ? "text-surface-300 cursor-not-allowed"
-                      : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
-                  }
-                `}
-                role="menuitem"
-              >
-                <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? "text-brand-600" : ""}`} />
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-medium block">{m.label}</span>
-                  <span className="text-[10px] text-surface-400 block">
-                    {isDisabled ? "Requires AI" : m.description}
-                  </span>
-                </div>
-                {isActive && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-brand-500 flex-shrink-0" />
-                )}
-              </button>
-            );
-          })}
-
-          {isOverride && (
-            <>
-              <div className="border-t border-surface-100 my-1" />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReset();
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
-                role="menuitem"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset to default</span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      {popoverMenu}
     </div>
   );
 }
