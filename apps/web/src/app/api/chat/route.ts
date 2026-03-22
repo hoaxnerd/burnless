@@ -44,6 +44,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     return errorResponse(aiCheck.reason!, 403);
   }
   const budgetWarning = aiCheck.budgetStatus?.warning;
+  const writeMode = aiCheck.writeMode ?? "full";
 
   // Feature gate: check AI message limit
   const plan = await getCompanyPlan(ctx.companyId);
@@ -164,6 +165,7 @@ export const POST = withErrorHandler(async (request: Request) => {
               scenarioId: scenario.id,
               userId: ctx.userId,
               conversationId: conversationId!,
+              writeMode,
             });
           },
         });

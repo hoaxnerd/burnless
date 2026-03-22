@@ -72,6 +72,7 @@ export function CardModePopover({
         !triggerRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
+        setHovered(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -82,7 +83,10 @@ export function CardModePopover({
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        setHovered(false);
+      }
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
@@ -101,8 +105,14 @@ export function CardModePopover({
     setOpen(false);
   }, [onModeChange]);
 
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { if (!open) setHovered(false); }}
+    >
       <button
         ref={triggerRef}
         onClick={(e) => {
@@ -112,9 +122,9 @@ export function CardModePopover({
         }}
         className={`
           p-1.5 rounded-full transition-all duration-200 shadow-sm border
-          ${open
-            ? "opacity-100 bg-surface-0 border-surface-300 text-surface-600"
-            : "opacity-0 group-hover:opacity-100 bg-surface-0 border-surface-200 text-surface-300 hover:text-surface-500 hover:border-surface-300"
+          ${open || hovered
+            ? "opacity-100 bg-surface-0 border-surface-300 text-surface-600 scale-100"
+            : "opacity-0 scale-90 bg-surface-0 border-surface-200 text-surface-300"
           }
         `}
         title="Card mode settings"

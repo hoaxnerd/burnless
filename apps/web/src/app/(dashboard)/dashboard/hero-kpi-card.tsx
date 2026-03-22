@@ -246,14 +246,23 @@ export function HeroKpiCard({
           ? "text-danger-500"
           : "text-surface-400";
 
+  // Track whether settings popover was recently used to prevent accidental navigation
+  const settingsActiveRef = useRef(false);
+
   return (
     <div
       role="link"
       tabIndex={0}
-      onClick={() => router.push(config.href)}
+      onClick={() => {
+        if (settingsActiveRef.current) {
+          settingsActiveRef.current = false;
+          return;
+        }
+        router.push(config.href);
+      }}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(config.href); }}
       className={`
-        group relative cursor-pointer
+        group relative cursor-pointer overflow-visible
         rounded-2xl border
         p-5 sm:p-6
         transition-all duration-300
@@ -272,9 +281,12 @@ export function HeroKpiCard({
         />
       )}
 
-      {/* Per-card mode gear — cut-out on top-right border */}
+      {/* Per-card mode gear — cut-out notch on top-right border */}
       {!ghost && (
-        <div className="absolute -top-2.5 -right-2.5 z-20">
+        <div
+          className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
+          onMouseDown={() => { settingsActiveRef.current = true; }}
+        >
           <CardModePopover
             currentMode={cardMode}
             onModeChange={(mode) => setCardMode(cardSlug, mode)}

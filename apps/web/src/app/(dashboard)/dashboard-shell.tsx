@@ -632,10 +632,17 @@ function SidebarInner({
               const itemMode = quickActionModeOverrides[qa.id] ?? quickActionMode;
               const isOverride = qa.id in quickActionModeOverrides;
 
+              const ModeIcon = modeIcons[itemMode];
+
               const inner = (
                 <>
                   <Zap className="h-3 w-3 text-warning-500 flex-shrink-0" />
                   <span className="flex-1 text-left">{qa.label}</span>
+                  {isOverride && (
+                    <span className="text-[9px] text-surface-300" title={`Mode: ${itemMode}`}>
+                      <ModeIcon className="h-2.5 w-2.5" />
+                    </span>
+                  )}
                   <QuickActionModeButton
                     actionId={qa.id}
                     currentMode={itemMode}
