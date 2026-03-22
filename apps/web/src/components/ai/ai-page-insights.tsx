@@ -209,9 +209,12 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
     <AiGate feature="insights" hideWhenOff>
       <div className="rounded-2xl border border-surface-200 bg-surface-0 overflow-hidden mb-6 animate-slide-up">
         {/* Header */}
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-50/50 transition-colors"
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded); } }}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-50/50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-brand-400" />
@@ -246,7 +249,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
               <ChevronDown className="h-3.5 w-3.5 text-surface-400" />
             )}
           </div>
-        </button>
+        </div>
 
         {/* Staleness warning banner */}
         {stale && expanded && (
