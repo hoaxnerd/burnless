@@ -84,6 +84,8 @@ interface CatalogProps {
   getDependencyTree: (slug: string) => string[];
   getDependents: (slug: string) => string[];
   getMetricDef: (slug: string) => MetricDef | undefined;
+  /** When true, catalog is in "swap hero card" mode — shows Swap button instead of Add */
+  swapMode?: boolean;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -274,6 +276,7 @@ function InlineCatalog({
   getDependencyTree,
   getDependents,
   getMetricDef,
+  swapMode = false,
 }: CatalogProps) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -319,7 +322,7 @@ function InlineCatalog({
   return (
     <div className="space-y-3">
       <p className="text-xs font-medium text-surface-500 uppercase tracking-wider">
-        Select Metric
+        {swapMode ? "Select a metric to replace this card" : "Select Metric"}
       </p>
 
       {/* Search */}
@@ -407,7 +410,15 @@ function InlineCatalog({
                       </div>
 
                       <div className="flex-shrink-0">
-                        {isUsed && !isHero ? (
+                        {swapMode ? (
+                          <button
+                            onClick={() => onSelect(metric.slug)}
+                            className="px-2 py-1 rounded-lg bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 transition-colors text-[10px] font-medium"
+                            title="Swap this card"
+                          >
+                            Swap
+                          </button>
+                        ) : isUsed && !isHero ? (
                           <button
                             onClick={() => onRemove(metric.slug)}
                             className="p-1 rounded-lg bg-danger-500/10 text-danger-500 hover:bg-danger-500/20 transition-colors"

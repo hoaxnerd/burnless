@@ -53,9 +53,30 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
     swapBySlot.set(swap.slotIndex, swap);
   }
 
+  // In Dynamic mode, filter out empty cards with no available swap
+  // In Custom/Intelligence mode, keep all cards (ghost state for user-pinned)
+  const visibleEntries = cards
+    .map((card, index) => ({ card, index }))
+    .filter(({ card, index }) => {
+      if (mode === "dynamic" && !card.hasData && !swapBySlot.has(index)) {
+        return false;
+      }
+      return true;
+    });
+
+  // Adapt grid columns to number of visible cards
+  const gridCols =
+    visibleEntries.length <= 2
+      ? "grid-cols-2"
+      : visibleEntries.length === 3
+        ? "grid-cols-2 lg:grid-cols-3"
+        : "grid-cols-2 lg:grid-cols-4";
+
+  if (visibleEntries.length === 0) return null;
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-      {cards.map((card, index) => {
+    <div className={`grid ${gridCols} gap-4 sm:gap-6 mb-8 sm:mb-12`}>
+      {visibleEntries.map(({ card, index }) => {
         // In Dynamic mode, swap empty cards with alternatives
         if (mode === "dynamic" && !card.hasData && swapBySlot.has(index)) {
           const swap = swapBySlot.get(index)!;
@@ -65,6 +86,7 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
               variant={swap.variant}
               {...swap.props}
               stagger={index}
+              heroCardIndex={index}
               celebrate={false}
               swapInfo={{
                 replacedSlug: swap.originalSlug,
@@ -75,13 +97,14 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
           );
         }
 
-        // Default: render the original card (ghost state if no data)
+        // Default: render the original card (ghost state if no data in Custom mode)
         return (
           <HeroKpiCard
             key={card.variant}
             variant={card.variant}
             {...card.props}
             stagger={index}
+            heroCardIndex={index}
             celebrate={allPopulated}
           />
         );

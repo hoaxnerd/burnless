@@ -255,6 +255,8 @@ export interface HeroKpiCardProps {
     color: string;
     href: string;
   };
+  /** Index in the hero card grid — enables swap mode in card settings */
+  heroCardIndex?: number;
 }
 
 /** Returns true if the value is a placeholder (ghost state). */
@@ -275,6 +277,7 @@ export function HeroKpiCard({
   slug,
   swapInfo,
   metricStyle,
+  heroCardIndex,
 }: HeroKpiCardProps) {
   // Resolve visual config: use metricStyle (for swapped cards) or variant config
   const resolvedConfig = useMemo(() => {
@@ -303,12 +306,13 @@ export function HeroKpiCard({
   const {
     getCardMode, setCardMode, mode: globalMode,
     registry, heroCards, secondaryMetrics,
-    addSecondaryMetric, removeSecondaryMetric, openFormulaViewer,
+    swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer,
   } = useDashboardIntelligence();
   const { masterEnabled: aiEnabled } = useAiFlags();
   const cardSlug = slug ?? variant;
   const cardMode = getCardMode(cardSlug);
   const isOverride = cardMode !== globalMode;
+  const isHeroSwapMode = heroCardIndex !== undefined;
   const allUsedSlugs = useMemo(
     () => new Set([...heroCards, ...secondaryMetrics]),
     [heroCards, secondaryMetrics]
@@ -317,14 +321,17 @@ export function HeroKpiCard({
     registry,
     usedSlugs: allUsedSlugs,
     heroSlugs: heroCards,
-    onSelect: addSecondaryMetric,
+    onSelect: isHeroSwapMode
+      ? (newSlug: string) => swapHeroCard(heroCardIndex, newSlug)
+      : addSecondaryMetric,
     onRemove: removeSecondaryMetric,
     onViewFormula: openFormulaViewer,
     categoryMeta: CATEGORY_META as Record<string, { label: string }>,
     getDependencyTree: getMetricDependencyTree,
     getDependents: getMetricDependents,
     getMetricDef: getMetricDef as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
-  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
+    swapMode: isHeroSwapMode,
+  }), [registry, allUsedSlugs, heroCards, isHeroSwapMode, heroCardIndex, swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
