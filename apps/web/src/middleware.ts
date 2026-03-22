@@ -63,7 +63,8 @@ export function middleware(request: NextRequest) {
     !pathname.startsWith("/api/auth/forgot-password") &&
     !pathname.startsWith("/api/auth/reset-password") &&
     !pathname.startsWith("/api/auth/send-verification") &&
-    !pathname.startsWith("/api/auth/verify-email")
+    !pathname.startsWith("/api/auth/verify-email") &&
+    !pathname.startsWith("/api/auth/redeem-invite")
   ) {
     return next();
   }
@@ -140,7 +141,8 @@ function resolveRateLimitTier(pathname: string, method: string) {
     pathname.startsWith("/api/auth/forgot-password") ||
     pathname.startsWith("/api/auth/reset-password") ||
     pathname.startsWith("/api/auth/send-verification") ||
-    pathname.startsWith("/api/auth/verify-email")
+    pathname.startsWith("/api/auth/verify-email") ||
+    pathname.startsWith("/api/auth/redeem-invite")
   ) {
     return RATE_LIMITS.auth!;
   }

@@ -244,6 +244,9 @@ importers:
 
   packages/types:
     devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
       zod:
         specifier: ^3.25.76
         version: 3.25.76
