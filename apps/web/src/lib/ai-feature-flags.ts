@@ -12,6 +12,7 @@ import {
   type AiFeatureFlagsState,
   type AiFeatureName,
   type AiFeatureConfig,
+  type AiWriteMode,
 } from "@burnless/ai";
 
 export interface CompanyProviderConfig {
@@ -42,6 +43,7 @@ export async function getAiFlags(
   return {
     masterEnabled: row.masterEnabled,
     dataMode: row.dataMode as AiFeatureFlagsState["dataMode"],
+    writeMode: (row.writeMode ?? "full") as AiWriteMode,
     features: row.features as AiFeatureConfig,
     monthlyBudgetCents: row.monthlyBudgetCents,
   };
@@ -103,7 +105,7 @@ export async function getBudgetStatus(companyId: string): Promise<BudgetStatus> 
 export async function checkAiFeatureAllowed(
   companyId: string,
   feature: AiFeatureName
-): Promise<{ allowed: boolean; reason?: string; budgetStatus?: BudgetStatus }> {
+): Promise<{ allowed: boolean; reason?: string; budgetStatus?: BudgetStatus; writeMode?: AiWriteMode }> {
   const flags = await getAiFlags(companyId);
 
   if (!flags.masterEnabled) {
@@ -131,7 +133,7 @@ export async function checkAiFeatureAllowed(
     };
   }
 
-  return { allowed: true, budgetStatus };
+  return { allowed: true, budgetStatus, writeMode: flags.writeMode };
 }
 
 /**

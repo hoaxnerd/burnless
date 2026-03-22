@@ -92,6 +92,13 @@
       "when": 1774123821347,
       "tag": "0012_fine_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774134000000,
+      "tag": "0013_ai_write_mode",
+      "breakpoints": true
     }
   ]
 }

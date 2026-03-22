@@ -5,12 +5,12 @@
 
 import { db } from "@burnless/db";
 import { financialAccounts } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
 import type { ToolContext, ToolHandler } from "./types";
-import { nameString, optionalId, sumValues, latest } from "./types";
+import { nameString, idString, optionalId, sumValues, latest } from "./types";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,17 @@ export const createAccountSchema = z.object({
   name: nameString,
   type: z.enum(["income", "expense", "asset", "liability", "equity"]),
   category: z.enum(["revenue", "cogs", "operating_expense", "other_income", "other_expense", "asset", "liability", "equity"]),
+});
+
+export const updateAccountSchema = z.object({
+  id: idString,
+  name: nameString.optional(),
+  type: z.enum(["income", "expense", "asset", "liability", "equity"]).optional(),
+  category: z.enum(["revenue", "cogs", "operating_expense", "other_income", "other_expense", "asset", "liability", "equity"]).optional(),
+});
+
+export const deleteAccountSchema = z.object({
+  id: idString,
 });
 
 export const categorizeTransactionsSchema = z.object({
@@ -357,11 +368,72 @@ async function benchmarkMetrics(
   });
 }
 
+async function updateAccount(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof updateAccountSchema>;
+
+  const [existing] = await db
+    .select({ id: financialAccounts.id, name: financialAccounts.name, isSystem: financialAccounts.isSystem })
+    .from(financialAccounts)
+    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, context.companyId)));
+  if (!existing) {
+    return JSON.stringify({ success: false, error: "Account not found or access denied" });
+  }
+  if (existing.isSystem) {
+    return JSON.stringify({ success: false, error: "Cannot modify system accounts" });
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.type !== undefined) updates.type = data.type;
+  if (data.category !== undefined) updates.category = data.category;
+
+  if (Object.keys(updates).length === 0) {
+    return JSON.stringify({ success: false, error: "No fields to update" });
+  }
+
+  await db.update(financialAccounts).set(updates).where(eq(financialAccounts.id, data.id));
+
+  return JSON.stringify({
+    success: true,
+    message: `Updated account "${data.name ?? existing.name}".`,
+  });
+}
+
+async function deleteAccount(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof deleteAccountSchema>;
+
+  const [existing] = await db
+    .select({ id: financialAccounts.id, name: financialAccounts.name, isSystem: financialAccounts.isSystem })
+    .from(financialAccounts)
+    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, context.companyId)));
+  if (!existing) {
+    return JSON.stringify({ success: false, error: "Account not found or access denied" });
+  }
+  if (existing.isSystem) {
+    return JSON.stringify({ success: false, error: "Cannot delete system accounts" });
+  }
+
+  await db.delete(financialAccounts).where(eq(financialAccounts.id, data.id));
+
+  return JSON.stringify({
+    success: true,
+    message: `Deleted account "${existing.name}" and all associated transactions and forecast lines.`,
+  });
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const analyticsSchemas: Record<string, z.ZodType> = {
   compute_metrics: computeMetricsSchema,
   create_account: createAccountSchema,
+  update_account: updateAccountSchema,
+  delete_account: deleteAccountSchema,
   categorize_transactions: categorizeTransactionsSchema,
   generate_report_narrative: generateReportNarrativeSchema,
   suggest_cost_cuts: suggestCostCutsSchema,
@@ -371,6 +443,8 @@ export const analyticsSchemas: Record<string, z.ZodType> = {
 export const analyticsHandlers: Record<string, ToolHandler> = {
   compute_metrics: computeMetrics,
   create_account: createAccount,
+  update_account: updateAccount,
+  delete_account: deleteAccount,
   categorize_transactions: categorizeTransactions,
   generate_report_narrative: generateReportNarrative,
   suggest_cost_cuts: suggestCostCuts,

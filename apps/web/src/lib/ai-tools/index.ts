@@ -35,6 +35,38 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...webSearchHandlers,
 };
 
+// ── Mutation tagging (for guardrail enforcement) ────────────────────────────
+
+/** Tools that create, update, or delete data. Read-only tools are excluded. */
+const MUTATION_TOOLS = new Set([
+  // Create
+  "create_scenario", "add_headcount", "create_department", "add_revenue_stream",
+  "add_funding_round", "create_forecast_line", "create_account",
+  // Update
+  "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
+  "update_funding_round", "update_forecast_line", "update_account",
+  // Delete
+  "delete_scenario", "delete_headcount", "delete_department", "delete_revenue_stream",
+  "delete_funding_round", "delete_forecast_line", "delete_account",
+]);
+
+function isMutationTool(toolName: string): boolean {
+  return MUTATION_TOOLS.has(toolName);
+}
+
+function describeMutation(toolName: string, input: Record<string, unknown>): string {
+  const action = toolName.startsWith("create_") || toolName.startsWith("add_")
+    ? "create"
+    : toolName.startsWith("update_")
+      ? "update"
+      : "delete";
+  const entity = toolName.replace(/^(create_|add_|update_|delete_)/, "").replace(/_/g, " ");
+  const id = input.id as string | undefined;
+  const name = (input.name ?? input.title) as string | undefined;
+  const label = name ? ` "${name}"` : id ? ` (ID: ${id})` : "";
+  return `${action} ${entity}${label}`;
+}
+
 // ── Validation ───────────────────────────────────────────────────────────────
 
 function validateToolInput(toolName: string, input: Record<string, unknown>): { success: true; data: Record<string, unknown> } | { success: false; error: string } {
@@ -102,6 +134,35 @@ export async function executeToolCall(
     const errorResult = { error: `Unknown tool: ${toolName}` };
     logToolAudit(context, toolName, input, "error", errorResult, Math.round(performance.now() - startTime));
     return JSON.stringify(errorResult);
+  }
+
+  // ── Guardrail enforcement ────────────────────────────────────────────────
+  const writeMode = context.writeMode ?? "full";
+  if (isMutationTool(toolName) && writeMode !== "full") {
+    const description = describeMutation(toolName, data);
+
+    if (writeMode === "read_only") {
+      const blockedResult = {
+        error: `Mutation blocked: AI write mode is set to "read_only". The user's settings prevent the AI from making changes to data. To ${description}, the user must change AI write mode to "full" or "confirm" in Settings > AI Features.`,
+        blocked: true,
+        action: description,
+      };
+      logToolAudit(context, toolName, input, "error", blockedResult, Math.round(performance.now() - startTime));
+      return JSON.stringify(blockedResult);
+    }
+
+    if (writeMode === "confirm") {
+      // Return a preview — the AI should present this to the user and ask for confirmation
+      const previewResult = {
+        requiresConfirmation: true,
+        action: description,
+        toolName,
+        input: data,
+        message: `I'd like to ${description}. This action requires your confirmation because AI write mode is set to "confirm". Please reply "yes" or "confirm" to proceed, or "no" to cancel.`,
+      };
+      logToolAudit(context, toolName, input, "success", previewResult, Math.round(performance.now() - startTime));
+      return JSON.stringify(previewResult);
+    }
   }
 
   let result: string;

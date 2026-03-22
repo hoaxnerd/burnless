@@ -134,6 +134,12 @@ export const aiDataModeEnum = pgEnum("ai_data_mode", [
   "hide_all",
 ]);
 
+export const aiWriteModeEnum = pgEnum("ai_write_mode", [
+  "full",
+  "confirm",
+  "read_only",
+]);
+
 // ── Auth Tables (Auth.js compatible) ──────────────────────────────────────────
 
 export const users = pgTable("users", {
@@ -637,6 +643,8 @@ export const aiFeatureFlags = pgTable(
         autoCategorization: true,
         weeklyDigest: true,
       }),
+    // AI write mode — guardrail for AI mutations (full = execute, confirm = ask first, read_only = block)
+    writeMode: aiWriteModeEnum("write_mode").notNull().default("full"),
     // AI Provider config — per-company provider override (null = use env vars)
     aiProvider: text("ai_provider"), // "anthropic" | "openai" | "openrouter"
     aiApiKey: text("ai_api_key"), // user's own API key (masked in API responses)

@@ -11,6 +11,7 @@ export interface ToolContext {
   scenarioId: string;
   userId: string;
   conversationId?: string;
+  writeMode?: "full" | "confirm" | "read_only";
 }
 
 // ── Validation primitives ────────────────────────────────────────────────────

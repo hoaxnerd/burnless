@@ -114,6 +114,98 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "update_headcount",
+    description:
+      "Update an existing headcount plan entry — change title, count, salary, dates, department, or benefits rate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The headcount plan ID to update",
+        },
+        title: {
+          type: "string",
+          description: "New job title",
+        },
+        count: {
+          type: "number",
+          description: "New number of people",
+        },
+        salary: {
+          type: "number",
+          description: "New annual salary per person",
+        },
+        startDate: {
+          type: "string",
+          description: "New start date (YYYY-MM-DD)",
+        },
+        endDate: {
+          type: "string",
+          description: "New end date (YYYY-MM-DD) or null to remove",
+        },
+        benefitsRate: {
+          type: "number",
+          description: "New benefits rate (0-2)",
+        },
+        departmentId: {
+          type: "string",
+          description: "New department ID",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_headcount",
+    description:
+      "Delete a headcount plan entry.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The headcount plan ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "update_department",
+    description:
+      "Rename an existing department.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The department ID to update",
+        },
+        name: {
+          type: "string",
+          description: "New department name",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_department",
+    description:
+      "Delete a department and all associated headcount plans.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The department ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "add_revenue_stream",
     description:
       "Add a revenue stream to model income — supports subscription (SaaS MRR), one-time, usage-based, and services revenue.",
@@ -139,6 +231,92 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
       },
       required: ["scenarioId", "name", "type", "parameters"],
+    },
+  },
+  {
+    name: "update_scenario",
+    description:
+      "Update an existing financial scenario's name, type, or description.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The scenario ID to update (from context)",
+        },
+        name: {
+          type: "string",
+          description: "New name for the scenario",
+        },
+        type: {
+          type: "string",
+          enum: ["base", "best", "worst", "custom"],
+          description: "New scenario type",
+        },
+        description: {
+          type: "string",
+          description: "New description",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_scenario",
+    description:
+      "Delete a financial scenario and all its associated forecast lines, headcount plans, and revenue streams. Cannot delete the default scenario.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The scenario ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "update_revenue_stream",
+    description:
+      "Update an existing revenue stream's name, type, or parameters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The revenue stream ID to update",
+        },
+        name: {
+          type: "string",
+          description: "New name",
+        },
+        type: {
+          type: "string",
+          enum: ["subscription", "one_time", "usage_based", "services"],
+          description: "New revenue type",
+        },
+        parameters: {
+          type: "object",
+          description: "New type-specific parameters",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_revenue_stream",
+    description:
+      "Delete a revenue stream.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The revenue stream ID to delete",
+        },
+      },
+      required: ["id"],
     },
   },
   {
@@ -247,6 +425,112 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "update_funding_round",
+    description:
+      "Update an existing funding round's details — name, amount, date, valuation, dilution, or projected status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The funding round ID to update",
+        },
+        name: {
+          type: "string",
+          description: "New round name",
+        },
+        type: {
+          type: "string",
+          enum: ["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"],
+          description: "New funding type",
+        },
+        amount: {
+          type: "number",
+          description: "New funding amount",
+        },
+        date: {
+          type: "string",
+          description: "New date (YYYY-MM-DD)",
+        },
+        preMoneyValuation: {
+          type: "number",
+          description: "New pre-money valuation",
+        },
+        dilutionPercent: {
+          type: "number",
+          description: "New dilution percentage (e.g., 0.15 for 15%)",
+        },
+        isProjected: {
+          type: "boolean",
+          description: "Whether this is projected vs. completed",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_funding_round",
+    description:
+      "Delete a funding round.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The funding round ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "update_forecast_line",
+    description:
+      "Update an existing forecast line's method, parameters, or date range.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The forecast line ID to update",
+        },
+        method: {
+          type: "string",
+          enum: ["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"],
+          description: "New forecasting method",
+        },
+        parameters: {
+          type: "object",
+          description: "New method-specific parameters",
+        },
+        startDate: {
+          type: "string",
+          description: "New start date (YYYY-MM-DD)",
+        },
+        endDate: {
+          type: "string",
+          description: "New end date (YYYY-MM-DD) or null",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_forecast_line",
+    description:
+      "Delete a forecast line and all its associated forecast values.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The forecast line ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "create_account",
     description:
       "Create a new financial account in the chart of accounts — for tracking a specific revenue or expense category.",
@@ -269,6 +553,50 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
       },
       required: ["name", "type", "category"],
+    },
+  },
+  {
+    name: "update_account",
+    description:
+      "Update an existing financial account's name, type, or category. Cannot modify system accounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The account ID to update",
+        },
+        name: {
+          type: "string",
+          description: "New account name",
+        },
+        type: {
+          type: "string",
+          enum: ["income", "expense", "asset", "liability", "equity"],
+          description: "New account type",
+        },
+        category: {
+          type: "string",
+          enum: ["revenue", "cogs", "operating_expense", "other_income", "other_expense", "asset", "liability", "equity"],
+          description: "New account category",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_account",
+    description:
+      "Delete a financial account and all associated transactions and forecast lines. Cannot delete system accounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The account ID to delete",
+        },
+      },
+      required: ["id"],
     },
   },
   {

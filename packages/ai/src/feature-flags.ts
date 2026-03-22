@@ -18,6 +18,8 @@ export type AiFeatureName =
 
 export type AiDataMode = "full" | "show_cached" | "hide_all";
 
+export type AiWriteMode = "full" | "confirm" | "read_only";
+
 export interface AiFeatureConfig {
   onboarding: boolean;
   chat: boolean;
@@ -30,6 +32,7 @@ export interface AiFeatureConfig {
 export interface AiFeatureFlagsState {
   masterEnabled: boolean;
   dataMode: AiDataMode;
+  writeMode: AiWriteMode;
   features: AiFeatureConfig;
 }
 
@@ -44,6 +47,7 @@ export interface AiFeatureStatus {
 export const DEFAULT_AI_FLAGS: AiFeatureFlagsState = {
   masterEnabled: true,
   dataMode: "full",
+  writeMode: "full",
   features: {
     onboarding: true,
     chat: true,

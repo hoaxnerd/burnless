@@ -72,6 +72,7 @@ export {
 export type {
   AiFeatureName,
   AiDataMode,
+  AiWriteMode,
   AiFeatureConfig,
   AiFeatureFlagsState,
   AiFeatureStatus,

@@ -3,7 +3,8 @@
  */
 
 import { db } from "@burnless/db";
-import { forecastLines } from "@burnless/db";
+import { forecastLines, scenarios } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
@@ -16,6 +17,20 @@ import {
   monthCount,
   sumValues,
 } from "./types";
+
+// ── Update/Delete Schemas ────────────────────────────────────────────────────
+
+export const updateForecastLineSchema = z.object({
+  id: idString,
+  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]).optional(),
+  parameters: z.record(z.unknown()).optional(),
+  startDate: dateString.optional(),
+  endDate: optionalDate,
+});
+
+export const deleteForecastLineSchema = z.object({
+  id: idString,
+});
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -215,16 +230,76 @@ async function forecastRevenue(
   });
 }
 
+async function updateForecastLine(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof updateForecastLineSchema>;
+
+  const [existing] = await db
+    .select({ id: forecastLines.id, accountId: forecastLines.accountId })
+    .from(forecastLines)
+    .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
+    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId)));
+  if (!existing) {
+    return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (data.method !== undefined) updates.method = data.method;
+  if (data.parameters !== undefined) updates.parameters = data.parameters;
+  if (data.startDate !== undefined) updates.startDate = new Date(data.startDate);
+  if (data.endDate !== undefined) updates.endDate = data.endDate ? new Date(data.endDate) : null;
+
+  if (Object.keys(updates).length === 0) {
+    return JSON.stringify({ success: false, error: "No fields to update" });
+  }
+
+  await db.update(forecastLines).set(updates).where(eq(forecastLines.id, data.id));
+
+  return JSON.stringify({
+    success: true,
+    message: `Updated forecast line for account ${existing.accountId}.`,
+  });
+}
+
+async function deleteForecastLine(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof deleteForecastLineSchema>;
+
+  const [existing] = await db
+    .select({ id: forecastLines.id, accountId: forecastLines.accountId })
+    .from(forecastLines)
+    .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
+    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId)));
+  if (!existing) {
+    return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
+  }
+
+  await db.delete(forecastLines).where(eq(forecastLines.id, data.id));
+
+  return JSON.stringify({
+    success: true,
+    message: `Deleted forecast line for account ${existing.accountId} and all associated forecast values.`,
+  });
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const forecastingSchemas: Record<string, z.ZodType> = {
   create_forecast_line: createForecastLineSchema,
+  update_forecast_line: updateForecastLineSchema,
+  delete_forecast_line: deleteForecastLineSchema,
   generate_financial_statements: generateStatementsSchema,
   forecast_revenue: forecastRevenueSchema,
 };
 
 export const forecastingHandlers: Record<string, ToolHandler> = {
   create_forecast_line: createForecastLine,
+  update_forecast_line: updateForecastLine,
+  delete_forecast_line: deleteForecastLine,
   generate_financial_statements: generateStatements,
   forecast_revenue: forecastRevenue,
 };
