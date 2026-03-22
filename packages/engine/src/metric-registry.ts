@@ -1086,6 +1086,68 @@ export function formatMetricValue(value: number, format: MetricFormat): string {
 }
 
 /**
+ * Check whether a metric has meaningful data for a given month.
+ * Returns false when the series doesn't exist, the month has no entry,
+ * or the value is NaN/Infinity.
+ */
+export function isMetricDataAvailable(
+  metrics: ComputedMetrics,
+  slug: string,
+  month: string,
+): boolean {
+  const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
+  if (!Array.isArray(series) || series.length === 0) return false;
+  const entry = series.find((m) => m.month === month);
+  if (entry === undefined) return false;
+  if (!Number.isFinite(entry.value)) return false;
+  return true;
+}
+
+/**
+ * Map of metric slugs → human-friendly hints explaining what data the user
+ * needs to add before this metric becomes available.
+ */
+const DATA_REQUIREMENT_HINTS: Record<string, string> = {
+  cashPosition: "Add a funding round to see cash position",
+  netBurnRate: "Add expenses to calculate burn rate",
+  cashRunwayMonths: "Add funding & expenses to calculate runway",
+  mrr: "Add subscription revenue to see MRR",
+  arr: "Add subscription revenue to see ARR",
+  totalRevenue: "Add revenue streams to see total revenue",
+  revenueRunRate: "Add revenue streams to calculate run rate",
+  burnRate: "Add expenses to see gross burn",
+  grossProfit: "Add revenue & expenses to see gross profit",
+  grossMarginPercent: "Add revenue & expenses to see gross margin",
+  netIncome: "Add revenue & expenses to see net income",
+  operatingIncome: "Add revenue & expenses to see operating income",
+  ebitda: "Add revenue & expenses to see EBITDA",
+  revenueGrowthRate: "Add revenue to track growth",
+  revenuePerEmployee: "Add revenue & team members",
+  burnMultiple: "Add revenue & expenses to calculate burn multiple",
+  ruleOf40: "Add revenue & expenses to calculate Rule of 40",
+  freeCashFlow: "Add revenue & expenses to see free cash flow",
+  fcfMargin: "Add revenue & expenses to see FCF margin",
+};
+
+/**
+ * Get a user-facing hint explaining what data is missing for a metric.
+ * Falls back to a generic message if no specific hint is registered.
+ */
+export function getMetricMissingDataHint(slug: string): string {
+  if (DATA_REQUIREMENT_HINTS[slug]) return DATA_REQUIREMENT_HINTS[slug];
+  const def = _bySlug.get(slug);
+  if (def?.requiresSaaS) return "Add subscription data to see this metric";
+  if (def?.dependsOn.length) {
+    const depNames = def.dependsOn
+      .map((d) => _bySlug.get(d)?.name ?? d)
+      .slice(0, 2)
+      .join(" & ");
+    return `Requires ${depNames}`;
+  }
+  return "More data needed";
+}
+
+/**
  * Evaluate a metric against its benchmark (if any).
  * Returns a signal: "good" | "warn" | "bad" | null.
  */

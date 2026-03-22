@@ -69,18 +69,22 @@ export default async function DashboardPage({
 
   const { metrics, hasData, currentMonth } = data;
 
-  /* ── Current values ─────────────────────────────────────────────── */
-  const currentCash = metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? data.startingCash;
-  const currentBurn = metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
-  const currentRunway = metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value ?? 0;
-  const currentMrr = metrics.mrr.find((m) => m.month === currentMonth)?.value ?? 0;
+  /* ── Current values (guard against NaN/Infinity from engine) ───── */
+  const safeNum = (v: number | undefined, fallback: number) => {
+    const n = v ?? fallback;
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const currentCash = safeNum(metrics.cashPosition.find((m) => m.month === currentMonth)?.value, data.startingCash);
+  const currentBurn = safeNum(metrics.netBurnRate.find((m) => m.month === currentMonth)?.value, 0);
+  const currentRunway = safeNum(metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value, 0);
+  const currentMrr = safeNum(metrics.mrr.find((m) => m.month === currentMonth)?.value, 0);
 
   /* ── Previous month values (for MoM change) ────────────────────── */
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const prevCash = metrics.cashPosition.find((m) => m.month === prevMonth)?.value ?? data.startingCash;
-  const prevBurn = metrics.netBurnRate.find((m) => m.month === prevMonth)?.value ?? 0;
-  const prevMrr = metrics.mrr.find((m) => m.month === prevMonth)?.value ?? 0;
+  const prevCash = safeNum(metrics.cashPosition.find((m) => m.month === prevMonth)?.value, data.startingCash);
+  const prevBurn = safeNum(metrics.netBurnRate.find((m) => m.month === prevMonth)?.value, 0);
+  const prevMrr = safeNum(metrics.mrr.find((m) => m.month === prevMonth)?.value, 0);
 
   /* ── Chart data ─────────────────────────────────────────────────── */
   const revenueArr = seriesToArray(data.totalRevenue);

@@ -121,6 +121,8 @@ export {
   extractMetricValue,
   formatMetricValue,
   evaluateBenchmark,
+  isMetricDataAvailable,
+  getMetricMissingDataHint,
   type MetricDefinition,
   type MetricCategory,
   type MetricTier,

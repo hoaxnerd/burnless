@@ -76,29 +76,53 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
         <AddFundingForm />
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards — only show cards with meaningful data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+        <div className={`rounded-2xl border p-6 ${totalRaised > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
           <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Total Raised</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalRaised)}</p>
-          <p className="mt-1 text-xs text-surface-400">{completedRounds.length} round{completedRounds.length !== 1 ? "s" : ""} completed</p>
+          {totalRaised > 0 ? (
+            <>
+              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalRaised)}</p>
+              <p className="mt-1 text-xs text-surface-400">{completedRounds.length} round{completedRounds.length !== 1 ? "s" : ""} completed</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-surface-300">Add a funding round</p>
+          )}
         </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+        <div className={`rounded-2xl border p-6 ${currentCash > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
           <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Current Cash</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(currentCash)}</p>
-          <p className="mt-1 text-xs text-surface-400">Available capital</p>
+          {currentCash > 0 ? (
+            <>
+              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(currentCash)}</p>
+              <p className="mt-1 text-xs text-surface-400">Available capital</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-surface-300">Add funding to see cash</p>
+          )}
         </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+        <div className={`rounded-2xl border p-6 ${currentBurn > 0 && currentCash > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
           <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Runway</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">
-            {currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`}
-          </p>
-          <p className="mt-1 text-xs text-surface-400">At {formatCurrency(currentBurn)}/mo burn</p>
+          {currentBurn > 0 && currentCash > 0 ? (
+            <>
+              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">
+                {currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`}
+              </p>
+              <p className="mt-1 text-xs text-surface-400">At {formatCurrency(currentBurn)}/mo burn</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-surface-300">Add funding & expenses</p>
+          )}
         </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+        <div className={`rounded-2xl border p-6 ${completedRounds.length > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
           <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Founder Ownership</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{foundersOwnership.toFixed(0)}%</p>
-          <p className="mt-1 text-xs text-surface-400">After {totalDilution.toFixed(0)}% dilution</p>
+          {completedRounds.length > 0 ? (
+            <>
+              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{foundersOwnership.toFixed(0)}%</p>
+              <p className="mt-1 text-xs text-surface-400">After {totalDilution.toFixed(0)}% dilution</p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-surface-300">Add a funding round</p>
+          )}
         </div>
       </div>
 

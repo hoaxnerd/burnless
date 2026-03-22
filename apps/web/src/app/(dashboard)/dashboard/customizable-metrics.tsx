@@ -12,6 +12,8 @@ import {
   extractMetricValue,
   formatMetricValue,
   evaluateBenchmark,
+  isMetricDataAvailable,
+  getMetricMissingDataHint,
   DEFAULT_SECONDARY_METRICS,
   type ComputedMetrics,
 } from "@burnless/engine";
@@ -84,8 +86,27 @@ function MetricRowDynamic({
   const def = getMetricDef(slug);
   if (!def) return null;
 
+  const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
+
+  // If no data available, show an actionable hint instead of misleading zeros
+  if (!hasData) {
+    const hint = getMetricMissingDataHint(slug);
+    return (
+      <div
+        className="flex items-center justify-between py-2 px-3 rounded-xl -mx-3 opacity-50"
+        title={hint}
+      >
+        <span className="text-sm text-surface-400">{def.name}</span>
+        <span className="text-xs text-surface-300 italic">{hint}</span>
+      </div>
+    );
+  }
+
   const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
   const prevVal = extractMetricValue(metrics, slug, prevMonth) ?? 0;
+
+  // Skip metrics that resolved to NaN or Infinity
+  if (!Number.isFinite(currentVal)) return null;
 
   const formattedValue = formatMetricValue(currentVal, def.format);
 
@@ -93,17 +114,17 @@ function MetricRowDynamic({
   let change: string | null = null;
   if (def.format === "percent") {
     const diff = currentVal - prevVal;
-    if (prevVal !== 0 && diff !== 0) {
+    if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
       change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
     }
   } else if (def.format === "number") {
     const diff = currentVal - prevVal;
-    if (prevVal !== 0 && diff !== 0) {
+    if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
       change = `${diff >= 0 ? "+" : ""}${diff}`;
     }
   } else if (prevVal !== 0) {
     const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
-    if (pct !== 0) {
+    if (pct !== 0 && Number.isFinite(pct)) {
       change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
     }
   }
