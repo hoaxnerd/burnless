@@ -50,12 +50,36 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
 
   if (!metadataCompanyId) return;
 
-  // Cross-check: if customerId is present, verify it maps to the same company.
-  // This prevents a malicious client from passing another company's ID in checkout metadata.
+  // ── Security: cross-check companyId ↔ customerId (defense-in-depth) ──────
+  // Metadata is set server-side during checkout creation and the webhook payload
+  // is signature-verified, but we still validate both directions to guard against
+  // bugs in checkout creation or any future code paths that set metadata.
   if (customerId) {
-    const existing = await findCompanyByCustomerId(customerId);
-    if (existing && existing.id !== metadataCompanyId) {
-      log.error(`checkout.completed: customerId=${customerId} belongs to company=${existing.id} but metadata says ${metadataCompanyId}. Ignoring.`);
+    // Direction 1: does another company already own this customerId?
+    const ownerOfCustomer = await findCompanyByCustomerId(customerId);
+    if (ownerOfCustomer && ownerOfCustomer.id !== metadataCompanyId) {
+      log.error(
+        `webhook rejected: customerId=${customerId} belongs to company=${ownerOfCustomer.id} but metadata claims companyId=${metadataCompanyId}`
+      );
+      return;
+    }
+
+    // Direction 2: does the claimed company already have a different customerId?
+    const [claimedCompany] = await db
+      .select({ id: companies.id, stripeCustomerId: companies.stripeCustomerId })
+      .from(companies)
+      .where(eq(companies.id, metadataCompanyId))
+      .limit(1);
+
+    if (!claimedCompany) {
+      log.error(`webhook rejected: companyId=${metadataCompanyId} does not exist`);
+      return;
+    }
+
+    if (claimedCompany.stripeCustomerId && claimedCompany.stripeCustomerId !== customerId) {
+      log.error(
+        `webhook rejected: companyId=${metadataCompanyId} has customerId=${claimedCompany.stripeCustomerId} but webhook sent customerId=${customerId}`
+      );
       return;
     }
   }
