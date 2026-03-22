@@ -6,6 +6,7 @@ import { X, Send, Bot, User, Loader2, Wrench, Sparkles, Copy, Check, Pin, PinOff
 import { usePinnedInsights } from "./use-pinned-insights";
 import { getPageContext } from "./page-context";
 import { InlineChart } from "./inline-chart";
+import { MarkdownRenderer } from "./markdown-renderer";
 
 interface ToolResult {
   tool: string;
@@ -262,7 +263,11 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
                       ? "bg-brand-600 text-white"
                       : "bg-surface-50 border border-surface-200 text-surface-800"
                   }`}>
-                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                    {msg.role === "assistant" ? (
+                      <MarkdownRenderer content={msg.content} />
+                    ) : (
+                      <span className="whitespace-pre-wrap">{msg.content}</span>
+                    )}
                     {msg.isStreaming && <span className="inline-block ml-0.5 animate-pulse">|</span>}
                     {/* Inline data visualizations */}
                     {msg.toolResults?.map((result, j) => (

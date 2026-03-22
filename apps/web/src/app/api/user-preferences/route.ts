@@ -34,6 +34,7 @@ export const GET = withErrorHandler(async () => {
 const patchSchema = z.object({
   sidebarOrder: z.array(z.string()).nullable().optional(),
   quickActionMode: z.enum(["intelligence", "dynamic", "custom"]).optional(),
+  quickActionModeOverrides: z.record(z.enum(["intelligence", "dynamic", "custom"])).nullable().optional(),
   customQuickActions: z.array(z.string()).nullable().optional(),
   sidebarCollapsed: z.boolean().optional(),
 });

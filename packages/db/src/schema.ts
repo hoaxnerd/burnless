@@ -1277,6 +1277,7 @@ export const userPreferences = pgTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     sidebarOrder: jsonb("sidebar_order").$type<string[]>(), // ordered array of nav item IDs
     quickActionMode: quickActionModeEnum("quick_action_mode").notNull().default("dynamic"),
+    quickActionModeOverrides: jsonb("quick_action_mode_overrides").$type<Record<string, "intelligence" | "dynamic" | "custom">>(), // per-action mode overrides
     customQuickActions: jsonb("custom_quick_actions").$type<string[]>(), // IDs of pinned quick actions
     sidebarCollapsed: boolean("sidebar_collapsed").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
