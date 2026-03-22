@@ -51,6 +51,10 @@ vi.mock("@/lib/api-helpers", () => ({
   withErrorHandler: (fn: Function) => fn,
 }));
 
+vi.mock("@/lib/api-rate-limit", () => ({
+  applyRateLimit: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/logger", () => ({
   logger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }),
 }));

@@ -23,6 +23,10 @@ vi.mock("@/lib/api-helpers", () => ({
   withErrorHandler: (fn: Function) => fn,
 }));
 
+vi.mock("@/lib/api-rate-limit", () => ({
+  applyRateLimit: vi.fn().mockResolvedValue(null),
+}));
+
 import { POST } from "../check-email/route";
 
 function jsonRequest(body: unknown): Request {
