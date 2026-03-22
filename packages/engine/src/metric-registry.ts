@@ -1279,6 +1279,24 @@ export function getHeroSwaps(
         break;
       }
 
+      // Second pass: try ALL metrics from the full registry
+      if (!swapped) {
+        for (const m of METRIC_REGISTRY) {
+          if (usedSlugs.has(m.slug)) continue;
+          if (!isMetricDataAvailable(metrics, m.slug, month)) continue;
+
+          usedSlugs.add(m.slug);
+          results.push({
+            displaySlug: m.slug,
+            displayDef: m,
+            replacedSlug: slug,
+            restoreHint: getMetricMissingDataHint(slug),
+          });
+          swapped = true;
+          break;
+        }
+      }
+
       if (!swapped) {
         // No fallback available — keep the ghost card
         results.push({
