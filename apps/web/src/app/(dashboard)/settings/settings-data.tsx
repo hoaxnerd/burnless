@@ -137,5 +137,6 @@ export const tabs = [
   { key: "ai" as const, label: "AI Features" },
   { key: "ai-dashboard" as const, label: "AI Dashboard" },
   { key: "integrations" as const, label: "Integrations" },
+  { key: "invite-codes" as const, label: "Invite Codes" },
   { key: "billing" as const, label: "Billing" },
 ];

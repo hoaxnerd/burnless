@@ -8,10 +8,11 @@ import { AiFeaturesTab } from "./ai-features-tab";
 import { AiDashboardTab } from "./ai-dashboard-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { BillingTab } from "./billing-tab";
+import { InviteCodesTab } from "./invite-codes-tab";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
-    "general" | "ai" | "ai-dashboard" | "integrations" | "billing"
+    "general" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
   >("general");
   const { flags, updateFlags, loaded: aiLoaded, monthlyBudgetCents, budget, providerConfig } = useAiFlags();
 
@@ -174,6 +175,9 @@ export default function SettingsPage() {
           getConnectedId={getConnectedId}
         />
       )}
+
+      {/* Invite Codes Tab */}
+      {activeTab === "invite-codes" && <InviteCodesTab />}
 
       {/* Billing Tab */}
       {activeTab === "billing" && (
