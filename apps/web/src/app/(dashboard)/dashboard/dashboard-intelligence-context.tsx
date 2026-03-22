@@ -16,6 +16,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -172,17 +173,37 @@ export function DashboardIntelligenceProvider({
     return () => { cancelled = true; };
   }, [initialPreferences]);
 
-  // Save preferences to API (debounced)
+  // Track pending save for beforeunload guard
+  const pendingSaveRef = useRef<Promise<void> | null>(null);
+
+  // Warn user if they try to leave with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (pendingSaveRef.current) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  // Save preferences to API
   const savePrefs = useCallback(
     (updated: DashboardPreferences) => {
       setIsSaving(true);
-      fetch("/api/dashboard-preferences", {
+      const savePromise = fetch("/api/dashboard-preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updated),
+        keepalive: true,
       })
+        .then(() => {})
         .catch(console.error)
-        .finally(() => setIsSaving(false));
+        .finally(() => {
+          pendingSaveRef.current = null;
+          setIsSaving(false);
+        });
+      pendingSaveRef.current = savePromise;
     },
     []
   );
