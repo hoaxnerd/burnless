@@ -445,7 +445,7 @@ export function InviteCodesTab() {
   };
 
   const copyLink = (code: InviteCode) => {
-    const url = `${window.location.origin}/signup?invite=${code.code}`;
+    const url = `${window.location.origin}/login?invite=${code.code}`;
     navigator.clipboard.writeText(url);
     setCopiedId(code.id);
     setTimeout(() => setCopiedId(null), 2000);
