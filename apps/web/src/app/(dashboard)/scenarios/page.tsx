@@ -15,7 +15,7 @@ async function ScenariosContent() {
     isDefault: s.isDefault,
     isBudget: s.isBudget,
     description: s.description,
-    createdAt: s.createdAt.toISOString(),
+    createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
   }));
 
   return (
