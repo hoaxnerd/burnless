@@ -8,6 +8,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
+    "typescript": "^5.7.0",
     "zod": "^3.25.76"
   }
 }
