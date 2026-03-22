@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "./auth";
 import { db, companies, getCompanyForUser } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { logger } from "./logger";
 
 /** Standard JSON error response. */
 export function errorResponse(message: string, status: number) {
@@ -96,7 +97,12 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
     } catch (error) {
       const request = args[0] as Request;
       const pathname = new URL(request.url).pathname;
-      console.error(`[API Error] ${request.method} ${pathname}:`, error);
+      const requestId = request.headers.get("x-request-id") ?? undefined;
+      const log = logger("api");
+      log.error(
+        { requestId, method: request.method, pathname, err: error instanceof Error ? error : undefined },
+        `${request.method} ${pathname} failed`
+      );
 
       return NextResponse.json(
         { error: "Internal server error" },

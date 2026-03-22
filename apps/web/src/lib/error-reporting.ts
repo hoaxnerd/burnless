@@ -7,13 +7,14 @@
  * Client-side error capture will be added when withSentryConfig() is properly
  * integrated into next.config.ts (requires Sentry auth token + project setup).
  *
- * Until then, errors are logged to console and caught by error boundaries.
+ * Until then, errors are logged via Pino and caught by error boundaries.
  */
 
+import { logger } from "./logger";
+
 export function captureException(error: unknown): void {
-  // In development, errors are already logged by Next.js error overlay
   if (process.env.NODE_ENV === "production") {
-    console.error("[error-reporting]", error);
+    logger("error-reporting").error(error instanceof Error ? error : String(error));
   }
 }
 

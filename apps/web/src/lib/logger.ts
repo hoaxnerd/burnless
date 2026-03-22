@@ -1,36 +1,111 @@
 /**
- * Structured logger — thin wrapper over console in dev.
- * Swap the transport for Sentry / Axiom / Datadog in production
- * by changing the `transport` implementation below.
+ * Structured logger powered by Pino.
+ *
+ * - Production: JSON output for log aggregation (Datadog, Loki, CloudWatch)
+ * - Development: pretty-printed, colorized output
+ * - Log level: configurable via LOG_LEVEL env var (default: "info" prod, "debug" dev)
+ *
+ * Usage:
+ *   import { logger } from "@/lib/logger";
+ *   const log = logger("webhook");
+ *   log.error("payment failed:", err);
+ *   log.info({ companyId, plan }, "subscription updated");
  */
 
-type LogPayload = unknown[];
+import pino from "pino";
 
-interface Transport {
-  error(module: string, ...args: LogPayload): void;
-  warn(module: string, ...args: LogPayload): void;
-  info(module: string, ...args: LogPayload): void;
-}
+const isDev = process.env.NODE_ENV !== "production";
+const level =
+  process.env.LOG_LEVEL ?? (isDev ? "debug" : "info");
 
-const consoleTransport: Transport = {
-  error: (mod, ...args) => console.error(`[${mod}]`, ...args),
-  warn: (mod, ...args) => console.warn(`[${mod}]`, ...args),
-  info: (mod, ...args) => console.log(`[${mod}]`, ...args),
-};
-
-// Single place to swap transports (e.g. Sentry in prod)
-const transport: Transport = consoleTransport;
+const rootLogger = pino({
+  level,
+  ...(isDev && {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true, translateTime: "HH:MM:ss" },
+    },
+  }),
+});
 
 export interface Logger {
-  error(...args: LogPayload): void;
-  warn(...args: LogPayload): void;
-  info(...args: LogPayload): void;
+  error(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+}
+
+/**
+ * Adapt variadic args (our existing API) to Pino's (obj?, msg) signature.
+ *
+ * Supports these calling patterns (all used in the codebase):
+ *   log.error("message")
+ *   log.error("message:", error)
+ *   log.error({ companyId }, "message")
+ */
+function toPino(args: unknown[]): [Record<string, unknown>, string] {
+  if (args.length === 0) return [{}, ""];
+
+  // Single Error
+  if (args.length === 1 && args[0] instanceof Error) {
+    return [{ err: args[0] }, args[0].message];
+  }
+
+  // Single string
+  if (args.length === 1 && typeof args[0] === "string") {
+    return [{}, args[0]];
+  }
+
+  // First arg is an object (not Error) — treat as structured context
+  if (
+    args.length >= 1 &&
+    typeof args[0] === "object" &&
+    args[0] !== null &&
+    !(args[0] instanceof Error)
+  ) {
+    const [obj, ...rest] = args;
+    return [
+      obj as Record<string, unknown>,
+      rest.map(String).join(" "),
+    ];
+  }
+
+  // Common pattern: "message:", errorOrValue
+  // Separate string parts from Error objects
+  const strings: string[] = [];
+  const ctx: Record<string, unknown> = {};
+
+  for (const arg of args) {
+    if (arg instanceof Error) {
+      ctx.err = arg;
+      strings.push(arg.message);
+    } else {
+      strings.push(String(arg));
+    }
+  }
+
+  return [ctx, strings.join(" ")];
 }
 
 export function logger(module: string): Logger {
+  const child = rootLogger.child({ module });
+
   return {
-    error: (...args) => transport.error(module, ...args),
-    warn: (...args) => transport.warn(module, ...args),
-    info: (...args) => transport.info(module, ...args),
+    error: (...args) => {
+      const [obj, msg] = toPino(args);
+      child.error(obj, msg);
+    },
+    warn: (...args) => {
+      const [obj, msg] = toPino(args);
+      child.warn(obj, msg);
+    },
+    info: (...args) => {
+      const [obj, msg] = toPino(args);
+      child.info(obj, msg);
+    },
+    debug: (...args) => {
+      const [obj, msg] = toPino(args);
+      child.debug(obj, msg);
+    },
   };
 }

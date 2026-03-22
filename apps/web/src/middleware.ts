@@ -40,8 +40,20 @@ export function middleware(request: NextRequest) {
   // Only rate-limit API routes
   if (!pathname.startsWith("/api/")) return NextResponse.next();
 
+  // Inject correlation ID for all API requests (readable by route handlers via headers)
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-request-id", requestId);
+
+  /** Forward the request-id on both the request (for route handlers) and response (for callers). */
+  function next() {
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("x-request-id", requestId);
+    return res;
+  }
+
   // Skip health check (monitoring services poll frequently)
-  if (pathname === "/api/health") return NextResponse.next();
+  if (pathname === "/api/health") return next();
 
   // Skip NextAuth session/callback internals (they have CSRF + session validation)
   if (
@@ -53,11 +65,11 @@ export function middleware(request: NextRequest) {
     !pathname.startsWith("/api/auth/send-verification") &&
     !pathname.startsWith("/api/auth/verify-email")
   ) {
-    return NextResponse.next();
+    return next();
   }
 
   // Skip webhooks (they have their own signature verification)
-  if (pathname.startsWith("/api/webhooks/")) return NextResponse.next();
+  if (pathname.startsWith("/api/webhooks/")) return next();
 
   // CSRF protection: verify Origin header on mutation requests
   if (MUTATION_METHODS.has(request.method)) {
@@ -113,7 +125,7 @@ export function middleware(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.next();
+  const response = next();
   response.headers.set("X-RateLimit-Limit", String(config.maxRequests));
   response.headers.set("X-RateLimit-Remaining", String(result.remaining));
   response.headers.set("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
