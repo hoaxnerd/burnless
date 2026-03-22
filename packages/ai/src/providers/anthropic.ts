@@ -159,7 +159,7 @@ export class AnthropicProvider extends LlmProvider {
 
     for await (const event of anthropicStream) {
       if (event.type === "content_block_delta") {
-        const delta = event.delta as Record<string, unknown>;
+        const delta = event.delta as unknown as Record<string, unknown>;
         if (delta.type === "text_delta" && typeof delta.text === "string") {
           yield { type: "text_delta", text: delta.text };
         } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
