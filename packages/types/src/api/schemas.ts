@@ -196,3 +196,34 @@ export const updateAiFeaturesSchema = z.object({
 });
 
 export type UpdateAiFeaturesInput = z.infer<typeof updateAiFeaturesSchema>;
+
+// ── Invite Codes ────────────────────────────────────────────────────────────
+
+export const inviteCodeTypeEnum = z.enum(["single_use", "multi_use"]);
+
+export const createInviteCodeSchema = z.object({
+  code: z.string().min(4).max(64).regex(/^[A-Za-z0-9_-]+$/, "Code must be alphanumeric (hyphens and underscores allowed)"),
+  type: inviteCodeTypeEnum.default("single_use"),
+  maxRedemptions: z.number().int().min(1).default(1),
+  expiresAt: z.string().datetime().nullable().optional(),
+  freePlatformDays: z.number().int().min(0).default(30),
+  aiCreditsCents: z.number().int().min(0).default(5000),
+  note: z.string().max(500).nullable().optional(),
+});
+
+export const updateInviteCodeSchema = z.object({
+  isActive: z.boolean().optional(),
+  maxRedemptions: z.number().int().min(1).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+  freePlatformDays: z.number().int().min(0).optional(),
+  aiCreditsCents: z.number().int().min(0).optional(),
+  note: z.string().max(500).nullable().optional(),
+});
+
+export const redeemInviteCodeSchema = z.object({
+  code: z.string().min(1),
+});
+
+export type CreateInviteCodeInput = z.infer<typeof createInviteCodeSchema>;
+export type UpdateInviteCodeInput = z.infer<typeof updateInviteCodeSchema>;
+export type RedeemInviteCodeInput = z.infer<typeof redeemInviteCodeSchema>;

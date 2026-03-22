@@ -1287,6 +1287,89 @@ export const aiToolAuditLogs = pgTable(
   ]
 );
 
+// ── Invite Codes (platform-level early access distribution) ─────────────────
+
+export const inviteCodeTypeEnum = pgEnum("invite_code_type", [
+  "single_use",
+  "multi_use",
+]);
+
+export const inviteCodes = pgTable(
+  "invite_codes",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    code: text("code").notNull(),
+    type: inviteCodeTypeEnum("type").notNull().default("single_use"),
+    maxRedemptions: integer("max_redemptions").notNull().default(1),
+    currentRedemptions: integer("current_redemptions").notNull().default(0),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    freePlatformDays: integer("free_platform_days").notNull().default(30),
+    aiCreditsCents: integer("ai_credits_cents").notNull().default(5000), // $50 default
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("invite_codes_code_idx").on(table.code),
+    index("invite_codes_created_by_idx").on(table.createdBy),
+    index("invite_codes_active_idx").on(table.isActive),
+  ]
+);
+
+export const inviteCodeRedemptions = pgTable(
+  "invite_code_redemptions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    inviteCodeId: text("invite_code_id")
+      .notNull()
+      .references(() => inviteCodes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    redeemedAt: timestamp("redeemed_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("invite_redemptions_code_idx").on(table.inviteCodeId),
+    uniqueIndex("invite_redemptions_user_code_idx").on(
+      table.inviteCodeId,
+      table.userId
+    ),
+  ]
+);
+
+export const inviteCodesRelations = relations(inviteCodes, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [inviteCodes.createdBy],
+    references: [users.id],
+  }),
+  redemptions: many(inviteCodeRedemptions),
+}));
+
+export const inviteCodeRedemptionsRelations = relations(
+  inviteCodeRedemptions,
+  ({ one }) => ({
+    inviteCode: one(inviteCodes, {
+      fields: [inviteCodeRedemptions.inviteCodeId],
+      references: [inviteCodes.id],
+    }),
+    user: one(users, {
+      fields: [inviteCodeRedemptions.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 export const aiToolAuditLogsRelations = relations(aiToolAuditLogs, ({ one }) => ({
   company: one(companies, {
     fields: [aiToolAuditLogs.companyId],

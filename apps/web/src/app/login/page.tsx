@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { trackEvent, identifyUser } from "@/lib/analytics";
@@ -11,10 +12,12 @@ import { SignInStep } from "./_components/signin-step";
 import { SignUpStep } from "./_components/signup-step";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [inviteCode, setInviteCode] = useState(searchParams.get("invite") ?? "");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -95,7 +98,12 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name: name || undefined }),
+        body: JSON.stringify({
+          email,
+          password,
+          name: name || undefined,
+          inviteCode: inviteCode || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -239,6 +247,8 @@ export default function LoginPage() {
               onNameChange={setName}
               password={password}
               onPasswordChange={setPassword}
+              inviteCode={inviteCode}
+              onInviteCodeChange={setInviteCode}
               onSubmit={handleSignUp}
               onBack={handleBack}
               isLoading={isLoading}

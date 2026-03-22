@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, users, verificationTokens } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { db, users, verificationTokens, inviteCodes, inviteCodeRedemptions } from "@burnless/db";
+import { eq, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";
@@ -22,6 +22,7 @@ const registerSchema = z.object({
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
   name: z.string().min(1).optional(),
+  inviteCode: z.string().min(1).optional(),
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -68,6 +69,43 @@ export const POST = withErrorHandler(async (request: Request) => {
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }
 
+  // Redeem invite code if provided
+  let inviteRedemption: { freePlatformDays: number; aiCreditsCents: number } | null = null;
+  if (body.inviteCode && user) {
+    try {
+      const [invite] = await db
+        .select()
+        .from(inviteCodes)
+        .where(eq(inviteCodes.code, body.inviteCode))
+        .limit(1);
+
+      if (
+        invite &&
+        invite.isActive &&
+        invite.currentRedemptions < invite.maxRedemptions &&
+        (!invite.expiresAt || invite.expiresAt >= new Date())
+      ) {
+        await db.transaction(async (tx) => {
+          await tx.insert(inviteCodeRedemptions).values({
+            inviteCodeId: invite.id,
+            userId: user.id,
+          });
+          await tx
+            .update(inviteCodes)
+            .set({ currentRedemptions: sql`${inviteCodes.currentRedemptions} + 1` })
+            .where(eq(inviteCodes.id, invite.id));
+        });
+        inviteRedemption = {
+          freePlatformDays: invite.freePlatformDays,
+          aiCreditsCents: invite.aiCreditsCents,
+        };
+      }
+    } catch (err) {
+      logger("register").error("Failed to redeem invite code:", err);
+      // Non-blocking — account creation succeeded even if invite fails
+    }
+  }
+
   // Send verification email — await token insert so we know verification is possible
   if (email.provider && user.email) {
     const normalizedEmail = user.email.toLowerCase().trim();
@@ -96,5 +134,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     }
   }
 
-  return NextResponse.json(user, { status: 201 });
+  return NextResponse.json(
+    { ...user, ...(inviteRedemption ? { invite: inviteRedemption } : {}) },
+    { status: 201 }
+  );
 });

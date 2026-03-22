@@ -7,6 +7,8 @@ interface SignUpStepProps {
   onNameChange: (name: string) => void;
   password: string;
   onPasswordChange: (password: string) => void;
+  inviteCode: string;
+  onInviteCodeChange: (code: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onBack: () => void;
   isLoading: boolean;
@@ -19,6 +21,8 @@ export function SignUpStep({
   onNameChange,
   password,
   onPasswordChange,
+  inviteCode,
+  onInviteCodeChange,
   onSubmit,
   onBack,
   isLoading,
@@ -65,6 +69,22 @@ export function SignUpStep({
           {passwordStrength && (
             <PasswordStrength strength={passwordStrength} />
           )}
+        </div>
+        <div>
+          <label
+            htmlFor="invite-code"
+            className="block text-sm font-medium text-surface-700 mb-2"
+          >
+            Invite code <span className="text-surface-400 font-normal">(optional)</span>
+          </label>
+          <input
+            id="invite-code"
+            type="text"
+            value={inviteCode}
+            onChange={(e) => onInviteCodeChange(e.target.value.toUpperCase())}
+            placeholder="e.g. BURNLESS2026"
+            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all font-mono tracking-wider"
+          />
         </div>
         <button
           type="submit"
