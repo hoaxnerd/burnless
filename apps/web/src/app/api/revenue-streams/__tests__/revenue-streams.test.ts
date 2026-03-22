@@ -76,7 +76,11 @@ vi.mock("@burnless/db", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  inArray: vi.fn(),
 }));
+
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
 
 /* ------------------------------------------------------------------ */
 /* Route imports (AFTER mocks are registered)                         */
