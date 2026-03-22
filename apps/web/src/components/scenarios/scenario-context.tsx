@@ -55,6 +55,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       const params = new URLSearchParams(searchParams.toString());
       params.set("scenarioId", id);
       router.push(`${pathname}?${params.toString()}`);
+      router.refresh();
     },
     [pathname, router, searchParams]
   );
@@ -66,6 +67,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     params.delete("scenarioId");
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
+    router.refresh();
   }, [pathname, router, searchParams]);
 
   return (

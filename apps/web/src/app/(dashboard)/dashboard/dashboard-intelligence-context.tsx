@@ -187,22 +187,37 @@ export function DashboardIntelligenceProvider({
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  // Save preferences to API
+  // Save preferences to API with retry on failure
   const savePrefs = useCallback(
     (updated: DashboardPreferences) => {
       setIsSaving(true);
-      const savePromise = fetch("/api/dashboard-preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-        keepalive: true,
-      })
-        .then(() => {})
-        .catch(console.error)
-        .finally(() => {
-          pendingSaveRef.current = null;
-          setIsSaving(false);
+      const body = JSON.stringify(updated);
+
+      const attempt = (retries: number, delay: number): Promise<void> =>
+        fetch("/api/dashboard-preferences", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body,
+          keepalive: true,
+        }).then((res) => {
+          if (!res.ok && retries > 0) {
+            return new Promise<void>((resolve) =>
+              setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
+            );
+          }
+        }).catch((err) => {
+          if (retries > 0) {
+            return new Promise<void>((resolve) =>
+              setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
+            );
+          }
+          console.error("Failed to save dashboard preferences:", err);
         });
+
+      const savePromise = attempt(2, 500).finally(() => {
+        pendingSaveRef.current = null;
+        setIsSaving(false);
+      });
       pendingSaveRef.current = savePromise;
     },
     []
