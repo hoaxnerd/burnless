@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, scenarios, forecastLines, revenueStreams } from "@burnless/db";
 import { requireCompanyAccess, requireRole, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { getDefaultScenario, getRevenueStreams, getForecastLines } from "@/lib/data";
@@ -19,6 +20,9 @@ const generateSchema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "ai");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");

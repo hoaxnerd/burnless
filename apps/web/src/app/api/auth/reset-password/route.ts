@@ -4,6 +4,7 @@ import { db, users, verificationTokens } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { hashPassword } from "@/lib/password";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
@@ -17,6 +18,9 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "auth");
+  if (blocked) return blocked;
+
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());

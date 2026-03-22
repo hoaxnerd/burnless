@@ -66,6 +66,7 @@ const nextConfig: NextConfig = {
     "@opentelemetry/api",
     "@auth/drizzle-adapter",
     "drizzle-orm",
+    "ioredis",
   ],
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts"],

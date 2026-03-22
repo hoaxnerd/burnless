@@ -6,6 +6,7 @@ import { randomBytes } from "crypto";
 import { email } from "@/lib/email";
 import { verificationEmail } from "@/lib/email/templates";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { logger } from "@/lib/logger";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
@@ -16,6 +17,9 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "auth");
+  if (blocked) return blocked;
+
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());

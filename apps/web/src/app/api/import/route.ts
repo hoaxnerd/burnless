@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, transactions, financialAccounts, importBatches, merchantCategoryMappings } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import { monetaryAmount } from "@/lib/financial-validation";
 import crypto from "crypto";
@@ -46,6 +47,9 @@ function chunk<T>(arr: T[], size: number): T[][] {
 // ── POST /api/import ─────────────────────────────────────────────────────────
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "import");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");

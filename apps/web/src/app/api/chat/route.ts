@@ -11,6 +11,7 @@ import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnl
 import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { canPerformAction } from "@/lib/feature-gate";
 import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tools";
@@ -25,6 +26,9 @@ const chatSchema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "chat");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 

@@ -1,28 +1,16 @@
 /**
- * In-memory sliding window rate limiter.
- * For production, replace with Redis-backed implementation.
+ * Tiered rate limiter with Redis-backed sliding window.
+ *
+ * Two modes:
+ *   1. `checkRateLimit` — synchronous, in-memory (used by Edge middleware)
+ *   2. `checkRateLimitAsync` — async, Redis-first with in-memory fallback
+ *      (used by route handlers running in Node.js runtime)
  */
+import { getRedis } from "./redis";
 
-interface RateLimitEntry {
-  timestamps: number[];
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-// Cleanup stale entries every 5 minutes
-const CLEANUP_INTERVAL = 5 * 60 * 1000;
-let lastCleanup = Date.now();
-
-function cleanup(windowMs: number) {
-  const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
-  lastCleanup = now;
-
-  for (const [key, entry] of store) {
-    entry.timestamps = entry.timestamps.filter((t) => now - t < windowMs);
-    if (entry.timestamps.length === 0) store.delete(key);
-  }
-}
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface RateLimitConfig {
   /** Maximum requests allowed in the window. */
@@ -37,10 +25,32 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
+// ---------------------------------------------------------------------------
+// In-memory store (Edge-compatible, per-process)
+// ---------------------------------------------------------------------------
+
+interface RateLimitEntry {
+  timestamps: number[];
+}
+
+const store = new Map<string, RateLimitEntry>();
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+let lastCleanup = Date.now();
+
+function cleanup(windowMs: number) {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+
+  for (const [key, entry] of store) {
+    entry.timestamps = entry.timestamps.filter((t) => now - t < windowMs);
+    if (entry.timestamps.length === 0) store.delete(key);
+  }
+}
+
 /**
- * Check if a request is within rate limits.
- * @param key Unique identifier (e.g., userId, IP, or userId:endpoint)
- * @param config Rate limit configuration
+ * Synchronous in-memory sliding window check.
+ * Used by Edge middleware where async Redis calls aren't possible.
  */
 export function checkRateLimit(
   key: string,
@@ -55,7 +65,6 @@ export function checkRateLimit(
     store.set(key, entry);
   }
 
-  // Remove timestamps outside the window
   entry.timestamps = entry.timestamps.filter(
     (t) => now - t < config.windowMs
   );
@@ -77,7 +86,84 @@ export function checkRateLimit(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Redis sliding window (ZSET-based)
+// ---------------------------------------------------------------------------
+
+/**
+ * Async rate limit check using Redis sorted sets for sliding window.
+ * Falls back to in-memory when Redis is unavailable.
+ *
+ * Algorithm: Store timestamps as ZSET scores. On each request:
+ *   1. Remove expired entries (score < now - windowMs)
+ *   2. Count remaining entries
+ *   3. If under limit, add current timestamp
+ *   4. Set TTL on the key for auto-cleanup
+ */
+export async function checkRateLimitAsync(
+  key: string,
+  config: RateLimitConfig
+): Promise<RateLimitResult> {
+  const redis = getRedis();
+  if (!redis) {
+    return checkRateLimit(key, config);
+  }
+
+  const now = Date.now();
+  const windowStart = now - config.windowMs;
+  const redisKey = `rl:${key}`;
+
+  try {
+    const pipeline = redis.pipeline();
+    // 1. Remove expired entries
+    pipeline.zremrangebyscore(redisKey, 0, windowStart);
+    // 2. Count current entries
+    pipeline.zcard(redisKey);
+    // 3. Add current timestamp (we'll remove it if over limit)
+    pipeline.zadd(redisKey, now, `${now}:${Math.random().toString(36).slice(2, 8)}`);
+    // 4. Set TTL for auto-cleanup (window + buffer)
+    pipeline.pexpire(redisKey, config.windowMs + 1000);
+
+    const results = await pipeline.exec();
+    if (!results) {
+      return checkRateLimit(key, config);
+    }
+
+    // results[1] = [err, count] from zcard (before adding current request)
+    const countBeforeAdd = (results[1]?.[1] as number) ?? 0;
+
+    if (countBeforeAdd >= config.maxRequests) {
+      // Over limit — remove the entry we just added
+      const lastResult = results[2];
+      if (lastResult) {
+        // Remove the member we just added by getting the last one
+        redis.zremrangebyscore(redisKey, now, now).catch(() => {});
+      }
+
+      // Get oldest entry to calculate reset time
+      const oldest = await redis.zrange(redisKey, 0, 0, "WITHSCORES");
+      const resetAt = oldest.length >= 2
+        ? Number(oldest[1]) + config.windowMs
+        : now + config.windowMs;
+
+      return { allowed: false, remaining: 0, resetAt };
+    }
+
+    return {
+      allowed: true,
+      remaining: config.maxRequests - countBeforeAdd - 1,
+      resetAt: now + config.windowMs,
+    };
+  } catch {
+    // Redis error — fall back to in-memory
+    return checkRateLimit(key, config);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Pre-defined rate limit configs
+// ---------------------------------------------------------------------------
+
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   /** Read API: 100 req/min per IP */
   read: { maxRequests: 100, windowMs: 60_000 },

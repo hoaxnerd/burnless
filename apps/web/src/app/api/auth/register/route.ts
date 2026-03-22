@@ -7,6 +7,7 @@ import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";
 import { verificationEmail } from "@/lib/email/templates";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { logger } from "@/lib/logger";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
@@ -24,6 +25,9 @@ const registerSchema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "auth");
+  if (blocked) return blocked;
+
   let body: z.infer<typeof registerSchema>;
   try {
     body = registerSchema.parse(await request.json());

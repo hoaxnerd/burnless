@@ -14,6 +14,7 @@ import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { generateInsights, generatePageInsights, type InsightPage } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getAiFlags, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
@@ -76,6 +77,9 @@ export const GET = withErrorHandler(async (request: Request) => {
 // ── POST: generate + cache insights ────────────────────────────────────────
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "ai");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
@@ -18,6 +19,9 @@ const schema = z.object({
  * The delay is random (50-150ms) regardless of whether the email exists.
  */
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "auth");
+  if (blocked) return blocked;
+
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());

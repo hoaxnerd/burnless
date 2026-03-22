@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { getProviderForFeature, createProvider } from "@burnless/ai";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
 
@@ -40,6 +41,9 @@ interface EnrichmentResult {
 }
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "ai");
+  if (blocked) return blocked;
+
   const user = await getAuthUser();
   if (!user?.id) return errorResponse("Please sign in to continue", 401);
 

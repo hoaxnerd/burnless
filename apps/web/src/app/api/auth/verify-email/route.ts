@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { email as emailService } from "@/lib/email";
 import { welcomeEmail } from "@/lib/email/templates";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import { logger } from "@/lib/logger";
 
 const schema = z.object({
@@ -13,6 +14,9 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "auth");
+  if (blocked) return blocked;
+
   let body: z.infer<typeof schema>;
   try {
     body = schema.parse(await request.json());
