@@ -2,7 +2,7 @@
 
 import type { MetricValue } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, MetricCard } from "@/components/ui";
+import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 
 interface RunwayViewProps {
@@ -79,20 +79,28 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
+        <SwappableMetricCard
+          slug="startingCash"
+          pageId="reports/runway"
           label="Starting Cash"
           value={formatCompactCurrency(startingCash)}
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="currentCash"
+          pageId="reports/runway"
           label="Current Cash"
           value={formatCompactCurrency(latest?.value ?? 0)}
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="netBurnRate"
+          pageId="reports/runway"
           label="Net Burn Rate"
           value={formatCompactCurrency(latestBurn?.value ?? 0)}
           description="Latest month"
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="runway"
+          pageId="reports/runway"
           label="Runway"
           value={latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e"}
           description={zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway"}

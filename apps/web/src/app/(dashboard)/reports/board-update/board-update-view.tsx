@@ -3,7 +3,7 @@
 import { ArrowLeft, Download, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, MetricCard } from "@/components/ui";
+import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { AiGate } from "@/components/ai/ai-gate";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
 
@@ -228,7 +228,9 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
 
       {/* Executive Summary KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-3">
-        <MetricCard
+        <SwappableMetricCard
+          slug="revenue"
+          pageId="reports/board-update"
           label="Revenue"
           value={formatCompactCurrency(d.revenue.current)}
           change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
@@ -236,19 +238,25 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
           trend={d.revenue.growthPercent > 1 ? "up" : d.revenue.growthPercent < -1 ? "down" : "flat"}
           variant={d.revenue.growthPercent > 5 ? "success" : d.revenue.growthPercent < 0 ? "danger" : "default"}
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="netBurn"
+          pageId="reports/board-update"
           label="Net Burn"
           value={formatCompactCurrency(d.cash.burnRate)}
           description="/month"
           variant={d.cash.burnRate > 0 ? "warning" : "success"}
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="cash"
+          pageId="reports/board-update"
           label="Cash"
           value={formatCompactCurrency(d.cash.position)}
           description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
           variant={d.cash.runway < 6 ? "danger" : d.cash.runway < 12 ? "warning" : "success"}
         />
-        <MetricCard
+        <SwappableMetricCard
+          slug="grossMargin"
+          pageId="reports/board-update"
           label="Gross Margin"
           value={`${d.profitability.grossMargin.toFixed(1)}%`}
           description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}

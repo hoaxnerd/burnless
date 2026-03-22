@@ -6,6 +6,7 @@ import { FundingDetails } from "./funding-details";
 import { AddFundingForm } from "./add-funding-form";
 import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
+import { SwappableMetricCard } from "@/components/ui";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -76,54 +77,37 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
         <AddFundingForm />
       </div>
 
-      {/* Summary cards — only show cards with meaningful data */}
+      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
-        <div className={`rounded-2xl border p-6 ${totalRaised > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Total Raised</p>
-          {totalRaised > 0 ? (
-            <>
-              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalRaised)}</p>
-              <p className="mt-1 text-xs text-surface-400">{completedRounds.length} round{completedRounds.length !== 1 ? "s" : ""} completed</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-surface-300">Add a funding round</p>
-          )}
-        </div>
-        <div className={`rounded-2xl border p-6 ${currentCash > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Current Cash</p>
-          {currentCash > 0 ? (
-            <>
-              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(currentCash)}</p>
-              <p className="mt-1 text-xs text-surface-400">Available capital</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-surface-300">Add funding to see cash</p>
-          )}
-        </div>
-        <div className={`rounded-2xl border p-6 ${currentBurn > 0 && currentCash > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Runway</p>
-          {currentBurn > 0 && currentCash > 0 ? (
-            <>
-              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">
-                {currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`}
-              </p>
-              <p className="mt-1 text-xs text-surface-400">At {formatCurrency(currentBurn)}/mo burn</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-surface-300">Add funding & expenses</p>
-          )}
-        </div>
-        <div className={`rounded-2xl border p-6 ${completedRounds.length > 0 ? "bg-surface-0 border-surface-200" : "bg-surface-50/50 border-dashed border-surface-200/70"}`}>
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Founder Ownership</p>
-          {completedRounds.length > 0 ? (
-            <>
-              <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{foundersOwnership.toFixed(0)}%</p>
-              <p className="mt-1 text-xs text-surface-400">After {totalDilution.toFixed(0)}% dilution</p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-surface-300">Add a funding round</p>
-          )}
-        </div>
+        <SwappableMetricCard
+          slug="totalRaised"
+          pageId="funding"
+          label="Total Raised"
+          value={totalRaised > 0 ? formatCurrency(totalRaised) : "$---"}
+          description={totalRaised > 0 ? `${completedRounds.length} round${completedRounds.length !== 1 ? "s" : ""} completed` : "Add a funding round"}
+        />
+        <SwappableMetricCard
+          slug="currentCash"
+          pageId="funding"
+          label="Current Cash"
+          value={currentCash > 0 ? formatCurrency(currentCash) : "$---"}
+          description={currentCash > 0 ? "Available capital" : "Add funding to see cash"}
+        />
+        <SwappableMetricCard
+          slug="runway"
+          pageId="funding"
+          label="Runway"
+          value={currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo"}
+          description={currentBurn > 0 && currentCash > 0 ? `At ${formatCurrency(currentBurn)}/mo burn` : "Add funding & expenses"}
+          variant={currentRunway > 0 && currentRunway < 6 ? "danger" : currentRunway < 12 ? "warning" : "default"}
+        />
+        <SwappableMetricCard
+          slug="founderOwnership"
+          pageId="funding"
+          label="Founder Ownership"
+          value={completedRounds.length > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%"}
+          description={completedRounds.length > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round"}
+        />
       </div>
 
       {/* Funding details */}

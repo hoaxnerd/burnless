@@ -2,7 +2,7 @@
 
 import type { BudgetVsActuals } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, MetricCard } from "@/components/ui";
+import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { ExportCSVButton } from "@/components/reports/export-button";
 
 export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
@@ -46,9 +46,11 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <MetricCard label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} />
-        <MetricCard label="Total Actual" value={formatCompactCurrency(totalActualSum)} />
-        <MetricCard
+        <SwappableMetricCard slug="totalBudget" pageId="reports/bva" label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} />
+        <SwappableMetricCard slug="totalActual" pageId="reports/bva" label="Total Actual" value={formatCompactCurrency(totalActualSum)} />
+        <SwappableMetricCard
+          slug="totalVariance"
+          pageId="reports/bva"
           label="Total Variance"
           value={formatCompactCurrency(totalVarianceSum)}
           change={totalVarianceSum >= 0 ? "Favorable" : "Unfavorable"}

@@ -1,4 +1,5 @@
 export { MetricCard } from "./metric-card";
+export { SwappableMetricCard } from "./swappable-metric-card";
 export { Button } from "./button";
 export { ChartCard } from "./chart-card";
 export { DataTable } from "./data-table";

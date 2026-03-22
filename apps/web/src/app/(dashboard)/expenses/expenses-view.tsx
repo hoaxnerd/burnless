@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, RotateCw, DollarSign, TrendingUp } from "lucide-react";
-import { MetricCard } from "@/components/ui";
+import { SwappableMetricCard } from "@/components/ui";
 import { BarChartWidget, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { ExpenseCategoryChart } from "./expense-category-chart";
@@ -76,7 +76,9 @@ export function ExpensesView({
       {/* Summary metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
         <div className="stagger-1 animate-slide-up">
-          <MetricCard
+          <SwappableMetricCard
+            slug="totalMonthly"
+            pageId="expenses"
             label="Total Monthly"
             value={formatCurrency(totalMonthly)}
             change={changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined}
@@ -87,7 +89,9 @@ export function ExpensesView({
           />
         </div>
         <div className="stagger-2 animate-slide-up">
-          <MetricCard
+          <SwappableMetricCard
+            slug="personnelCost"
+            pageId="expenses"
             label="People"
             value={formatCurrency(personnelCost)}
             description={`${personnelPercent.toFixed(0)}% of total`}
@@ -96,7 +100,9 @@ export function ExpensesView({
           />
         </div>
         <div className="stagger-3 animate-slide-up">
-          <MetricCard
+          <SwappableMetricCard
+            slug="anomalies"
+            pageId="expenses"
             label="Anomalies"
             value={String(anomalyCount)}
             description={anomalyCount > 0 ? "Unusual spend detected" : "All spend normal"}
@@ -105,7 +111,9 @@ export function ExpensesView({
           />
         </div>
         <div className="stagger-4 animate-slide-up">
-          <MetricCard
+          <SwappableMetricCard
+            slug="recurring"
+            pageId="expenses"
             label="Recurring"
             value={String(recurringCount)}
             description={`of ${expenseDetails.lineItems.length} expenses`}

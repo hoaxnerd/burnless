@@ -5,6 +5,7 @@ import { monthKey } from "@burnless/engine";
 import { TeamDetails } from "./team-details";
 import { AddHireForm } from "./add-hire-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
+import { SwappableMetricCard } from "@/components/ui";
 
 function formatCurrency(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -120,30 +121,34 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Total Headcount</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{totalHeadcount}</p>
-          {plannedHires.length > 0 && (
-            <p className="mt-1 text-xs text-surface-400">+{plannedHires.reduce((s, h) => s + h.count, 0)} planned</p>
-          )}
-        </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Monthly People Cost</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(totalMonthlyCost)}</p>
-          <p className="mt-1 text-xs text-surface-400">
-            {costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits"}
-          </p>
-        </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Revenue / Employee</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{formatCurrency(revPerEmployee)}<span className="text-base font-normal text-surface-400">/mo</span></p>
-          <p className="mt-1 text-xs text-surface-400">Efficiency metric</p>
-        </div>
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
-          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">Departments</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-surface-900">{deptGroups.size}</p>
-          <p className="mt-1 text-xs text-surface-400">{departments.length} total defined</p>
-        </div>
+        <SwappableMetricCard
+          slug="totalHeadcount"
+          pageId="team"
+          label="Total Headcount"
+          value={String(totalHeadcount)}
+          description={plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + h.count, 0)} planned` : undefined}
+        />
+        <SwappableMetricCard
+          slug="monthlyPeopleCost"
+          pageId="team"
+          label="Monthly People Cost"
+          value={formatCurrency(totalMonthlyCost)}
+          description={costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits"}
+        />
+        <SwappableMetricCard
+          slug="revenuePerEmployee"
+          pageId="team"
+          label="Revenue / Employee"
+          value={`${formatCurrency(revPerEmployee)}/mo`}
+          description="Efficiency metric"
+        />
+        <SwappableMetricCard
+          slug="departments"
+          pageId="team"
+          label="Departments"
+          value={String(deptGroups.size)}
+          description={`${departments.length} total defined`}
+        />
       </div>
 
       {/* Team details */}

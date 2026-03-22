@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, MetricCard } from "@/components/ui";
+import { ChartCard, SwappableMetricCard } from "@/components/ui";
 
 interface ScenarioOption {
   id: string;
@@ -107,9 +107,11 @@ export function ScenarioCompareView({
             return (
               <div key={line.name} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <MetricCard label={`${baseName} — ${line.name}`} value={formatCompactCurrency(lastBase)} />
-                  <MetricCard label={`${compareName} — ${line.name}`} value={formatCompactCurrency(lastCompare)} />
-                  <MetricCard
+                  <SwappableMetricCard slug={`base-${line.name}`} pageId="reports/scenario-compare" label={`${baseName} — ${line.name}`} value={formatCompactCurrency(lastBase)} />
+                  <SwappableMetricCard slug={`compare-${line.name}`} pageId="reports/scenario-compare" label={`${compareName} — ${line.name}`} value={formatCompactCurrency(lastCompare)} />
+                  <SwappableMetricCard
+                    slug={`delta-${line.name}`}
+                    pageId="reports/scenario-compare"
                     label={`Delta — ${line.name}`}
                     value={formatCompactCurrency(delta)}
                     change={lastBase !== 0 ? `${delta >= 0 ? "+" : ""}${((delta / Math.abs(lastBase)) * 100).toFixed(1)}%` : undefined}

@@ -1,7 +1,7 @@
 "use client";
 
 import { DollarSign, TrendingUp, Users, BarChart3 } from "lucide-react";
-import { MetricCard } from "@/components/ui";
+import { SwappableMetricCard } from "@/components/ui";
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { RevenueWaterfallChart } from "./revenue-waterfall-chart";
@@ -37,7 +37,9 @@ export function RevenueView({
       {/* Hero metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
         <div className="stagger-1 animate-slide-up">
-          <MetricCard
+          <SwappableMetricCard
+            slug="monthlyRevenue"
+            pageId="revenue"
             label="Monthly Revenue"
             value={`${formatCurrency(g.currentRevenue)}`}
             change={g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined}
@@ -51,7 +53,9 @@ export function RevenueView({
         {hasSaaS ? (
           <>
             <div className="stagger-2 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="mrr"
+                pageId="revenue"
                 label="MRR"
                 value={formatCurrency(g.currentMrr)}
                 change={g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined}
@@ -62,7 +66,9 @@ export function RevenueView({
               />
             </div>
             <div className="stagger-3 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="customers"
+                pageId="revenue"
                 label="Customers"
                 value={String(Math.round(g.totalCustomers))}
                 description={`ARPA: ${formatCurrency(g.arpa)}/mo`}
@@ -70,7 +76,9 @@ export function RevenueView({
               />
             </div>
             <div className="stagger-4 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="churnRate"
+                pageId="revenue"
                 label="Churn Rate"
                 value={`${g.churnRate.toFixed(1)}%`}
                 description={`LTV: ${formatCurrency(g.ltv)}`}
@@ -82,7 +90,9 @@ export function RevenueView({
         ) : (
           <>
             <div className="stagger-2 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="annualRunRate"
+                pageId="revenue"
                 label="Annual Run Rate"
                 value={formatCurrency(g.currentRevenue * 12)}
                 description="Based on current monthly"
@@ -91,7 +101,9 @@ export function RevenueView({
               />
             </div>
             <div className="stagger-3 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="revenueStreams"
+                pageId="revenue"
                 label="Revenue Streams"
                 value={String(revenueDetails.streamCount)}
                 description="Active sources"
@@ -99,7 +111,9 @@ export function RevenueView({
               />
             </div>
             <div className="stagger-4 animate-slide-up">
-              <MetricCard
+              <SwappableMetricCard
+                slug="growth"
+                pageId="revenue"
                 label="Growth"
                 value={`${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`}
                 description={g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month"}
