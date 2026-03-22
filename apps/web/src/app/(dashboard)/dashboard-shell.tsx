@@ -94,6 +94,8 @@ interface QuickAction {
   icon: LucideIcon;
   href?: string;
   action?: () => void;
+  /** Per-item mode */
+  mode?: QuickActionMode;
 }
 
 /* ── User info ────────────────────────────────────────────────────────────── */
@@ -267,6 +269,7 @@ function DashboardContent({
       .then((prefs) => {
         if (prefs?.sidebarOrder?.length) setNavOrder(prefs.sidebarOrder);
         if (prefs?.quickActionMode) setQuickActionMode(prefs.quickActionMode);
+        if (prefs?.quickActionModeOverrides) setQuickActionModeOverrides(prefs.quickActionModeOverrides);
         if (prefs?.sidebarCollapsed != null) setSidebarCollapsed(prefs.sidebarCollapsed);
       })
       .catch(() => {}); // silently fail — use defaults
@@ -334,25 +337,26 @@ function DashboardContent({
       .filter((item): item is NavItem => !!item);
   }, [navOrder]);
 
-  // Quick actions (dynamic mode — context-aware suggestions)
+  // Per-quick-action mode overrides
+  const [quickActionModeOverrides, setQuickActionModeOverrides] = useState<
+    Record<string, QuickActionMode>
+  >({});
+
+  // Quick actions — merged list with per-item mode support
   const quickActions = useMemo((): QuickAction[] => {
-    if (quickActionMode === "intelligence" && masterEnabled) {
-      return [
+    const actions: QuickAction[] = [
+      { id: "qa-add-expense", label: "Add expense", icon: Receipt, href: "/expenses" },
+      { id: "qa-new-scenario", label: "New scenario", icon: GitBranch, href: "/scenarios/new" },
+      { id: "qa-import", label: "Import data", icon: Upload, href: "/data-room?tab=import" },
+    ];
+    if (masterEnabled) {
+      actions.unshift(
         { id: "qa-ai-review", label: "Review financials", icon: Sparkles, href: "/dashboard" },
         { id: "qa-ai-forecast", label: "Update forecast", icon: Activity, href: "/scenarios" },
-      ];
+      );
     }
-    if (quickActionMode === "dynamic") {
-      return [
-        { id: "qa-add-expense", label: "Add expense", icon: Receipt, href: "/expenses" },
-        { id: "qa-new-scenario", label: "New scenario", icon: GitBranch, href: "/scenarios/new" },
-        { id: "qa-import", label: "Import data", icon: Upload, href: "/data-room?tab=import" },
-      ];
-    }
-    return [
-      { id: "qa-dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    ];
-  }, [quickActionMode, masterEnabled]);
+    return actions;
+  }, [masterEnabled]);
 
   const handleToggleSidebar = useCallback(() => {
     setSidebarCollapsed((c) => {
@@ -365,6 +369,19 @@ function DashboardContent({
   const handleSetQuickActionMode = useCallback((mode: QuickActionMode) => {
     setQuickActionMode(mode);
     persistPreferences({ quickActionMode: mode });
+  }, [persistPreferences]);
+
+  const handleSetQuickActionItemMode = useCallback((actionId: string, mode: QuickActionMode | null) => {
+    setQuickActionModeOverrides((prev) => {
+      const next = { ...prev };
+      if (mode === null) {
+        delete next[actionId];
+      } else {
+        next[actionId] = mode;
+      }
+      persistPreferences({ quickActionModeOverrides: next });
+      return next;
+    });
   }, [persistPreferences]);
 
   const sidebarWidth = sidebarCollapsed ? "w-16" : "w-64";
@@ -425,6 +442,8 @@ function DashboardContent({
               quickActionMode={quickActionMode}
               onSetQuickActionMode={handleSetQuickActionMode}
               quickActions={quickActions}
+              quickActionModeOverrides={quickActionModeOverrides}
+              onSetQuickActionItemMode={handleSetQuickActionItemMode}
               onOpenSearch={() => setCommandPaletteOpen(true)}
               onToggleAI={() => setAiPanelOpen(true)}
               user={user}
@@ -466,8 +485,12 @@ function DashboardContent({
           />
         </aside>
 
-        {/* Main content — only this scrolls */}
-        <main className="flex-1 overflow-auto bg-surface-50" id="main-content" role="main">
+        {/* Main content — floats on desktop to match sidebar, full-bleed on mobile */}
+        <main
+          className="flex-1 overflow-auto bg-surface-50 lg:my-2 lg:mr-2 lg:rounded-2xl lg:border lg:border-surface-200/60 lg:shadow-sm"
+          id="main-content"
+          role="main"
+        >
           <div key={pathname} className="p-4 sm:p-6 lg:p-8 animate-page-enter">
             <ErrorBoundary>
               {children}
@@ -509,6 +532,8 @@ function SidebarInner({
   quickActionMode,
   onSetQuickActionMode,
   quickActions,
+  quickActionModeOverrides,
+  onSetQuickActionItemMode,
   onOpenSearch,
   onToggleAI,
   user,
@@ -528,6 +553,8 @@ function SidebarInner({
   quickActionMode: QuickActionMode;
   onSetQuickActionMode: (mode: QuickActionMode) => void;
   quickActions: QuickAction[];
+  quickActionModeOverrides: Record<string, QuickActionMode>;
+  onSetQuickActionItemMode: (actionId: string, mode: QuickActionMode | null) => void;
   onOpenSearch: () => void;
   onToggleAI: () => void;
   user: UserInfo | null;
@@ -596,60 +623,51 @@ function SidebarInner({
         </button>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions — per-item mode controls, no global toggle */}
       {!collapsed && (
         <div className="px-3 mb-1">
-          <div className="flex items-center justify-between px-1 py-1.5">
+          <div className="flex items-center px-1 py-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
               Quick Actions
             </span>
-            <div className="flex items-center gap-0.5">
-              {(["intelligence", "dynamic", "custom"] as QuickActionMode[]).map((mode) => {
-                const ModeIcon = modeIcons[mode];
-                const isActiveMode = quickActionMode === mode;
-                const isDisabled = mode === "intelligence" && !masterEnabled;
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => !isDisabled && onSetQuickActionMode(mode)}
-                    disabled={isDisabled}
-                    className={`p-1 rounded-md transition-colors ${
-                      isActiveMode
-                        ? "bg-brand-50 text-brand-600"
-                        : isDisabled
-                        ? "text-surface-200 cursor-not-allowed"
-                        : "text-surface-300 hover:text-surface-500 hover:bg-surface-50"
-                    }`}
-                    title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} mode${isDisabled ? " (requires AI)" : ""}`}
-                  >
-                    <ModeIcon className="h-3 w-3" />
-                  </button>
-                );
-              })}
-            </div>
           </div>
           <div className="space-y-0.5">
-            {quickActions.map((qa) => (
-              qa.href ? (
+            {quickActions.map((qa) => {
+              const itemMode = quickActionModeOverrides[qa.id] ?? quickActionMode;
+              const isOverride = qa.id in quickActionModeOverrides;
+
+              const inner = (
+                <>
+                  <Zap className="h-3 w-3 text-warning-500 flex-shrink-0" />
+                  <span className="flex-1 text-left">{qa.label}</span>
+                  <QuickActionModeButton
+                    actionId={qa.id}
+                    currentMode={itemMode}
+                    isOverride={isOverride}
+                    aiEnabled={masterEnabled}
+                    onModeChange={onSetQuickActionItemMode}
+                  />
+                </>
+              );
+
+              return qa.href ? (
                 <Link
                   key={qa.id}
                   href={qa.href}
-                  className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
+                  className="group/qa flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
                 >
-                  <Zap className="h-3 w-3 text-warning-500" />
-                  <span>{qa.label}</span>
+                  {inner}
                 </Link>
               ) : (
                 <button
                   key={qa.id}
                   onClick={qa.action}
-                  className="w-full flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
+                  className="group/qa w-full flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
                 >
-                  <Zap className="h-3 w-3 text-warning-500" />
-                  <span>{qa.label}</span>
+                  {inner}
                 </button>
-              )
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

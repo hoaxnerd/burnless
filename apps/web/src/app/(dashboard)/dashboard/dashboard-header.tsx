@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Dashboard Header — title, mode switcher, catalog button, and board mode.
+ * Dashboard Header — title, catalog button, and board mode.
+ * Global mode switcher removed — per-card mode controls are now on each card.
  */
 
 import { LayoutGrid } from "lucide-react";
-import { ModeSwitcher } from "./mode-switcher";
 import { BoardMeetingMode } from "./board-meeting-mode";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -44,7 +44,6 @@ export function DashboardHeader({ companyName, hasData, boardData }: DashboardHe
         <div className="flex items-center gap-2 flex-shrink-0">
           {hasData && (
             <>
-              <ModeSwitcher />
               <button
                 onClick={() => setCatalogOpen(true)}
                 title="Open metrics catalog"

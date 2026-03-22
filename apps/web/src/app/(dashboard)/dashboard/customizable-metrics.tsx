@@ -18,6 +18,8 @@ import {
   type ComputedMetrics,
 } from "@burnless/engine";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { CardModePopover } from "@/components/ui/card-mode-popover";
+import { useAiFlags } from "@/components/ai/ai-feature-context";
 
 interface CustomizableMetricsProps {
   metrics: ComputedMetrics;
@@ -82,9 +84,12 @@ function MetricRowDynamic({
   prevMonth: string;
   headcount?: { current: number; previous: number };
 }) {
-  const { openFormulaViewer } = useDashboardIntelligence();
+  const { openFormulaViewer, getCardMode, setCardMode, mode: globalMode } = useDashboardIntelligence();
+  const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
   if (!def) return null;
+  const cardMode = getCardMode(slug);
+  const isOverride = cardMode !== globalMode;
 
   const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
 
@@ -147,42 +152,51 @@ function MetricRowDynamic({
       <span className="text-sm text-surface-500 group-hover:text-surface-700 transition-colors">
         {def.name}
       </span>
-      <div className="flex items-center gap-3">
-        {change && (
-          <span
-            className={`text-xs font-medium tabular-nums ${
-              def.direction === "lower_better"
-                ? change.startsWith("+")
-                  ? "text-danger-500"
-                  : change.startsWith("-")
-                    ? "text-success-500"
-                    : "text-surface-400"
-                : change.startsWith("+")
-                  ? "text-success-500"
-                  : change.startsWith("-")
+      <div className="flex items-center gap-2">
+        <CardModePopover
+          currentMode={cardMode}
+          onModeChange={(mode) => setCardMode(slug, mode)}
+          isOverride={isOverride}
+          aiEnabled={aiEnabled}
+          align="right"
+        />
+        <div className="flex items-center gap-3">
+          {change && (
+            <span
+              className={`text-xs font-medium tabular-nums ${
+                def.direction === "lower_better"
+                  ? change.startsWith("+")
                     ? "text-danger-500"
-                    : "text-surface-400"
-            }`}
-          >
-            {change}
+                    : change.startsWith("-")
+                      ? "text-success-500"
+                      : "text-surface-400"
+                  : change.startsWith("+")
+                    ? "text-success-500"
+                    : change.startsWith("-")
+                      ? "text-danger-500"
+                      : "text-surface-400"
+              }`}
+            >
+              {change}
+            </span>
+          )}
+          {benchmarkDisplay && (
+            <span
+              className={`text-xs tabular-nums ${
+                benchmarkDisplay.status === "good"
+                  ? "text-success-500"
+                  : benchmarkDisplay.status === "warn"
+                    ? "text-warning-500"
+                    : "text-danger-500"
+              }`}
+            >
+              {benchmarkDisplay.label}
+            </span>
+          )}
+          <span className="text-sm font-semibold text-surface-900 tabular-nums">
+            {formattedValue}
           </span>
-        )}
-        {benchmarkDisplay && (
-          <span
-            className={`text-xs tabular-nums ${
-              benchmarkDisplay.status === "good"
-                ? "text-success-500"
-                : benchmarkDisplay.status === "warn"
-                  ? "text-warning-500"
-                  : "text-danger-500"
-            }`}
-          >
-            {benchmarkDisplay.label}
-          </span>
-        )}
-        <span className="text-sm font-semibold text-surface-900 tabular-nums">
-          {formattedValue}
-        </span>
+        </div>
       </div>
     </div>
   );

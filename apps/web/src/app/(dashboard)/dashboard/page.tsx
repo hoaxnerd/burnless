@@ -163,6 +163,7 @@ export default async function DashboardPage({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
           <HeroKpiCard
             variant="cash"
+            slug="cash_position"
             label="Cash Position"
             value={hasFunding ? formatCurrency(currentCash) : "$---"}
             change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
@@ -174,6 +175,7 @@ export default async function DashboardPage({
           />
           <HeroKpiCard
             variant="burn"
+            slug="net_burn_rate"
             label="Monthly Burn"
             value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
             change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
@@ -185,6 +187,7 @@ export default async function DashboardPage({
           />
           <HeroKpiCard
             variant="runway"
+            slug="cash_runway_months"
             label="Runway"
             value={
               hasFunding && hasExpenses
@@ -209,6 +212,7 @@ export default async function DashboardPage({
           />
           <HeroKpiCard
             variant="revenue"
+            slug="mrr"
             label="MRR"
             value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
             change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}

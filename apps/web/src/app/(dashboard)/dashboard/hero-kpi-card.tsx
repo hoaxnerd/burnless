@@ -9,6 +9,9 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
+import { CardModePopover, type CardMode } from "@/components/ui/card-mode-popover";
+import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useAiFlags } from "@/components/ai/ai-feature-context";
 
 /* ── Mini sparkline — pure SVG, zero dependencies ─────────────────────────── */
 
@@ -194,6 +197,8 @@ interface HeroKpiCardProps {
   sparkData?: number[];
   /** Animation stagger index (0-based) */
   stagger?: number;
+  /** Metric slug for per-card mode overrides */
+  slug?: string;
 }
 
 /** Returns true if the value is a placeholder (ghost state). */
@@ -211,11 +216,19 @@ export function HeroKpiCard({
   sparkData,
   stagger = 0,
   celebrate = false,
+  slug,
 }: HeroKpiCardProps & { celebrate?: boolean }) {
   const config = variantConfig[variant];
   const Icon = config.icon;
   const router = useRouter();
   const ghost = isGhost(value);
+
+  // Per-card mode from intelligence context
+  const { getCardMode, setCardMode, mode: globalMode } = useDashboardIntelligence();
+  const { masterEnabled: aiEnabled } = useAiFlags();
+  const cardSlug = slug ?? variant;
+  const cardMode = getCardMode(cardSlug);
+  const isOverride = cardMode !== globalMode;
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -260,7 +273,7 @@ export function HeroKpiCard({
       )}
 
       <div className="relative z-10">
-        {/* Header: icon + label */}
+        {/* Header: icon + label + per-card mode gear */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className={ghost ? "text-surface-300" : config.accentColor}>
@@ -270,11 +283,21 @@ export function HeroKpiCard({
               {label}
             </span>
           </div>
-          {!ghost && sparkData && sparkData.length >= 2 && (
-            <div className="hidden sm:block">
-              <Sparkline data={sparkData} color={config.sparkColor} />
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {!ghost && (
+              <CardModePopover
+                currentMode={cardMode}
+                onModeChange={(mode) => setCardMode(cardSlug, mode)}
+                isOverride={isOverride}
+                aiEnabled={aiEnabled}
+              />
+            )}
+            {!ghost && sparkData && sparkData.length >= 2 && (
+              <div className="hidden sm:block">
+                <Sparkline data={sparkData} color={config.sparkColor} />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Value */}
