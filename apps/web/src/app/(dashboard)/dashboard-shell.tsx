@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  BarChart3,
   LayoutDashboard,
   Receipt,
   TrendingUp,
@@ -47,7 +48,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BrandLogo } from "@/components/brand-logo";
-import { AiPanel } from "@/components/ai/ai-panel";
+
 import { AiFeatureProvider, useAiFlags } from "@/components/ai/ai-feature-context";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
 import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
@@ -175,7 +176,6 @@ export function DashboardShell({
   children: React.ReactNode;
   user: UserInfo | null;
 }) {
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -190,27 +190,28 @@ export function DashboardShell({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Listen for custom event from child components (e.g. AiCommandCenter)
-  useEffect(() => {
-    const handler = () => setAiPanelOpen(true);
-    window.addEventListener("burnless:open-ai-panel", handler);
-    return () => window.removeEventListener("burnless:open-ai-panel", handler);
+  // Navigate to AI page when AI is requested (replaces panel behavior)
+  const navigateToAi = useCallback(() => {
+    window.location.href = "/ai";
   }, []);
 
-  const toggleAI = useCallback(() => setAiPanelOpen((prev) => !prev), []);
+  // Listen for custom event from child components (e.g. AiCommandCenter)
+  useEffect(() => {
+    window.addEventListener("burnless:open-ai-panel", navigateToAi);
+    return () => window.removeEventListener("burnless:open-ai-panel", navigateToAi);
+  }, [navigateToAi]);
 
   return (
     <ThemeProvider>
     <ToastProvider>
     <LocaleProvider>
     <AiFeatureProvider>
-    <KeyboardShortcutsProvider onToggleAI={toggleAI}>
+    <KeyboardShortcutsProvider onToggleAI={navigateToAi}>
     <ScenarioProvider>
       <DashboardContent
-        aiPanelOpen={aiPanelOpen}
-        setAiPanelOpen={setAiPanelOpen}
         commandPaletteOpen={commandPaletteOpen}
         setCommandPaletteOpen={setCommandPaletteOpen}
+        navigateToAi={navigateToAi}
         user={user}
       >
         {children}
@@ -228,17 +229,15 @@ export function DashboardShell({
 
 function DashboardContent({
   children,
-  aiPanelOpen,
-  setAiPanelOpen,
   commandPaletteOpen,
   setCommandPaletteOpen,
+  navigateToAi,
   user,
 }: {
   children: React.ReactNode;
-  aiPanelOpen: boolean;
-  setAiPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  navigateToAi: () => void;
   user: UserInfo | null;
 }) {
   const pathname = usePathname();
@@ -351,7 +350,7 @@ function DashboardContent({
     ];
     if (masterEnabled) {
       actions.unshift(
-        { id: "qa-ai-review", label: "Review financials", icon: Sparkles, href: "/dashboard" },
+        { id: "qa-ai-review", label: "Review financials", icon: BarChart3, href: "/dashboard" },
         { id: "qa-ai-forecast", label: "Update forecast", icon: Activity, href: "/scenarios" },
       );
     }
@@ -445,7 +444,7 @@ function DashboardContent({
               quickActionModeOverrides={quickActionModeOverrides}
               onSetQuickActionItemMode={handleSetQuickActionItemMode}
               onOpenSearch={() => setCommandPaletteOpen(true)}
-              onToggleAI={() => setAiPanelOpen(true)}
+              onToggleAI={navigateToAi}
               user={user}
             />
           </aside>
@@ -482,7 +481,7 @@ function DashboardContent({
             quickActionModeOverrides={quickActionModeOverrides}
             onSetQuickActionItemMode={handleSetQuickActionItemMode}
             onOpenSearch={() => setCommandPaletteOpen(true)}
-            onToggleAI={() => setAiPanelOpen(true)}
+            onToggleAI={navigateToAi}
             user={user}
           />
         </aside>
@@ -504,13 +503,8 @@ function DashboardContent({
         <CommandPalette
           open={commandPaletteOpen}
           onClose={() => setCommandPaletteOpen(false)}
-          onToggleAI={chatEnabled ? () => setAiPanelOpen(true) : undefined}
+          onToggleAI={chatEnabled ? navigateToAi : undefined}
         />
-
-        {/* Global AI Panel */}
-        {chatEnabled && (
-          <AiPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
-        )}
       </div>
     </div>
   );
