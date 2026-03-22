@@ -109,7 +109,7 @@ export function CardModePopover({
 
   return (
     <div
-      className="relative"
+      className={`relative ${open ? "z-[100]" : "z-20"}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { if (!open) setHovered(false); }}
     >

@@ -284,7 +284,7 @@ export function HeroKpiCard({
       {/* Per-card mode gear — cut-out notch on top-right border */}
       {!ghost && (
         <div
-          className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
+          className="absolute -top-3 right-3 rounded-full bg-surface-0 ring-1 ring-surface-200"
           onMouseDown={() => { settingsActiveRef.current = true; }}
         >
           <CardModePopover

@@ -136,20 +136,25 @@ function SortableNavItem({
   };
 
   const Icon = item.icon;
+  const isAi = item.id === "ai";
 
   return (
     <div ref={setNodeRef} style={style} className="group relative">
       <Link
         href={href}
         className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
-          isActive
-            ? "bg-brand-50 text-brand-700 shadow-sm"
-            : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+          isAi
+            ? isActive
+              ? "bg-gradient-to-r from-accent-500/15 to-accent-400/10 text-accent-700 shadow-sm border border-accent-500/20"
+              : "bg-gradient-to-r from-accent-500/[0.06] to-transparent text-accent-600 hover:from-accent-500/10 hover:to-accent-400/[0.06] border border-accent-500/10 hover:border-accent-500/20"
+            : isActive
+              ? "bg-brand-50 text-brand-700 shadow-sm"
+              : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
         } ${collapsed ? "justify-center px-2" : ""}`}
         aria-current={isActive ? "page" : undefined}
         title={collapsed ? item.label : undefined}
       >
-        <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? "text-brand-600" : "text-surface-400"}`} />
+        <Icon className={`h-4 w-4 flex-shrink-0 ${isAi ? "text-accent-500" : isActive ? "text-brand-600" : "text-surface-400"}`} />
         {!collapsed && <span className="flex-1">{item.label}</span>}
       </Link>
       {/* Drag handle — only visible on hover, only when expanded */}
@@ -254,7 +259,7 @@ function DashboardContent({
   // Nav item ordering — users can reorder via drag-and-drop
   const defaultOrder = useMemo(() => {
     const items = masterEnabled
-      ? [...coreNavItems, aiNavItem]
+      ? [aiNavItem, ...coreNavItems]
       : coreNavItems;
     return items.map((i) => i.id);
   }, [masterEnabled]);
@@ -300,8 +305,7 @@ function DashboardContent({
     setNavOrder((prev: string[]) => {
       const hasAi = prev.includes("ai");
       if (masterEnabled && !hasAi) {
-        const first = prev[0] ?? "dashboard";
-        return [first, "ai", ...prev.slice(1)];
+        return ["ai", ...prev];
       }
       if (!masterEnabled && hasAi) {
         return prev.filter((id): id is string => id !== "ai");
@@ -605,7 +609,7 @@ function SidebarInner({
       </div>
 
       {/* Search trigger — prominent at top */}
-      <div className="px-3 mb-1">
+      <div className="px-3 mb-3">
         <button
           onClick={onOpenSearch}
           className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all
@@ -629,7 +633,7 @@ function SidebarInner({
 
       {/* Quick Actions — per-item mode controls, no global toggle */}
       {!collapsed && (
-        <div className="px-3 mb-1">
+        <div className="px-3 mb-3">
           <div className="flex items-center px-1 py-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
               Quick Actions
@@ -684,12 +688,12 @@ function SidebarInner({
       )}
 
       {/* Divider */}
-      <div className="px-4 mb-1">
+      <div className="px-4 mb-3">
         <div className="border-t border-surface-200/60" />
       </div>
 
       {/* Main nav — scrollable, drag-and-drop reorderable */}
-      <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-0.5" aria-label="Sidebar">
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1" aria-label="Sidebar">
         <DndContext
           id={dndContextId}
           sensors={sensors}

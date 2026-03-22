@@ -11,6 +11,9 @@ import {
   ArrowUp,
   Loader2,
   X,
+  TrendingUp,
+  ShieldAlert,
+  Zap,
 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
@@ -40,40 +43,94 @@ function formatCompact(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-function generateSummary(
+interface InsightItem {
+  title: string;
+  message: string;
+  severity: "success" | "warning" | "info";
+  icon: typeof TrendingUp;
+}
+
+function generateInsights(
   runway: number,
   burnRate: number,
   mrr: number,
   mrrGrowth: number,
   cash: number,
-): string {
-  const parts: string[] = [];
+): InsightItem[] {
+  const insights: InsightItem[] = [];
 
   if (runway > 0 && runway <= 6) {
-    parts.push(
-      `Your runway is at ${Math.round(runway)} months — time to act on fundraising or cost reduction.`,
-    );
+    insights.push({
+      title: "Runway Alert",
+      message: `${Math.round(runway)} months remaining — time to act on fundraising or cost reduction.`,
+      severity: "warning",
+      icon: ShieldAlert,
+    });
   } else if (runway > 0 && runway < 999) {
-    parts.push(`Your runway looks healthy at ${Math.round(runway)} months.`);
+    insights.push({
+      title: "Runway Healthy",
+      message: `${Math.round(runway)} months of runway at current burn rate.`,
+      severity: "success",
+      icon: TrendingUp,
+    });
   } else if (runway >= 999 && cash > 0) {
-    parts.push(`You're cash-flow positive with ${formatCompact(cash)} in the bank.`);
+    insights.push({
+      title: "Cash-Flow Positive",
+      message: `${formatCompact(cash)} in the bank with positive cash flow.`,
+      severity: "success",
+      icon: TrendingUp,
+    });
   }
 
   if (mrrGrowth > 10) {
-    parts.push(`MRR grew ${mrrGrowth.toFixed(0)}% this month — exceptional momentum.`);
+    insights.push({
+      title: "Exceptional Growth",
+      message: `MRR grew ${mrrGrowth.toFixed(0)}% this month — exceptional momentum.`,
+      severity: "success",
+      icon: Zap,
+    });
   } else if (mrrGrowth > 5) {
-    parts.push(`MRR grew ${mrrGrowth.toFixed(0)}% this month — strong and steady.`);
+    insights.push({
+      title: "Strong MRR Growth",
+      message: `MRR grew ${mrrGrowth.toFixed(0)}% month-over-month — strong and steady.`,
+      severity: "success",
+      icon: TrendingUp,
+    });
   } else if (mrrGrowth > 0 && mrr > 0) {
-    parts.push(`MRR is up ${mrrGrowth.toFixed(1)}% month-over-month.`);
+    insights.push({
+      title: "MRR Trending Up",
+      message: `MRR is up ${mrrGrowth.toFixed(1)}% month-over-month.`,
+      severity: "info",
+      icon: TrendingUp,
+    });
   } else if (mrrGrowth < -5 && mrr > 0) {
-    parts.push(`MRR declined ${Math.abs(mrrGrowth).toFixed(1)}% — worth investigating.`);
+    insights.push({
+      title: "MRR Declining",
+      message: `MRR declined ${Math.abs(mrrGrowth).toFixed(1)}% — worth investigating.`,
+      severity: "warning",
+      icon: ShieldAlert,
+    });
   }
 
-  if (burnRate > 0 && parts.length < 2) {
-    parts.push(`Monthly burn is ${formatCompact(burnRate)}.`);
+  if (burnRate > 0 && insights.length < 2) {
+    insights.push({
+      title: "Burn Rate",
+      message: `Monthly burn is ${formatCompact(burnRate)} with ${formatCompact(cash)} cash on hand.`,
+      severity: "info",
+      icon: Zap,
+    });
   }
 
-  return parts.join(" ") || `You have ${formatCompact(cash)} in cash with ${formatCompact(burnRate)}/mo burn.`;
+  if (insights.length === 0) {
+    insights.push({
+      title: "Financial Snapshot",
+      message: `${formatCompact(cash)} in cash with ${formatCompact(burnRate)}/mo burn.`,
+      severity: "info",
+      icon: TrendingUp,
+    });
+  }
+
+  return insights;
 }
 
 /** Pick a contextual placeholder based on financial data. */
@@ -160,7 +217,7 @@ export function AiCommandCenter({
     return () => controller.abort();
   }, []);
 
-  const summary = generateSummary(runway, burnRate, mrr, mrrGrowth, cash);
+  const insights = generateInsights(runway, burnRate, mrr, mrrGrowth, cash);
   const placeholder = getPlaceholder(runway, mrr, burnRate);
 
   const handleSubmit = useCallback(async () => {
@@ -393,14 +450,57 @@ export function AiCommandCenter({
               </div>
             )}
 
-            {/* AI Summary (shown when no active response) */}
+            {/* AI Insights (shown when no active response) */}
             {!hasResponse && !isStreaming && (
-              <div className="mb-5 rounded-xl bg-surface-50/80 border border-surface-100 p-3.5 sm:p-4">
-                <p className="text-sm text-surface-700 leading-relaxed">
-                  <span className="text-surface-400 mr-1.5">&ldquo;</span>
-                  {summary}
-                  <span className="text-surface-400 ml-1">&rdquo;</span>
-                </p>
+              <div className="mb-5 space-y-2">
+                {insights.map((insight, i) => {
+                  const InsightIcon = insight.icon;
+                  const severityStyles = {
+                    success: {
+                      border: "border-emerald-500/20",
+                      bg: "bg-emerald-50/50",
+                      iconBg: "bg-emerald-500/10",
+                      iconColor: "text-emerald-600",
+                      dot: "bg-emerald-500",
+                    },
+                    warning: {
+                      border: "border-warning-500/20",
+                      bg: "bg-warning-50/50",
+                      iconBg: "bg-warning-500/10",
+                      iconColor: "text-warning-600",
+                      dot: "bg-warning-500",
+                    },
+                    info: {
+                      border: "border-accent-500/15",
+                      bg: "bg-accent-50/30",
+                      iconBg: "bg-accent-500/10",
+                      iconColor: "text-accent-600",
+                      dot: "bg-accent-500",
+                    },
+                  }[insight.severity];
+
+                  return (
+                    <div
+                      key={i}
+                      className={`rounded-xl border ${severityStyles.border} ${severityStyles.bg} p-3.5`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`rounded-lg p-1.5 ${severityStyles.iconBg} mt-0.5`}>
+                          <InsightIcon className={`h-3.5 w-3.5 ${severityStyles.iconColor}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-surface-900">
+                            {insight.title}
+                          </p>
+                          <p className="text-xs text-surface-500 mt-0.5 leading-relaxed">
+                            {insight.message}
+                          </p>
+                        </div>
+                        <div className={`h-2 w-2 rounded-full mt-1.5 ${severityStyles.dot}`} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

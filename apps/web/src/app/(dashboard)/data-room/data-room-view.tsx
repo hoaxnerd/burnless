@@ -9,6 +9,7 @@ import {
   Timer, Target, LayoutGrid, Shuffle, Zap, ChevronRight,
 } from "lucide-react";
 import type { ProfitAndLoss, CashFlowStatement, BalanceSheet } from "@burnless/engine";
+import { useToast } from "@/components/ui/toast";
 import { ImportFlow } from "../import/import-flow";
 
 /* ── Types ──────────────────────────────────────────────────────────────────── */
@@ -123,6 +124,9 @@ const exportItems: ExportItem[] = [
   { id: "cashflow", label: "Cash Flow Statement", description: "Operating, investing, and financing cash flows", format: "pdf", icon: FileText },
   { id: "balance", label: "Balance Sheet", description: "Assets, liabilities, and equity", format: "pdf", icon: FileText },
   { id: "runway", label: "Runway Summary", description: "Cash position, burn rate, and runway projections", format: "pdf", icon: FileText },
+  { id: "pnl-csv", label: "Profit & Loss (CSV)", description: "Full P&L with monthly breakdown by account", format: "csv", icon: Table },
+  { id: "cashflow-csv", label: "Cash Flow (CSV)", description: "Cash flow statement with monthly columns", format: "csv", icon: Table },
+  { id: "balance-csv", label: "Balance Sheet (CSV)", description: "Assets, liabilities, and equity monthly breakdown", format: "csv", icon: Table },
   { id: "metrics-csv", label: "Key Metrics (CSV)", description: "All financial metrics in spreadsheet format", format: "csv", icon: Table },
   { id: "funding-csv", label: "Funding History (CSV)", description: "Funding rounds, amounts, and valuations", format: "csv", icon: Table },
 ];
@@ -131,9 +135,9 @@ const exportItems: ExportItem[] = [
 
 const reportSections = [
   { id: "snapshot", label: "Financial Snapshot", description: "Key metrics overview", exportIds: ["metrics-csv"] },
-  { id: "pnl", label: "Profit & Loss", description: "Revenue & expenses", exportIds: ["pnl"] },
-  { id: "cashflow", label: "Cash Flow", description: "Inflows & outflows", exportIds: ["cashflow"] },
-  { id: "balance", label: "Balance Sheet", description: "Assets & liabilities", exportIds: ["balance"] },
+  { id: "pnl", label: "Profit & Loss", description: "Revenue & expenses", exportIds: ["pnl", "pnl-csv"] },
+  { id: "cashflow", label: "Cash Flow", description: "Inflows & outflows", exportIds: ["cashflow", "cashflow-csv"] },
+  { id: "balance", label: "Balance Sheet", description: "Assets & liabilities", exportIds: ["balance", "balance-csv"] },
   { id: "runway", label: "Runway Analysis", description: "Burn & runway", exportIds: ["runway"] },
   { id: "funding", label: "Funding History", description: "Rounds & valuations", exportIds: ["funding-csv"] },
 ];
@@ -155,6 +159,7 @@ export function DataRoomView({
 }: DataRoomViewProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { success: toastSuccess, error: toastError } = useToast();
   const initialTab = (searchParams.get("tab") as TabId) || "reports";
   const [activeTab, setActiveTab] = useState<TabId>(
     tabs.some((t) => t.id === initialTab) ? initialTab : "reports"
@@ -227,25 +232,103 @@ export function DataRoomView({
           downloadPDF(doc, "runway-summary");
           break;
         }
+        case "pnl-csv": {
+          const { generateStatementCSV, downloadCSV: dlCSV } = await import("@/lib/excel-export");
+          const pnlMonths = profitAndLoss.revenue.values.map((v) => v.month);
+          const csv = generateStatementCSV(
+            { title: "Profit & Loss Statement", companyName, scenarioName, months: pnlMonths },
+            [
+              { name: "Revenue", items: [profitAndLoss.revenue] },
+              { name: "Cost of Goods Sold", items: [profitAndLoss.cogs] },
+              { name: "Gross Profit", items: [profitAndLoss.grossProfit] },
+              { name: "Operating Expenses", items: [profitAndLoss.operatingExpenses] },
+              { name: "Operating Income", items: [profitAndLoss.operatingIncome] },
+              { name: "Other Income", items: [profitAndLoss.otherIncome] },
+              { name: "Other Expenses", items: [profitAndLoss.otherExpenses] },
+              { name: "Net Income", items: [profitAndLoss.netIncome] },
+            ]
+          );
+          dlCSV(csv, "profit-and-loss");
+          break;
+        }
+        case "cashflow-csv": {
+          const { generateStatementCSV: genCSV, downloadCSV: dlCSV2 } = await import("@/lib/excel-export");
+          const cfMonths = cashFlow.operatingCashFlow.values.map((v) => v.month);
+          const csv = genCSV(
+            { title: "Cash Flow Statement", companyName, scenarioName, months: cfMonths },
+            [
+              { name: "Operating Cash Flow", items: [cashFlow.operatingCashFlow] },
+              { name: "Investing Cash Flow", items: [cashFlow.investingCashFlow] },
+              { name: "Financing Cash Flow", items: [cashFlow.financingCashFlow] },
+              { name: "Net Cash Change", items: [cashFlow.netCashChange] },
+              { name: "Ending Cash Position", items: [{ name: "Ending Cash", values: cashFlow.endingCash }] },
+            ]
+          );
+          dlCSV2(csv, "cash-flow");
+          break;
+        }
+        case "balance-csv": {
+          const { generateStatementCSV: genBSCSV, downloadCSV: dlCSV3 } = await import("@/lib/excel-export");
+          const bsMonths = balanceSheet.assets.values.map((v) => v.month);
+          const csv = genBSCSV(
+            { title: "Balance Sheet", companyName, scenarioName, months: bsMonths },
+            [
+              { name: "Assets", items: [balanceSheet.assets] },
+              { name: "Liabilities", items: [balanceSheet.liabilities] },
+              { name: "Equity", items: [balanceSheet.equity] },
+            ]
+          );
+          dlCSV3(csv, "balance-sheet");
+          break;
+        }
         case "metrics-csv": {
-          const headers = ["Category", "Metric", "Value"];
-          const rows = [headers.join(","), ...keyMetrics.map((m) => `${m.category},${m.label},${m.value}`)];
-          downloadCSV(rows.join("\n"), "key-metrics");
+          const lines: string[] = [];
+          lines.push(`Key Financial Metrics`);
+          lines.push(`Company: ${companyName}`);
+          lines.push(`Scenario: ${scenarioName}`);
+          lines.push(`Generated: ${new Date().toLocaleDateString()}`);
+          lines.push(``);
+          lines.push("Category,Metric,Value");
+          for (const m of keyMetrics) {
+            lines.push(`${m.category},${m.label},"${m.value}"`);
+          }
+          lines.push(``);
+          lines.push("Summary");
+          lines.push(`Starting Cash,${startingCash}`);
+          lines.push(`Net Burn Rate,${netBurnRate}`);
+          lines.push(`Runway (months),${runwayMonths >= 999 ? "36+" : Math.round(runwayMonths)}`);
+          lines.push(`Funding Rounds,${fundingRounds.length}`);
+          lines.push(`Total Funding Raised,${fundingRounds.reduce((s, r) => s + r.amount, 0)}`);
+          downloadCSV(lines.join("\n"), "key-metrics");
           break;
         }
         case "funding-csv": {
-          const headers = ["Round", "Amount", "Date", "Pre-Money Valuation"];
-          const rows = [
-            headers.join(","),
-            ...fundingRounds.map((r) =>
-              [r.round, r.amount, r.date, r.valuation ?? "N/A"].join(",")
-            ),
-          ];
-          downloadCSV(rows.join("\n"), "funding-rounds");
+          const fmtAmount = (v: number) => {
+            if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+            if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
+            return `$${v.toFixed(0)}`;
+          };
+          const lines: string[] = [];
+          lines.push(`Funding History`);
+          lines.push(`Company: ${companyName}`);
+          lines.push(`Generated: ${new Date().toLocaleDateString()}`);
+          lines.push(``);
+          lines.push("Round,Amount,Formatted Amount,Date,Pre-Money Valuation");
+          for (const r of fundingRounds) {
+            lines.push(`${r.round},${r.amount},"${fmtAmount(r.amount)}",${r.date},${r.valuation ?? "N/A"}`);
+          }
+          lines.push(``);
+          lines.push(`Total Rounds,${fundingRounds.length}`);
+          lines.push(`Total Raised,${fundingRounds.reduce((s, r) => s + r.amount, 0)},"${fmtAmount(fundingRounds.reduce((s, r) => s + r.amount, 0))}"`);
+          downloadCSV(lines.join("\n"), "funding-rounds");
           break;
         }
       }
       setExported((prev) => new Set(prev).add(id));
+      toastSuccess("Export complete", { description: `${id === "full-deck" ? "Full Financial Package" : id} downloaded.` });
+    } catch (err) {
+      console.error("Export failed:", err);
+      toastError("Export failed", { description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again." });
     } finally {
       setExporting(null);
     }
