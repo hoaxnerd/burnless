@@ -88,7 +88,7 @@ export async function getCompanyPlan(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
   handler: T
-): T {
+): (...args: Parameters<T>) => Promise<NextResponse> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wrapped = async (...args: any[]) => {
     try {
@@ -104,7 +104,7 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
       );
     }
   };
-  return wrapped as T;
+  return wrapped as (...args: Parameters<T>) => Promise<NextResponse>;
 }
 
 /** Parse JSON body with Zod schema. */

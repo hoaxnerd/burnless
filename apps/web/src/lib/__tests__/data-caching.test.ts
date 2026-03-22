@@ -96,7 +96,7 @@ describe("data.ts caching structure (BUR-198 regression)", () => {
         const match = dataSource.match(fnPattern);
         expect(match).not.toBeNull();
         if (match) {
-          const tagValues = match[1]
+          const tagValues = match[1]!
             .split(",")
             .map((t) => t.trim().replace(/['"]/g, ""));
           for (const tag of tags) {

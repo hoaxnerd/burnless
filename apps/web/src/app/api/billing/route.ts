@@ -36,7 +36,7 @@ interface SubscriptionStatus {
   };
 }
 
-export const GET = withErrorHandler(async () => {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
