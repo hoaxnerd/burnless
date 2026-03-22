@@ -20,6 +20,7 @@ import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { logger } from "@/lib/logger";
+import { checkInsightFreshness, MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
 
 const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios"] as const;
 type PageType = (typeof VALID_PAGES)[number];
@@ -60,8 +61,13 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   const cachedAt = cached[0].updatedAt;
   const ageMs = Date.now() - cachedAt.getTime();
-  const stale = ageMs > 24 * 60 * 60 * 1000; // > 24h
+  const timeStale = ageMs > 24 * 60 * 60 * 1000; // > 24h
   const expiresAt = cached[0].expiresAt;
+
+  // Check if underlying data has changed since insights were generated
+  const freshness = await checkInsightFreshness(ctx.companyId, cachedAt);
+  const dataChanged = freshness.dataChangedAt !== null && freshness.dataChangedAt > cachedAt.getTime();
+  const stale = timeStale || dataChanged;
 
   return NextResponse.json({
     insights: cached[0].content,
@@ -71,6 +77,11 @@ export const GET = withErrorHandler(async (request: Request) => {
     stale,
     ageMs,
     canRefresh: status.canGenerate,
+    // Data mutation awareness
+    dataChanged,
+    dataChangedAt: freshness.dataChangedAt ? new Date(freshness.dataChangedAt).toISOString() : null,
+    graceRemaining: freshness.graceRemaining,
+    gracePeriodMs: MUTATION_GRACE_PERIOD_MS,
   });
 });
 
@@ -98,10 +109,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   let scenarioId: string | undefined;
   let page: PageType = "dashboard";
   let pageData: Record<string, unknown> | undefined;
+  let forceRefresh = false;
 
   try {
     const body = await request.json();
     scenarioId = body.scenarioId;
+    forceRefresh = body.forceRefresh === true;
     if (body.page && VALID_PAGES.includes(body.page)) {
       page = body.page;
     }
@@ -110,6 +123,48 @@ export const POST = withErrorHandler(async (request: Request) => {
     }
   } catch {
     // No body is fine — use defaults
+  }
+
+  // Check grace period — unless user explicitly forced a refresh
+  if (!forceRefresh && page !== "dashboard") {
+    const cacheType = page === "expenses" ? "expense" as const : page === "scenarios" ? "scenario" as const : page;
+    const cached = await db
+      .select()
+      .from(aiInsightCache)
+      .where(
+        and(
+          eq(aiInsightCache.companyId, ctx.companyId),
+          eq(aiInsightCache.type, cacheType)
+        )
+      )
+      .limit(1);
+
+    if (cached[0]) {
+      const freshness = await checkInsightFreshness(ctx.companyId, cached[0].updatedAt);
+
+      // If data hasn't changed, serve cached — no need to regenerate
+      if (!freshness.needsRegeneration && freshness.dataChangedAt === null) {
+        return NextResponse.json({
+          insights: cached[0].content,
+          cached: true,
+          cachedAt: cached[0].updatedAt,
+          page,
+          skippedReason: "no_data_change",
+        });
+      }
+
+      // If data changed but grace period is still active, serve cached with hint
+      if (!freshness.needsRegeneration && freshness.graceRemaining !== null) {
+        return NextResponse.json({
+          insights: cached[0].content,
+          cached: true,
+          cachedAt: cached[0].updatedAt,
+          page,
+          skippedReason: "grace_period",
+          graceRemaining: freshness.graceRemaining,
+        });
+      }
+    }
   }
 
   let scenario;

@@ -5,6 +5,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { updateForecastLineSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
@@ -32,6 +33,7 @@ export const PATCH = withErrorHandler(async (
 
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
+  await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   return NextResponse.json(row);
 });
@@ -49,6 +51,7 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(forecastLines).where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "delete", { before: row });
+  await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   return NextResponse.json({ deleted: true });
 });

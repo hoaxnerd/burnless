@@ -6,6 +6,7 @@ import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorH
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import { monetaryAmount } from "@/lib/financial-validation";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import crypto from "crypto";
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -248,6 +249,8 @@ export const POST = withErrorHandler(async (request: Request) => {
         errors: errors.length > 0 ? errors : null,
       })
       .where(eq(importBatches.id, batch!.id));
+
+    await trackDataMutation(ctx.companyId, "expenses");
 
     return NextResponse.json({
       imported: toInsert.length,

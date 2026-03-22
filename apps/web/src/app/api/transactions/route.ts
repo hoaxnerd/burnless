@@ -6,6 +6,7 @@ import { requireCompanyAccess, parseBody, withErrorHandler } from "@/lib/api-hel
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { monetaryAmount } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 const createSchema = z.object({
   accountId: z.string(),
@@ -60,5 +61,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "transaction", row.id, "create", { after: row });
+  await trackDataMutation(ctx.companyId, "expenses");
   return NextResponse.json(row, { status: 201 });
 });

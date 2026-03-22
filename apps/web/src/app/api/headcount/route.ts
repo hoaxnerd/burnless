@@ -6,6 +6,7 @@ import { createHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -54,6 +55,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }).returning();
 
   if (row) await logAudit(ctx, "headcount_plan", row.id, "create", { after: row });
+  await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
   return NextResponse.json(row, { status: 201 });
 });

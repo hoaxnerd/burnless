@@ -6,6 +6,7 @@ import { createFundingRoundSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -51,6 +52,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "funding_round", row.id, "create", { after: row });
+  await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
   return NextResponse.json(row, { status: 201 });
 });

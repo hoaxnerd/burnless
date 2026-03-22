@@ -7,6 +7,7 @@ import { requireCompanyAccess, requireRole, getCompanyPlan, parseBody, errorResp
 import { canPerformAction } from "@/lib/feature-gate";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -60,6 +61,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     .returning();
 
   if (row) await logAudit(ctx, "scenario", row.id, "create", { after: row });
+  await trackDataMutation(ctx.companyId, "scenarios");
   revalidateTag("scenarios");
   return NextResponse.json(row, { status: 201 });
 });

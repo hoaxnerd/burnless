@@ -5,6 +5,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { updateHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
@@ -31,6 +32,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db.update(headcountPlans).set(updates).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
+  await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
   return NextResponse.json(row);
 });
@@ -48,6 +50,7 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(headcountPlans).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "delete", { before: row });
+  await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
   return NextResponse.json({ deleted: true });
 });

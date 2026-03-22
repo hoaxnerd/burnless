@@ -4,6 +4,7 @@ import { scenarios, findByIdForCompany, updateForCompany, deleteForCompany } fro
 import { updateScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const GET = withErrorHandler(async (
   _request: Request,
@@ -42,6 +43,7 @@ export const PATCH = withErrorHandler(async (
   const row = await updateForCompany(scenarios, id, ctx.companyId, updates);
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "update", { after: row });
+  await trackDataMutation(ctx.companyId, "scenarios");
   revalidateTag("scenarios");
   return NextResponse.json(row);
 });
@@ -59,6 +61,7 @@ export const DELETE = withErrorHandler(async (
   const row = await deleteForCompany(scenarios, id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "delete", { before: row });
+  await trackDataMutation(ctx.companyId, "scenarios");
   revalidateTag("scenarios");
   return NextResponse.json({ deleted: true });
 });

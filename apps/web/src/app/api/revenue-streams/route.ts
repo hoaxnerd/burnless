@@ -6,6 +6,7 @@ import { createRevenueStreamSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -53,6 +54,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const [row] = await db.insert(revenueStreams).values(parsed.data).returning();
   if (row) await logAudit(ctx, "revenue_stream", row.id, "create", { after: row });
+  await trackDataMutation(ctx.companyId, "revenue");
   revalidateTag("revenue-streams");
   return NextResponse.json(row, { status: 201 });
 });

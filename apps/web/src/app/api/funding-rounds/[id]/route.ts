@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { updateFundingRoundSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -29,6 +30,7 @@ export const PATCH = withErrorHandler(async (
   const [row] = await db.update(fundingRounds).set(updates).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "update", { after: row });
+  await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
   return NextResponse.json(row);
 });
@@ -46,6 +48,7 @@ export const DELETE = withErrorHandler(async (
   const [row] = await db.delete(fundingRounds).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "delete", { before: row });
+  await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
   return NextResponse.json({ deleted: true });
 });

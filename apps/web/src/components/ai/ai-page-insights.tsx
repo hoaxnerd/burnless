@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Info,
 } from "lucide-react";
 import { AiGate } from "./ai-gate";
 import { useAiFeature } from "./ai-feature-context";
@@ -89,6 +90,13 @@ function formatAge(dateStr: string): string {
   return `${days}d ago`;
 }
 
+/** Format remaining grace period as human-readable. */
+function formatGraceRemaining(ms: number): string {
+  const mins = Math.ceil(ms / 60_000);
+  if (mins <= 1) return "less than a minute";
+  return `~${mins} minutes`;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsProps) {
@@ -99,77 +107,89 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [cached, setCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
+  const [dataChanged, setDataChanged] = useState(false);
+  const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
   const [canRefresh, setCanRefresh] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const [slow, setSlow] = useState(false);
   const _insightFeature = useAiFeature("insights");
 
-  const fetchInsights = useCallback(
-    async (forceGenerate = false) => {
-      setLoading(true);
-      setError(false);
-      setSlow(false);
+  /** Fetch cached insights only — never auto-triggers LLM generation. */
+  const fetchCached = useCallback(async () => {
+    setLoading(true);
+    setError(false);
 
-      const controller = new AbortController();
-      const slowTimer = setTimeout(() => setSlow(true), 5000);
-      const abortTimer = setTimeout(() => controller.abort(), 15000);
-
-      try {
-        if (!forceGenerate) {
-          // Try cached first
-          const cachedRes = await fetch(`/api/insights?page=${page}`, { signal: controller.signal });
-          if (cachedRes.ok) {
-            const data = await cachedRes.json();
-            if (data.insights?.length > 0) {
-              setInsights(data.insights);
-              setCached(true);
-              setCachedAt(data.cachedAt ?? null);
-              setStale(data.stale ?? false);
-              setCanRefresh(data.canRefresh ?? true);
-              setLoading(false);
-              clearTimeout(slowTimer);
-              clearTimeout(abortTimer);
-              return;
-            }
-          }
-        }
-
-        // Generate fresh insights
-        const res = await fetch("/api/insights", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ page, scenarioId, pageData }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) throw new Error("Failed to generate insights");
-
+    try {
+      const res = await fetch(`/api/insights?page=${page}`);
+      if (res.ok) {
         const data = await res.json();
-        setInsights(data.insights ?? []);
-        setCached(false);
-        setCachedAt(null);
-        setStale(false);
-        setCanRefresh(true);
-      } catch (err) {
-        setError(true);
-        setErrorVariant(classifyError(err));
-        // Log error
-        if (!(err instanceof DOMException && err.name === "AbortError")) {
-          captureException(err);
+        if (data.insights?.length > 0) {
+          setInsights(data.insights);
+          setCached(true);
+          setCachedAt(data.cachedAt ?? null);
+          setStale(data.stale ?? false);
+          setDataChanged(data.dataChanged ?? false);
+          setGraceRemaining(data.graceRemaining ?? null);
+          setCanRefresh(data.canRefresh ?? true);
         }
-      } finally {
-        setLoading(false);
-        setSlow(false);
-        clearTimeout(slowTimer);
-        clearTimeout(abortTimer);
       }
-    },
-    [page, scenarioId, pageData]
-  );
+    } catch (err) {
+      setError(true);
+      setErrorVariant(classifyError(err));
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        captureException(err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
 
+  /** User-triggered refresh — sends forceRefresh to bypass grace period. */
+  const refreshInsights = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    setSlow(false);
+
+    const controller = new AbortController();
+    const slowTimer = setTimeout(() => setSlow(true), 5000);
+    const abortTimer = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const res = await fetch("/api/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, scenarioId, pageData, forceRefresh: true }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error("Failed to generate insights");
+
+      const data = await res.json();
+      setInsights(data.insights ?? []);
+      setCached(false);
+      setCachedAt(null);
+      setStale(false);
+      setDataChanged(false);
+      setGraceRemaining(null);
+      setCanRefresh(true);
+    } catch (err) {
+      setError(true);
+      setErrorVariant(classifyError(err));
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        captureException(err);
+      }
+    } finally {
+      setLoading(false);
+      setSlow(false);
+      clearTimeout(slowTimer);
+      clearTimeout(abortTimer);
+    }
+  }, [page, scenarioId, pageData]);
+
+  // On mount: only fetch cached insights — never auto-generate
   useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
+    fetchCached();
+  }, [fetchCached]);
 
   if (loading && insights.length === 0) {
     return (
@@ -195,7 +215,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
           <DataLoadError
             title="Couldn't load insights"
             variant={errorVariant}
-            onRetry={() => fetchInsights()}
+            onRetry={() => fetchCached()}
             retrying={loading}
             compact
           />
@@ -230,16 +250,15 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Show refresh even in cached-only mode when stale */}
-            {(canRefresh || (cached && stale)) && (
+            {canRefresh && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  fetchInsights(true);
+                  refreshInsights();
                 }}
-                disabled={loading || (!canRefresh && !stale)}
+                disabled={loading}
                 className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all disabled:opacity-50"
-                title={canRefresh ? "Refresh insights" : "Cached mode — refresh unavailable"}
+                title="Refresh insights"
               >
                 <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
               </button>
@@ -252,15 +271,51 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
           </div>
         </div>
 
-        {/* Staleness warning banner */}
-        {stale && expanded && (
+        {/* Data changed + grace period banner */}
+        {dataChanged && graceRemaining !== null && graceRemaining > 0 && expanded && (
+          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-brand-500/15 bg-brand-50/30 px-3 py-2">
+            <Info className="h-3.5 w-3.5 text-brand-500 flex-shrink-0" />
+            <p className="text-xs text-brand-700">
+              Your data has changed. New insights will be available in {formatGraceRemaining(graceRemaining)}.
+              <button
+                onClick={() => refreshInsights()}
+                disabled={loading}
+                className="ml-1 underline hover:no-underline font-medium"
+              >
+                Refresh now
+              </button>
+            </p>
+          </div>
+        )}
+
+        {/* Data changed + grace elapsed banner */}
+        {dataChanged && (graceRemaining === null || graceRemaining <= 0) && expanded && (
+          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
+            <p className="text-xs text-warning-700">
+              These insights may not reflect your recent data changes.
+              {canRefresh && (
+                <button
+                  onClick={() => refreshInsights()}
+                  disabled={loading}
+                  className="ml-1 underline hover:no-underline font-medium"
+                >
+                  Refresh now
+                </button>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Time-based staleness banner (>24h, no data change) */}
+        {stale && !dataChanged && expanded && (
           <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
             <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
             <p className="text-xs text-warning-700">
               These insights are over 24 hours old and may not reflect recent changes.
               {canRefresh && (
                 <button
-                  onClick={() => fetchInsights(true)}
+                  onClick={() => refreshInsights()}
                   disabled={loading}
                   className="ml-1 underline hover:no-underline font-medium"
                 >
