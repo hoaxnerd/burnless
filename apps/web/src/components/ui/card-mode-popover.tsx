@@ -107,20 +107,21 @@ export function CardModePopover({
         ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           setOpen((prev) => !prev);
         }}
         className={`
-          p-1 rounded-md transition-all duration-200
+          p-1.5 rounded-full transition-all duration-200 shadow-sm border
           ${open
-            ? "opacity-100 bg-surface-100 text-surface-600"
-            : "opacity-0 group-hover:opacity-100 text-surface-300 hover:text-surface-500 hover:bg-surface-100"
+            ? "opacity-100 bg-surface-0 border-surface-300 text-surface-600"
+            : "opacity-0 group-hover:opacity-100 bg-surface-0 border-surface-200 text-surface-300 hover:text-surface-500 hover:border-surface-300"
           }
         `}
         title="Card mode settings"
         aria-label="Card mode settings"
         aria-expanded={open}
       >
-        <Settings className="h-3.5 w-3.5" />
+        <Settings className="h-3 w-3" />
       </button>
 
       {open && (

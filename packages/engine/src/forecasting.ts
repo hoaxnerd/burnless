@@ -138,16 +138,18 @@ function computeMonthValue(
   switch (method) {
     case "fixed": {
       const p = params as unknown as FixedParams;
-      return p.amount;
+      return p.amount ?? 0;
     }
 
     case "growth_rate": {
       const p = params as unknown as GrowthRateParams;
+      if (p.baseAmount == null || p.monthlyGrowthRate == null) return 0;
       return D(p.baseAmount).mul(dPow(D(1).plus(p.monthlyGrowthRate), monthsElapsed)).toNumber();
     }
 
     case "per_unit": {
       const p = params as unknown as PerUnitParams;
+      if (p.units == null || p.pricePerUnit == null) return 0;
       const units = D(p.units).mul(dPow(D(1).plus(p.unitGrowthRate ?? 0), monthsElapsed));
       const price = D(p.pricePerUnit).mul(dPow(D(1).plus(p.priceGrowthRate ?? 0), monthsElapsed));
       return units.mul(price).toNumber();
@@ -159,11 +161,13 @@ function computeMonthValue(
       const sourceSeries = resolvedLines.get(p.sourceLineId);
       if (!sourceSeries) return 0;
       const sourceValue = sourceSeries.get(currentMonthKey) ?? 0;
+      if (p.percentage == null) return 0;
       return D(sourceValue).mul(p.percentage).toNumber();
     }
 
     case "custom_formula": {
       const p = params as unknown as CustomFormulaParams;
+      if (!p.expression) return 0;
       const ctx: FormulaContext = {
         variables: {
           ...p.variables,
@@ -174,7 +178,7 @@ function computeMonthValue(
         allMonthKeys,
       };
       const result = evaluateFormula(p.expression, ctx);
-      return result.value;
+      return result.value ?? 0;
     }
 
     default:

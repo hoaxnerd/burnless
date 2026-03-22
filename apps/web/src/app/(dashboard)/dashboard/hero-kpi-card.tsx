@@ -253,7 +253,7 @@ export function HeroKpiCard({
       onClick={() => router.push(config.href)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(config.href); }}
       className={`
-        group relative overflow-hidden cursor-pointer
+        group relative cursor-pointer
         rounded-2xl border
         p-5 sm:p-6
         transition-all duration-300
@@ -268,12 +268,24 @@ export function HeroKpiCard({
       {/* Subtle gradient glow — only on populated cards */}
       {!ghost && (
         <div
-          className={`absolute inset-0 bg-gradient-to-br ${config.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${config.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
         />
       )}
 
+      {/* Per-card mode gear — cut-out on top-right border */}
+      {!ghost && (
+        <div className="absolute -top-2.5 -right-2.5 z-20">
+          <CardModePopover
+            currentMode={cardMode}
+            onModeChange={(mode) => setCardMode(cardSlug, mode)}
+            isOverride={isOverride}
+            aiEnabled={aiEnabled}
+          />
+        </div>
+      )}
+
       <div className="relative z-10">
-        {/* Header: icon + label + per-card mode gear */}
+        {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className={ghost ? "text-surface-300" : config.accentColor}>
@@ -284,14 +296,6 @@ export function HeroKpiCard({
             </span>
           </div>
           <div className="flex items-center gap-1">
-            {!ghost && (
-              <CardModePopover
-                currentMode={cardMode}
-                onModeChange={(mode) => setCardMode(cardSlug, mode)}
-                isOverride={isOverride}
-                aiEnabled={aiEnabled}
-              />
-            )}
             {!ghost && sparkData && sparkData.length >= 2 && (
               <div className="hidden sm:block">
                 <Sparkline data={sparkData} color={config.sparkColor} />

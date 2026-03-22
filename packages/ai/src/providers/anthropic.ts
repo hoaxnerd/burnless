@@ -29,25 +29,26 @@ function toAnthropicTools(
   }));
 }
 
-/** Map Anthropic content blocks to our generic format. */
+/** Map Anthropic content blocks to our generic format (skip thinking blocks). */
 function fromAnthropicContent(
   blocks: Anthropic.ContentBlock[]
 ): ContentBlock[] {
-  return blocks.map((b) => {
-    if (b.type === "text") {
-      return { type: "text" as const, text: b.text };
-    }
-    if (b.type === "tool_use") {
-      return {
-        type: "tool_use" as const,
-        id: b.id,
-        name: b.name,
-        input: b.input as Record<string, unknown>,
-      };
-    }
-    // Fallback for unknown block types
-    return { type: "text" as const, text: "" };
-  });
+  return blocks
+    .filter((b) => b.type === "text" || b.type === "tool_use")
+    .map((b) => {
+      if (b.type === "text") {
+        return { type: "text" as const, text: b.text };
+      }
+      if (b.type === "tool_use") {
+        return {
+          type: "tool_use" as const,
+          id: b.id,
+          name: b.name,
+          input: b.input as Record<string, unknown>,
+        };
+      }
+      return { type: "text" as const, text: "" };
+    });
 }
 
 function mapStopReason(reason: string | null): StopReason {
@@ -158,8 +159,9 @@ export class AnthropicProvider extends LlmProvider {
 
     for await (const event of anthropicStream) {
       if (event.type === "content_block_delta") {
-        const delta = event.delta;
-        if ("text" in delta) {
+        const delta = event.delta as Record<string, unknown>;
+        // Only yield text deltas, skip thinking deltas
+        if (delta.type === "text_delta" && typeof delta.text === "string") {
           yield { type: "text_delta", text: delta.text };
         }
       } else if (event.type === "message_stop") {

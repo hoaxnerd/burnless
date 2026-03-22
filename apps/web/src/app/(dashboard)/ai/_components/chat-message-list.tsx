@@ -4,6 +4,11 @@ import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
 import type { Message } from "./types";
 
+/** Strip model thinking tags (e.g. <think>...</think>) from response text. */
+function stripThinkingTags(text: string): string {
+  return text.replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "").trim();
+}
+
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 5) return "just now";
@@ -77,7 +82,7 @@ export function ChatMessageList({
                       : "bg-surface-0 border border-surface-200 text-surface-800 rounded-bl-md shadow-sm"
                   }`}
                 >
-                  <MarkdownRenderer content={msg.content} />
+                  <MarkdownRenderer content={isUser ? msg.content : stripThinkingTags(msg.content)} />
 
                   {/* Typing indicator — shown when streaming with no content yet */}
                   {msg.isStreaming && !msg.content && (

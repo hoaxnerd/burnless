@@ -674,33 +674,6 @@ function SidebarInner({
         </div>
       )}
 
-      {/* AI Companion — prominent card */}
-      {masterEnabled && chatEnabled && (
-        <div className="px-3 mb-2">
-          <button
-            onClick={onToggleAI}
-            className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all
-              bg-gradient-to-r from-accent-50 to-accent-100 dark:from-accent-950 dark:to-accent-950
-              border border-accent-200/50 dark:border-accent-800/30
-              text-accent-700 dark:text-accent-300
-              hover:shadow-md hover:border-accent-300/70 dark:hover:border-accent-700/50
-              ${collapsed ? "justify-center px-2" : ""}
-            `}
-            title={collapsed ? "AI Companion" : undefined}
-          >
-            <Sparkles className="h-4 w-4 flex-shrink-0 text-accent-500" />
-            {!collapsed && (
-              <>
-                <span className="flex-1 text-left">AI Companion</span>
-                <span className="text-[10px] font-normal text-accent-400 bg-accent-100 dark:bg-accent-900/40 px-1.5 py-0.5 rounded-full">
-                  Ask
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Divider */}
       <div className="px-4 mb-1">
         <div className="border-t border-surface-200/60" />
