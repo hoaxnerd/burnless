@@ -14,7 +14,6 @@ import {
   scenarios,
   financialAccounts,
   departments,
-  forecastLines,
   revenueStreams,
 } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
@@ -25,7 +24,6 @@ import {
   parseStage,
   parseBusinessModel,
   parseMoneyAmount,
-  parseTeamSize,
 } from "@/lib/onboarding-helpers";
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -72,7 +70,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   const stage = parseStage(body.stage);
   const businessModel = parseBusinessModel(body.business_model);
   const monthlyRevenue = parseMoneyAmount(body.monthly_revenue ?? "0");
-  const teamSize = parseTeamSize(body.team_size ?? "1");
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -123,7 +120,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         { name: "Equity", type: "equity" as const, category: "equity" as const, isSystem: true },
       ];
 
-      const createdAccounts = await tx
+      await tx
         .insert(financialAccounts)
         .values(
           defaultAccounts.map((a) => ({
@@ -133,8 +130,7 @@ export const POST = withErrorHandler(async (request: Request) => {
             category: a.category,
             isSystem: a.isSystem,
           }))
-        )
-        .returning();
+        );
 
       // Create default departments
       const defaultDepts = ["Engineering", "Sales", "Marketing", "Operations", "General & Admin"];
@@ -167,38 +163,9 @@ export const POST = withErrorHandler(async (request: Request) => {
         });
       }
 
-      // Create initial forecast lines based on user's expense info
-      const now = new Date();
-      const periodStart = new Date(now.getFullYear(), 0, 1);
-      const periodEnd = new Date(now.getFullYear(), 11, 31);
-
-      const expenseAccounts = createdAccounts.filter(
-        (a) => a.category === "operating_expense"
-      );
-
-      const forecastValues = [];
-      for (const account of expenseAccounts) {
-        let monthlyAmount = 0;
-        if (account.name === "Cloud Infrastructure") monthlyAmount = Math.max(500, Math.round(monthlyRevenue * 0.1));
-        else if (account.name === "Marketing") monthlyAmount = Math.max(1000, Math.round(monthlyRevenue * 0.15));
-        else if (account.name === "Office & Admin") monthlyAmount = Math.max(500, teamSize * 200);
-        else if (account.name === "Software & Tools") monthlyAmount = Math.max(200, teamSize * 100);
-
-        if (monthlyAmount > 0) {
-          forecastValues.push({
-            scenarioId: scenario.id,
-            accountId: account.id,
-            method: "fixed" as const,
-            parameters: { amount: monthlyAmount },
-            startDate: periodStart,
-            endDate: periodEnd,
-          });
-        }
-      }
-
-      if (forecastValues.length > 0) {
-        await tx.insert(forecastLines).values(forecastValues);
-      }
+      // Note: We no longer auto-generate expense forecast lines during onboarding.
+      // Users should add their real expenses explicitly via the expenses page.
+      // This avoids showing placeholder/dummy data that confuses users.
 
       return { companyId: company.id, scenarioId: scenario.id };
     });

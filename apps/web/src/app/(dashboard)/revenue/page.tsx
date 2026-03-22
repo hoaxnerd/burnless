@@ -5,7 +5,7 @@ import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { seriesToArray } from "@burnless/engine";
 import { RevenueView } from "./revenue-view";
 import { AddRevenueStreamForm } from "./add-revenue-stream-form";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { SetupPrompt, ScenarioPrompt, RevenueEmptyState } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 export default async function RevenuePage({
@@ -32,6 +32,24 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),
   ]);
+
+  // Show empty state if no revenue streams exist
+  if (revenueDetails.streamCount === 0) {
+    return (
+      <div>
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Revenue</h1>
+            <p className="mt-1 text-sm text-surface-500">
+              Your growth story &mdash; MRR, streams, waterfall, and AI projections
+            </p>
+          </div>
+          <AddRevenueStreamForm scenarioId={scenarioId} />
+        </div>
+        <RevenueEmptyState />
+      </div>
+    );
+  }
 
   const revenueTimeline = seriesToArray(data.totalRevenue);
   const mrrTimeline = data.metrics.mrr;

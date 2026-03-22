@@ -6,6 +6,7 @@ import { seriesToArray, monthKey } from "@burnless/engine";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
+import { ExpensesEmptyState } from "@/components/ui/empty-state";
 
 export default async function ExpensesPage({
   searchParams,
@@ -54,6 +55,27 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
     budgetScenario && budgetScenario.id !== scenarioId
       ? computeDashboardData(companyId, budgetScenario.id)
       : null;
+
+  // Show empty state if no expense data exists
+  if (expenseDetails.lineItems.length === 0) {
+    return (
+      <div>
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Expenses</h1>
+            <p className="mt-1 text-sm text-surface-500">
+              Intelligent spend management &mdash; AI categorized, anomaly tracked, fully searchable
+            </p>
+          </div>
+          <AddExpenseForm
+            scenarioId={scenarioId}
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+          />
+        </div>
+        <ExpensesEmptyState />
+      </div>
+    );
+  }
 
   const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
   const totalExpenseAmount = totalExpenses.get(currentMonth) ?? 0;
