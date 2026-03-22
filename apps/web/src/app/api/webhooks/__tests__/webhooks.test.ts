@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-// ── Hoisted mocks ───────────────────────────────────────────────────────────
+// ── Hoisted mocks ────────────────────────────────────────────────────────────
 
 const {
   mockSelect,
@@ -33,7 +33,7 @@ const { mockLogError, mockLogWarn } = vi.hoisted(() => ({
   mockLogWarn: vi.fn(),
 }));
 
-// ── Module mocks ────────────────────────────────────────────────────────────
+// ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@burnless/db", () => ({
   db: {
@@ -121,7 +121,7 @@ function webhookRequest(
   return [request, { params: Promise.resolve({ provider }) }];
 }
 
-/** Set up the chainable db.select().from().where().limit() mock. */
+/** Set up the chainable db.select().from().where().limit() mock with sequential results. */
 function setupSelectChain(results: unknown[][]) {
   let callIndex = 0;
   mockSelect.mockImplementation(() => ({ from: mockFrom }));
@@ -193,12 +193,13 @@ describe("POST /api/webhooks/[provider]", () => {
       });
       mockGetSubscription.mockResolvedValue({ planId: "price_pro" });
 
-      // Direction 1: findCompanyByCustomerId → returns matching company
-      // Direction 2: lookup claimed company → returns matching
+      // Direction 1: findCompanyByCustomerId → same company
+      // Direction 2: claimed company check → matching customerId
+      // ownerEmail → returns email
       setupSelectChain([
-        [{ id: "comp-1", ownerId: "user-1" }], // findCompanyByCustomerId
-        [{ id: "comp-1", stripeCustomerId: "cus_123" }], // claimed company check
-        [{ email: "user@test.com" }], // ownerEmail
+        [{ id: "comp-1", ownerId: "user-1" }],
+        [{ id: "comp-1", stripeCustomerId: "cus_123" }],
+        [{ email: "user@test.com" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
@@ -223,9 +224,9 @@ describe("POST /api/webhooks/[provider]", () => {
 
       // No company owns this customer yet; claimed company has no stripeCustomerId
       setupSelectChain([
-        [], // findCompanyByCustomerId → no match (new customer)
-        [{ id: "comp-2", stripeCustomerId: null }], // claimed company → no existing customer
-        [{ email: "owner@test.com" }], // ownerEmail
+        [],
+        [{ id: "comp-2", stripeCustomerId: null }],
+        [{ email: "owner@test.com" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
@@ -235,7 +236,7 @@ describe("POST /api/webhooks/[provider]", () => {
       expect(mockUpdate).toHaveBeenCalled();
     });
 
-    it("REJECTS when customerId belongs to a different company", async () => {
+    it("REJECTS when customerId belongs to a different company (security)", async () => {
       mockHandleWebhook.mockResolvedValue({
         type: "checkout.session.completed",
         data: {
@@ -245,25 +246,22 @@ describe("POST /api/webhooks/[provider]", () => {
         },
       });
 
-      // Direction 1: customerId already belongs to a different company
+      // Direction 1: customerId belongs to a different company
       setupSelectChain([
-        [{ id: "comp-victim", ownerId: "user-victim" }], // findCompanyByCustomerId → different!
+        [{ id: "comp-victim", ownerId: "user-victim" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
       const res = await POST(req, ctx);
-      const body = await res.json();
 
-      expect(res.status).toBe(200); // webhook still returns 200 to avoid retries
-      expect(body.received).toBe(true);
-      // But the update should NOT have been called
+      expect(res.status).toBe(200);
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockLogError).toHaveBeenCalledWith(
         expect.stringContaining("webhook rejected")
       );
     });
 
-    it("REJECTS when claimed company already has a different customerId", async () => {
+    it("REJECTS when claimed company already has a different customerId (security)", async () => {
       mockHandleWebhook.mockResolvedValue({
         type: "checkout.session.completed",
         data: {
@@ -273,11 +271,10 @@ describe("POST /api/webhooks/[provider]", () => {
         },
       });
 
-      // Direction 1: no company owns this new customerId
-      // Direction 2: but the target company already has a different customer
+      // No company owns this customerId, but target already has a different one
       setupSelectChain([
-        [], // findCompanyByCustomerId → no match
-        [{ id: "comp-target", stripeCustomerId: "cus_legitimate" }], // different customer!
+        [],
+        [{ id: "comp-target", stripeCustomerId: "cus_legitimate" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
@@ -301,8 +298,8 @@ describe("POST /api/webhooks/[provider]", () => {
       });
 
       setupSelectChain([
-        [], // findCompanyByCustomerId → no match
-        [], // claimed company → does not exist
+        [],
+        [],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
@@ -344,7 +341,7 @@ describe("POST /api/webhooks/[provider]", () => {
       });
 
       setupSelectChain([
-        [{ id: "comp-1", ownerId: "user-1" }], // findCompanyByCustomerId
+        [{ id: "comp-1", ownerId: "user-1" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
@@ -381,6 +378,32 @@ describe("POST /api/webhooks/[provider]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).not.toHaveBeenCalled();
     });
+
+    it("sends cancellation email when scheduled", async () => {
+      mockHandleWebhook.mockResolvedValue({
+        type: "customer.subscription.updated",
+        data: {
+          customerId: "cus_123",
+          subscriptionId: "sub_456",
+          planId: "price_pro",
+          cancelAtPeriodEnd: true,
+          currentPeriodEnd: 1745366400, // epoch seconds
+        },
+      });
+
+      setupSelectChain([
+        [{ id: "comp-1", ownerId: "user-1" }],
+        [{ email: "owner@test.com" }],
+      ]);
+
+      const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
+      const res = await POST(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "owner@test.com" })
+      );
+    });
   });
 
   // ── subscription.deleted ────────────────────────────────────────────────
@@ -402,41 +425,77 @@ describe("POST /api/webhooks/[provider]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalled();
     });
+
+    it("skips when customer not found", async () => {
+      mockHandleWebhook.mockResolvedValue({
+        type: "customer.subscription.deleted",
+        data: { customerId: "cus_gone" },
+      });
+
+      setupSelectChain([[]]);
+
+      const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
+      const res = await POST(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
   });
 
   // ── payment_failed ──────────────────────────────────────────────────────
 
   describe("invoice.payment_failed", () => {
-    it("sends payment failed email", async () => {
+    it("sends payment failed email to owner", async () => {
       mockHandleWebhook.mockResolvedValue({
         type: "invoice.payment_failed",
         data: { customerId: "cus_123" },
       });
 
       setupSelectChain([
-        [{ id: "comp-1", ownerId: "user-1" }], // findCompanyByCustomerId
-        [{ email: "owner@test.com" }], // ownerEmail
+        [{ id: "comp-1", ownerId: "user-1" }],
+        [{ email: "owner@test.com" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
       const res = await POST(req, ctx);
 
       expect(res.status).toBe(200);
-      expect(mockSendEmail).toHaveBeenCalled();
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "owner@test.com" })
+      );
+    });
+
+    it("skips email when owner email not found", async () => {
+      mockHandleWebhook.mockResolvedValue({
+        type: "invoice.payment_failed",
+        data: { customerId: "cus_123" },
+      });
+
+      setupSelectChain([
+        [{ id: "comp-1", ownerId: "user-1" }],
+        [],
+      ]);
+
+      const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");
+      const res = await POST(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(mockSendEmail).not.toHaveBeenCalled();
     });
   });
 
-  // ── Unknown/other providers ─────────────────────────────────────────────
+  // ── Other providers ─────────────────────────────────────────────────────
 
   describe("other providers", () => {
     it("returns not_implemented for known integration providers", async () => {
-      for (const provider of ["quickbooks", "xero", "plaid", "mercury"]) {
+      for (const provider of ["quickbooks", "xero", "freshbooks", "plaid", "mercury", "gusto"]) {
         const [req, ctx] = webhookRequest(provider, "{}");
         const res = await POST(req, ctx);
         const body = await res.json();
 
         expect(res.status).toBe(200);
         expect(body.status).toBe("not_implemented");
+        expect(body.provider).toBe(provider);
       }
     });
 
@@ -450,10 +509,10 @@ describe("POST /api/webhooks/[provider]", () => {
     });
   });
 
-  // ── Unhandled event type ────────────────────────────────────────────────
+  // ── Unhandled events ────────────────────────────────────────────────────
 
   describe("unhandled events", () => {
-    it("logs a warning for unknown event types", async () => {
+    it("logs warning for unrecognized event types", async () => {
       mockHandleWebhook.mockResolvedValue({
         type: "some.unknown.event",
         data: {},
@@ -464,6 +523,7 @@ describe("POST /api/webhooks/[provider]", () => {
       const body = await res.json();
 
       expect(res.status).toBe(200);
+      expect(body.received).toBe(true);
       expect(body.type).toBe("some.unknown.event");
       expect(mockLogWarn).toHaveBeenCalledWith(
         expect.stringContaining("Unhandled")
