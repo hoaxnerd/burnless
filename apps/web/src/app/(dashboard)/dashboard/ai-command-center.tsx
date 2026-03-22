@@ -352,7 +352,7 @@ export function AiCommandCenter({
                     <p className="text-sm text-red-500">{error}</p>
                   ) : response ? (
                     <div className="text-sm text-surface-700 leading-relaxed">
-                      <FormattedContent content={response} />
+                      <MarkdownRenderer content={response} />
                     </div>
                   ) : isStreaming ? (
                     <div className="flex items-center gap-2 text-sm text-surface-400">
