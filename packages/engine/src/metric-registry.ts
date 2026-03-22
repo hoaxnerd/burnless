@@ -1204,3 +1204,92 @@ export function evaluateBenchmark(
     return "bad";
   }
 }
+
+// ── Hero Card Auto-Swap ──────────────────────────────────────────────────────
+
+/**
+ * Ordered list of metric slugs that can replace empty hero card slots.
+ * Tried in order; the first one with available data wins.
+ */
+export const HERO_CARD_FALLBACK_ORDER: string[] = [
+  "totalRevenue",
+  "arr",
+  "grossProfit",
+  "ebitda",
+  "burnRate",
+  "revenueRunRate",
+  "grossMarginPercent",
+  "burnMultiple",
+  "ruleOf40",
+  "freeCashFlow",
+];
+
+export interface HeroSwapResult {
+  /** The slug to actually display in this hero slot */
+  displaySlug: string;
+  /** The metric definition for the display slug */
+  displayDef: MetricDefinition;
+  /** If auto-swapped, the original slug that was replaced */
+  replacedSlug: string | null;
+  /** If auto-swapped, what data the user needs to add to restore the original */
+  restoreHint: string | null;
+}
+
+/**
+ * Given the default hero card slugs and data availability, compute which
+ * metrics to actually display. Empty slots are filled from HERO_CARD_FALLBACK_ORDER.
+ */
+export function getHeroSwaps(
+  heroSlugs: string[],
+  metrics: ComputedMetrics,
+  month: string,
+): HeroSwapResult[] {
+  const usedSlugs = new Set<string>();
+  const results: HeroSwapResult[] = [];
+
+  for (const slug of heroSlugs) {
+    usedSlugs.add(slug);
+    const def = _bySlug.get(slug);
+    if (!def) continue;
+
+    if (isMetricDataAvailable(metrics, slug, month)) {
+      results.push({
+        displaySlug: slug,
+        displayDef: def,
+        replacedSlug: null,
+        restoreHint: null,
+      });
+    } else {
+      // Find first available fallback not already used
+      let swapped = false;
+      for (const fallback of HERO_CARD_FALLBACK_ORDER) {
+        if (usedSlugs.has(fallback)) continue;
+        if (!isMetricDataAvailable(metrics, fallback, month)) continue;
+        const fbDef = _bySlug.get(fallback);
+        if (!fbDef) continue;
+
+        usedSlugs.add(fallback);
+        results.push({
+          displaySlug: fallback,
+          displayDef: fbDef,
+          replacedSlug: slug,
+          restoreHint: getMetricMissingDataHint(slug),
+        });
+        swapped = true;
+        break;
+      }
+
+      if (!swapped) {
+        // No fallback available — keep the ghost card
+        results.push({
+          displaySlug: slug,
+          displayDef: def,
+          replacedSlug: null,
+          restoreHint: null,
+        });
+      }
+    }
+  }
+
+  return results;
+}

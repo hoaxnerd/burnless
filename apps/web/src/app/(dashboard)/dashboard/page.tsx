@@ -10,20 +10,28 @@ import {
   getDashboardPreferences,
 } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { seriesToArray, monthKey } from "@burnless/engine";
-import { HeroKpiCard } from "./hero-kpi-card";
+import {
+  seriesToArray,
+  monthKey,
+  DEFAULT_HERO_CARDS,
+  getHeroSwaps,
+  extractMetricValue,
+  formatMetricValue,
+  getMetricMissingDataHint,
+} from "@burnless/engine";
+import { type KpiVariant } from "./hero-kpi-card";
+import { HeroCardGrid, type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
 import { DashboardCharts } from "./dashboard-charts";
 import { AiCommandCenter } from "./ai-command-center";
 import { QuickActions } from "./quick-actions";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
-import { BoardMeetingMode } from "./board-meeting-mode";
 import { DashboardIntelligenceProvider } from "./dashboard-intelligence-context";
 import { DashboardHeader } from "./dashboard-header";
 import { CustomizableMetrics } from "./customizable-metrics";
 import { StatsCatalog } from "./stats-catalog";
 import { FormulaViewer } from "./formula-viewer";
-import { DashboardGrid, type WidgetId } from "./dashboard-grid";
+import { DashboardGrid } from "./dashboard-grid";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -106,6 +114,125 @@ export default async function DashboardPage({
   const hasFunding = fundingRounds.length > 0;
   const allPopulated = hasFunding && hasExpenses && hasRevenue;
 
+  /* ── Hero card auto-swap computation (Dynamic mode) ──────────── */
+  const heroSwaps = getHeroSwaps(DEFAULT_HERO_CARDS, metrics, currentMonth);
+  const variantOrder: KpiVariant[] = ["cash", "burn", "runway", "revenue"];
+
+  const heroCards: HeroCardDatum[] = [
+    {
+      variant: "cash",
+      hasData: hasFunding,
+      props: {
+        slug: "cash_position",
+        label: "Cash Position",
+        value: hasFunding ? formatCurrency(currentCash) : "$---",
+        change: hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined,
+        changeLabel: hasFunding ? "vs last month" : undefined,
+        description: !hasFunding ? "Add funding to see cash" : undefined,
+        sparkData: hasFunding ? sparkline(metrics.cashPosition) : undefined,
+      },
+    },
+    {
+      variant: "burn",
+      hasData: hasExpenses,
+      props: {
+        slug: "net_burn_rate",
+        label: "Monthly Burn",
+        value: hasExpenses ? formatCurrency(currentBurn) : "$---",
+        change: hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined,
+        changeLabel: hasExpenses ? "vs last month" : undefined,
+        description: !hasExpenses ? "Add expenses to calculate" : undefined,
+        sparkData: hasExpenses ? sparkline(metrics.netBurnRate) : undefined,
+      },
+    },
+    {
+      variant: "runway",
+      hasData: hasFunding && hasExpenses,
+      props: {
+        slug: "cash_runway_months",
+        label: "Runway",
+        value:
+          hasFunding && hasExpenses
+            ? currentRunway >= 999
+              ? "\u221e"
+              : `${Math.round(currentRunway)} mo`
+            : "-- mo",
+        description: hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses",
+        sparkData:
+          hasFunding && hasExpenses
+            ? sparkline(
+                metrics.cashRunwayMonths.map((m) => ({
+                  ...m,
+                  value: Math.min(m.value, 100),
+                }))
+              )
+            : undefined,
+      },
+    },
+    {
+      variant: "revenue",
+      hasData: hasRevenue,
+      props: {
+        slug: "mrr",
+        label: "MRR",
+        value: hasRevenue ? formatCurrency(currentMrr) : "$---",
+        change: hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined,
+        changeLabel: hasRevenue && prevMrr > 0 ? "MoM growth" : undefined,
+        description: !hasRevenue ? "Add revenue streams" : undefined,
+        sparkData: hasRevenue ? sparkline(metrics.mrr) : undefined,
+      },
+    },
+  ];
+
+  // Build swap cards from engine's hero swap computation
+  const heroSwapCards: SwapCardDatum[] = [];
+  for (let i = 0; i < heroSwaps.length; i++) {
+    const swap = heroSwaps[i];
+    if (!swap || !swap.replacedSlug) continue;
+
+    const currentVal = extractMetricValue(metrics, swap.displaySlug, currentMonth) ?? 0;
+    const prevVal = extractMetricValue(metrics, swap.displaySlug, prevMonth) ?? 0;
+    const formattedValue = formatMetricValue(currentVal, swap.displayDef.format);
+
+    // Compute MoM change for the swap metric
+    let swapChange: string | undefined;
+    if (swap.displayDef.format === "percent") {
+      const diff = currentVal - prevVal;
+      if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
+        swapChange = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+      }
+    } else if (prevVal !== 0) {
+      const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
+      if (pct !== 0 && Number.isFinite(pct)) {
+        swapChange = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+      }
+    }
+
+    // Get sparkline data for the swap metric
+    const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
+    const swapSparkData = Array.isArray(series) ? sparkline(series) : undefined;
+
+    heroSwapCards.push({
+      slotIndex: i,
+      originalLabel: heroCards[i]?.props.label ?? "",
+      originalSlug: swap.replacedSlug,
+      restoreHint: swap.restoreHint ?? getMetricMissingDataHint(swap.replacedSlug),
+      variant: variantOrder[i] ?? "cash",
+      props: {
+        slug: swap.displaySlug,
+        label: swap.displayDef.name,
+        value: formattedValue,
+        change: swapChange,
+        changeLabel: swapChange ? "vs last month" : undefined,
+        metricStyle: {
+          icon: swap.displayDef.icon,
+          color: swap.displayDef.color,
+          href: swap.displayDef.href,
+        },
+      },
+    });
+  }
+
   /* ── Pinned secondary metrics ───────────────────────────────────── */
   const pinnedScenarios = allScenarios.filter((s) => !s.isDefault).slice(0, 4);
 
@@ -147,13 +274,8 @@ export default async function DashboardPage({
 
         {!hasData ? (
           <>
-            {/* Hero KPI Cards — always show (ghost state when no data) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-              <HeroKpiCard variant="cash" slug="cash_position" label="Cash Position" value="$---" description="Add funding to see cash" stagger={0} />
-              <HeroKpiCard variant="burn" slug="net_burn_rate" label="Monthly Burn" value="$---" description="Add expenses to calculate" stagger={1} />
-              <HeroKpiCard variant="runway" slug="cash_runway_months" label="Runway" value="-- mo" description="Add cash & expenses" stagger={2} />
-              <HeroKpiCard variant="revenue" slug="mrr" label="MRR" value="$---" description="Add revenue streams" stagger={3} />
-            </div>
+            {/* Hero KPI Cards — ghost state when no data, auto-swap in Dynamic mode */}
+            <HeroCardGrid cards={heroCards} swaps={heroSwapCards} allPopulated={false} />
             <DashboardEmptyState
               companyName={company.name}
               hasExpenses={hasExpenses}
@@ -177,69 +299,7 @@ export default async function DashboardPage({
                 </Suspense>
               ),
               "hero-kpis": (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                  <HeroKpiCard
-                    variant="cash"
-                    slug="cash_position"
-                    label="Cash Position"
-                    value={hasFunding ? formatCurrency(currentCash) : "$---"}
-                    change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
-                    changeLabel={hasFunding ? "vs last month" : undefined}
-                    description={!hasFunding ? "Add funding to see cash" : undefined}
-                    sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
-                    stagger={0}
-                    celebrate={allPopulated}
-                  />
-                  <HeroKpiCard
-                    variant="burn"
-                    slug="net_burn_rate"
-                    label="Monthly Burn"
-                    value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
-                    change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
-                    changeLabel={hasExpenses ? "vs last month" : undefined}
-                    description={!hasExpenses ? "Add expenses to calculate" : undefined}
-                    sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
-                    stagger={1}
-                    celebrate={allPopulated}
-                  />
-                  <HeroKpiCard
-                    variant="runway"
-                    slug="cash_runway_months"
-                    label="Runway"
-                    value={
-                      hasFunding && hasExpenses
-                        ? currentRunway >= 999
-                          ? "\u221e"
-                          : `${Math.round(currentRunway)} mo`
-                        : "-- mo"
-                    }
-                    description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
-                    sparkData={
-                      hasFunding && hasExpenses
-                        ? sparkline(
-                            metrics.cashRunwayMonths.map((m) => ({
-                              ...m,
-                              value: Math.min(m.value, 100),
-                            }))
-                          )
-                        : undefined
-                    }
-                    stagger={2}
-                    celebrate={allPopulated}
-                  />
-                  <HeroKpiCard
-                    variant="revenue"
-                    slug="mrr"
-                    label="MRR"
-                    value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
-                    change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
-                    changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
-                    description={!hasRevenue ? "Add revenue streams" : undefined}
-                    sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
-                    stagger={3}
-                    celebrate={allPopulated}
-                  />
-                </div>
+                <HeroCardGrid cards={heroCards} swaps={heroSwapCards} allPopulated={allPopulated} />
               ),
               "quick-actions": (
                 <QuickActions
