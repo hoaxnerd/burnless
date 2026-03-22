@@ -130,7 +130,7 @@ export default function AiCompanionPage() {
       const res = await fetch("/api/chat/history");
       if (res.ok) {
         const json = await res.json();
-        setConversations(Array.isArray(json) ? json : json.data ?? []);
+        setConversations(json.data ?? []);
       }
     } catch {
       /* non-critical */
@@ -257,7 +257,12 @@ export default function AiCompanionPage() {
           try {
             const event = JSON.parse(jsonStr);
 
-            if (event.type === "thinking") {
+            if (event.type === "conversation_id") {
+              // Server sends conversationId as first event for reliable tracking
+              if (event.conversationId) {
+                setConversationId(event.conversationId);
+              }
+            } else if (event.type === "thinking") {
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1]!;

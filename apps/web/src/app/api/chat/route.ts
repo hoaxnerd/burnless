@@ -148,6 +148,11 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Send conversationId immediately so client can track it even if stream fails
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: "conversation_id", conversationId })}\n\n`)
+      );
+
       try {
         const chunks = chatStream({
           messages,
@@ -189,13 +194,22 @@ export const POST = withErrorHandler(async (request: Request) => {
               encoder.encode(`data: ${JSON.stringify({ type: "tool_result", tool: chunk.toolName, data: parsedResult })}\n\n`)
             );
           } else if (chunk.type === "done") {
-            // Save assistant response
-            if (fullResponse) {
+            // Strip any leaked thinking tags (defense for non-Anthropic providers)
+            const cleanResponse = fullResponse
+              .replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "")
+              .trim();
+
+            // Save assistant response and update conversation timestamp
+            if (cleanResponse) {
               await db.insert(aiMessages).values({
                 conversationId: conversationId!,
                 role: "assistant",
-                content: fullResponse,
+                content: cleanResponse,
               });
+              await db
+                .update(aiConversations)
+                .set({ updatedAt: new Date() })
+                .where(eq(aiConversations.id, conversationId!));
             }
 
             controller.enqueue(
@@ -204,6 +218,24 @@ export const POST = withErrorHandler(async (request: Request) => {
           }
         }
       } catch (error) {
+        // Save partial response on error so history isn't lost
+        if (fullResponse) {
+          const cleanPartial = fullResponse
+            .replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "")
+            .trim();
+          if (cleanPartial) {
+            await db.insert(aiMessages).values({
+              conversationId: conversationId!,
+              role: "assistant",
+              content: cleanPartial,
+            }).catch(() => {}); // best-effort
+            await db
+              .update(aiConversations)
+              .set({ updatedAt: new Date() })
+              .where(eq(aiConversations.id, conversationId!))
+              .catch(() => {});
+          }
+        }
         const message = error instanceof Error ? error.message : "AI error";
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ type: "error", content: message })}\n\n`)

@@ -54,7 +54,8 @@ export const GET = withErrorHandler(async (request: Request) => {
   ];
 
   if (cursor) {
-    conditions.push(lt(aiConversations.id, cursor));
+    // Cursor is an ISO timestamp (updatedAt of last item on previous page)
+    conditions.push(lt(aiConversations.updatedAt, new Date(cursor)));
   }
 
   const rows = await db
@@ -64,5 +65,5 @@ export const GET = withErrorHandler(async (request: Request) => {
     .orderBy(desc(aiConversations.updatedAt))
     .limit(limit + 1);
 
-  return NextResponse.json(paginatedResponse(rows, limit));
+  return NextResponse.json(paginatedResponse(rows, limit, "updatedAt"));
 });

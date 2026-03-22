@@ -66,7 +66,10 @@ export function paginatedResponse<T extends Record<string, unknown>>(
   const hasMore = rows.length > limit;
   const data = hasMore ? rows.slice(0, limit) : rows;
   const lastItem = data[data.length - 1];
-  const nextCursor = hasMore && lastItem ? String(lastItem[cursorField]) : null;
+  const cursorValue = lastItem?.[cursorField];
+  const nextCursor = hasMore && cursorValue != null
+    ? (cursorValue instanceof Date ? cursorValue.toISOString() : String(cursorValue))
+    : null;
 
   return {
     data,
