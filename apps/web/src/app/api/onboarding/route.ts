@@ -149,7 +149,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         // Each revenue type has its own parameter shape expected by the engine
         let revenueParams: Record<string, number>;
         if (revenueType === "subscription") {
-          revenueParams = { monthlyPrice: monthlyRevenue, startingCustomers: 1, monthlyGrowthRate: 5 };
+          revenueParams = { monthlyPrice: monthlyRevenue, startingCustomers: 1, newCustomersPerMonth: 5, monthlyChurnRate: 0.05 };
         } else if (revenueType === "services") {
           // Convert monthly revenue into hours * rate (assume $150/hr default)
           const hourlyRate = 150;

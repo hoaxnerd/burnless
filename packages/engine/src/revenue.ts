@@ -162,16 +162,33 @@ export function computeSubscriptionDetail(
   const months = monthRange(periodStart, periodEnd);
   const details: SubscriptionDetail[] = [];
 
+  // Guard against missing required params (e.g. legacy data or malformed onboarding)
+  const startingCustomers = params.startingCustomers ?? 0;
+  const monthlyPrice = params.monthlyPrice ?? 0;
+  const newCustomersPerMonth = params.newCustomersPerMonth ?? 0;
+  const monthlyChurnRate = params.monthlyChurnRate ?? 0;
+
+  if (startingCustomers === 0 && monthlyPrice === 0) {
+    for (const m of months) {
+      details.push({
+        month: monthKey(m),
+        customers: 0, newCustomers: 0, churnedCustomers: 0,
+        mrr: 0, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0,
+      });
+    }
+    return details;
+  }
+
   // Use Decimal for the accumulating state to prevent compounding drift
-  let customers = D(params.startingCustomers);
-  let pricePerCustomer = D(params.monthlyPrice);
+  let customers = D(startingCustomers);
+  let pricePerCustomer = D(monthlyPrice);
 
   for (let i = 0; i < months.length; i++) {
     const key = monthKey(months[i]!);
 
     // Churn happens on existing customers
-    const churnedCustomers = customers.mul(params.monthlyChurnRate);
-    const newCustomers = D(params.newCustomersPerMonth);
+    const churnedCustomers = customers.mul(monthlyChurnRate);
+    const newCustomers = D(newCustomersPerMonth);
 
     // MRR components — all in Decimal
     const retainedCustomers = customers.minus(churnedCustomers);
@@ -249,10 +266,19 @@ function computeUsageRevenue(
   const months = monthRange(periodStart, periodEnd);
   const series: MonthlySeries = new Map();
 
+  // Guard against missing required params (e.g. legacy data with {amount} shape)
+  const activeUsers = params.activeUsers ?? 0;
+  const avgUsagePerUser = params.avgUsagePerUser ?? 0;
+  const pricePerUnit = params.pricePerUnit ?? 0;
+  if (activeUsers === 0 && pricePerUnit === 0) {
+    for (const m of months) series.set(monthKey(m), 0);
+    return series;
+  }
+
   for (let i = 0; i < months.length; i++) {
-    const users = D(params.activeUsers).mul(dPow(D(1).plus(params.userGrowthRate ?? 0), i));
-    const usage = D(params.avgUsagePerUser).mul(dPow(D(1).plus(params.usageGrowthRate ?? 0), i));
-    series.set(monthKey(months[i]!), dRound2(users.mul(usage).mul(params.pricePerUnit)));
+    const users = D(activeUsers).mul(dPow(D(1).plus(params.userGrowthRate ?? 0), i));
+    const usage = D(avgUsagePerUser).mul(dPow(D(1).plus(params.usageGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(users.mul(usage).mul(pricePerUnit)));
   }
 
   return series;
