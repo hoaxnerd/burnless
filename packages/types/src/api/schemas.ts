@@ -88,6 +88,7 @@ export const createHeadcountSchema = z.object({
 });
 
 export const updateHeadcountSchema = z.object({
+  departmentId: z.string().optional(),
   title: z.string().min(1).optional(),
   count: z.number().int().min(1).optional(),
   salary: positiveAmount().optional(),

@@ -195,6 +195,7 @@ export function AddHireForm({ scenarioId, departments, editHire, open: controlle
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            departmentId: deptId,
             title,
             count: Number(count),
             salary: Number(salary),
