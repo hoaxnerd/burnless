@@ -416,11 +416,11 @@ function DashboardContent({
 
       <div className="flex-1 flex overflow-hidden">
         {/* Floating Sidebar — desktop */}
-        <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? "w-[calc(4rem+1rem)]" : "w-[calc(16rem+1rem)]"} hidden lg:block`}>
+        <div className={`flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? "w-[calc(4rem+1.5rem)]" : "w-[calc(16rem+1.5rem)]"} hidden lg:block`}>
           <aside
             className={`
               ${sidebarWidth} bg-surface-0 flex flex-col flex-shrink-0 transition-all duration-300
-              m-2 rounded-2xl shadow-lg border border-surface-200/60 h-[calc(100vh-1rem)]
+              m-3 rounded-2xl shadow-lg border border-surface-200/60 h-[calc(100vh-1.5rem)]
               hidden lg:flex
             `}
             role="navigation"
@@ -489,7 +489,7 @@ function DashboardContent({
 
         {/* Main content — floats on desktop to match sidebar, full-bleed on mobile */}
         <main
-          className="flex-1 overflow-auto bg-surface-50 lg:my-2 lg:mr-2 lg:rounded-2xl lg:border lg:border-surface-200/60 lg:shadow-sm"
+          className="flex-1 overflow-auto bg-surface-50 lg:my-3 lg:mr-3 lg:rounded-2xl lg:border lg:border-surface-200/60 lg:shadow-sm"
           id="main-content"
           role="main"
         >
