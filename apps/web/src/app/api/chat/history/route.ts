@@ -21,7 +21,21 @@ export const GET = withErrorHandler(async (request: Request) => {
   const conversationId = searchParams.get("conversationId");
 
   if (conversationId) {
-    // Get messages for a specific conversation
+    // Verify conversation belongs to this company before returning messages
+    const [conv] = await db
+      .select({ id: aiConversations.id })
+      .from(aiConversations)
+      .where(
+        and(
+          eq(aiConversations.id, conversationId),
+          eq(aiConversations.companyId, ctx.companyId)
+        )
+      );
+
+    if (!conv) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    }
+
     const messages = await db
       .select()
       .from(aiMessages)

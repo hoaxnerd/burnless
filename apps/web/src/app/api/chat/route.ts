@@ -20,8 +20,8 @@ import { initAiUsageTracking } from "@/lib/ai-usage-tracker";
 
 const chatSchema = z.object({
   message: z.string().min(1),
-  conversationId: z.string().optional(),
-  scenarioId: z.string().optional(),
+  conversationId: z.string().nullable().optional(),
+  scenarioId: z.string().nullable().optional(),
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -70,7 +70,21 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Get or create conversation
   let conversationId = body.conversationId;
-  if (!conversationId) {
+  if (conversationId) {
+    // Verify conversation belongs to this company
+    const [existing] = await db
+      .select({ id: aiConversations.id })
+      .from(aiConversations)
+      .where(
+        and(
+          eq(aiConversations.id, conversationId),
+          eq(aiConversations.companyId, ctx.companyId)
+        )
+      );
+    if (!existing) {
+      return errorResponse("Conversation not found", 404);
+    }
+  } else {
     const [conv] = await db
       .insert(aiConversations)
       .values({
