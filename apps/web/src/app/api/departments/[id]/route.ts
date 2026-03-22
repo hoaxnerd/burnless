@@ -4,6 +4,7 @@ import { departments, updateForCompany, deleteForCompany } from "@burnless/db";
 import { updateDepartmentSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -21,6 +22,7 @@ export const PATCH = withErrorHandler(async (
   const row = await updateForCompany(departments, id, ctx.companyId, parsed.data);
   if (!row) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "update", { after: row });
+  await trackDataMutation(ctx.companyId, "departments");
   revalidateTag("departments");
   return NextResponse.json(row);
 });
@@ -38,6 +40,7 @@ export const DELETE = withErrorHandler(async (
   const row = await deleteForCompany(departments, id, ctx.companyId);
   if (!row) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "delete", { before: row });
+  await trackDataMutation(ctx.companyId, "departments");
   revalidateTag("departments");
   return NextResponse.json({ deleted: true });
 });

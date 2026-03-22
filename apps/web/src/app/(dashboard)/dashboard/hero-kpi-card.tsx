@@ -7,6 +7,12 @@ import {
   Flame,
   Clock,
   TrendingUp,
+  DollarSign,
+  Zap,
+  BarChart3,
+  Banknote,
+  ArrowUpRight,
+  Info,
   type LucideIcon,
 } from "lucide-react";
 import { CardSettingsModal, type CardMode } from "@/components/ui/card-settings-modal";
@@ -149,6 +155,34 @@ function AnimatedValue({ value }: { value: string }) {
   );
 }
 
+/* ── Icon & Color Maps ────────────────────────────────────────────────────── */
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Wallet,
+  Flame,
+  Clock,
+  TrendingUp,
+  DollarSign,
+  Zap,
+  BarChart3,
+  Banknote,
+  ArrowUpRight,
+};
+
+/** Map metric color keys to Tailwind classes and hex values for sparklines */
+const COLOR_MAP: Record<string, { accent: string; spark: string; glow: string }> = {
+  emerald: { accent: "text-emerald-500", spark: "#10b981", glow: "from-emerald-500/5 to-transparent" },
+  orange: { accent: "text-orange-500", spark: "#f97316", glow: "from-orange-500/5 to-transparent" },
+  blue: { accent: "text-brand-500", spark: "#3b82f6", glow: "from-brand-500/5 to-transparent" },
+  violet: { accent: "text-violet-500", spark: "#8b5cf6", glow: "from-violet-500/5 to-transparent" },
+  teal: { accent: "text-highlight-500", spark: "#14b8a6", glow: "from-highlight-500/5 to-transparent" },
+  amber: { accent: "text-amber-500", spark: "#f59e0b", glow: "from-amber-500/5 to-transparent" },
+  red: { accent: "text-danger-500", spark: "#ef4444", glow: "from-danger-500/5 to-transparent" },
+  pink: { accent: "text-pink-500", spark: "#ec4899", glow: "from-pink-500/5 to-transparent" },
+};
+
+const DEFAULT_COLOR = COLOR_MAP.emerald;
+
 /* ── KPI Card ─────────────────────────────────────────────────────────────── */
 
 export type KpiVariant = "cash" | "burn" | "runway" | "revenue";
@@ -193,7 +227,7 @@ const variantConfig: Record<
   },
 };
 
-interface HeroKpiCardProps {
+export interface HeroKpiCardProps {
   variant: KpiVariant;
   label: string;
   value: string;
@@ -205,6 +239,22 @@ interface HeroKpiCardProps {
   stagger?: number;
   /** Metric slug for per-card mode overrides */
   slug?: string;
+  celebrate?: boolean;
+  /** Auto-swap info — when this card replaces an empty default */
+  swapInfo?: {
+    /** The original metric slug that was replaced */
+    replacedSlug: string;
+    /** The original metric label */
+    replacedLabel: string;
+    /** Hint telling user what data to add to restore the original */
+    restoreHint: string;
+  };
+  /** Override icon/color/href from metric definition (for swapped cards) */
+  metricStyle?: {
+    icon: string;
+    color: string;
+    href: string;
+  };
 }
 
 /** Returns true if the value is a placeholder (ghost state). */
@@ -223,11 +273,31 @@ export function HeroKpiCard({
   stagger = 0,
   celebrate = false,
   slug,
-}: HeroKpiCardProps & { celebrate?: boolean }) {
-  const config = variantConfig[variant];
-  const Icon = config.icon;
+  swapInfo,
+  metricStyle,
+}: HeroKpiCardProps) {
+  // Resolve visual config: use metricStyle (for swapped cards) or variant config
+  const resolvedConfig = useMemo(() => {
+    if (metricStyle) {
+      const colorSet = (COLOR_MAP[metricStyle.color] ?? DEFAULT_COLOR)!;
+      const IconComp = ICON_MAP[metricStyle.icon] ?? TrendingUp;
+      return {
+        icon: IconComp,
+        accentColor: colorSet.accent,
+        sparkColor: colorSet.spark,
+        glowClass: colorSet.glow,
+        href: metricStyle.href,
+      };
+    }
+    return variantConfig[variant];
+  }, [variant, metricStyle]);
+
+  const Icon = resolvedConfig.icon;
   const router = useRouter();
   const ghost = isGhost(value);
+
+  // For change color, use direction-aware logic
+  const isLowerBetter = variant === "burn" || metricStyle?.color === "orange";
 
   // Per-card mode from intelligence context
   const {
@@ -258,19 +328,17 @@ export function HeroKpiCard({
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
-  // For burn, positive change is bad (increasing burn)
-  const changeColor =
-    variant === "burn"
-      ? isPositive
-        ? "text-danger-500"
-        : isNegative
-          ? "text-success-500"
-          : "text-surface-400"
-      : isPositive
+  const changeColor = isLowerBetter
+    ? isPositive
+      ? "text-danger-500"
+      : isNegative
         ? "text-success-500"
-        : isNegative
-          ? "text-danger-500"
-          : "text-surface-400";
+        : "text-surface-400"
+    : isPositive
+      ? "text-success-500"
+      : isNegative
+        ? "text-danger-500"
+        : "text-surface-400";
 
   // Track whether settings popover was recently used to prevent accidental navigation
   const settingsActiveRef = useRef(false);
@@ -284,9 +352,9 @@ export function HeroKpiCard({
           settingsActiveRef.current = false;
           return;
         }
-        router.push(config.href);
+        router.push(resolvedConfig.href);
       }}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(config.href); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(resolvedConfig.href); }}
       className={`
         group relative cursor-pointer overflow-visible
         rounded-2xl border
@@ -303,7 +371,7 @@ export function HeroKpiCard({
       {/* Subtle gradient glow — only on populated cards */}
       {!ghost && (
         <div
-          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${config.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${resolvedConfig.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
         />
       )}
 
@@ -323,11 +391,28 @@ export function HeroKpiCard({
         </div>
       )}
 
+      {/* Auto-swap indicator */}
+      {swapInfo && (
+        <div
+          className="absolute -top-3 left-3 z-20 group/swap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-1 rounded-full bg-surface-50 ring-1 ring-surface-200 px-2 py-0.5 text-[10px] text-surface-400 cursor-help">
+            <Info className="h-3 w-3" />
+            <span className="hidden sm:inline">Swapped</span>
+          </div>
+          <div className="absolute left-0 top-full mt-1 w-48 rounded-lg bg-surface-900 text-surface-0 text-xs p-2.5 shadow-lg opacity-0 pointer-events-none group-hover/swap:opacity-100 group-hover/swap:pointer-events-auto transition-opacity z-30">
+            <p className="font-medium mb-1">Replaces: {swapInfo.replacedLabel}</p>
+            <p className="text-surface-300">{swapInfo.restoreHint}</p>
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10">
         {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className={ghost ? "text-surface-300" : config.accentColor}>
+            <div className={ghost ? "text-surface-300" : resolvedConfig.accentColor}>
               <Icon className="h-4 w-4" strokeWidth={2} />
             </div>
             <span className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-300" : "text-surface-400"}`}>
@@ -337,7 +422,7 @@ export function HeroKpiCard({
           <div className="flex items-center gap-1">
             {!ghost && sparkData && sparkData.length >= 2 && (
               <div className="hidden sm:block">
-                <Sparkline data={sparkData} color={config.sparkColor} />
+                <Sparkline data={sparkData} color={resolvedConfig.sparkColor} />
               </div>
             )}
           </div>
