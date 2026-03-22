@@ -43,12 +43,22 @@ async function ownerEmail(ownerId: string): Promise<string | null> {
 // ── Event Handlers (provider-agnostic, using normalized webhook data) ────────
 
 async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType: PaymentProviderType) {
-  const companyId = data.metadata?.companyId;
+  const metadataCompanyId = data.metadata?.companyId;
   const subscriptionId = data.subscriptionId;
   const customerId = data.customerId;
   const userId = data.metadata?.userId;
 
-  if (!companyId) return;
+  if (!metadataCompanyId) return;
+
+  // Cross-check: if customerId is present, verify it maps to the same company.
+  // This prevents a malicious client from passing another company's ID in checkout metadata.
+  if (customerId) {
+    const existing = await findCompanyByCustomerId(customerId);
+    if (existing && existing.id !== metadataCompanyId) {
+      log.error(`checkout.completed: customerId=${customerId} belongs to company=${existing.id} but metadata says ${metadataCompanyId}. Ignoring.`);
+      return;
+    }
+  }
 
   // Resolve plan from subscription if available
   let plan: "free" | "pro" | "team" = "free";
@@ -70,7 +80,7 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
       stripeSubscriptionId: subscriptionId ?? null,
       stripePlan: plan,
     })
-    .where(eq(companies.id, companyId));
+    .where(eq(companies.id, metadataCompanyId));
 
   // Send confirmation email to company owner
   if (userId) {
