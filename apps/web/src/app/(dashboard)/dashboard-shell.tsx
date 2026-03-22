@@ -59,6 +59,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { LocaleProvider } from "@/components/locale/locale-context";
 import { useProactiveAlerts } from "@/components/ai/use-proactive-alerts";
+import { MetricsProvider } from "@/components/providers/metrics-context";
 
 /* ── Nav item definitions ─────────────────────────────────────────────────── */
 
@@ -213,6 +214,7 @@ export function DashboardShell({
     <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={navigateToAi}>
     <ScenarioProvider>
+    <MetricsProvider>
       <DashboardContent
         commandPaletteOpen={commandPaletteOpen}
         setCommandPaletteOpen={setCommandPaletteOpen}
@@ -221,6 +223,7 @@ export function DashboardShell({
       >
         {children}
       </DashboardContent>
+    </MetricsProvider>
     </ScenarioProvider>
     </KeyboardShortcutsProvider>
     </AiFeatureProvider>
@@ -502,7 +505,7 @@ function DashboardContent({
           id="main-content"
           role="main"
         >
-          <div key={pathname} className="p-4 sm:p-6 lg:p-8 animate-page-enter">
+          <div className="p-4 sm:p-6 lg:p-8">
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
