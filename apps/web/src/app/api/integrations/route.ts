@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
+import { createIntegrationSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 
 // ── GET /api/integrations — List all integrations for company ───────────────
@@ -20,26 +20,13 @@ export const GET = withErrorHandler(async (_request: Request) => {
 
 // ── POST /api/integrations — Create/connect an integration ──────────────────
 
-const createSchema = z.object({
-  type: z.enum([
-    "quickbooks",
-    "xero",
-    "freshbooks",
-    "plaid",
-    "mercury",
-    "gusto",
-    "stripe",
-  ]),
-  metadata: z.record(z.unknown()).optional(),
-});
-
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
 
-  const parsed = await parseBody(request, createSchema);
+  const parsed = await parseBody(request, createIntegrationSchema);
   if ("error" in parsed) return parsed.error;
 
   const { type, metadata } = parsed.data;

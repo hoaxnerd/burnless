@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, departments } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
+import { createDepartmentSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
-
-const createSchema = z.object({
-  name: z.string().min(1),
-  parentId: z.string().nullable().default(null),
-});
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -38,7 +33,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
-  const parsed = await parseBody(request, createSchema);
+  const parsed = await parseBody(request, createDepartmentSchema);
   if ("error" in parsed) return parsed.error;
 
   const [row] = await db.insert(departments).values({ companyId: ctx.companyId, ...parsed.data }).returning();

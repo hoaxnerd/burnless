@@ -1,3 +1,6 @@
+// API schemas (Zod) — shared request/response contracts
+export * from "./api";
+
 // Core entity types for Burnless financial planning
 
 // ── Currency & Locale ────────────────────────────────────────────────────────

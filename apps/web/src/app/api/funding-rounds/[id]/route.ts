@@ -1,21 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, fundingRounds } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
+import { updateFundingRoundSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { positiveAmount, percentage } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]).optional(),
-  amount: positiveAmount().optional(),
-  date: z.string().transform((s) => new Date(s)).optional(),
-  preMoneyValuation: positiveAmount().nullable().optional(),
-  dilutionPercent: percentage().nullable().optional(),
-  isProjected: z.boolean().optional(),
-});
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -27,7 +16,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await context.params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateFundingRoundSchema);
   if ("error" in parsed) return parsed.error;
 
   const updates: Record<string, unknown> = { ...parsed.data };

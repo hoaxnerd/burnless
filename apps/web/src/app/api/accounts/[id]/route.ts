@@ -1,20 +1,9 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { financialAccounts, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
+import { updateAccountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: z.enum(["income", "expense", "asset", "liability", "equity"]).optional(),
-  category: z.enum([
-    "revenue", "cogs", "operating_expense", "other_income",
-    "other_expense", "asset", "liability", "equity",
-  ]).optional(),
-  parentId: z.string().nullable().optional(),
-  sortOrder: z.number().int().optional(),
-});
 
 export const GET = withErrorHandler(async (
   _request: Request,
@@ -39,7 +28,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateAccountSchema);
   if ("error" in parsed) return parsed.error;
 
   const row = await updateForCompany(financialAccounts, id, ctx.companyId, parsed.data);

@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { scenarios, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
+import { updateScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: z.enum(["base", "best", "worst", "custom"]).optional(),
-  isDefault: z.boolean().optional(),
-  isBudget: z.boolean().optional(),
-  description: z.string().nullable().optional(),
-});
 
 export const GET = withErrorHandler(async (
   _request: Request,
@@ -36,7 +28,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateScenarioSchema);
   if ("error" in parsed) return parsed.error;
 
   // If locking as budget, set budgetLockedAt

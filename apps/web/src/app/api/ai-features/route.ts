@@ -7,10 +7,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@burnless/db";
 import { aiFeatureFlags } from "@burnless/db";
 import { eq } from "drizzle-orm";
+import { updateAiFeaturesSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
 import { getBudgetStatus } from "@/lib/ai-feature-flags";
@@ -28,29 +28,6 @@ export const GET = withErrorHandler(async (_request: Request) => {
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
 
-const VALID_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
-
-const patchSchema = z.object({
-  masterEnabled: z.boolean().optional(),
-  dataMode: z.enum(["full", "show_cached", "hide_all"]).optional(),
-  writeMode: z.enum(["full", "confirm", "read_only"]).optional(),
-  monthlyBudgetCents: z.number().int().min(0).max(1_000_000).optional(), // $0 – $10,000
-  features: z
-    .object({
-      onboarding: z.boolean().optional(),
-      chat: z.boolean().optional(),
-      insights: z.boolean().optional(),
-      uiPersonalization: z.boolean().optional(),
-      autoCategorization: z.boolean().optional(),
-    })
-    .optional(),
-  // Provider config
-  aiProvider: z.enum(VALID_PROVIDERS).nullable().optional(),
-  aiApiKey: z.string().max(256).nullable().optional(),
-  aiModel: z.string().max(128).nullable().optional(),
-  aiBaseUrl: z.string().url().max(512).nullable().optional(),
-});
-
 export const PATCH = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
@@ -59,9 +36,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
 
-  let body: z.infer<typeof patchSchema>;
+  let body: import("@burnless/types").UpdateAiFeaturesInput;
   try {
-    body = patchSchema.parse(await request.json());
+    body = updateAiFeaturesSchema.parse(await request.json());
   } catch {
     return errorResponse("Invalid request body", 400);
   }

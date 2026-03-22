@@ -1,19 +1,12 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
+import { createScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, getCompanyPlan, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
-
-const createSchema = z.object({
-  name: z.string().min(1),
-  type: z.enum(["base", "best", "worst", "custom"]).default("custom"),
-  isDefault: z.boolean().default(false),
-  description: z.string().nullable().default(null),
-});
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -55,7 +48,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const gate = canPerformAction(plan, "create_scenario", currentCount.length);
   if (!gate.allowed) return errorResponse(gate.reason!, 403);
 
-  const parsed = await parseBody(request, createSchema);
+  const parsed = await parseBody(request, createScenarioSchema);
   if ("error" in parsed) return parsed.error;
 
   const [row] = await db

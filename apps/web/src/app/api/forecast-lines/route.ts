@@ -1,20 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, forecastLines, getScenarioForCompany } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
+import { createForecastLineSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
-
-const createSchema = z.object({
-  scenarioId: z.string(),
-  accountId: z.string(),
-  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]).default("fixed"),
-  parameters: z.record(z.unknown()).default({}),
-  startDate: z.string().transform((s) => new Date(s)),
-  endDate: z.string().nullable().default(null).transform((s) => (s ? new Date(s) : null)),
-});
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -49,7 +40,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
-  const parsed = await parseBody(request, createSchema);
+  const parsed = await parseBody(request, createForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
   const scenario = await getScenarioForCompany(parsed.data.scenarioId, ctx.companyId);

@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, headcountPlans, scenarios } from "@burnless/db";
 import { eq, and, gt } from "drizzle-orm";
+import { createHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
-import { positiveAmount, ratio } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
-
-const createSchema = z.object({
-  scenarioId: z.string(),
-  departmentId: z.string(),
-  title: z.string().min(1),
-  count: z.number().int().min(1).default(1),
-  salary: positiveAmount(),
-  startDate: z.string().transform((s) => new Date(s)),
-  endDate: z.string().nullable().default(null).transform((s) => (s ? new Date(s) : null)),
-  benefitsRate: ratio().default(0.20),
-});
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -52,7 +40,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
-  const parsed = await parseBody(request, createSchema);
+  const parsed = await parseBody(request, createHeadcountSchema);
   if ("error" in parsed) return parsed.error;
 
   const [scenario] = await db.select().from(scenarios)

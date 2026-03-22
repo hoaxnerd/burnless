@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, headcountPlans, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
+import { updateHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { positiveAmount, ratio } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  title: z.string().min(1).optional(),
-  count: z.number().int().min(1).optional(),
-  salary: positiveAmount().optional(),
-  startDate: z.string().transform((s) => new Date(s)).optional(),
-  endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
-  benefitsRate: ratio().optional(),
-});
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
@@ -31,7 +21,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateHeadcountSchema);
   if ("error" in parsed) return parsed.error;
 
   const updates: Record<string, unknown> = { ...parsed.data };

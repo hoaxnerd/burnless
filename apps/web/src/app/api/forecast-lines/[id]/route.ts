@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, forecastLines, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
+import { updateForecastLineSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]).optional(),
-  parameters: z.record(z.unknown()).optional(),
-  startDate: z.string().transform((s) => new Date(s)).optional(),
-  endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
-});
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
@@ -28,7 +21,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
   const [row] = await db

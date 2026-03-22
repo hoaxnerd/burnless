@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { db, revenueStreams, scenarios } from "@burnless/db";
 import { eq, and, inArray } from "drizzle-orm";
+import { updateRevenueStreamSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: z.enum(["subscription", "one_time", "usage_based", "services"]).optional(),
-  parameters: z.record(z.unknown()).optional(),
-});
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
@@ -27,7 +21,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateRevenueStreamSchema);
   if ("error" in parsed) return parsed.error;
 
   const [row] = await db.update(revenueStreams).set(parsed.data).where(and(eq(revenueStreams.id, id), inArray(revenueStreams.scenarioId, companyScenarioIds(ctx.companyId)))).returning();

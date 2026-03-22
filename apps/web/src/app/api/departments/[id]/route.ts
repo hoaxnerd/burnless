@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { z } from "zod";
 import { departments, updateForCompany, deleteForCompany } from "@burnless/db";
+import { updateDepartmentSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  parentId: z.string().nullable().optional(),
-});
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -20,7 +15,7 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await context.params;
 
-  const parsed = await parseBody(request, updateSchema);
+  const parsed = await parseBody(request, updateDepartmentSchema);
   if ("error" in parsed) return parsed.error;
 
   const row = await updateForCompany(departments, id, ctx.companyId, parsed.data);
