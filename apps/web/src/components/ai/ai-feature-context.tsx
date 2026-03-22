@@ -78,6 +78,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           setFlags({
             masterEnabled: data.masterEnabled,
             dataMode: data.dataMode,
+            writeMode: data.writeMode ?? "full",
             features: data.features,
           });
           if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
@@ -113,6 +114,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         setFlags({
           masterEnabled: updated.masterEnabled,
           dataMode: updated.dataMode,
+          writeMode: updated.writeMode ?? "full",
           features: updated.features,
         });
         if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);

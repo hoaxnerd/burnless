@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Power, Database, Sparkles, DollarSign, Cpu, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { AI_FEATURE_LIST, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
+import { Power, Database, Sparkles, DollarSign, Cpu, Eye, EyeOff, Loader2, CheckCircle2, XCircle, Shield } from "lucide-react";
+import { AI_FEATURE_LIST, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
 import type { BudgetStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
 
 interface AiFeaturesTabProps {
@@ -113,6 +113,72 @@ export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, 
                   value={mode.value}
                   checked={flags.dataMode === mode.value}
                   onChange={() => updateFlags({ dataMode: mode.value })}
+                  className="h-4 w-4 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-surface-900">
+                    {mode.label}
+                  </span>
+                  <p className="text-xs text-surface-500 mt-0.5">
+                    {mode.desc}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI Write Mode (Guardrails) */}
+      {flags.masterEnabled && (
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
+              <Shield className="h-[18px] w-[18px] text-surface-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-surface-900">
+                AI Write Access
+              </h2>
+              <p className="text-sm text-surface-500 mt-0.5">
+                Control whether AI can create, update, or delete your data
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {(
+              [
+                {
+                  value: "full" as AiWriteMode,
+                  label: "Full Access",
+                  desc: "AI can create, update, and delete entries freely",
+                },
+                {
+                  value: "confirm" as AiWriteMode,
+                  label: "Confirm First",
+                  desc: "AI describes changes and asks for your confirmation before making them",
+                },
+                {
+                  value: "read_only" as AiWriteMode,
+                  label: "Read Only",
+                  desc: "AI can analyze and report but cannot modify any data",
+                },
+              ]
+            ).map((mode) => (
+              <label
+                key={mode.value}
+                className={`flex items-center gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
+                  (flags.writeMode ?? "full") === mode.value
+                    ? "border-brand-500 bg-brand-50 shadow-sm"
+                    : "border-surface-200 hover:bg-surface-50 hover:border-surface-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="writeMode"
+                  value={mode.value}
+                  checked={(flags.writeMode ?? "full") === mode.value}
+                  onChange={() => updateFlags({ writeMode: mode.value })}
                   className="h-4 w-4 text-brand-600 focus:ring-brand-500"
                 />
                 <div>

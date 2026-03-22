@@ -33,6 +33,7 @@ const VALID_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
 const patchSchema = z.object({
   masterEnabled: z.boolean().optional(),
   dataMode: z.enum(["full", "show_cached", "hide_all"]).optional(),
+  writeMode: z.enum(["full", "confirm", "read_only"]).optional(),
   monthlyBudgetCents: z.number().int().min(0).max(1_000_000).optional(), // $0 – $10,000
   features: z
     .object({
@@ -74,6 +75,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (body.dataMode !== undefined) {
     updates.dataMode = body.dataMode;
   }
+  if (body.writeMode !== undefined) {
+    updates.writeMode = body.writeMode;
+  }
   if (body.monthlyBudgetCents !== undefined) {
     updates.monthlyBudgetCents = body.monthlyBudgetCents;
   }
@@ -108,6 +112,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   return NextResponse.json({
     masterEnabled: updated.masterEnabled,
     dataMode: updated.dataMode,
+    writeMode: updated.writeMode,
     features: updated.features,
     monthlyBudgetCents: updated.monthlyBudgetCents,
     aiProvider: updated.aiProvider,
@@ -131,6 +136,7 @@ async function getOrCreateFlags(companyId: string) {
     return {
       masterEnabled: existing.masterEnabled,
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
+      writeMode: (existing.writeMode ?? "full") as "full" | "confirm" | "read_only",
       features: existing.features as AiFeatureConfig,
       monthlyBudgetCents: existing.monthlyBudgetCents,
       aiProvider: existing.aiProvider,
@@ -154,6 +160,7 @@ async function getOrCreateFlags(companyId: string) {
   return {
     masterEnabled: created?.masterEnabled ?? DEFAULT_AI_FLAGS.masterEnabled,
     dataMode: (created?.dataMode ?? DEFAULT_AI_FLAGS.dataMode) as "full" | "show_cached" | "hide_all",
+    writeMode: (created?.writeMode ?? DEFAULT_AI_FLAGS.writeMode) as "full" | "confirm" | "read_only",
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
     monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
     aiProvider: null,
