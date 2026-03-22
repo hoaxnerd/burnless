@@ -36,6 +36,7 @@ export const GET = withErrorHandler(async () => {
       cardModeOverrides: {},
       cardScenarioOverrides: {},
       customMetrics: [],
+      layout: [],
     }
   );
 });
@@ -48,6 +49,16 @@ const patchSchema = z.object({
   secondaryMetrics: z.array(z.string()).max(20).optional(),
   cardModeOverrides: z.record(z.string(), z.enum(["intelligence", "dynamic", "custom"])).optional(),
   cardScenarioOverrides: z.record(z.string(), z.string()).optional(),
+  layout: z
+    .array(
+      z.object({
+        widgetId: z.string(),
+        w: z.number().int().min(1).max(12),
+        h: z.number().int().min(1).max(12),
+      })
+    )
+    .max(20)
+    .optional(),
   customMetrics: z
     .array(
       z.object({

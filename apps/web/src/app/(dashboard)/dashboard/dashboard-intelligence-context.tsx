@@ -30,12 +30,19 @@ import {
 
 export type DashboardMode = "intelligence" | "dynamic" | "custom";
 
+export interface WidgetLayout {
+  widgetId: string;
+  w: number;
+  h: number;
+}
+
 export interface DashboardPreferences {
   mode: DashboardMode;
   heroCards: string[];
   secondaryMetrics: string[];
   cardModeOverrides: Record<string, DashboardMode>;
   cardScenarioOverrides: Record<string, string>;
+  layout: WidgetLayout[];
   customMetrics: Array<{
     id: string;
     name: string;
@@ -83,6 +90,10 @@ export interface DashboardIntelligenceState {
   closeFormulaViewer: () => void;
   /** Full metric registry for catalog */
   registry: MetricDefinition[];
+  /** Dashboard widget layout order */
+  layout: WidgetLayout[];
+  /** Reorder widgets by providing new ordered list */
+  reorderLayout: (layout: WidgetLayout[]) => void;
   /** Whether preferences are loading */
   isLoading: boolean;
   /** Whether preferences are being saved */
@@ -132,6 +143,7 @@ export function DashboardIntelligenceProvider({
         : DEFAULT_SECONDARY_METRICS,
     cardModeOverrides: initialPreferences?.cardModeOverrides ?? {},
     cardScenarioOverrides: initialPreferences?.cardScenarioOverrides ?? {},
+    layout: initialPreferences?.layout ?? [],
     customMetrics: initialPreferences?.customMetrics ?? [],
   }));
 
@@ -151,6 +163,7 @@ export function DashboardIntelligenceProvider({
             : DEFAULT_SECONDARY_METRICS,
           cardModeOverrides: data.cardModeOverrides ?? {},
           cardScenarioOverrides: data.cardScenarioOverrides ?? {},
+          layout: data.layout ?? [],
           customMetrics: data.customMetrics ?? [],
         });
         setIsLoading(false);
@@ -230,6 +243,11 @@ export function DashboardIntelligenceProvider({
     [updatePrefs]
   );
 
+  const reorderLayout = useCallback(
+    (layout: WidgetLayout[]) => updatePrefs((p) => ({ ...p, layout })),
+    [updatePrefs]
+  );
+
   const getCardMode = useCallback(
     (slug: string): DashboardMode =>
       (prefs.cardModeOverrides[slug] as DashboardMode) ?? prefs.mode,
@@ -277,6 +295,7 @@ export function DashboardIntelligenceProvider({
         secondaryMetrics: DEFAULT_SECONDARY_METRICS,
         cardModeOverrides: {},
         cardScenarioOverrides: {},
+        layout: [],
         customMetrics: [],
       })),
     [updatePrefs]
@@ -303,6 +322,8 @@ export function DashboardIntelligenceProvider({
       openFormulaViewer: setFormulaViewerSlug,
       closeFormulaViewer: () => setFormulaViewerSlug(null),
       registry: METRIC_REGISTRY,
+      layout: prefs.layout,
+      reorderLayout,
       isLoading,
       isSaving,
       resetToDefaults,
@@ -311,12 +332,14 @@ export function DashboardIntelligenceProvider({
       prefs.mode,
       prefs.heroCards,
       prefs.secondaryMetrics,
+      prefs.layout,
       setMode,
       swapHeroCard,
       reorderHeroCards,
       addSecondaryMetric,
       removeSecondaryMetric,
       reorderSecondaryMetrics,
+      reorderLayout,
       getCardMode,
       setCardMode,
       getCardScenario,

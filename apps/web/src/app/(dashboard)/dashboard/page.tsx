@@ -23,6 +23,7 @@ import { DashboardHeader } from "./dashboard-header";
 import { CustomizableMetrics } from "./customizable-metrics";
 import { StatsCatalog } from "./stats-catalog";
 import { FormulaViewer } from "./formula-viewer";
+import { DashboardGrid, type WidgetId } from "./dashboard-grid";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -132,185 +133,191 @@ export default async function DashboardPage({
         secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
         cardModeOverrides: (dashPrefs.cardModeOverrides as Record<string, "intelligence" | "dynamic" | "custom">) ?? {},
         cardScenarioOverrides: (dashPrefs.cardScenarioOverrides as Record<string, string>) ?? {},
+        layout: (dashPrefs.layout as Array<{ widgetId: string; w: number; h: number }>) ?? [],
         customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
       } : null}
     >
       <div>
-        {/* Monday Morning CFO Digest */}
-        {hasData && <WeeklyDigestBanner />}
-
-        {/* AI Command Center */}
-        {hasData && (
-          <Suspense fallback={<div className="h-48 rounded-2xl bg-surface-50 animate-pulse mb-6" />}>
-            <AiCommandCenter
-              runway={currentRunway}
-              burnRate={currentBurn}
-              mrr={currentMrr}
-              mrrGrowth={mrrGrowthPct}
-              cash={currentCash}
-            />
-          </Suspense>
-        )}
-
-        {/* Header with Mode Switcher */}
+        {/* Header with Mode Switcher — always above the grid */}
         <DashboardHeader
           companyName={company.name}
           hasData={hasData}
           boardData={boardData}
         />
 
-        {/* Hero KPI Cards — progressively populate as data arrives */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-          <HeroKpiCard
-            variant="cash"
-            slug="cash_position"
-            label="Cash Position"
-            value={hasFunding ? formatCurrency(currentCash) : "$---"}
-            change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
-            changeLabel={hasFunding ? "vs last month" : undefined}
-            description={!hasFunding ? "Add funding to see cash" : undefined}
-            sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
-            stagger={0}
-            celebrate={allPopulated}
-          />
-          <HeroKpiCard
-            variant="burn"
-            slug="net_burn_rate"
-            label="Monthly Burn"
-            value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
-            change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
-            changeLabel={hasExpenses ? "vs last month" : undefined}
-            description={!hasExpenses ? "Add expenses to calculate" : undefined}
-            sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
-            stagger={1}
-            celebrate={allPopulated}
-          />
-          <HeroKpiCard
-            variant="runway"
-            slug="cash_runway_months"
-            label="Runway"
-            value={
-              hasFunding && hasExpenses
-                ? currentRunway >= 999
-                  ? "\u221e"
-                  : `${Math.round(currentRunway)} mo`
-                : "-- mo"
-            }
-            description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
-            sparkData={
-              hasFunding && hasExpenses
-                ? sparkline(
-                    metrics.cashRunwayMonths.map((m) => ({
+        {!hasData ? (
+          <>
+            {/* Hero KPI Cards — always show (ghost state when no data) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+              <HeroKpiCard variant="cash" slug="cash_position" label="Cash Position" value="$---" description="Add funding to see cash" stagger={0} />
+              <HeroKpiCard variant="burn" slug="net_burn_rate" label="Monthly Burn" value="$---" description="Add expenses to calculate" stagger={1} />
+              <HeroKpiCard variant="runway" slug="cash_runway_months" label="Runway" value="-- mo" description="Add cash & expenses" stagger={2} />
+              <HeroKpiCard variant="revenue" slug="mrr" label="MRR" value="$---" description="Add revenue streams" stagger={3} />
+            </div>
+            <DashboardEmptyState
+              companyName={company.name}
+              hasExpenses={hasExpenses}
+              hasRevenue={hasRevenue}
+              hasFunding={hasFunding}
+            />
+          </>
+        ) : (
+          <DashboardGrid
+            widgets={{
+              "weekly-digest": <WeeklyDigestBanner />,
+              "ai-command-center": (
+                <Suspense fallback={<div className="h-48 rounded-2xl bg-surface-50 animate-pulse" />}>
+                  <AiCommandCenter
+                    runway={currentRunway}
+                    burnRate={currentBurn}
+                    mrr={currentMrr}
+                    mrrGrowth={mrrGrowthPct}
+                    cash={currentCash}
+                  />
+                </Suspense>
+              ),
+              "hero-kpis": (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <HeroKpiCard
+                    variant="cash"
+                    slug="cash_position"
+                    label="Cash Position"
+                    value={hasFunding ? formatCurrency(currentCash) : "$---"}
+                    change={hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined}
+                    changeLabel={hasFunding ? "vs last month" : undefined}
+                    description={!hasFunding ? "Add funding to see cash" : undefined}
+                    sparkData={hasFunding ? sparkline(metrics.cashPosition) : undefined}
+                    stagger={0}
+                    celebrate={allPopulated}
+                  />
+                  <HeroKpiCard
+                    variant="burn"
+                    slug="net_burn_rate"
+                    label="Monthly Burn"
+                    value={hasExpenses ? formatCurrency(currentBurn) : "$---"}
+                    change={hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined}
+                    changeLabel={hasExpenses ? "vs last month" : undefined}
+                    description={!hasExpenses ? "Add expenses to calculate" : undefined}
+                    sparkData={hasExpenses ? sparkline(metrics.netBurnRate) : undefined}
+                    stagger={1}
+                    celebrate={allPopulated}
+                  />
+                  <HeroKpiCard
+                    variant="runway"
+                    slug="cash_runway_months"
+                    label="Runway"
+                    value={
+                      hasFunding && hasExpenses
+                        ? currentRunway >= 999
+                          ? "\u221e"
+                          : `${Math.round(currentRunway)} mo`
+                        : "-- mo"
+                    }
+                    description={hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses"}
+                    sparkData={
+                      hasFunding && hasExpenses
+                        ? sparkline(
+                            metrics.cashRunwayMonths.map((m) => ({
+                              ...m,
+                              value: Math.min(m.value, 100),
+                            }))
+                          )
+                        : undefined
+                    }
+                    stagger={2}
+                    celebrate={allPopulated}
+                  />
+                  <HeroKpiCard
+                    variant="revenue"
+                    slug="mrr"
+                    label="MRR"
+                    value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
+                    change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
+                    changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
+                    description={!hasRevenue ? "Add revenue streams" : undefined}
+                    sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
+                    stagger={3}
+                    celebrate={allPopulated}
+                  />
+                </div>
+              ),
+              "quick-actions": (
+                <QuickActions
+                  scenarioId={scenario.id}
+                  accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+                  context={{
+                    hasRevenue,
+                    hasMultipleScenarios: allScenarios.length > 1,
+                    burnRate: currentBurn,
+                    runway: currentRunway,
+                  }}
+                />
+              ),
+              "charts": (
+                <Suspense fallback={
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
+                    ))}
+                  </div>
+                }>
+                  <DashboardCharts
+                    revenueVsExpenses={revenueVsExpenses}
+                    cashData={metrics.cashPosition}
+                    burnData={metrics.netBurnRate}
+                    runwayData={metrics.cashRunwayMonths.map((m) => ({
                       ...m,
                       value: Math.min(m.value, 100),
-                    }))
-                  )
-                : undefined
-            }
-            stagger={2}
-            celebrate={allPopulated}
-          />
-          <HeroKpiCard
-            variant="revenue"
-            slug="mrr"
-            label="MRR"
-            value={hasRevenue ? formatCurrency(currentMrr) : "$---"}
-            change={hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined}
-            changeLabel={hasRevenue && prevMrr > 0 ? "MoM growth" : undefined}
-            description={!hasRevenue ? "Add revenue streams" : undefined}
-            sparkData={hasRevenue ? sparkline(metrics.mrr) : undefined}
-            stagger={3}
-            celebrate={allPopulated}
-          />
-        </div>
-
-        {!hasData ? (
-          <DashboardEmptyState
-            companyName={company.name}
-            hasExpenses={hasExpenses}
-            hasRevenue={hasRevenue}
-            hasFunding={hasFunding}
-          />
-        ) : (
-          <>
-            {/* Quick Actions */}
-            <QuickActions
-              scenarioId={scenario.id}
-              accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
-              context={{
-                hasRevenue,
-                hasMultipleScenarios: allScenarios.length > 1,
-                burnRate: currentBurn,
-                runway: currentRunway,
-              }}
-            />
-
-            {/* Charts */}
-            <Suspense fallback={
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
-                ))}
-              </div>
-            }>
-              <DashboardCharts
-                revenueVsExpenses={revenueVsExpenses}
-                cashData={metrics.cashPosition}
-                burnData={metrics.netBurnRate}
-                runwayData={metrics.cashRunwayMonths.map((m) => ({
-                  ...m,
-                  value: Math.min(m.value, 100),
-                }))}
-                mrrData={metrics.mrr}
-                hasSaaS={metrics.mrr.some((m) => m.value > 0)}
-              />
-            </Suspense>
-
-            {/* Bottom section: Scenarios + Customizable Key Metrics */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
-              {/* Pinned Scenarios */}
-              {pinnedScenarios.length > 0 && (
-                <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
-                    <Link
-                      href="/scenarios"
-                      className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
-                    >
-                      View all
-                    </Link>
-                  </div>
-                  <div className="space-y-2">
-                    {pinnedScenarios.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-surface-900">{s.name}</p>
-                          <span className="text-xs text-surface-400 capitalize">{s.type}</span>
-                        </div>
+                    }))}
+                    mrrData={metrics.mrr}
+                    hasSaaS={metrics.mrr.some((m) => m.value > 0)}
+                  />
+                </Suspense>
+              ),
+              "bottom-section": (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  {pinnedScenarios.length > 0 && (
+                    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
                         <Link
                           href="/scenarios"
                           className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
                         >
-                          View
+                          View all
                         </Link>
                       </div>
-                    ))}
-                  </div>
+                      <div className="space-y-2">
+                        {pinnedScenarios.map((s) => (
+                          <div
+                            key={s.id}
+                            className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-surface-900">{s.name}</p>
+                              <span className="text-xs text-surface-400 capitalize">{s.type}</span>
+                            </div>
+                            <Link
+                              href="/scenarios"
+                              className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
+                            >
+                              View
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <CustomizableMetrics
+                    metrics={metrics}
+                    currentMonth={currentMonth}
+                    prevMonth={prevMonth}
+                    headcount={{ current: currentHeadcount, previous: prevHeadcount }}
+                  />
                 </div>
-              )}
-
-              {/* Customizable Key Metrics */}
-              <CustomizableMetrics
-                metrics={metrics}
-                currentMonth={currentMonth}
-                prevMonth={prevMonth}
-                headcount={{ current: currentHeadcount, previous: prevHeadcount }}
-              />
-            </div>
-          </>
+              ),
+            }}
+          />
         )}
 
         {/* Stats Catalog Slide-over */}

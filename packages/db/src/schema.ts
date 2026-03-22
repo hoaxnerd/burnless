@@ -688,6 +688,33 @@ export const aiConversations = pgTable(
   ]
 );
 
+// ── AI Insight Invalidations (mutation-driven regeneration queue) ────────────
+
+export const insightInvalidations = pgTable(
+  "insight_invalidations",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    insightType: text("insight_type").notNull(), // dashboard | revenue | expense | scenario
+    mutationSource: text("mutation_source").notNull(), // which data changed: expenses, revenue, headcount, funding, scenarios, accounts
+    firstInvalidatedAt: timestamp("first_invalidated_at", { mode: "date" }).defaultNow().notNull(),
+    lastMutationAt: timestamp("last_mutation_at", { mode: "date" }).defaultNow().notNull(),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("insight_invalidations_company_type_idx").on(
+      table.companyId,
+      table.insightType
+    ),
+    index("insight_invalidations_pending_idx").on(table.processedAt),
+  ]
+);
+
 // ── AI Insight Cache ─────────────────────────────────────────────────────────
 
 export const aiInsightCacheTypeEnum = pgEnum("ai_insight_cache_type", [
@@ -785,6 +812,17 @@ export const dashboardPreferences = pgTable(
       .$type<Record<string, string>>()
       .notNull()
       .default({}),
+    /** Dashboard widget layout: ordered list of { widgetId, w, h } */
+    layout: jsonb("layout")
+      .$type<
+        Array<{
+          widgetId: string;
+          w: number;
+          h: number;
+        }>
+      >()
+      .notNull()
+      .default([]),
     /** User-defined custom metric formulas: [{ id, name, formula, dependsOn }] */
     customMetrics: jsonb("custom_metrics")
       .$type<
