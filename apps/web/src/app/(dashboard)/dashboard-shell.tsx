@@ -260,6 +260,7 @@ function DashboardContent({
   }, [masterEnabled]);
 
   const [navOrder, setNavOrder] = useState<string[]>(defaultOrder);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   // Load preferences from API on mount
   useEffect(() => {
@@ -271,7 +272,8 @@ function DashboardContent({
         if (prefs?.quickActionModeOverrides) setQuickActionModeOverrides(prefs.quickActionModeOverrides);
         if (prefs?.sidebarCollapsed != null) setSidebarCollapsed(prefs.sidebarCollapsed);
       })
-      .catch(() => {}); // silently fail — use defaults
+      .catch(() => {}) // silently fail — use defaults
+      .finally(() => setPrefsLoaded(true));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist preferences on change
@@ -291,8 +293,10 @@ function DashboardContent({
     setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
   }, [pathname]);
 
-  // Sync nav order when masterEnabled changes
+  // Sync nav order when masterEnabled changes — only after prefs loaded
+  // to avoid cascading re-renders (default → AI sync → prefs overwrite)
   useEffect(() => {
+    if (!prefsLoaded) return;
     setNavOrder((prev: string[]) => {
       const hasAi = prev.includes("ai");
       if (masterEnabled && !hasAi) {
@@ -304,7 +308,7 @@ function DashboardContent({
       }
       return prev;
     });
-  }, [masterEnabled]);
+  }, [masterEnabled, prefsLoaded]);
 
   const scenarioId = searchParams.get("scenarioId");
   const buildHref = (base: string) =>
@@ -446,6 +450,7 @@ function DashboardContent({
               onOpenSearch={() => setCommandPaletteOpen(true)}
               onToggleAI={navigateToAi}
               user={user}
+              dndContextId="sidebar-dnd-desktop"
             />
           </aside>
         </div>
@@ -483,6 +488,7 @@ function DashboardContent({
             onOpenSearch={() => setCommandPaletteOpen(true)}
             onToggleAI={navigateToAi}
             user={user}
+            dndContextId="sidebar-dnd-mobile"
           />
         </aside>
 
@@ -533,6 +539,7 @@ function SidebarInner({
   onOpenSearch,
   onToggleAI,
   user,
+  dndContextId,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -554,6 +561,7 @@ function SidebarInner({
   onOpenSearch: () => void;
   onToggleAI: () => void;
   user: UserInfo | null;
+  dndContextId: string;
 }) {
   const modeIcons: Record<QuickActionMode, LucideIcon> = {
     intelligence: Brain,
@@ -683,6 +691,7 @@ function SidebarInner({
       {/* Main nav — scrollable, drag-and-drop reorderable */}
       <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-0.5" aria-label="Sidebar">
         <DndContext
+          id={dndContextId}
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={onDragEnd}
