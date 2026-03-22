@@ -123,6 +123,8 @@ export {
   evaluateBenchmark,
   isMetricDataAvailable,
   getMetricMissingDataHint,
+  getMetricFallbacks,
+  type MetricFallback,
   type MetricDefinition,
   type MetricCategory,
   type MetricTier,

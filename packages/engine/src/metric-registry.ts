@@ -1148,6 +1148,42 @@ export function getMetricMissingDataHint(slug: string): string {
 }
 
 /**
+ * Formula chain fallback — when a metric can't be calculated, return its
+ * direct dependencies that ARE available. This lets the UI show partial
+ * information instead of just "data missing".
+ *
+ * Example: cashRunwayMonths depends on [cashPosition, netBurnRate].
+ * If cashRunwayMonths is unavailable but netBurnRate is available,
+ * returns [{ slug: "netBurnRate", def: MetricDefinition, value: 4200 }].
+ */
+export interface MetricFallback {
+  slug: string;
+  def: MetricDefinition;
+  value: number;
+}
+
+export function getMetricFallbacks(
+  slug: string,
+  metrics: ComputedMetrics,
+  month: string,
+): MetricFallback[] {
+  const def = _bySlug.get(slug);
+  if (!def || def.dependsOn.length === 0) return [];
+
+  const fallbacks: MetricFallback[] = [];
+  for (const depSlug of def.dependsOn) {
+    if (isMetricDataAvailable(metrics, depSlug, month)) {
+      const depDef = _bySlug.get(depSlug);
+      const val = extractMetricValue(metrics, depSlug, month);
+      if (depDef && val !== undefined && Number.isFinite(val)) {
+        fallbacks.push({ slug: depSlug, def: depDef, value: val });
+      }
+    }
+  }
+  return fallbacks;
+}
+
+/**
  * Evaluate a metric against its benchmark (if any).
  * Returns a signal: "good" | "warn" | "bad" | null.
  */

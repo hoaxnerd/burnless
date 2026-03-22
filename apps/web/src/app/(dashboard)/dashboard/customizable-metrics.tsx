@@ -14,6 +14,7 @@ import {
   evaluateBenchmark,
   isMetricDataAvailable,
   getMetricMissingDataHint,
+  getMetricFallbacks,
   DEFAULT_SECONDARY_METRICS,
   type ComputedMetrics,
 } from "@burnless/engine";
@@ -93,9 +94,39 @@ function MetricRowDynamic({
 
   const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
 
-  // If no data available, show an actionable hint instead of misleading zeros
+  // If no data available, try to show available dependency metrics as fallback
   if (!hasData) {
+    const fallbacks = getMetricFallbacks(slug, metrics, currentMonth);
     const hint = getMetricMissingDataHint(slug);
+
+    if (fallbacks.length > 0) {
+      // Show the unavailable parent with its available children inline
+      return (
+        <div className="py-1 px-3 rounded-xl -mx-3">
+          <div className="flex items-center justify-between py-1 opacity-50" title={hint}>
+            <span className="text-sm text-surface-400">{def.name}</span>
+            <span className="text-xs text-surface-300 italic">{hint}</span>
+          </div>
+          {fallbacks.map((fb) => (
+            <div
+              key={fb.slug}
+              className="flex items-center justify-between py-1.5 pl-4 cursor-pointer hover:bg-surface-50 rounded-lg transition-colors"
+              onClick={() => openFormulaViewer(fb.slug)}
+              title={`${fb.def.description} — available as fallback`}
+            >
+              <span className="text-xs text-surface-400">
+                <span className="text-surface-300 mr-1">↳</span>
+                {fb.def.name}
+              </span>
+              <span className="text-xs font-medium text-surface-700 tabular-nums">
+                {formatMetricValue(fb.value, fb.def.format)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div
         className="flex items-center justify-between py-2 px-3 rounded-xl -mx-3 opacity-50"
