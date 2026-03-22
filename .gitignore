@@ -41,6 +41,16 @@ coverage/
 
 # Agents internal
 agents/*/HEARTBEAT.md
+agents/*/screenshots/
+
+# Claude Code
+.claude/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Root-level screenshots (ad-hoc agent artifacts)
+/*.png
 
 
 
