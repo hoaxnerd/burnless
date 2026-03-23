@@ -98,6 +98,7 @@ describe("GET /api/chat/history", () => {
     mockPaginatedResponse.mockReturnValue({
       data: [],
       nextCursor: null,
+      hasMore: false,
     });
   });
 
