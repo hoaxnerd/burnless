@@ -69,7 +69,7 @@ const nextConfig: NextConfig = {
     "ioredis",
   ],
   experimental: {
-    optimizePackageImports: ["lucide-react", "recharts"],
+    optimizePackageImports: ["recharts"],
   },
   eslint: {
     // Lint separately via `pnpm lint` — don't block builds on eslint-plugin compat issues
