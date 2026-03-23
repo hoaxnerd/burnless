@@ -33,6 +33,8 @@ export type DashboardMode = "intelligence" | "dynamic" | "custom";
 
 export interface WidgetLayout {
   widgetId: string;
+  x: number;
+  y: number;
   w: number;
   h: number;
 }

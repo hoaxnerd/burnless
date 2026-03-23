@@ -1,165 +1,177 @@
 "use client";
 
 /**
- * DashboardGrid — drag-and-drop sortable dashboard layout.
- * Uses @dnd-kit/sortable to let users rearrange widgets.
- * Layout order is persisted to dashboardPreferences.
+ * DashboardGrid — 2D drag-and-drop grid layout for the dashboard.
+ * Uses react-grid-layout v2 for Metabase/Grafana-style grid snapping.
+ * Each card is an independent grid item that can be placed anywhere.
+ * Layout persists to dashboardPreferences.
  */
 
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, RotateCcw } from "lucide-react";
-import { Fragment, type ReactNode, useCallback, useMemo, useState } from "react";
+  ResponsiveGridLayout,
+  useContainerWidth,
+  verticalCompactor,
+  type LayoutItem,
+} from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import { GripVertical, Lock, RotateCcw, Unlock } from "lucide-react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { useDashboardIntelligence, type WidgetLayout } from "./dashboard-intelligence-context";
 
-// ── Widget definitions ────────────────────────────────────────────────────────
+// ── Widget ID type — individual cards, not sections ─────────────────────────
 
 export type WidgetId =
-  | "hero-kpis"
+  | "hero-0"
+  | "hero-1"
+  | "hero-2"
+  | "hero-3"
   | "ai-command-center"
   | "weekly-digest"
   | "quick-actions"
-  | "charts"
-  | "bottom-section";
+  | "chart-cash"
+  | "chart-rev-exp"
+  | "chart-burn-runway"
+  | "chart-mrr"
+  | "scenarios"
+  | "custom-metrics";
 
-/** Default widget order — matches the current static layout */
-export const DEFAULT_WIDGET_ORDER: WidgetId[] = [
-  "weekly-digest",
-  "ai-command-center",
-  "hero-kpis",
-  "quick-actions",
-  "charts",
-  "bottom-section",
+// ── Default layouts per breakpoint (12-column grid) ─────────────────────────
+
+const ROW_HEIGHT = 30;
+const GRID_MARGIN: [number, number] = [16, 16];
+const GRID_COLS = { lg: 12, md: 12, sm: 6, xs: 6, xxs: 6 };
+
+type RGLLayout = readonly LayoutItem[];
+
+/** Default layout for lg (>=1200px) — 12 columns */
+const DEFAULT_LAYOUT_LG: RGLLayout = [
+  { i: "hero-0",            x: 0,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
+  { i: "hero-1",            x: 3,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
+  { i: "hero-2",            x: 6,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
+  { i: "hero-3",            x: 9,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
+  { i: "weekly-digest",     x: 0,  y: 5,  w: 12, h: 2, minW: 6, minH: 2 },
+  { i: "ai-command-center", x: 0,  y: 7,  w: 12, h: 8, minW: 6, minH: 5 },
+  { i: "quick-actions",     x: 0,  y: 15, w: 12, h: 5, minW: 6, minH: 3 },
+  { i: "chart-cash",        x: 0,  y: 20, w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-rev-exp",     x: 6,  y: 20, w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-burn-runway", x: 0,  y: 30, w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-mrr",         x: 6,  y: 30, w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "scenarios",         x: 0,  y: 40, w: 6,  h: 8, minW: 4, minH: 5 },
+  { i: "custom-metrics",    x: 6,  y: 40, w: 6,  h: 8, minW: 4, minH: 5 },
 ];
 
-// ── Sortable Widget Wrapper ───────────────────────────────────────────────────
+/** Default layout for md (>=996px) */
+const DEFAULT_LAYOUT_MD: RGLLayout = DEFAULT_LAYOUT_LG;
 
-function SortableWidget({
-  id,
-  children,
-  isDragMode,
-}: {
-  id: string;
-  children: ReactNode;
-  isDragMode: boolean;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+/** Default layout for sm/xs/xxs (mobile — 6 columns, stacked) */
+const DEFAULT_LAYOUT_SM: RGLLayout = [
+  { i: "hero-0",            x: 0, y: 0,  w: 3, h: 5, minW: 3, minH: 4 },
+  { i: "hero-1",            x: 3, y: 0,  w: 3, h: 5, minW: 3, minH: 4 },
+  { i: "hero-2",            x: 0, y: 5,  w: 3, h: 5, minW: 3, minH: 4 },
+  { i: "hero-3",            x: 3, y: 5,  w: 3, h: 5, minW: 3, minH: 4 },
+  { i: "weekly-digest",     x: 0, y: 10, w: 6, h: 2, minW: 6, minH: 2 },
+  { i: "ai-command-center", x: 0, y: 12, w: 6, h: 8, minW: 6, minH: 5 },
+  { i: "quick-actions",     x: 0, y: 20, w: 6, h: 5, minW: 6, minH: 3 },
+  { i: "chart-cash",        x: 0, y: 25, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-rev-exp",     x: 0, y: 35, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-burn-runway", x: 0, y: 45, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-mrr",         x: 0, y: 55, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "scenarios",         x: 0, y: 65, w: 6, h: 8, minW: 6, minH: 5 },
+  { i: "custom-metrics",    x: 0, y: 73, w: 6, h: 8, minW: 6, minH: 5 },
+];
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    position: "relative" as const,
-  };
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
-  return (
-    <div ref={setNodeRef} style={style}>
-      {isDragMode && (
-        <button
-          key="drag-handle"
-          {...attributes}
-          {...listeners}
-          className="absolute -left-2 top-1/2 -translate-y-1/2 z-30 p-1.5 rounded-lg bg-surface-0 border border-surface-200 shadow-sm text-surface-400 hover:text-surface-600 hover:bg-surface-50 cursor-grab active:cursor-grabbing transition-colors"
-          aria-label="Drag to reorder"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      )}
-      {isDragMode && (
-        <div key="drag-overlay" className="absolute inset-0 rounded-2xl border-2 border-dashed border-brand-200 pointer-events-none z-20" />
-      )}
-      <Fragment key="content">{children}</Fragment>
-    </div>
-  );
+/** Convert persisted WidgetLayout[] to react-grid-layout LayoutItem[] */
+function savedToRGL(saved: WidgetLayout[], defaults: RGLLayout): LayoutItem[] {
+  if (saved.length === 0) return [...defaults];
+
+  const result: LayoutItem[] = [];
+  const seen = new Set<string>();
+
+  // Place saved items first
+  for (const s of saved) {
+    const def = defaults.find((d) => d.i === s.widgetId);
+    result.push({
+      i: s.widgetId,
+      x: s.x,
+      y: s.y,
+      w: s.w,
+      h: s.h,
+      minW: def?.minW,
+      minH: def?.minH,
+    });
+    seen.add(s.widgetId);
+  }
+
+  // Add any defaults not in saved (new widgets added after user saved)
+  for (const d of defaults) {
+    if (!seen.has(d.i)) {
+      result.push({ ...d });
+    }
+  }
+
+  return result;
 }
 
-// ── Main Grid Component ───────────────────────────────────────────────────────
+/** Convert react-grid-layout Layout to our WidgetLayout[] for persistence */
+function rglToSaved(rgl: RGLLayout): WidgetLayout[] {
+  return rgl.map((item) => ({
+    widgetId: item.i,
+    x: item.x,
+    y: item.y,
+    w: item.w,
+    h: item.h,
+  }));
+}
+
+// ── Main Grid Component ─────────────────────────────────────────────────────
 
 interface DashboardGridProps {
   /** Map from widget ID to its rendered content */
-  widgets: Record<WidgetId, ReactNode>;
+  widgets: Partial<Record<WidgetId, ReactNode>>;
   /** Widget IDs that should be hidden (no data, etc.) */
   hiddenWidgets?: WidgetId[];
 }
 
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
-  const { layout, reorderLayout, isLoading } = useDashboardIntelligence();
+  const { layout: savedLayout, reorderLayout, isLoading } = useDashboardIntelligence();
   const [isDragMode, setIsDragMode] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Compute effective widget order from saved layout or defaults.
-  // Deduplicates IDs and filters to only valid widget IDs to prevent React key errors.
-  const widgetOrder = useMemo(() => {
-    const validIds = new Set(Object.keys(widgets) as WidgetId[]);
-    const hiddenSet = new Set(hiddenWidgets);
-    const seen = new Set<WidgetId>();
+  // Width measurement for responsive grid
+  const { width, containerRef } = useContainerWidth({ initialWidth: 1200 });
 
-    const dedup = (ids: WidgetId[]) =>
-      ids.filter((id) => {
-        if (seen.has(id) || hiddenSet.has(id) || !validIds.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
-
-    if (layout.length > 0) {
-      const savedOrder = layout.map((l) => l.widgetId as WidgetId);
-      const missing = DEFAULT_WIDGET_ORDER.filter((id) => !savedOrder.includes(id));
-      return dedup([...savedOrder, ...missing]);
-    }
-    return dedup([...DEFAULT_WIDGET_ORDER]);
-  }, [layout, hiddenWidgets, widgets]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+  // Filter out hidden widgets from the active set
+  const hiddenSet = useMemo(() => new Set(hiddenWidgets), [hiddenWidgets]);
+  const visibleWidgetIds = useMemo(
+    () => Object.keys(widgets).filter((id) => !hiddenSet.has(id as WidgetId)) as WidgetId[],
+    [widgets, hiddenSet]
   );
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  // Build responsive layouts from saved preferences + defaults
+  const layouts = useMemo(() => {
+    const filterHidden = (items: LayoutItem[]) =>
+      items.filter((item) => !hiddenSet.has(item.i as WidgetId) && item.i in (widgets as Record<string, unknown>));
 
-      const oldIndex = widgetOrder.indexOf(active.id as WidgetId);
-      const newIndex = widgetOrder.indexOf(over.id as WidgetId);
-      if (oldIndex === -1 || newIndex === -1) return;
+    return {
+      lg: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_LG)),
+      md: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_MD)),
+      sm: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
+      xs: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
+      xxs: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
+    };
+  }, [savedLayout, hiddenSet, widgets]);
 
-      const newOrder = [...widgetOrder];
-      newOrder.splice(oldIndex, 1);
-      newOrder.splice(newIndex, 0, active.id as WidgetId);
-
-      reorderLayout(
-        newOrder.map((id) => ({
-          widgetId: id,
-          w: 12,
-          h: 1,
-        }))
-      );
+  // Debounced save to avoid saving on every pixel of drag
+  const handleLayoutChange = useCallback(
+    (currentLayout: RGLLayout) => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        reorderLayout(rglToSaved(currentLayout));
+      }, 500);
     },
-    [widgetOrder, reorderLayout]
+    [reorderLayout]
   );
 
   const handleReset = useCallback(() => {
@@ -167,23 +179,21 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     setIsDragMode(false);
   }, [reorderLayout]);
 
-  // Show skeleton while loading to prevent flash of default layout
+  // Loading skeleton
   if (isLoading) {
     return (
-      <div className="space-y-6 sm:space-y-8">
-        {DEFAULT_WIDGET_ORDER.filter((id) => !hiddenWidgets.includes(id)).map((id) => (
-          <div
-            key={id}
-            className="rounded-2xl bg-surface-50 animate-pulse"
-            style={{ height: id === "hero-kpis" ? 180 : id === "charts" ? 320 : 120 }}
-          />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-2xl bg-surface-50 animate-pulse h-36" />
         ))}
+        <div className="col-span-2 lg:col-span-4 rounded-2xl bg-surface-50 animate-pulse h-48" />
+        <div className="col-span-2 lg:col-span-4 rounded-2xl bg-surface-50 animate-pulse h-32" />
       </div>
     );
   }
 
   return (
-    <div>
+    <div ref={containerRef}>
       {/* Layout controls */}
       <div className="flex items-center justify-end gap-2 mb-4">
         <button
@@ -196,8 +206,8 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
             }
           `}
         >
-          <GripVertical className="h-3 w-3" />
-          {isDragMode ? "Done" : "Rearrange"}
+          {isDragMode ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+          {isDragMode ? "Lock Layout" : "Edit Layout"}
         </button>
         {isDragMode && (
           <button
@@ -205,30 +215,50 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700 text-xs font-medium transition-colors"
           >
             <RotateCcw className="h-3 w-3" />
-            Reset Layout
+            Reset
           </button>
         )}
       </div>
 
-      {/* Sortable grid */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+      {/* Grid layout */}
+      <ResponsiveGridLayout
+        width={width}
+        layouts={layouts}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+        cols={GRID_COLS}
+        rowHeight={ROW_HEIGHT}
+        margin={GRID_MARGIN}
+        containerPadding={[0, 0]}
+        isDraggable={isDragMode}
+        isResizable={isDragMode}
+        compactor={verticalCompactor}
+        onLayoutChange={handleLayoutChange}
+        draggableHandle=".grid-drag-handle"
+        useCSSTransforms
       >
-        <SortableContext
-          items={widgetOrder}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="space-y-6 sm:space-y-8">
-            {widgetOrder.map((id) => (
-              <SortableWidget key={id} id={id} isDragMode={isDragMode}>
-                {widgets[id]}
-              </SortableWidget>
-            ))}
+        {visibleWidgetIds.map((id) => (
+          <div key={id} className="relative">
+            {/* Drag handle — visible in edit mode */}
+            {isDragMode && (
+              <div className="grid-drag-handle absolute -top-1 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-b-lg bg-surface-100/90 border border-t-0 border-surface-200 text-surface-400 hover:text-surface-600 cursor-grab active:cursor-grabbing transition-colors backdrop-blur-sm">
+                <GripVertical className="h-3 w-3" />
+                <span className="text-[10px] font-medium select-none">Drag</span>
+              </div>
+            )}
+            {/* Edit mode border overlay */}
+            {isDragMode && (
+              <div className="absolute inset-0 rounded-2xl border-2 border-dashed border-brand-200/60 pointer-events-none z-20" />
+            )}
+            {/* Widget content */}
+            <div className="h-full overflow-hidden">
+              {widgets[id]}
+            </div>
           </div>
-        </SortableContext>
-      </DndContext>
+        ))}
+      </ResponsiveGridLayout>
     </div>
   );
 }
+
+// Re-export defaults for use in page.tsx
+export { DEFAULT_LAYOUT_LG };

@@ -24,7 +24,15 @@ import {
 } from "@burnless/engine";
 import { type KpiVariant } from "./hero-kpi-card";
 import { HeroCardGrid, type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
-import { DashboardCharts } from "./dashboard-charts";
+import { HeroCardSlot } from "./hero-card-slot";
+import {
+  DashboardChartCard,
+  AreaChartWidget,
+  BarChartWidget,
+  MultiLineChart,
+  chartColors,
+  formatCompactCurrency,
+} from "./dashboard-charts";
 import { AiCommandCenter } from "./ai-command-center";
 import { QuickActions } from "./quick-actions";
 import { DashboardEmptyState } from "./empty-state";
@@ -263,7 +271,7 @@ export default async function DashboardPage({
         secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
         cardModeOverrides: (dashPrefs.cardModeOverrides as Record<string, "intelligence" | "dynamic" | "custom">) ?? {},
         cardScenarioOverrides: (dashPrefs.cardScenarioOverrides as Record<string, string>) ?? {},
-        layout: (dashPrefs.layout as Array<{ widgetId: string; w: number; h: number }>) ?? [],
+        layout: (dashPrefs.layout as Array<{ widgetId: string; x: number; y: number; w: number; h: number }>) ?? [],
         customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
       } : null}
     >
@@ -289,9 +297,37 @@ export default async function DashboardPage({
         ) : (
           <DashboardGrid
             widgets={{
+              /* ── Individual Hero KPI Cards ─────────────────────────── */
+              ...Object.fromEntries(
+                heroCards.map((card, i) => {
+                  const swap = heroSwapCards.find((s) => s.slotIndex === i);
+                  return [
+                    `hero-${i}`,
+                    <HeroCardSlot
+                      key={`hero-${i}`}
+                      index={i}
+                      variant={card.variant}
+                      hasData={card.hasData}
+                      allPopulated={allPopulated}
+                      cardProps={card.props}
+                      swapProps={swap ? {
+                        originalSlug: swap.originalSlug,
+                        originalLabel: swap.originalLabel,
+                        restoreHint: swap.restoreHint,
+                        variant: swap.variant,
+                        cardProps: swap.props,
+                      } : null}
+                    />,
+                  ];
+                })
+              ),
+
+              /* ── Weekly Digest ─────────────────────────────────────── */
               "weekly-digest": <WeeklyDigestBanner />,
+
+              /* ── AI Command Center ─────────────────────────────────── */
               "ai-command-center": (
-                <Suspense fallback={<div className="h-48 rounded-2xl bg-surface-50 animate-pulse" />}>
+                <Suspense fallback={<div className="h-full rounded-2xl bg-surface-50 animate-pulse" />}>
                   <AiCommandCenter
                     runway={currentRunway}
                     burnRate={currentBurn}
@@ -301,9 +337,8 @@ export default async function DashboardPage({
                   />
                 </Suspense>
               ),
-              "hero-kpis": (
-                <HeroCardGrid cards={heroCards} swaps={heroSwapCards} allPopulated={allPopulated} />
-              ),
+
+              /* ── Quick Actions ──────────────────────────────────────── */
               "quick-actions": (
                 <QuickActions
                   scenarioId={scenario.id}
@@ -316,69 +351,132 @@ export default async function DashboardPage({
                   }}
                 />
               ),
-              "charts": (
-                <Suspense fallback={
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 animate-pulse">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="rounded-2xl bg-surface-0 border border-surface-200 p-6 h-72" />
-                    ))}
-                  </div>
-                }>
-                  <DashboardCharts
-                    revenueVsExpenses={revenueVsExpenses}
-                    cashData={metrics.cashPosition}
-                    burnData={metrics.netBurnRate}
-                    runwayData={metrics.cashRunwayMonths.map((m) => ({
-                      ...m,
-                      value: Math.min(m.value, 100),
-                    }))}
-                    mrrData={metrics.mrr}
-                    hasSaaS={metrics.mrr.some((m) => m.value > 0)}
-                  />
-                </Suspense>
+
+              /* ── Individual Charts ──────────────────────────────────── */
+              "chart-cash": (
+                <DashboardChartCard
+                  title="Cash Position"
+                  subtitle="Cash balance over time"
+                  expandedChildren={<AreaChartWidget data={metrics.cashPosition} color={chartColors.success} height={420} />}
+                >
+                  <AreaChartWidget data={metrics.cashPosition} color={chartColors.success} />
+                </DashboardChartCard>
               ),
-              "bottom-section": (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                  {pinnedScenarios.length > 0 && (
-                    <div key="pinned-scenarios" className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-5 hover-lift">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
+              "chart-rev-exp": (
+                <DashboardChartCard
+                  title="Revenue vs Expenses"
+                  subtitle="Monthly comparison"
+                  expandedChildren={
+                    <BarChartWidget
+                      data={revenueVsExpenses}
+                      bars={[
+                        { dataKey: "revenue", label: "Revenue", color: chartColors.brand },
+                        { dataKey: "expenses", label: "Expenses", color: chartColors.danger },
+                      ]}
+                      height={420}
+                    />
+                  }
+                >
+                  <BarChartWidget
+                    data={revenueVsExpenses}
+                    bars={[
+                      { dataKey: "revenue", label: "Revenue", color: chartColors.brand },
+                      { dataKey: "expenses", label: "Expenses", color: chartColors.danger },
+                    ]}
+                  />
+                </DashboardChartCard>
+              ),
+              "chart-burn-runway": (() => {
+                const burnRunwayCombined = metrics.netBurnRate.map((b, i) => ({
+                  month: b.month,
+                  burn: b.value,
+                  runway: Math.min(metrics.cashRunwayMonths[i]?.value ?? 0, 100),
+                }));
+                const lines = [
+                  { dataKey: "burn" as const, label: "Net Burn", color: chartColors.danger },
+                  { dataKey: "runway" as const, label: "Runway (mo)", color: chartColors.info, dashed: true },
+                ];
+                return (
+                  <DashboardChartCard
+                    title="Burn Rate & Runway"
+                    subtitle="Net burn and months of runway"
+                    expandedChildren={
+                      <MultiLineChart data={burnRunwayCombined} lines={lines} formatValue={formatCompactCurrency} height={420} />
+                    }
+                  >
+                    <MultiLineChart data={burnRunwayCombined} lines={lines} formatValue={formatCompactCurrency} />
+                  </DashboardChartCard>
+                );
+              })(),
+              "chart-mrr": metrics.mrr.some((m) => m.value > 0) ? (
+                <DashboardChartCard
+                  title="MRR"
+                  subtitle="Monthly recurring revenue"
+                  expandedChildren={<AreaChartWidget data={metrics.mrr} color="#7c3aed" height={420} />}
+                >
+                  <AreaChartWidget data={metrics.mrr} color="#7c3aed" />
+                </DashboardChartCard>
+              ) : (
+                <DashboardChartCard
+                  title="Revenue Trend"
+                  subtitle="Total monthly revenue"
+                  expandedChildren={<AreaChartWidget data={metrics.cashPosition} color={chartColors.brand} height={420} />}
+                >
+                  <AreaChartWidget data={metrics.cashPosition} color={chartColors.brand} />
+                </DashboardChartCard>
+              ),
+
+              /* ── Scenarios Panel ────────────────────────────────────── */
+              "scenarios": pinnedScenarios.length > 0 ? (
+                <div className="h-full rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 hover-lift">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
+                    <Link
+                      href="/scenarios"
+                      className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
+                    >
+                      View all
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    {pinnedScenarios.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-surface-900">{s.name}</p>
+                          <span className="text-xs text-surface-400 capitalize">{s.type}</span>
+                        </div>
                         <Link
                           href="/scenarios"
                           className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
                         >
-                          View all
+                          View
                         </Link>
                       </div>
-                      <div className="space-y-2">
-                        {pinnedScenarios.map((s) => (
-                          <div
-                            key={s.id}
-                            className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
-                          >
-                            <div>
-                              <p className="text-sm font-medium text-surface-900">{s.name}</p>
-                              <span className="text-xs text-surface-400 capitalize">{s.type}</span>
-                            </div>
-                            <Link
-                              href="/scenarios"
-                              className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
-                            >
-                              View
-                            </Link>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <CustomizableMetrics
-                    key="customizable-metrics"
-                    metrics={metrics}
-                    currentMonth={currentMonth}
-                    prevMonth={prevMonth}
-                    headcount={{ current: currentHeadcount, previous: prevHeadcount }}
-                  />
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <div className="h-full rounded-2xl bg-surface-50/50 border border-dashed border-surface-200 p-5 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-sm text-surface-400 mb-2">No scenarios yet</p>
+                    <Link href="/scenarios/new" className="text-xs font-medium text-brand-500 hover:text-brand-600">
+                      Create scenario
+                    </Link>
+                  </div>
+                </div>
+              ),
+
+              /* ── Customizable Metrics ───────────────────────────────── */
+              "custom-metrics": (
+                <CustomizableMetrics
+                  metrics={metrics}
+                  currentMonth={currentMonth}
+                  prevMonth={prevMonth}
+                  headcount={{ current: currentHeadcount, previous: prevHeadcount }}
+                />
               ),
             }}
           />

@@ -74,7 +74,7 @@ function ChartExpandModal({
 
 /* ── Chart Card — collapsible on mobile, click-to-expand on desktop ──── */
 
-function DashboardChartCard({
+export function DashboardChartCard({
   title,
   subtitle,
   children,
@@ -158,6 +158,9 @@ function DashboardChartCard({
     </>
   );
 }
+
+// Re-export chart components for individual grid items
+export { AreaChartWidget, BarChartWidget, MultiLineChart, chartColors, formatCompactCurrency };
 
 export function DashboardCharts({
   revenueVsExpenses,
