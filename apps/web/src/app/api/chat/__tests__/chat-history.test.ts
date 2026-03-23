@@ -24,7 +24,7 @@ const {
 const { mockParsePaginationParams, mockPaginatedResponse } = vi.hoisted(
   () => ({
     mockParsePaginationParams: vi.fn().mockReturnValue({ limit: 20, cursor: null }),
-    mockPaginatedResponse: vi.fn((rows: any[], limit: number) => ({ data: rows.slice(0, limit), nextCursor: null })),
+    mockPaginatedResponse: vi.fn((rows: any[], limit: number) => ({ data: rows.slice(0, limit), pagination: { hasMore: false, nextCursor: null, count: rows.length } })),
   })
 );
 
@@ -97,8 +97,7 @@ describe("GET /api/chat/history", () => {
     mockParsePaginationParams.mockReturnValue({ limit: 20, cursor: null });
     mockPaginatedResponse.mockReturnValue({
       data: [],
-      nextCursor: null,
-      hasMore: false,
+      pagination: { hasMore: false, nextCursor: null, count: 0 },
     });
   });
 
@@ -170,7 +169,7 @@ describe("GET /api/chat/history", () => {
     mockLimit.mockResolvedValueOnce(conversations);
     mockPaginatedResponse.mockReturnValueOnce({
       data: conversations,
-      nextCursor: null,
+      pagination: { hasMore: false, nextCursor: null, count: conversations.length },
     });
 
     const { GET } = await import("../history/route");
@@ -195,6 +194,6 @@ describe("GET /api/chat/history", () => {
 
     expect(res.status).toBe(200);
     expect(body.data).toHaveLength(0);
-    expect(body.hasMore).toBe(false);
+    expect(body.pagination.hasMore).toBe(false);
   });
 });

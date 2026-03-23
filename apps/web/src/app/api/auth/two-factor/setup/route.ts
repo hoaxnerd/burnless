@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { withErrorHandler, getAuthUser, errorResponse } from "@/lib/api-helpers";
+import { withErrorHandler, getAuthUser, errorResponse, parseBody } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import {
   generateTotpSecret,
@@ -57,7 +57,9 @@ export const POST = withErrorHandler(async (request: Request) => {
   const user = await getAuthUser();
   if (!user) return errorResponse("Unauthorized", 401);
 
-  const body = verifySchema.parse(await request.json());
+  const parsed = await parseBody(request, verifySchema);
+  if ("error" in parsed) return parsed.error;
+  const body = parsed.data;
 
   const [dbUser] = await db
     .select({

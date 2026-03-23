@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, dashboardPreferences } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, withErrorHandler, parseBody } from "@/lib/api-helpers";
 import { DEFAULT_HERO_CARDS, DEFAULT_SECONDARY_METRICS } from "@burnless/engine";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
@@ -87,7 +87,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
-  const body = patchSchema.parse(await request.json());
+  const parsed = await parseBody(request, patchSchema);
+  if ("error" in parsed) return parsed.error;
+  const body = parsed.data;
 
   // Upsert — create if missing, update if exists
   const [existing] = await db

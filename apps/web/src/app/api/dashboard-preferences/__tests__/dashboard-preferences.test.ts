@@ -8,6 +8,15 @@ const { mockRequireCompanyAccess } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   withErrorHandler: (fn: Function) => fn,
+  parseBody: async (req: Request, schema: { parse: (d: unknown) => unknown }) => {
+    try {
+      const body = await req.json();
+      return { data: schema.parse(body) };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Invalid request body";
+      return { error: NextResponse.json({ error: msg }, { status: 400 }) };
+    }
+  },
 }));
 
 const {
@@ -157,7 +166,8 @@ describe("/api/dashboard-preferences", () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      await expect(PATCH(req)).rejects.toThrow();
+      const res = await PATCH(req);
+      expect(res.status).toBe(400);
     });
 
     it("rejects heroCards exceeding max 8", async () => {
@@ -167,7 +177,8 @@ describe("/api/dashboard-preferences", () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      await expect(PATCH(req)).rejects.toThrow();
+      const res = await PATCH(req);
+      expect(res.status).toBe(400);
     });
   });
 });
