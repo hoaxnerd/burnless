@@ -81,6 +81,9 @@ importers:
       posthog-js:
         specifier: ^1.363.1
         version: 1.363.1
+      posthog-node:
+        specifier: ^5.28.5
+        version: 5.28.5
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -4340,6 +4343,15 @@ packages:
 
   posthog-js@1.363.1:
     resolution: {integrity: sha512-iaDtRxCs/FiB+RXe83uo7RZXgpLlyB6qFoNHl3bNMgRCgrPI2nkzx2m9Va1l30HHl/zA1kPOXSy2/tZC5Ql5kg==}
+
+  posthog-node@5.28.5:
+    resolution: {integrity: sha512-+8H7rMPB48cwKhzZmq0EQXDFWjdT6yQrecq+f7c7m19HMzyvYtm54I7vNncEr9lrkzczc4kcePxwLD4qgt/YXg==}
+    engines: {node: ^20.20.0 || >=22.22.0}
+    peerDependencies:
+      rxjs: ^7.0.0
+    peerDependenciesMeta:
+      rxjs:
+        optional: true
 
   preact-render-to-string@6.5.11:
     resolution: {integrity: sha512-ubnauqoGczeGISiOh6RjX0/cdaF8v/oDXIjO85XALCQjwQP+SB4RDXXtvZ6yTYSjG+PC1QRP2AhPgCEsM2EvUw==}
@@ -9553,6 +9565,10 @@ snapshots:
       preact: 10.29.0
       query-selector-shadow-dom: 1.0.1
       web-vitals: 5.1.0
+
+  posthog-node@5.28.5:
+    dependencies:
+      '@posthog/core': 1.24.1
 
   preact-render-to-string@6.5.11(preact@10.24.3):
     dependencies:

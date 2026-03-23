@@ -97,3 +97,19 @@ export function resetAnalytics() {
 export function getPostHog() {
   return initialized ? posthog : null;
 }
+
+/**
+ * Track an A/B test experiment exposure.
+ * Call this when a user sees a specific variant of an experiment.
+ */
+export function trackExperiment(
+  experimentKey: string,
+  variant: string,
+  properties?: Record<string, unknown>
+) {
+  trackEvent("$experiment_exposure", {
+    $feature_flag: experimentKey,
+    $feature_flag_response: variant,
+    ...properties,
+  });
+}
