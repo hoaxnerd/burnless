@@ -8,7 +8,7 @@
  * 4. getCompany and getDashboardPreferences use React.cache() for request dedup
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 

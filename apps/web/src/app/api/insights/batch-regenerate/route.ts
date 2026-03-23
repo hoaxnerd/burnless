@@ -17,7 +17,6 @@ import {
   db,
   insightInvalidations,
   aiInsightCache,
-  scenarios as scenariosTable,
 } from "@burnless/db";
 import { eq, isNull, lte, and } from "drizzle-orm";
 import {

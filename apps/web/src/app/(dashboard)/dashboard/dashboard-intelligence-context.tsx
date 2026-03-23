@@ -437,6 +437,7 @@ export function DashboardIntelligenceProvider({
       setCardMode,
       getCardScenario,
       setCardScenario,
+      setCatalogOpen,
       catalogOpen,
       catalogMode,
       formulaViewerSlug,

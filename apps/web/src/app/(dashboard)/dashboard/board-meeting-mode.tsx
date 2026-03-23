@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, Copy, Check, Presentation } from "lucide-react";
 import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
@@ -233,7 +233,7 @@ export function BoardMeetingOverlay({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Safely build metrics with fallback defaults
-  const safeData: BoardMeetingData = {
+  const safeData: BoardMeetingData = useMemo(() => ({
     companyName: data?.companyName ?? "Company",
     monthLabel: data?.monthLabel ?? "",
     cash: Number.isFinite(data?.cash) ? data.cash : 0,
@@ -243,7 +243,7 @@ export function BoardMeetingOverlay({
     mrrGrowth: Number.isFinite(data?.mrrGrowth) ? data.mrrGrowth : 0,
     headcount: Number.isFinite(data?.headcount) ? data.headcount : 0,
     headcountDelta: Number.isFinite(data?.headcountDelta) ? data.headcountDelta : 0,
-  };
+  }), [data]);
   const metrics = buildMetrics(safeData);
 
   // Wait for client-side mount before rendering portal (avoids SSR/hydration mismatch)

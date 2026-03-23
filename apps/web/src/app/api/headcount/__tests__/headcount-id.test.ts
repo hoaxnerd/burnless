@@ -8,7 +8,7 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
 
 const {
   mockSelect,
-  mockFrom,
+  _mockFrom,
   mockWhere,
   mockUpdate,
   mockSet,
@@ -16,7 +16,7 @@ const {
   mockReturning,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
-  mockFrom: vi.fn(),
+  _mockFrom: vi.fn(),
   mockWhere: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),

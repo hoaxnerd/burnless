@@ -259,6 +259,10 @@ function DashboardContent({
   const [quickActionMode, setQuickActionMode] = useState<QuickActionMode>(
     masterEnabled ? "intelligence" : "dynamic"
   );
+  // Per-quick-action mode overrides
+  const [quickActionModeOverrides, setQuickActionModeOverrides] = useState<
+    Record<string, QuickActionMode>
+  >({});
 
   // Nav item ordering — users can reorder via drag-and-drop
   const defaultOrder = useMemo(() => {
@@ -283,7 +287,7 @@ function DashboardContent({
       })
       .catch(() => {}) // silently fail — use defaults
       .finally(() => setPrefsLoaded(true));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist preferences on change
   const persistPreferences = useCallback((updates: Record<string, unknown>) => {
@@ -298,12 +302,15 @@ function DashboardContent({
   useProactiveAlerts();
 
   // Close mobile sidebar on navigation
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
+    setMobileOpen(false);
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Sync nav order when masterEnabled changes — only after prefs loaded
   // to avoid cascading re-renders (default → AI sync → prefs overwrite)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!prefsLoaded) return;
     setNavOrder((prev: string[]) => {
@@ -317,6 +324,7 @@ function DashboardContent({
       return prev;
     });
   }, [masterEnabled, prefsLoaded]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const scenarioId = searchParams.get("scenarioId");
   const buildHref = (base: string) =>
@@ -347,11 +355,6 @@ function DashboardContent({
       .map((id) => NAV_ITEM_MAP.get(id))
       .filter((item): item is NavItem => !!item);
   }, [navOrder]);
-
-  // Per-quick-action mode overrides
-  const [quickActionModeOverrides, setQuickActionModeOverrides] = useState<
-    Record<string, QuickActionMode>
-  >({});
 
   // Quick actions — merged list with per-item mode support
   const quickActions = useMemo((): QuickAction[] => {
@@ -541,14 +544,14 @@ function SidebarInner({
   sensors,
   onDragEnd,
   masterEnabled,
-  chatEnabled,
+  chatEnabled: _chatEnabled,
   quickActionMode,
-  onSetQuickActionMode,
+  onSetQuickActionMode: _onSetQuickActionMode,
   quickActions,
   quickActionModeOverrides,
   onSetQuickActionItemMode,
   onOpenSearch,
-  onToggleAI,
+  onToggleAI: _onToggleAI,
   user,
   dndContextId,
 }: {

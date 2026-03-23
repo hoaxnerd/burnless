@@ -26,6 +26,7 @@ export function useFeatureFlag(
     setValue(v ?? undefined);
   }, [key]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     // Evaluate immediately
     evaluate();
@@ -36,6 +37,7 @@ export function useFeatureFlag(
       ph.onFeatureFlags(evaluate);
     }
   }, [evaluate]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return value;
 }

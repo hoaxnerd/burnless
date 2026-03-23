@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -7,14 +6,14 @@ const {
   mockSelect,
   mockFrom,
   mockWhere,
-  mockLimit,
+  _mockLimit,
   mockUpdate,
   mockSet,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
-  mockLimit: vi.fn(),
+  _mockLimit: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
 }));

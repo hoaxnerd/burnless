@@ -193,7 +193,7 @@ describe("CommandPalette", () => {
     it("does not show AI tab without onToggleAI", () => {
       renderPalette();
       // "AI" section header might appear, but "AI" tab should not
-      const tabs = screen
+      const _tabs = screen
         .getAllByRole("button")
         .filter((b) => b.textContent === "AI");
       // The AI tab shouldn't be there when no onToggleAI

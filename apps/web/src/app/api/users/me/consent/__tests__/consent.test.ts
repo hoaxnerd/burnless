@@ -11,9 +11,9 @@ const {
   mockWhere,
   mockOrderBy,
   mockInsert,
-  mockValues,
+  _mockValues,
   mockUpdate,
-  mockSet,
+  _mockSet,
   mockTransaction,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
@@ -21,9 +21,9 @@ const {
   mockWhere: vi.fn(),
   mockOrderBy: vi.fn(),
   mockInsert: vi.fn(),
-  mockValues: vi.fn(),
+  _mockValues: vi.fn(),
   mockUpdate: vi.fn(),
-  mockSet: vi.fn(),
+  _mockSet: vi.fn(),
   mockTransaction: vi.fn(),
 }));
 
@@ -166,7 +166,7 @@ describe("POST /api/users/me/consent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default transaction mock: execute the callback with a tx object
-    mockTransaction.mockImplementation(async (cb: Function) => {
+    mockTransaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
       const txSelect = vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue([]),

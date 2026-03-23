@@ -52,7 +52,7 @@ function useCounter(target: number, duration: number, active: boolean) {
 
 function StatCard({
   icon: Icon,
-  value,
+  value: _value,
   suffix,
   prefix,
   label,

@@ -114,9 +114,11 @@ function CodeFormModal({
 }) {
   const [form, setForm] = useState<CodeFormData>(initial);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) setForm(initial);
   }, [open, initial]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const set = <K extends keyof CodeFormData>(k: K, v: CodeFormData[K]) =>
     setForm((f) => ({ ...f, [k]: v }));

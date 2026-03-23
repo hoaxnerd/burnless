@@ -62,6 +62,7 @@ export function CardModePopover({
   align = "right",
 }: CardModePopoverProps) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
@@ -138,8 +139,6 @@ export function CardModePopover({
     onModeChange(null);
     setOpen(false);
   }, [onModeChange]);
-
-  const [hovered, setHovered] = useState(false);
 
   const popoverMenu = open && popoverPos && createPortal(
     <div

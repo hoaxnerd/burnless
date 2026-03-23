@@ -94,7 +94,7 @@ describe("GET /api/audit", () => {
     mockLimit.mockResolvedValue([]);
 
     const req = new Request("http://localhost:3000/api/audit?limit=999");
-    const res = await GET(req);
+    const _res = await GET(req);
 
     expect(mockLimit).toHaveBeenCalledWith(201); // 200 + 1 for pagination check
   });

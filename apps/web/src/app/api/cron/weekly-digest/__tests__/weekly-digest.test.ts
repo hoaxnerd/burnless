@@ -73,7 +73,7 @@ vi.mock("@/lib/ai-feature-flags", () => ({
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
-  withErrorHandler: (handler: Function) => handler,
+  withErrorHandler: (handler: (...args: unknown[]) => unknown) => handler,
 }));
 
 import { GET } from "../route";

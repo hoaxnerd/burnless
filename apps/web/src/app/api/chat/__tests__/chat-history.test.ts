@@ -24,7 +24,7 @@ const {
 const { mockParsePaginationParams, mockPaginatedResponse } = vi.hoisted(
   () => ({
     mockParsePaginationParams: vi.fn().mockReturnValue({ limit: 20, cursor: null }),
-    mockPaginatedResponse: vi.fn((rows: any[], limit: number) => ({ data: rows.slice(0, limit), pagination: { hasMore: false, nextCursor: null, count: rows.length } })),
+    mockPaginatedResponse: vi.fn((rows: unknown[], limit: number) => ({ data: (rows as Record<string, unknown>[]).slice(0, limit), pagination: { hasMore: false, nextCursor: null, count: rows.length } })),
   })
 );
 

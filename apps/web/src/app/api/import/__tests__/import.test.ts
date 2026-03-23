@@ -24,7 +24,7 @@ const {
   mockReturning,
   mockUpdate,
   mockSet,
-  mockLimit,
+  _mockLimit,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
@@ -34,7 +34,7 @@ const {
   mockReturning: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
-  mockLimit: vi.fn(),
+  _mockLimit: vi.fn(),
 }));
 
 const mockCategorizeWithMemory = vi.hoisted(() => vi.fn());
@@ -91,6 +91,7 @@ vi.mock("@/lib/api-rate-limit", () => ({
 
 vi.mock("@/lib/financial-validation", () => ({
   monetaryAmount: () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { z } = require("zod");
     return z.number().finite();
   },
@@ -322,7 +323,7 @@ describe("POST /api/import", () => {
         dryRun: true,
       })
     );
-    const body = await res.json();
+    const _body = await res.json();
 
     expect(res.status).toBe(200);
     // categorizeWithMemory should NOT have been called for null description

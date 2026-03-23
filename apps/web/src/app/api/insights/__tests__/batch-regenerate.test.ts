@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 const { mockSelect, mockFrom, mockWhere, mockUpdate, mockSet, mockInsert, mockValues, mockOnConflictDoUpdate } =
@@ -96,7 +95,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
-  withErrorHandler: (handler: Function) => handler,
+  withErrorHandler: (handler: (...args: unknown[]) => unknown) => handler,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────

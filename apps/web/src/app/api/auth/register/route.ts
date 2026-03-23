@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, users, verificationTokens, inviteCodes, inviteCodeRedemptions } from "@burnless/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";

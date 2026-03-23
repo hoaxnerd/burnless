@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
-import { withErrorHandler, errorResponse } from "@/lib/api-helpers";
+import { withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 
 const schema = z.object({ email: z.string().email() });

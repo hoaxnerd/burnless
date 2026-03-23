@@ -104,8 +104,8 @@ export default async function DashboardPage({
   /* ── Previous month values (for MoM change) ────────────────────── */
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const prevCash = safeNum(metrics.cashPosition.find((m) => m.month === prevMonth)?.value, data.startingCash);
-  const prevBurn = safeNum(metrics.netBurnRate.find((m) => m.month === prevMonth)?.value, 0);
+  const _prevCash = safeNum(metrics.cashPosition.find((m) => m.month === prevMonth)?.value, data.startingCash);
+  const _prevBurn = safeNum(metrics.netBurnRate.find((m) => m.month === prevMonth)?.value, 0);
   const prevMrr = safeNum(metrics.mrr.find((m) => m.month === prevMonth)?.value, 0);
 
   /* ── Chart data ─────────────────────────────────────────────────── */
@@ -245,7 +245,7 @@ export default async function DashboardPage({
     }
 
     const swapSeries = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
-    const swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries) : undefined;
+    const _swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries) : undefined;
 
     heroSwapCards.push({
       slotIndex: heroIndex,

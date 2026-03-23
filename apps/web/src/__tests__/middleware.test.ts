@@ -140,7 +140,7 @@ describe("middleware", () => {
 
     for (const path of rateLimitedAuthPaths) {
       it(`rate-limits ${path}`, () => {
-        const res = middleware(createRequest(path));
+        const _res = middleware(createRequest(path));
         expect(mockCheckRateLimit).toHaveBeenCalled();
       });
     }

@@ -89,7 +89,7 @@ describe("GET /api/ai-dashboard", () => {
     mockWhere.mockReturnValue({ groupBy: mockGroupBy });
     mockGroupBy.mockImplementation(() => {
       // Return a thenable that also has .orderBy
-      const result: any = Promise.resolve([]);
+      const result = Promise.resolve([]) as unknown as Record<string, unknown>;
       result.orderBy = mockOrderBy;
       return result;
     });

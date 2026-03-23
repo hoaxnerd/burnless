@@ -16,7 +16,7 @@ import {
   Info,
   type LucideIcon,
 } from "lucide-react";
-import { CardSettingsModal, type CardMode } from "@/components/ui/card-settings-modal";
+import { CardSettingsModal } from "@/components/ui/card-settings-modal";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import {
@@ -89,6 +89,7 @@ function AnimatedValue({ value }: { value: string }) {
   const prevRef = useRef(value);
   const rafRef = useRef<number>(0);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     // Only animate if it looks like a number (starts with $ or is numeric)
     const numericMatch = value.match(/^(\$?)([\d,.]+)(.*)$/);
@@ -148,6 +149,7 @@ function AnimatedValue({ value }: { value: string }) {
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [value]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return (
     <span className="display-number tabular-nums transition-all duration-300">

@@ -10,7 +10,7 @@
  *   Layer 2: Route handler — Redis, cross-instance (catches distributed abuse)
  */
 import { NextResponse } from "next/server";
-import { checkRateLimitAsync, RATE_LIMITS, type RateLimitConfig } from "./rate-limit";
+import { checkRateLimitAsync, RATE_LIMITS } from "./rate-limit";
 
 /**
  * Extract client IP from request headers.

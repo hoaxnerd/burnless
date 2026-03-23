@@ -45,7 +45,7 @@ export function CustomizableMetrics({
   const {
     secondaryMetrics,
     setCatalogOpen,
-    mode,
+    mode: _mode,
   } = useDashboardIntelligence();
 
   const activeMetrics = secondaryMetrics.length > 0 ? secondaryMetrics : DEFAULT_SECONDARY_METRICS;
@@ -83,7 +83,7 @@ function MetricRowDynamic({
   metrics,
   currentMonth,
   prevMonth,
-  headcount,
+  headcount: _headcount,
 }: {
   slug: string;
   metrics: ComputedMetrics;
@@ -98,7 +98,6 @@ function MetricRowDynamic({
   } = useDashboardIntelligence();
   const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
-  if (!def) return null;
   const cardMode = getCardMode(slug);
   const isOverride = cardMode !== globalMode;
   const allUsedSlugs = useMemo(
@@ -117,6 +116,8 @@ function MetricRowDynamic({
     getDependents: getMetricDependents,
     getMetricDef: getMetricDefFn as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
   }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
+
+  if (!def) return null;
 
   const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
 

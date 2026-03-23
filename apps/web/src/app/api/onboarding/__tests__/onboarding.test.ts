@@ -198,7 +198,7 @@ describe("POST /api/onboarding", () => {
     mockGetUserCompany.mockResolvedValue(null);
 
     const txResult = { companyId: "new-co", scenarioId: "new-scenario" };
-    mockTransaction.mockImplementation(async (fn: Function) => txResult);
+    mockTransaction.mockImplementation(async (_fn: (...args: unknown[]) => unknown) => txResult);
 
     const res = await POST(makeRequest(validBody));
     const body = await res.json();

@@ -73,6 +73,7 @@ export function AiDashboardTab() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLoading(true);
     fetch(`/api/ai-dashboard?days=${days}`)
@@ -81,6 +82,7 @@ export function AiDashboardTab() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [days]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (loading) {
     return (
