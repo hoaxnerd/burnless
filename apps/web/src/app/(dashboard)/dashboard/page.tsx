@@ -21,6 +21,8 @@ import {
   extractMetricValue,
   formatMetricValue,
   getMetricMissingDataHint,
+  getMetricDef,
+  isMetricDataAvailable,
 } from "@burnless/engine";
 import { type KpiVariant } from "./hero-kpi-card";
 import { HeroCardGrid, type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
@@ -125,114 +127,136 @@ export default async function DashboardPage({
   const hasFunding = fundingRounds.length > 0;
   const allPopulated = hasFunding && hasExpenses && hasRevenue;
 
-  /* ── Hero card auto-swap computation (Dynamic mode) ──────────── */
-  const heroSwaps = getHeroSwaps(DEFAULT_HERO_CARDS, metrics, currentMonth);
+  /* ── Hero card slugs from preferences (dynamic) ──────────── */
+  const heroSlugs: string[] =
+    (dashPrefs?.heroCards as string[] | undefined)?.length
+      ? (dashPrefs.heroCards as string[])
+      : DEFAULT_HERO_CARDS;
+
+  // Known default slug → variant mapping for the 4 built-in hero cards
+  const SLUG_VARIANT: Record<string, KpiVariant> = {
+    cashPosition: "cash",
+    netBurnRate: "burn",
+    cashRunwayMonths: "runway",
+    mrr: "revenue",
+  };
   const variantOrder: KpiVariant[] = ["cash", "burn", "runway", "revenue"];
 
-  const heroCards: HeroCardDatum[] = [
-    {
-      variant: "cash",
-      hasData: hasFunding,
-      props: {
-        slug: "cash_position",
-        label: "Cash Position",
-        value: hasFunding ? formatCurrency(currentCash) : "$---",
-        change: hasFunding ? pctChange(currentCash, prevCash) ?? undefined : undefined,
-        changeLabel: hasFunding ? "vs last month" : undefined,
-        description: !hasFunding ? "Add funding to see cash" : undefined,
-        sparkData: hasFunding ? sparkline(metrics.cashPosition) : undefined,
-      },
-    },
-    {
-      variant: "burn",
-      hasData: hasExpenses,
-      props: {
-        slug: "net_burn_rate",
-        label: "Monthly Burn",
-        value: hasExpenses ? formatCurrency(currentBurn) : "$---",
-        change: hasExpenses ? pctChange(currentBurn, prevBurn) ?? undefined : undefined,
-        changeLabel: hasExpenses ? "vs last month" : undefined,
-        description: !hasExpenses ? "Add expenses to calculate" : undefined,
-        sparkData: hasExpenses ? sparkline(metrics.netBurnRate) : undefined,
-      },
-    },
-    {
-      variant: "runway",
-      hasData: hasFunding && hasExpenses,
-      props: {
-        slug: "cash_runway_months",
-        label: "Runway",
-        value:
-          hasFunding && hasExpenses
-            ? currentRunway >= 999
-              ? "\u221e"
-              : `${Math.round(currentRunway)} mo`
-            : "-- mo",
-        description: hasFunding && hasExpenses ? "At current burn rate" : "Add cash & expenses",
-        sparkData:
-          hasFunding && hasExpenses
-            ? sparkline(
-                metrics.cashRunwayMonths.map((m) => ({
-                  ...m,
-                  value: Math.min(m.value, 100),
-                }))
-              )
-            : undefined,
-      },
-    },
-    {
-      variant: "revenue",
-      hasData: hasRevenue,
-      props: {
-        slug: "mrr",
-        label: "MRR",
-        value: hasRevenue ? formatCurrency(currentMrr) : "$---",
-        change: hasRevenue && prevMrr > 0 ? pctChange(currentMrr, prevMrr) ?? undefined : undefined,
-        changeLabel: hasRevenue && prevMrr > 0 ? "MoM growth" : undefined,
-        description: !hasRevenue ? "Add revenue streams" : undefined,
-        sparkData: hasRevenue ? sparkline(metrics.mrr) : undefined,
-      },
-    },
-  ];
+  // Special hasData checks for known defaults (context-dependent, not just data presence)
+  const SLUG_HAS_DATA: Record<string, boolean> = {
+    cashPosition: hasFunding,
+    netBurnRate: hasExpenses,
+    cashRunwayMonths: hasFunding && hasExpenses,
+    mrr: hasRevenue,
+  };
 
-  // Build swap cards from engine's hero swap computation
+  // Build hero card data for each slug
+  const heroCards: HeroCardDatum[] = heroSlugs.map((slug, i) => {
+    const def = getMetricDef(slug);
+    const variant = SLUG_VARIANT[slug] ?? variantOrder[i % variantOrder.length];
+    const hasData = slug in SLUG_HAS_DATA
+      ? SLUG_HAS_DATA[slug]
+      : isMetricDataAvailable(metrics, slug, currentMonth);
+
+    const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
+    const prevVal = extractMetricValue(metrics, slug, prevMonth) ?? 0;
+
+    // Format value based on metric definition
+    let formattedValue: string;
+    if (!hasData) {
+      formattedValue = def?.format === "months" ? "-- mo" : "$---";
+    } else if (def) {
+      formattedValue = formatMetricValue(currentVal, def.format);
+    } else {
+      formattedValue = formatCurrency(currentVal);
+    }
+
+    // MoM change
+    let change: string | undefined;
+    let changeLabel: string | undefined;
+    if (hasData && prevVal !== 0) {
+      if (def?.format === "percent") {
+        const diff = currentVal - prevVal;
+        if (diff !== 0 && Number.isFinite(diff)) {
+          change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+          changeLabel = "vs last month";
+        }
+      } else {
+        change = pctChange(currentVal, prevVal) ?? undefined;
+        changeLabel = change ? "vs last month" : undefined;
+      }
+    }
+
+    // Sparkline data
+    const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
+    const sparkData = hasData && Array.isArray(series) ? sparkline(series) : undefined;
+
+    // For non-default metrics, use metricStyle from the registry
+    const isKnownDefault = slug in SLUG_VARIANT;
+    const metricStyle = !isKnownDefault && def
+      ? { icon: def.icon, color: def.color, href: def.href }
+      : undefined;
+
+    return {
+      variant,
+      hasData,
+      props: {
+        slug,
+        label: def?.name ?? slug,
+        value: formattedValue,
+        change,
+        changeLabel,
+        description: !hasData
+          ? (getMetricMissingDataHint(slug) ?? (def?.description))
+          : undefined,
+        sparkData,
+        metricStyle,
+      },
+    };
+  });
+
+  // Build swap cards from engine's hero swap computation (only for the known defaults)
+  const heroSwaps = getHeroSwaps(DEFAULT_HERO_CARDS, metrics, currentMonth);
   const heroSwapCards: SwapCardDatum[] = [];
   for (let i = 0; i < heroSwaps.length; i++) {
     const swap = heroSwaps[i];
     if (!swap || !swap.replacedSlug) continue;
 
-    const currentVal = extractMetricValue(metrics, swap.displaySlug, currentMonth) ?? 0;
-    const prevVal = extractMetricValue(metrics, swap.displaySlug, prevMonth) ?? 0;
-    const formattedValue = formatMetricValue(currentVal, swap.displayDef.format);
+    // Find the actual index in heroSlugs for this default slug
+    const defaultSlug = DEFAULT_HERO_CARDS[i];
+    const heroIndex = heroSlugs.indexOf(defaultSlug);
+    if (heroIndex === -1) continue; // User removed this default card
 
-    // Compute MoM change for the swap metric
+    const swapCurrentVal = extractMetricValue(metrics, swap.displaySlug, currentMonth) ?? 0;
+    const swapPrevVal = extractMetricValue(metrics, swap.displaySlug, prevMonth) ?? 0;
+    const formattedSwapValue = formatMetricValue(swapCurrentVal, swap.displayDef.format);
+
     let swapChange: string | undefined;
     if (swap.displayDef.format === "percent") {
-      const diff = currentVal - prevVal;
-      if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
+      const diff = swapCurrentVal - swapPrevVal;
+      if (swapPrevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
         swapChange = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
       }
-    } else if (prevVal !== 0) {
-      const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
+    } else if (swapPrevVal !== 0) {
+      const pct = ((swapCurrentVal - swapPrevVal) / Math.abs(swapPrevVal)) * 100;
       if (pct !== 0 && Number.isFinite(pct)) {
         swapChange = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
       }
     }
 
-    // Get sparkline data for the swap metric
-    const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
-    const swapSparkData = Array.isArray(series) ? sparkline(series) : undefined;
+    const swapSeries = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
+    const swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries) : undefined;
 
     heroSwapCards.push({
-      slotIndex: i,
-      originalLabel: heroCards[i]?.props.label ?? "",
+      slotIndex: heroIndex,
+      originalLabel: heroCards[heroIndex]?.props.label ?? "",
       originalSlug: swap.replacedSlug,
       restoreHint: swap.restoreHint ?? getMetricMissingDataHint(swap.replacedSlug),
-      variant: variantOrder[i] ?? "cash",
+      variant: variantOrder[heroIndex % variantOrder.length],
       props: {
         slug: swap.displaySlug,
         label: swap.displayDef.name,
-        value: formattedValue,
+        value: formattedSwapValue,
         change: swapChange,
         changeLabel: swapChange ? "vs last month" : undefined,
         metricStyle: {

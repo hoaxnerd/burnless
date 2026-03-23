@@ -21,10 +21,7 @@ import { useDashboardIntelligence, type WidgetLayout } from "./dashboard-intelli
 // ── Widget ID type — individual cards, not sections ─────────────────────────
 
 export type WidgetId =
-  | "hero-0"
-  | "hero-1"
-  | "hero-2"
-  | "hero-3"
+  | `hero-${number}`
   | "ai-command-center"
   | "weekly-digest"
   | "quick-actions"
@@ -43,42 +40,67 @@ const GRID_COLS = { lg: 12, md: 12, sm: 6, xs: 6, xxs: 6 };
 
 type RGLLayout = readonly LayoutItem[];
 
-/** Default layout for lg (>=1200px) — 12 columns */
-const DEFAULT_LAYOUT_LG: RGLLayout = [
-  { i: "hero-0",            x: 0,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
-  { i: "hero-1",            x: 3,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
-  { i: "hero-2",            x: 6,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
-  { i: "hero-3",            x: 9,  y: 0,  w: 3,  h: 5, minW: 2, minH: 4 },
-  { i: "weekly-digest",     x: 0,  y: 5,  w: 12, h: 2, minW: 6, minH: 2 },
-  { i: "ai-command-center", x: 0,  y: 7,  w: 12, h: 8, minW: 6, minH: 5 },
-  { i: "quick-actions",     x: 0,  y: 15, w: 12, h: 5, minW: 6, minH: 3 },
-  { i: "chart-cash",        x: 0,  y: 20, w: 6,  h: 10, minW: 4, minH: 7 },
-  { i: "chart-rev-exp",     x: 6,  y: 20, w: 6,  h: 10, minW: 4, minH: 7 },
-  { i: "chart-burn-runway", x: 0,  y: 30, w: 6,  h: 10, minW: 4, minH: 7 },
-  { i: "chart-mrr",         x: 6,  y: 30, w: 6,  h: 10, minW: 4, minH: 7 },
-  { i: "scenarios",         x: 0,  y: 40, w: 6,  h: 8, minW: 4, minH: 5 },
-  { i: "custom-metrics",    x: 6,  y: 40, w: 6,  h: 8, minW: 4, minH: 5 },
+/** Non-hero widgets with relative y-offsets (hero height is prepended dynamically) */
+const NON_HERO_LAYOUT_LG: readonly Omit<LayoutItem, "y">[] = [
+  { i: "weekly-digest",     x: 0,  w: 12, h: 2, minW: 6, minH: 2 },
+  { i: "ai-command-center", x: 0,  w: 12, h: 8, minW: 6, minH: 5 },
+  { i: "quick-actions",     x: 0,  w: 12, h: 5, minW: 6, minH: 3 },
+  { i: "chart-cash",        x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-rev-exp",     x: 6,  w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-burn-runway", x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "chart-mrr",         x: 6,  w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "scenarios",         x: 0,  w: 6,  h: 8, minW: 4, minH: 5 },
+  { i: "custom-metrics",    x: 6,  w: 6,  h: 8, minW: 4, minH: 5 },
 ];
 
-/** Default layout for md (>=996px) */
-const DEFAULT_LAYOUT_MD: RGLLayout = DEFAULT_LAYOUT_LG;
-
-/** Default layout for sm/xs/xxs (mobile — 6 columns, stacked) */
-const DEFAULT_LAYOUT_SM: RGLLayout = [
-  { i: "hero-0",            x: 0, y: 0,  w: 3, h: 5, minW: 3, minH: 4 },
-  { i: "hero-1",            x: 3, y: 0,  w: 3, h: 5, minW: 3, minH: 4 },
-  { i: "hero-2",            x: 0, y: 5,  w: 3, h: 5, minW: 3, minH: 4 },
-  { i: "hero-3",            x: 3, y: 5,  w: 3, h: 5, minW: 3, minH: 4 },
-  { i: "weekly-digest",     x: 0, y: 10, w: 6, h: 2, minW: 6, minH: 2 },
-  { i: "ai-command-center", x: 0, y: 12, w: 6, h: 8, minW: 6, minH: 5 },
-  { i: "quick-actions",     x: 0, y: 20, w: 6, h: 5, minW: 6, minH: 3 },
-  { i: "chart-cash",        x: 0, y: 25, w: 6, h: 10, minW: 6, minH: 7 },
-  { i: "chart-rev-exp",     x: 0, y: 35, w: 6, h: 10, minW: 6, minH: 7 },
-  { i: "chart-burn-runway", x: 0, y: 45, w: 6, h: 10, minW: 6, minH: 7 },
-  { i: "chart-mrr",         x: 0, y: 55, w: 6, h: 10, minW: 6, minH: 7 },
-  { i: "scenarios",         x: 0, y: 65, w: 6, h: 8, minW: 6, minH: 5 },
-  { i: "custom-metrics",    x: 0, y: 73, w: 6, h: 8, minW: 6, minH: 5 },
+const NON_HERO_LAYOUT_SM: readonly Omit<LayoutItem, "y">[] = [
+  { i: "weekly-digest",     x: 0, w: 6, h: 2, minW: 6, minH: 2 },
+  { i: "ai-command-center", x: 0, w: 6, h: 8, minW: 6, minH: 5 },
+  { i: "quick-actions",     x: 0, w: 6, h: 5, minW: 6, minH: 3 },
+  { i: "chart-cash",        x: 0, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-rev-exp",     x: 0, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-burn-runway", x: 0, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "chart-mrr",         x: 0, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "scenarios",         x: 0, w: 6, h: 8, minW: 6, minH: 5 },
+  { i: "custom-metrics",    x: 0, w: 6, h: 8, minW: 6, minH: 5 },
 ];
+
+/** Generate default layout for a given hero count and breakpoint */
+function generateDefaultLayout(
+  heroCount: number,
+  cols: number,
+  nonHeroItems: readonly Omit<LayoutItem, "y">[],
+): LayoutItem[] {
+  const heroH = 5;
+  const perRow = cols === 12 ? 4 : 2; // lg/md = 4 per row, sm = 2
+  const heroW = cols === 12 ? 3 : 3;
+  const minW = cols === 12 ? 2 : 3;
+  const items: LayoutItem[] = [];
+
+  // Hero cards
+  for (let i = 0; i < heroCount; i++) {
+    items.push({
+      i: `hero-${i}`,
+      x: (i % perRow) * heroW,
+      y: Math.floor(i / perRow) * heroH,
+      w: heroW,
+      h: heroH,
+      minW,
+      minH: 4,
+    });
+  }
+
+  // Non-hero items start after last hero row
+  const heroRows = Math.ceil(heroCount / perRow);
+  let yOffset = heroRows * heroH;
+  for (const item of nonHeroItems) {
+    items.push({ ...item, y: yOffset } as LayoutItem);
+    // Advance y when the item is full-width or at x=0 of a new pair
+    if (item.x === 0) yOffset += item.h;
+  }
+
+  return items;
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -135,7 +157,7 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
-  const { layout: savedLayout, reorderLayout, isLoading } = useDashboardIntelligence();
+  const { layout: savedLayout, reorderLayout, isLoading, heroCards } = useDashboardIntelligence();
   const [isDragMode, setIsDragMode] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,19 +171,23 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     [widgets, hiddenSet]
   );
 
-  // Build responsive layouts from saved preferences + defaults
+  // Build responsive layouts from saved preferences + defaults (hero count is dynamic)
   const layouts = useMemo(() => {
+    const hc = heroCards.length || 4;
+    const defaultLG = generateDefaultLayout(hc, 12, NON_HERO_LAYOUT_LG);
+    const defaultSM = generateDefaultLayout(hc, 6, NON_HERO_LAYOUT_SM);
+
     const filterHidden = (items: LayoutItem[]) =>
       items.filter((item) => !hiddenSet.has(item.i as WidgetId) && item.i in (widgets as Record<string, unknown>));
 
     return {
-      lg: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_LG)),
-      md: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_MD)),
-      sm: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
-      xs: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
-      xxs: filterHidden(savedToRGL(savedLayout, DEFAULT_LAYOUT_SM)),
+      lg: filterHidden(savedToRGL(savedLayout, defaultLG)),
+      md: filterHidden(savedToRGL(savedLayout, defaultLG)),
+      sm: filterHidden(savedToRGL(savedLayout, defaultSM)),
+      xs: filterHidden(savedToRGL(savedLayout, defaultSM)),
+      xxs: filterHidden(savedToRGL(savedLayout, defaultSM)),
     };
-  }, [savedLayout, hiddenSet, widgets]);
+  }, [savedLayout, hiddenSet, widgets, heroCards.length]);
 
   // Debounced save to avoid saving on every pixel of drag
   const handleLayoutChange = useCallback(
@@ -258,5 +284,5 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
   );
 }
 
-// Re-export defaults for use in page.tsx
-export { DEFAULT_LAYOUT_LG };
+// Re-export layout generator for use in page.tsx
+export { generateDefaultLayout };
