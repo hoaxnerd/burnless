@@ -9,10 +9,11 @@ import { AiDashboardTab } from "./ai-dashboard-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { BillingTab } from "./billing-tab";
 import { InviteCodesTab } from "./invite-codes-tab";
+import { SecurityTab } from "./security-tab";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
-    "general" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
+    "general" | "security" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
   >("general");
   const { flags, updateFlags, loaded: aiLoaded, monthlyBudgetCents, budget, providerConfig } = useAiFlags();
 
@@ -155,6 +156,9 @@ export default function SettingsPage() {
           saveCompany={saveCompany}
         />
       )}
+
+      {/* Security Tab */}
+      {activeTab === "security" && <SecurityTab />}
 
       {/* AI Features Tab */}
       {activeTab === "ai" && aiLoaded && (
