@@ -42,6 +42,8 @@ coverage/
 # Agents internal
 agents/*/HEARTBEAT.md
 agents/*/screenshots/
+agents/*/lighthouse-results/
+agents/*/smoke-test/
 
 # Claude Code
 .claude/
