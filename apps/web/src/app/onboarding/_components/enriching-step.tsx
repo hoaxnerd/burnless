@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { Sparkles, SkipForward } from "lucide-react";
 import { DEFAULTS } from "./constants";
+
+const ENRICHMENT_TIMEOUT_SECS = 30;
 
 interface EnrichingStepProps {
   greeting: string;
@@ -16,9 +19,47 @@ export function EnrichingStep({
   onSkipToForm,
   onSkipOnboarding,
 }: EnrichingStepProps) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed((prev) => {
+        if (prev + 1 >= ENRICHMENT_TIMEOUT_SECS) {
+          clearInterval(interval);
+          onSkipToForm();
+        }
+        return prev + 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [onSkipToForm]);
+
+  const remaining = ENRICHMENT_TIMEOUT_SECS - elapsed;
+
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm text-center animate-fade-in">
+        {/* Progress indicator */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-8 rounded-full bg-brand-600 animate-pulse" />
+              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+              <div className="h-2 w-8 rounded-full bg-surface-200 dark:bg-surface-700" />
+            </div>
+            <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
+              Step 1 of 3
+            </span>
+          </div>
+          <button
+            onClick={onSkipOnboarding}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+            Skip all
+          </button>
+        </div>
+
         <div className="relative mx-auto mb-6">
           <div className="h-14 w-14 rounded-2xl bg-brand-600 flex items-center justify-center mx-auto shadow-lg">
             <Sparkles className="w-7 h-7 text-white animate-pulse" />
@@ -50,6 +91,12 @@ export function EnrichingStep({
             ? `Found ${enrichedCount} field${enrichedCount !== 1 ? "s" : ""}`
             : "Searching..."}
         </p>
+
+        {remaining <= 15 && remaining > 0 && (
+          <p className="mt-2 text-xs text-surface-400">
+            Moving to manual entry in {remaining}s&hellip;
+          </p>
+        )}
 
         <button
           onClick={onSkipToForm}

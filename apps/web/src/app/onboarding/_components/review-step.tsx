@@ -1,8 +1,9 @@
-import { ArrowRight, Building2, DollarSign, Users, SkipForward, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Building2, DollarSign, Users, SkipForward, Sparkles, AlertTriangle, RotateCcw } from "lucide-react";
 import type { CompanyFields } from "./types";
 import { FIELD_LABELS, FIELD_PLACEHOLDERS, STAGE_OPTIONS, MODEL_OPTIONS } from "./constants";
 import { ConfidenceBadge } from "./confidence-badge";
-import { FormField } from "./form-field";
+
 
 interface ReviewStepProps {
   fields: CompanyFields;
@@ -92,6 +93,8 @@ function InlineField({
   min,
   step,
   prefix,
+  error,
+  onBlur,
 }: {
   label: string;
   field: { value: string; source: string };
@@ -103,6 +106,8 @@ function InlineField({
   min?: string;
   step?: string;
   prefix?: string;
+  error?: string;
+  onBlur?: () => void;
 }) {
   return (
     <div>
@@ -123,16 +128,22 @@ function InlineField({
           type={type}
           value={field.value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           min={min}
           step={step}
           className={`w-full rounded-lg border bg-surface-0 dark:bg-surface-900 ${prefix ? "pl-7" : "px-3"} ${!prefix ? "px-3" : "pr-3"} py-2 text-sm text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors ${
-            field.source === "ai"
-              ? "border-accent-300 dark:border-accent-700"
-              : "border-surface-300 dark:border-surface-600"
+            error
+              ? "border-danger-500"
+              : field.source === "ai"
+                ? "border-accent-300 dark:border-accent-700"
+                : "border-surface-300 dark:border-surface-600"
           }`}
         />
       </div>
+      {error && (
+        <p className="mt-1 text-xs text-danger-500">{error}</p>
+      )}
     </div>
   );
 }
@@ -144,6 +155,11 @@ export function ReviewStep({
   onCreate,
   onSkipOnboarding,
 }: ReviewStepProps) {
+  const [nameBlurred, setNameBlurred] = useState(false);
+  const nameError = nameBlurred && !fields.company_name.value.trim()
+    ? "Company name is required"
+    : undefined;
+
   const aiFieldCount = Object.values(fields).filter(
     (f) => f.source === "ai"
   ).length;
@@ -196,8 +212,25 @@ export function ReviewStep({
         </div>
 
         {createError && (
-          <div className="mb-6 rounded-xl bg-danger-50 dark:bg-danger-950 border border-danger-500/20 p-4 text-sm text-danger-700 dark:text-danger-500">
-            {createError}
+          <div className="mb-6 rounded-xl bg-danger-50 dark:bg-danger-950 border border-danger-500/20 p-4 animate-slide-up">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-danger-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-danger-700 dark:text-danger-400">
+                  {createError}
+                </p>
+                <p className="mt-1 text-xs text-danger-600 dark:text-danger-500">
+                  Check your details below and try again. If this keeps happening, skip onboarding and set up your company from Settings.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onCreate}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-danger-700 dark:text-danger-400 bg-danger-100 dark:bg-danger-900/50 hover:bg-danger-200 dark:hover:bg-danger-900 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Retry
+            </button>
           </div>
         )}
 
@@ -210,7 +243,9 @@ export function ReviewStep({
                 field={fields.company_name}
                 placeholder={FIELD_PLACEHOLDERS.company_name}
                 onChange={(v) => onUpdateField("company_name", v)}
+                onBlur={() => setNameBlurred(true)}
                 required
+                error={nameError}
                 badge={<ConfidenceBadge {...fields.company_name} />}
               />
               <div className="grid grid-cols-2 gap-3">
