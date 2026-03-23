@@ -81,10 +81,16 @@ export interface DashboardIntelligenceState {
   getCardScenario: (slug: string) => string | null;
   /** Set per-card scenario override */
   setCardScenario: (slug: string, scenarioId: string | null) => void;
+  /** Add a metric as a new dashboard card (hero slot) */
+  addHeroCard: (slug: string) => void;
+  /** Remove a metric card from the dashboard */
+  removeHeroCard: (slug: string) => void;
   /** Whether the stats catalog is open */
   catalogOpen: boolean;
+  /** Catalog mode: "manage" adds/removes cards, "secondary" adds to Key Metrics */
+  catalogMode: "manage" | "secondary";
   /** Open/close the stats catalog */
-  setCatalogOpen: (open: boolean) => void;
+  setCatalogOpen: (open: boolean, mode?: "manage" | "secondary") => void;
   /** Whether the formula viewer is open for a metric */
   formulaViewerSlug: string | null;
   /** Open formula viewer for a metric */
@@ -133,7 +139,12 @@ export function DashboardIntelligenceProvider({
 }: ProviderProps) {
   const [isLoading, setIsLoading] = useState(!initialPreferences);
   const [isSaving, setIsSaving] = useState(false);
-  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogOpen, setCatalogOpenRaw] = useState(false);
+  const [catalogMode, setCatalogMode] = useState<"manage" | "secondary">("manage");
+  const setCatalogOpen = useCallback((open: boolean, mode?: "manage" | "secondary") => {
+    setCatalogOpenRaw(open);
+    if (mode) setCatalogMode(mode);
+  }, []);
   const [formulaViewerSlug, setFormulaViewerSlug] = useState<string | null>(null);
 
   const [prefs, setPrefs] = useState<DashboardPreferences>(() => ({
@@ -253,6 +264,26 @@ export function DashboardIntelligenceProvider({
     [updatePrefs]
   );
 
+  const addHeroCard = useCallback(
+    (slug: string) =>
+      updatePrefs((p) => ({
+        ...p,
+        heroCards: p.heroCards.includes(slug)
+          ? p.heroCards
+          : [...p.heroCards, slug],
+      })),
+    [updatePrefs]
+  );
+
+  const removeHeroCard = useCallback(
+    (slug: string) =>
+      updatePrefs((p) => ({
+        ...p,
+        heroCards: p.heroCards.filter((s) => s !== slug),
+      })),
+    [updatePrefs]
+  );
+
   const reorderHeroCards = useCallback(
     (cards: string[]) => updatePrefs((p) => ({ ...p, heroCards: cards })),
     [updatePrefs]
@@ -363,6 +394,8 @@ export function DashboardIntelligenceProvider({
       heroCards: prefs.heroCards,
       secondaryMetrics: prefs.secondaryMetrics,
       swapHeroCard,
+      addHeroCard,
+      removeHeroCard,
       reorderHeroCards,
       addSecondaryMetric,
       removeSecondaryMetric,
@@ -372,6 +405,7 @@ export function DashboardIntelligenceProvider({
       getCardScenario,
       setCardScenario,
       catalogOpen,
+      catalogMode,
       setCatalogOpen,
       formulaViewerSlug,
       openFormulaViewer: setFormulaViewerSlug,
@@ -392,6 +426,8 @@ export function DashboardIntelligenceProvider({
       hasIntelligenceCards,
       setMode,
       swapHeroCard,
+      addHeroCard,
+      removeHeroCard,
       reorderHeroCards,
       addSecondaryMetric,
       removeSecondaryMetric,
@@ -402,6 +438,7 @@ export function DashboardIntelligenceProvider({
       getCardScenario,
       setCardScenario,
       catalogOpen,
+      catalogMode,
       formulaViewerSlug,
       isLoading,
       isSaving,

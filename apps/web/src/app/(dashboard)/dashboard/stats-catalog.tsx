@@ -45,11 +45,14 @@ const tierLabels: Record<MetricTier, string> = {
 export function StatsCatalog() {
   const {
     catalogOpen,
+    catalogMode,
     setCatalogOpen,
     registry,
     heroCards,
     secondaryMetrics,
     swapHeroCard,
+    addHeroCard,
+    removeHeroCard,
     addSecondaryMetric,
     removeSecondaryMetric,
     openFormulaViewer,
@@ -109,9 +112,13 @@ export function StatsCatalog() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
-            <h2 className="text-lg font-bold text-surface-900">Metrics Catalog</h2>
+            <h2 className="text-lg font-bold text-surface-900">
+              {catalogMode === "manage" ? "Dashboard Cards" : "Metrics Catalog"}
+            </h2>
             <p className="text-xs text-surface-400 mt-0.5">
-              {registry.length} metrics available
+              {catalogMode === "manage"
+                ? `${heroCards.length} cards on dashboard`
+                : `${registry.length} metrics available`}
             </p>
           </div>
           <button
@@ -200,13 +207,22 @@ export function StatsCatalog() {
                       if (swapTarget !== null) {
                         swapHeroCard(swapTarget, metric.slug);
                         setSwapTarget(null);
+                      } else if (catalogMode === "manage") {
+                        addHeroCard(metric.slug);
                       } else {
                         addSecondaryMetric(metric.slug);
                       }
                     }}
-                    onRemove={() => removeSecondaryMetric(metric.slug)}
+                    onRemove={() => {
+                      if (catalogMode === "manage") {
+                        removeHeroCard(metric.slug);
+                      } else {
+                        removeSecondaryMetric(metric.slug);
+                      }
+                    }}
                     onViewFormula={() => openFormulaViewer(metric.slug)}
                     swapMode={swapTarget !== null}
+                    manageMode={catalogMode === "manage"}
                   />
                 ))}
               </div>
@@ -281,6 +297,7 @@ function MetricRow({
   onRemove,
   onViewFormula,
   swapMode,
+  manageMode,
 }: {
   metric: MetricDefinition;
   isUsed: boolean;
@@ -291,6 +308,7 @@ function MetricRow({
   onRemove: () => void;
   onViewFormula: () => void;
   swapMode: boolean;
+  manageMode: boolean;
 }) {
   const deps = getMetricDependencyTree(metric.slug);
   const dependents = getMetricDependents(metric.slug);
@@ -334,24 +352,26 @@ function MetricRow({
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
-          ) : isUsed && !isHero ? (
-            <button
-              onClick={onRemove}
-              className="p-1.5 rounded-lg bg-danger-500/10 text-danger-500 hover:bg-danger-500/20 transition-colors"
-              title="Remove from dashboard"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-          ) : !isUsed ? (
+          ) : isUsed ? (
+            manageMode || !isHero ? (
+              <button
+                onClick={onRemove}
+                className="p-1.5 rounded-lg bg-danger-500/10 text-danger-500 hover:bg-danger-500/20 transition-colors"
+                title={manageMode ? "Remove card from dashboard" : "Remove from Key Metrics"}
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <span className="text-[10px] text-surface-400 px-2">Hero</span>
+            )
+          ) : (
             <button
               onClick={onAdd}
               className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 transition-colors"
-              title="Add to dashboard"
+              title={manageMode ? "Add as dashboard card" : "Add to Key Metrics"}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
-          ) : (
-            <span className="text-[10px] text-surface-400 px-2">Hero</span>
           )}
         </div>
       </div>

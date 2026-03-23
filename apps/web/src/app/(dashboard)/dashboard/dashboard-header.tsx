@@ -45,8 +45,8 @@ export function DashboardHeader({ companyName, hasData, boardData }: DashboardHe
           {hasData && (
             <>
               <button
-                onClick={() => setCatalogOpen(true)}
-                title="Open metrics catalog"
+                onClick={() => setCatalogOpen(true, "manage")}
+                title="Add or remove dashboard cards"
                 className="p-2 rounded-lg border border-surface-200 hover:bg-surface-50 transition-colors text-surface-500 hover:text-surface-700"
               >
                 <LayoutGrid className="h-4 w-4" />
