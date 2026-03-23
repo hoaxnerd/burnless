@@ -53,11 +53,13 @@ const patchSchema = z.object({
     .array(
       z.object({
         widgetId: z.string(),
+        x: z.number().int().min(0).max(12).optional().default(0),
+        y: z.number().int().min(0).max(200).optional().default(0),
         w: z.number().int().min(1).max(12),
-        h: z.number().int().min(1).max(12),
+        h: z.number().int().min(1).max(50),
       })
     )
-    .max(20)
+    .max(30)
     .optional(),
   customMetrics: z
     .array(
