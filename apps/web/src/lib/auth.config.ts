@@ -19,6 +19,19 @@ declare module "next-auth" {
   }
 }
 
+/**
+ * Error thrown when password is valid but 2FA verification is required.
+ * The frontend catches this to show the TOTP challenge step.
+ */
+export class TwoFactorRequiredError extends Error {
+  public readonly userId: string;
+  constructor(userId: string) {
+    super("2FA_REQUIRED");
+    this.name = "TwoFactorRequiredError";
+    this.userId = userId;
+  }
+}
+
 export const authConfig = {
   providers: [
     GitHub,
@@ -28,10 +41,12 @@ export const authConfig = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totpCode: { label: "2FA Code", type: "text" },
       },
       async authorize(credentials) {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
+        const totpCode = credentials?.totpCode as string | undefined;
 
         if (!email || !password) return null;
 
@@ -45,6 +60,35 @@ export const authConfig = {
 
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid) return null;
+
+        // If 2FA is enabled, require a valid TOTP code
+        if (user.twoFactorEnabled && user.twoFactorSecret) {
+          if (!totpCode) {
+            // Signal to the frontend that 2FA is needed
+            throw new TwoFactorRequiredError(user.id);
+          }
+
+          // Lazy-import to avoid bundling otplib on every auth check
+          const { verifyTotpCode, verifyBackupCode } = await import("./two-factor");
+
+          const isValidTotp = verifyTotpCode(totpCode, user.twoFactorSecret);
+
+          if (!isValidTotp) {
+            // Try backup code
+            const storedCodes: string[] = user.twoFactorBackupCodes
+              ? JSON.parse(user.twoFactorBackupCodes)
+              : [];
+            const matchIdx = await verifyBackupCode(totpCode, storedCodes);
+            if (matchIdx === -1) return null; // Invalid code
+
+            // Consume the backup code
+            storedCodes.splice(matchIdx, 1);
+            await db
+              .update(users)
+              .set({ twoFactorBackupCodes: JSON.stringify(storedCodes) })
+              .where(eq(users.id, user.id));
+          }
+        }
 
         return {
           id: user.id,

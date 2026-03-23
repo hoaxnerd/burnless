@@ -10,6 +10,7 @@ import type { AuthStep, PasswordStrength } from "./_components/types";
 import { EmailStep } from "./_components/email-step";
 import { SignInStep } from "./_components/signin-step";
 import { SignUpStep } from "./_components/signup-step";
+import { TwoFactorStep } from "./_components/two-factor-step";
 
 export default function LoginPage() {
   return (
@@ -26,6 +27,7 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [inviteCode, setInviteCode] = useState(searchParams.get("invite") ?? "");
+  const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -78,12 +80,37 @@ function LoginContent() {
       const result = await signIn("credentials", {
         email,
         password,
+        totpCode: totpCode || undefined,
         redirect: false,
       });
 
       if (result?.error) {
+        // On first sign-in attempt, check if 2FA is required
+        if (step !== "2fa") {
+          try {
+            const tfaRes = await fetch("/api/auth/two-factor/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
+            });
+            const tfaData = await tfaRes.json();
+            if (tfaData.required) {
+              trackEvent("auth_2fa_required", { method: "credentials" });
+              setStep("2fa");
+              setIsLoading(false);
+              return;
+            }
+          } catch {
+            // If 2FA check fails, fall through to normal error
+          }
+        }
+
         trackEvent("auth_signin_error", { method: "credentials" });
-        setError("Wrong password. Please try again.");
+        setError(
+          step === "2fa"
+            ? "Invalid verification code. Please try again."
+            : "Wrong password. Please try again."
+        );
         setIsLoading(false);
       } else {
         trackEvent("auth_signin_success", { method: "credentials" });
@@ -146,9 +173,16 @@ function LoginContent() {
   }
 
   function handleBack() {
+    if (step === "2fa") {
+      setStep("signin");
+      setTotpCode("");
+      setError("");
+      return;
+    }
     setStep("email");
     setPassword("");
     setName("");
+    setTotpCode("");
     setError("");
     setTimeout(() => emailRef.current?.focus(), 100);
   }
@@ -156,15 +190,17 @@ function LoginContent() {
   const heading =
     step === "email"
       ? "Welcome to Burnless"
-      : step === "signin"
-        ? "Welcome back"
-        : "Create your account";
+      : step === "2fa"
+        ? "Two-factor authentication"
+        : step === "signin"
+          ? "Welcome back"
+          : "Create your account";
 
   const subtitle =
     step === "email"
       ? "Financial planning that feels like a superpower"
-      : step === "signin"
-        ? email
+      : step === "2fa"
+        ? "One more step to secure your account"
         : email;
 
   const passwordStrength: PasswordStrength =
@@ -246,6 +282,17 @@ function LoginContent() {
               onBack={handleBack}
               isLoading={isLoading}
               passwordRef={passwordRef}
+            />
+          )}
+
+          {step === "2fa" && (
+            <TwoFactorStep
+              totpCode={totpCode}
+              onTotpCodeChange={setTotpCode}
+              onSubmit={handleSignIn}
+              onBack={handleBack}
+              isLoading={isLoading}
+              email={email}
             />
           )}
 
