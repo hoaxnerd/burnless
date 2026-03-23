@@ -84,8 +84,10 @@ interface CatalogProps {
   getDependencyTree: (slug: string) => string[];
   getDependents: (slug: string) => string[];
   getMetricDef: (slug: string) => MetricDef | undefined;
-  /** When true, catalog is in "swap hero card" mode — shows Swap button instead of Add */
+  /** When true, catalog is in "swap hero card" mode — shows Select button instead of Add */
   swapMode?: boolean;
+  /** Currently staged (but not yet applied) metric slug in swap mode */
+  stagedSlug?: string | null;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -112,6 +114,8 @@ export function CardSettingsModal({
 }: CardSettingsModalProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  /** Staged metric slug — selected but not yet applied (swap mode only) */
+  const [stagedSlug, setStagedSlug] = useState<string | null>(null);
 
   const handleSelect = useCallback(
     (mode: CardMode) => {
@@ -154,7 +158,7 @@ export function CardSettingsModal({
       {/* Modal */}
       <Modal
         open={open}
-        onClose={() => { setOpen(false); setHovered(false); }}
+        onClose={() => { setStagedSlug(null); setOpen(false); setHovered(false); }}
         title="Card Settings"
         size={currentMode === "custom" && catalogProps ? "xl" : "md"}
       >
@@ -219,7 +223,11 @@ export function CardSettingsModal({
 
           {/* Inline catalog: shown in Custom mode, or always when swapping a hero card */}
           {catalogProps && (currentMode === "custom" || catalogProps.swapMode) && (
-            <InlineCatalog {...catalogProps} />
+            <InlineCatalog
+              {...catalogProps}
+              onSelect={catalogProps.swapMode ? (slug) => setStagedSlug(slug) : catalogProps.onSelect}
+              stagedSlug={catalogProps.swapMode ? stagedSlug : null}
+            />
           )}
 
           {/* Footer actions */}
@@ -239,7 +247,14 @@ export function CardSettingsModal({
               <span className="text-xs text-surface-400">Using global default</span>
             )}
             <button
-              onClick={() => { setOpen(false); setHovered(false); }}
+              onClick={() => {
+                if (stagedSlug && catalogProps?.swapMode) {
+                  catalogProps.onSelect(stagedSlug);
+                }
+                setStagedSlug(null);
+                setOpen(false);
+                setHovered(false);
+              }}
               className="px-4 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
             >
               Done
@@ -277,6 +292,7 @@ function InlineCatalog({
   getDependents,
   getMetricDef,
   swapMode = false,
+  stagedSlug = null,
 }: CatalogProps) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -381,8 +397,10 @@ function InlineCatalog({
                 const deps = getDependencyTree(metric.slug);
                 const dependents = getDependents(metric.slug);
 
+                const isStaged = stagedSlug === metric.slug;
+
                 return (
-                  <div key={metric.slug} className="px-4 py-2.5">
+                  <div key={metric.slug} className={`px-4 py-2.5 ${isStaged ? "bg-brand-50/60" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -413,10 +431,14 @@ function InlineCatalog({
                         {swapMode ? (
                           <button
                             onClick={() => onSelect(metric.slug)}
-                            className="px-2 py-1 rounded-lg bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 transition-colors text-[10px] font-medium"
-                            title="Swap this card"
+                            className={`px-2 py-1 rounded-lg transition-colors text-[10px] font-medium ${
+                              stagedSlug === metric.slug
+                                ? "bg-brand-600 text-white ring-1 ring-brand-500"
+                                : "bg-brand-500/10 text-brand-600 hover:bg-brand-500/20"
+                            }`}
+                            title="Select this metric"
                           >
-                            Swap
+                            {stagedSlug === metric.slug ? "Selected" : "Select"}
                           </button>
                         ) : isUsed && !isHero ? (
                           <button
