@@ -29,6 +29,7 @@ import { buildAiContext } from "@/lib/build-ai-context";
 import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { getDefaultScenario } from "@/lib/data";
 import { logger } from "@/lib/logger";
+import { withErrorHandler } from "@/lib/api-helpers";
 
 const log = logger("batch-regenerate");
 
@@ -64,7 +65,7 @@ interface RegenerationResult {
   reason?: string;
 }
 
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async function POST(request: Request) {
   // Auth: Vercel Cron secret or dev mode
   if (!IS_DEV) {
     if (!CRON_SECRET) {
@@ -251,7 +252,7 @@ export async function POST(request: Request) {
     regenerated,
     results,
   });
-}
+});
 
 async function markProcessed(invalidationId: string): Promise<void> {
   await db
