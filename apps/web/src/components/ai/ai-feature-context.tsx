@@ -104,30 +104,59 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
 
   const updateFlags = useCallback(
     async (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => {
-      const res = await fetch("/api/ai-features", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setFlags({
-          masterEnabled: updated.masterEnabled,
-          dataMode: updated.dataMode,
-          writeMode: updated.writeMode ?? "full",
-          features: updated.features,
+      // Optimistic update for immediate UI feedback
+      const prevFlags = flags;
+      const prevBudgetCents = monthlyBudgetCents;
+      const prevProvider = providerConfig;
+
+      if (patch.masterEnabled !== undefined || patch.dataMode || patch.writeMode || patch.features) {
+        setFlags((prev) => ({
+          ...prev,
+          ...(patch.masterEnabled !== undefined ? { masterEnabled: patch.masterEnabled } : {}),
+          ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
+          ...(patch.writeMode ? { writeMode: patch.writeMode } : {}),
+          ...(patch.features ? { features: { ...prev.features, ...patch.features } } : {}),
+        }));
+      }
+
+      try {
+        const res = await fetch("/api/ai-features", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
         });
-        if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
-        if (updated.budget) setBudget(updated.budget);
-        setProviderConfig({
-          aiProvider: updated.aiProvider ?? null,
-          aiApiKey: updated.aiApiKey ?? null,
-          aiModel: updated.aiModel ?? null,
-          aiBaseUrl: updated.aiBaseUrl ?? null,
-        });
+        if (res.ok) {
+          const updated = await res.json();
+          setFlags({
+            masterEnabled: updated.masterEnabled,
+            dataMode: updated.dataMode,
+            writeMode: updated.writeMode ?? "full",
+            features: updated.features,
+          });
+          if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
+          if (updated.budget) setBudget(updated.budget);
+          setProviderConfig({
+            aiProvider: updated.aiProvider ?? null,
+            aiApiKey: updated.aiApiKey ?? null,
+            aiModel: updated.aiModel ?? null,
+            aiBaseUrl: updated.aiBaseUrl ?? null,
+          });
+        } else {
+          // Revert optimistic update on failure
+          setFlags(prevFlags);
+          setMonthlyBudgetCents(prevBudgetCents);
+          setProviderConfig(prevProvider);
+          console.error(`AI feature update failed: ${res.status}`);
+        }
+      } catch {
+        // Revert optimistic update on network error
+        setFlags(prevFlags);
+        setMonthlyBudgetCents(prevBudgetCents);
+        setProviderConfig(prevProvider);
+        console.error("AI feature update failed: network error");
       }
     },
-    []
+    [flags, monthlyBudgetCents, providerConfig]
   );
 
   return (
