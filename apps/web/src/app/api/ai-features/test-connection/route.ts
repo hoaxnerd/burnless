@@ -11,11 +11,14 @@ import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } fr
 import { createProvider } from "@burnless/ai";
 
 const bodySchema = z.object({
-  provider: z.enum(["anthropic", "openai", "openrouter"]),
-  apiKey: z.string().min(1).max(256),
+  provider: z.enum(["anthropic", "openai", "openrouter", "ollama"]),
+  apiKey: z.string().min(1).max(256).optional(),
   model: z.string().max(128).optional(),
   baseUrl: z.string().url().max(512).optional(),
-});
+}).refine(
+  (data) => data.provider === "ollama" || !!data.apiKey,
+  { message: "API key is required for non-Ollama providers", path: ["apiKey"] }
+);
 
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -33,7 +36,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const provider = createProvider({
     provider: body.provider,
-    apiKey: body.apiKey,
+    apiKey: body.apiKey ?? (body.provider === "ollama" ? "ollama" : ""),
     model: body.model,
     baseUrl: body.baseUrl,
     maxTokens: 10,

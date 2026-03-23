@@ -13,7 +13,7 @@ export const forecastMethodEnum = z.enum(["fixed", "growth_rate", "per_unit", "p
 export const revenueStreamTypeEnum = z.enum(["subscription", "one_time", "usage_based", "services"]);
 export const fundingRoundTypeEnum = z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]);
 export const integrationTypeEnum = z.enum(["quickbooks", "xero", "freshbooks", "plaid", "mercury", "gusto", "stripe"]);
-export const aiProviderEnum = z.enum(["anthropic", "openai", "openrouter"]);
+export const aiProviderEnum = z.enum(["anthropic", "openai", "openrouter", "ollama"]);
 export const aiDataModeEnum = z.enum(["full", "show_cached", "hide_all"]);
 export const aiWriteModeEnum = z.enum(["full", "confirm", "read_only"]);
 

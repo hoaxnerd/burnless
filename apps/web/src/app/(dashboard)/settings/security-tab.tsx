@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Shield,
   Lock,
@@ -50,9 +50,9 @@ export function SecurityTab() {
   }, []);
 
   // Trigger load on first render
-  useState(() => {
+  useEffect(() => {
     loadStatus();
-  });
+  }, [loadStatus]);
 
   const startSetup = async () => {
     setStep("loading");
