@@ -1,22 +1,28 @@
 /**
  * TOTP-based Two-Factor Authentication utilities.
+ * Uses otplib v13 functional API for TOTP and Web Crypto for backup codes.
  */
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verifySync } from "otplib";
 
 const APP_NAME = "Burnless";
 const BACKUP_CODE_COUNT = 10;
 const BACKUP_CODE_LENGTH = 8;
 
 export function generateTotpSecret(): string {
-  return authenticator.generateSecret();
+  return generateSecret();
 }
 
 export function buildTotpUri(secret: string, userEmail: string): string {
-  return authenticator.keyuri(userEmail, APP_NAME, secret);
+  return generateURI({
+    issuer: APP_NAME,
+    label: userEmail,
+    secret,
+  });
 }
 
 export function verifyTotpCode(code: string, secret: string): boolean {
-  return authenticator.verify({ token: code, secret });
+  const result = verifySync({ token: code, secret });
+  return result.valid;
 }
 
 export function generateBackupCodes(): string[] {
