@@ -12,6 +12,7 @@ import {
   BarChart3,
   Banknote,
   ArrowUpRight,
+  Plus,
   Info,
   type LucideIcon,
 } from "lucide-react";
@@ -369,34 +370,30 @@ export function HeroKpiCard({
         transition-all duration-300
         animate-slide-up stagger-${stagger + 1}
         ${ghost
-          ? "bg-surface-50/50 border-dashed border-surface-200/70 hover:border-surface-300"
+          ? "bg-surface-0 border-surface-200/80 hover:border-brand-300 hover:bg-brand-50/30"
           : "bg-surface-0 border-surface-200 hover:border-surface-300 hover-lift"
         }
         ${celebrate ? "animate-celebrate" : ""}
       `}
     >
-      {/* Subtle gradient glow — only on populated cards */}
-      {!ghost && (
-        <div
-          className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${resolvedConfig.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
-        />
-      )}
+      {/* Subtle gradient glow */}
+      <div
+        className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${ghost ? "from-brand-500/5 to-transparent" : resolvedConfig.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+      />
 
-      {/* Per-card mode gear — cut-out notch on top-right border */}
-      {!ghost && (
-        <div
-          className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
-          onMouseDown={() => { settingsActiveRef.current = true; }}
-        >
-          <CardSettingsModal
-            currentMode={cardMode}
-            onModeChange={(mode) => setCardMode(cardSlug, mode)}
-            isOverride={isOverride}
-            aiEnabled={aiEnabled}
-            catalogProps={catalogProps}
-          />
-        </div>
-      )}
+      {/* Per-card mode gear — always visible so users can switch metrics even on empty cards */}
+      <div
+        className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
+        onMouseDown={() => { settingsActiveRef.current = true; }}
+      >
+        <CardSettingsModal
+          currentMode={cardMode}
+          onModeChange={(mode) => setCardMode(cardSlug, mode)}
+          isOverride={isOverride}
+          aiEnabled={aiEnabled}
+          catalogProps={catalogProps}
+        />
+      </div>
 
       {/* Auto-swap indicator */}
       {swapInfo && (
@@ -419,10 +416,10 @@ export function HeroKpiCard({
         {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className={ghost ? "text-surface-300" : resolvedConfig.accentColor}>
+            <div className={ghost ? "text-surface-400" : resolvedConfig.accentColor}>
               <Icon className="h-4 w-4" strokeWidth={2} />
             </div>
-            <span className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-300" : "text-surface-400"}`}>
+            <span className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-400" : "text-surface-400"}`}>
               {label}
             </span>
           </div>
@@ -435,25 +432,46 @@ export function HeroKpiCard({
           </div>
         </div>
 
-        {/* Value */}
-        <div className={`text-2xl sm:text-3xl font-bold leading-none mb-2 ${ghost ? "text-surface-300" : "text-surface-900"}`}>
-          <AnimatedValue value={value} />
-        </div>
+        {ghost ? (
+          /* Empty card prompt — actionable instead of disabled */
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-surface-500">No data yet</p>
+            {description && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(resolvedConfig.href);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                {description}
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Value */}
+            <div className="text-2xl sm:text-3xl font-bold leading-none mb-2 text-surface-900">
+              <AnimatedValue value={value} />
+            </div>
 
-        {/* Change + Description */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {change && (
-            <span className={`text-xs font-semibold ${changeColor}`}>
-              {change}
-            </span>
-          )}
-          {changeLabel && (
-            <span className="text-xs text-surface-400">{changeLabel}</span>
-          )}
-          {description && !change && (
-            <span className={`text-xs ${ghost ? "text-surface-300" : "text-surface-400"}`}>{description}</span>
-          )}
-        </div>
+            {/* Change + Description */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {change && (
+                <span className={`text-xs font-semibold ${changeColor}`}>
+                  {change}
+                </span>
+              )}
+              {changeLabel && (
+                <span className="text-xs text-surface-400">{changeLabel}</span>
+              )}
+              {description && !change && (
+                <span className="text-xs text-surface-400">{description}</span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
