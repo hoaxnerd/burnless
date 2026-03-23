@@ -28,17 +28,26 @@ export const GET = withErrorHandler(async () => {
     .limit(1);
 
   // Return defaults if no preferences saved yet
-  return NextResponse.json(
-    prefs ?? {
-      mode: "dynamic",
-      heroCards: DEFAULT_HERO_CARDS,
-      secondaryMetrics: DEFAULT_SECONDARY_METRICS,
-      cardModeOverrides: {},
-      cardScenarioOverrides: {},
-      customMetrics: [],
-      layout: [],
-    }
-  );
+  const data = prefs ?? {
+    mode: "dynamic" as const,
+    heroCards: DEFAULT_HERO_CARDS,
+    secondaryMetrics: DEFAULT_SECONDARY_METRICS,
+    cardModeOverrides: {} as Record<string, string>,
+    cardScenarioOverrides: {},
+    customMetrics: [],
+    layout: [],
+  };
+
+  // Compute whether any card uses Intelligence mode — server-side equivalent
+  // of the client-side hasIntelligenceCards in dashboard-intelligence-context.tsx.
+  // Used to gate AI card processing: when false, no Intelligence pipeline runs.
+  const overrides = (data.cardModeOverrides ?? {}) as Record<string, string>;
+  const hasIntelligenceCards = data.mode === "intelligence"
+    ? Object.values(overrides).filter((m) => m !== "intelligence").length <
+      ((data.heroCards as string[])?.length ?? 0) + ((data.secondaryMetrics as string[])?.length ?? 0)
+    : Object.values(overrides).some((m) => m === "intelligence");
+
+  return NextResponse.json({ ...data, hasIntelligenceCards });
 });
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
