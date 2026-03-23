@@ -28,16 +28,11 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   const initialFocusSetRef = useRef(false);
-  const [mounted, setMounted] = useState(false);
 
   // Keep onClose ref current without causing effect re-runs
   useEffect(() => {
     onCloseRef.current = onClose;
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -106,7 +101,7 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
     };
   }, [open]);
 
-  if (!open || !mounted) return null;
+  if (!open || typeof document === "undefined") return null;
 
   // Portal to document.body so that CSS transforms on ancestor elements
   // (e.g. animate-page-enter) don't break position:fixed centering.

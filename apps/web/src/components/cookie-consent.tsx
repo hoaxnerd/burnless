@@ -75,16 +75,14 @@ function dispatchConsentEvent(preferences: CookiePreferences) {
 export function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [preferences, setPreferences] = useState<CookiePreferences>({
-    essential: true,
-    analytics: false,
-    marketing: false,
+  const [preferences, setPreferences] = useState<CookiePreferences>(() => {
+    if (typeof window === "undefined") return { essential: true, analytics: false, marketing: false };
+    return getStoredConsent() ?? { essential: true, analytics: false, marketing: false };
   });
 
   useEffect(() => {
     const stored = getStoredConsent();
     if (stored) {
-      setPreferences(stored);
       dispatchConsentEvent(stored);
     } else {
       // Delay banner to avoid competing with hero LCP element
