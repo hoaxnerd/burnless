@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { db, companies, scenarios, aiMessages, aiConversations, users } from "@burnless/db";
+import { db, companies, scenarios, aiMessages, aiConversations, exportLogs, users } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
 import { env } from "@/lib/env";
@@ -66,6 +66,18 @@ export const GET = withErrorHandler(async (_request: Request) => {
     );
   const aiMessageCount = aiMessageRows[0]?.cnt ?? 0;
 
+  // Monthly exports
+  const exportRows = await db
+    .select({ cnt: count() })
+    .from(exportLogs)
+    .where(
+      and(
+        eq(exportLogs.companyId, ctx.companyId),
+        gte(exportLogs.createdAt, monthStart)
+      )
+    );
+  const exportCount = exportRows[0]?.cnt ?? 0;
+
   // Get subscription status via provider abstraction
   let status: SubscriptionStatus["status"] = "none";
   let currentPeriodEnd: string | null = null;
@@ -116,7 +128,7 @@ export const GET = withErrorHandler(async (_request: Request) => {
         limit: limits.maxAiMessages === Infinity ? -1 : limits.maxAiMessages,
       },
       exports: {
-        used: 0, // Export tracking can be added later
+        used: exportCount,
         limit: limits.maxExports === Infinity ? -1 : limits.maxExports,
       },
     },

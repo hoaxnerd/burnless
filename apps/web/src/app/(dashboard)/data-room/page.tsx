@@ -1,5 +1,9 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { Lock } from "lucide-react";
 import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
+import { getCompanyPlan } from "@/lib/api-helpers";
+import { canPerformAction } from "@/lib/feature-gate";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { DataRoomView } from "./data-room-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
@@ -8,6 +12,30 @@ import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 export default async function DataRoomPage() {
   const company = await getCompany();
   if (!company) return <SetupPrompt context="building your data room" />;
+
+  // Plan gate: Data Room is Pro+ only
+  const plan = await getCompanyPlan(company.id);
+  const gate = canPerformAction(plan, "data_room");
+  if (!gate.allowed) {
+    return (
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-8 sm:p-12 text-center animate-scale-in">
+        <div className="inline-flex items-center justify-center rounded-2xl bg-violet-500/10 p-4 mb-5">
+          <Lock className="h-8 w-8 text-violet-500" />
+        </div>
+        <h3 className="text-xl font-bold text-surface-900 mb-2">Data Room</h3>
+        <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto leading-relaxed">
+          {gate.reason}
+        </p>
+        <Link
+          href="/settings?tab=billing"
+          className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg"
+        >
+          Upgrade Plan
+        </Link>
+      </div>
+    );
+  }
+
   const scenario = await getDefaultScenario(company.id);
   if (!scenario) return <ScenarioPrompt context="generate investor-ready reports" />;
 

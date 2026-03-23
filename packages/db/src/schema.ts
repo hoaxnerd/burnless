@@ -1468,3 +1468,27 @@ export const aiUsageLogs = pgTable(
     index("ai_usage_created_idx").on(table.companyId, table.createdAt),
   ]
 );
+
+// ── Export Tracking ─────────────────────────────────────────────────────────
+
+export const exportLogs = pgTable(
+  "export_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    exportType: text("export_type").notNull(),
+    format: text("format").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("export_logs_company_idx").on(table.companyId),
+    index("export_logs_company_created_idx").on(table.companyId, table.createdAt),
+  ]
+);

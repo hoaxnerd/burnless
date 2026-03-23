@@ -187,6 +187,19 @@ export function DataRoomView({
     await new Promise((r) => setTimeout(r, 100));
 
     try {
+      // Check export limit and record usage
+      const format = id.endsWith("-csv") ? "csv" : "pdf";
+      const gateRes = await fetch("/api/exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exportType: id, format }),
+      });
+      if (gateRes.status === 403) {
+        const { error } = await gateRes.json();
+        toastError("Export limit reached", { description: error ?? "Upgrade your plan for more exports." });
+        return;
+      }
+
       switch (id) {
         case "full-deck": {
           const { generateInvestorDataRoomPDF, downloadPDF } = await import("@/lib/pdf-export");
