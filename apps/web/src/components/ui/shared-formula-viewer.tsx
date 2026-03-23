@@ -57,11 +57,11 @@ export function SharedFormulaViewer() {
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 transition-opacity"
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60] transition-opacity"
         onClick={closeFormulaViewer}
       />
 
-      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-50 flex flex-col overflow-hidden">
+      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-[60] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
             <h2 className="text-lg font-bold text-surface-900">{metric.name}</h2>
