@@ -11,13 +11,12 @@ import {
   generateBackupCodes,
   hashBackupCodes,
 } from "@/lib/two-factor";
-import * as QRCode from "qrcode";
 
 const verifySchema = z.object({
   code: z.string().length(6).regex(/^\d+$/),
 });
 
-/** GET /api/auth/two-factor/setup — Start 2FA enrollment (QR code + secret) */
+/** GET /api/auth/two-factor/setup — Start 2FA enrollment */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "auth");
   if (blocked) return blocked;
@@ -37,6 +36,9 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   const secret = generateTotpSecret();
   const uri = buildTotpUri(secret, dbUser?.email ?? user.email);
+
+  // Generate QR code via dynamic import to avoid bundling issues
+  const QRCode = await import("qrcode");
   const qrCodeDataUrl = await QRCode.toDataURL(uri);
 
   await db
