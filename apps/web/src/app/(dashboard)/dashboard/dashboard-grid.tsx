@@ -165,7 +165,7 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
 
   // Debounced save to avoid saving on every pixel of drag
   const handleLayoutChange = useCallback(
-    (currentLayout: RGLLayout) => {
+    (currentLayout: RGLLayout, _allLayouts: Partial<Record<string, RGLLayout>>) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
         reorderLayout(rglToSaved(currentLayout));
@@ -229,12 +229,10 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
         rowHeight={ROW_HEIGHT}
         margin={GRID_MARGIN}
         containerPadding={[0, 0]}
-        isDraggable={isDragMode}
-        isResizable={isDragMode}
+        dragConfig={{ enabled: isDragMode, handle: ".grid-drag-handle" }}
+        resizeConfig={{ enabled: isDragMode }}
         compactor={verticalCompactor}
         onLayoutChange={handleLayoutChange}
-        draggableHandle=".grid-drag-handle"
-        useCSSTransforms
       >
         {visibleWidgetIds.map((id) => (
           <div key={id} className="relative">
