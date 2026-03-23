@@ -97,6 +97,8 @@ export interface DashboardIntelligenceState {
   layout: WidgetLayout[];
   /** Reorder widgets by providing new ordered list */
   reorderLayout: (layout: WidgetLayout[]) => void;
+  /** Whether any card uses Intelligence mode (global or per-card override) */
+  hasIntelligenceCards: boolean;
   /** Whether preferences are loading */
   isLoading: boolean;
   /** Whether preferences are being saved */
@@ -339,6 +341,21 @@ export function DashboardIntelligenceProvider({
     [updatePrefs]
   );
 
+  // Compute whether any card uses Intelligence mode — used to gate AI processing
+  const hasIntelligenceCards = useMemo(() => {
+    // If global mode is intelligence, all cards without overrides use it
+    if (prefs.mode === "intelligence") {
+      // Check if at least one card does NOT override away from intelligence
+      const overrideCount = Object.values(prefs.cardModeOverrides).filter(
+        (m) => m !== "intelligence"
+      ).length;
+      const totalCards = prefs.heroCards.length + prefs.secondaryMetrics.length;
+      return overrideCount < totalCards;
+    }
+    // Otherwise, check if any per-card override uses intelligence
+    return Object.values(prefs.cardModeOverrides).some((m) => m === "intelligence");
+  }, [prefs.mode, prefs.cardModeOverrides, prefs.heroCards.length, prefs.secondaryMetrics.length]);
+
   const value = useMemo<DashboardIntelligenceState>(
     () => ({
       mode: prefs.mode,
@@ -362,6 +379,7 @@ export function DashboardIntelligenceProvider({
       registry: METRIC_REGISTRY,
       layout: prefs.layout,
       reorderLayout,
+      hasIntelligenceCards,
       isLoading,
       isSaving,
       resetToDefaults,
@@ -371,6 +389,7 @@ export function DashboardIntelligenceProvider({
       prefs.heroCards,
       prefs.secondaryMetrics,
       prefs.layout,
+      hasIntelligenceCards,
       setMode,
       swapHeroCard,
       reorderHeroCards,
