@@ -78,6 +78,7 @@ vi.mock("@burnless/db", () => {
     aiMessages: { conversationId: "conversationId", role: "role", createdAt: "createdAt" },
     aiConversations: { id: "id", companyId: "companyId" },
     users: { id: "id", email: "email", name: "name" },
+    exportLogs: { companyId: "companyId", createdAt: "createdAt" },
   };
 });
 
@@ -150,6 +151,7 @@ describe("GET /api/billing", () => {
     dbResults = [
       [{ cnt: 0 }],   // scenario count
       [{ cnt: 0 }],   // AI message count
+      [{ cnt: 0 }],   // export count
       [{              // company
         billingProvider: null, stripeCustomerId: null,
         stripeSubscriptionId: null, currency: "USD",
@@ -181,6 +183,7 @@ describe("GET /api/billing", () => {
     dbResults = [
       [{ cnt: 3 }],    // scenario count
       [{ cnt: 15 }],   // AI messages
+      [{ cnt: 0 }],    // export count
       [{               // company - no subscription
         billingProvider: null, stripeCustomerId: null,
         stripeSubscriptionId: null, currency: "USD",
@@ -210,6 +213,7 @@ describe("GET /api/billing", () => {
     dbResults = [
       [{ cnt: 2 }],
       [{ cnt: 5 }],
+      [{ cnt: 0 }],
       [{
         billingProvider: "stripe", stripeCustomerId: "cus_123",
         stripeSubscriptionId: "sub_456", currency: "USD",
@@ -245,6 +249,7 @@ describe("GET /api/billing", () => {
     mockIsBillingEnabled.mockReturnValue(true);
 
     dbResults = [
+      [{ cnt: 0 }],
       [{ cnt: 0 }],
       [{ cnt: 0 }],
       [{

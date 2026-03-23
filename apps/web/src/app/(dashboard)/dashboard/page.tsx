@@ -130,7 +130,7 @@ export default async function DashboardPage({
   /* ── Hero card slugs from preferences (dynamic) ──────────── */
   const heroSlugs: string[] =
     (dashPrefs?.heroCards as string[] | undefined)?.length
-      ? (dashPrefs.heroCards as string[])
+      ? (dashPrefs!.heroCards as string[])
       : DEFAULT_HERO_CARDS;
 
   // Known default slug → variant mapping for the 4 built-in hero cards
@@ -153,9 +153,9 @@ export default async function DashboardPage({
   // Build hero card data for each slug
   const heroCards: HeroCardDatum[] = heroSlugs.map((slug, i) => {
     const def = getMetricDef(slug);
-    const variant = SLUG_VARIANT[slug] ?? variantOrder[i % variantOrder.length];
-    const hasData = slug in SLUG_HAS_DATA
-      ? SLUG_HAS_DATA[slug]
+    const variant: KpiVariant = SLUG_VARIANT[slug] ?? variantOrder[i % variantOrder.length]!;
+    const hasData: boolean = slug in SLUG_HAS_DATA
+      ? SLUG_HAS_DATA[slug]!
       : isMetricDataAvailable(metrics, slug, currentMonth);
 
     const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
@@ -223,7 +223,7 @@ export default async function DashboardPage({
     if (!swap || !swap.replacedSlug) continue;
 
     // Find the actual index in heroSlugs for this default slug
-    const defaultSlug = DEFAULT_HERO_CARDS[i];
+    const defaultSlug = DEFAULT_HERO_CARDS[i]!;
     const heroIndex = heroSlugs.indexOf(defaultSlug);
     if (heroIndex === -1) continue; // User removed this default card
 
@@ -252,7 +252,7 @@ export default async function DashboardPage({
       originalLabel: heroCards[heroIndex]?.props.label ?? "",
       originalSlug: swap.replacedSlug,
       restoreHint: swap.restoreHint ?? getMetricMissingDataHint(swap.replacedSlug),
-      variant: variantOrder[heroIndex % variantOrder.length],
+      variant: variantOrder[heroIndex % variantOrder.length]!,
       props: {
         slug: swap.displaySlug,
         label: swap.displayDef.name,

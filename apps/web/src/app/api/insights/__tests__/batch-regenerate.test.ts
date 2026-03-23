@@ -95,6 +95,10 @@ vi.mock("@/lib/logger", () => ({
   }),
 }));
 
+vi.mock("@/lib/api-helpers", () => ({
+  withErrorHandler: (handler: Function) => handler,
+}));
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function makeRequest(
   url: string,

@@ -72,6 +72,10 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getAiFlags: mockGetAiFlags,
 }));
 
+vi.mock("@/lib/api-helpers", () => ({
+  withErrorHandler: (handler: Function) => handler,
+}));
+
 import { GET } from "../route";
 
 function makeRequest(headers: Record<string, string> = {}) {
