@@ -62,7 +62,7 @@ vi.mock("@burnless/db", () => {
     chain.values = self;
     chain.returning = self;
     // Make the chain thenable so `await chain` resolves to the next result
-    chain.then = (resolve: (...args: unknown[]) => unknown) => resolve(nextDbResult());
+    chain.then = (...args: unknown[]) => (args[0] as (v: unknown) => unknown)(nextDbResult());
     return chain;
   };
 

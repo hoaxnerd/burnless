@@ -60,7 +60,7 @@ vi.mock("@burnless/db", () => {
     chain.where = self;
     chain.limit = self;
     chain.orderBy = self;
-    chain.then = (resolve: (...args: unknown[]) => unknown) => resolve(nextDbResult());
+    chain.then = (...args: unknown[]) => (args[0] as (v: unknown) => unknown)(nextDbResult());
     return chain;
   };
 

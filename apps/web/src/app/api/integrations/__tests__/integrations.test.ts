@@ -56,7 +56,7 @@ vi.mock("@burnless/db", () => {
     chain.set = self;
     chain.values = self;
     chain.returning = self;
-    chain.then = (resolve: (...args: unknown[]) => unknown) => resolve(nextDbResult());
+    chain.then = (...args: unknown[]) => (args[0] as (v: unknown) => unknown)(nextDbResult());
     return chain;
   };
 
