@@ -5,6 +5,7 @@ import type { NextAuthConfig } from "next-auth";
 import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "./password";
+import { verifyTotpCode, verifyBackupCode } from "./two-factor";
 
 declare module "next-auth" {
   interface Session {
@@ -64,12 +65,8 @@ export const authConfig = {
         // If 2FA is enabled, require a valid TOTP code
         if (user.twoFactorEnabled && user.twoFactorSecret) {
           if (!totpCode) {
-            // Signal to the frontend that 2FA is needed
             throw new TwoFactorRequiredError(user.id);
           }
-
-          // Lazy-import to avoid bundling otplib on every auth check
-          const { verifyTotpCode, verifyBackupCode } = await import("./two-factor");
 
           const isValidTotp = verifyTotpCode(totpCode, user.twoFactorSecret);
 
@@ -79,7 +76,7 @@ export const authConfig = {
               ? JSON.parse(user.twoFactorBackupCodes)
               : [];
             const matchIdx = await verifyBackupCode(totpCode, storedCodes);
-            if (matchIdx === -1) return null; // Invalid code
+            if (matchIdx === -1) return null;
 
             // Consume the backup code
             storedCodes.splice(matchIdx, 1);
