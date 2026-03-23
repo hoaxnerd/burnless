@@ -61,7 +61,7 @@ vi.mock("@/lib/api-helpers", () => ({
   },
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@burnless/db", () => ({

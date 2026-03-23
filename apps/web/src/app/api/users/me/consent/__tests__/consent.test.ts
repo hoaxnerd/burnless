@@ -47,7 +47,7 @@ vi.mock("@/lib/api-helpers", () => ({
       };
     }
   },
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@burnless/db", () => ({

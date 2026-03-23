@@ -31,7 +31,7 @@ vi.mock("@/lib/api-helpers", () => ({
   },
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 /**
@@ -46,8 +46,8 @@ function nextDbResult() {
 }
 
 vi.mock("@burnless/db", () => {
-  const makeChain = (): Record<string, Function> => {
-    const chain: Record<string, Function> = {};
+  const makeChain = (): Record<string, (...args: unknown[]) => unknown> => {
+    const chain: Record<string, (...args: unknown[]) => unknown> = {};
     const self = () => chain;
     chain.from = self;
     chain.where = self;
@@ -56,7 +56,7 @@ vi.mock("@burnless/db", () => {
     chain.set = self;
     chain.values = self;
     chain.returning = self;
-    chain.then = (resolve: Function) => resolve(nextDbResult());
+    chain.then = (resolve: (...args: unknown[]) => unknown) => resolve(nextDbResult());
     return chain;
   };
 

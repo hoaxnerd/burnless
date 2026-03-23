@@ -7,7 +7,7 @@ const { mockRequireCompanyAccess } = vi.hoisted(() => ({
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
   parseBody: async (req: Request, schema: { parse: (d: unknown) => unknown }) => {
     try {
       const body = await req.json();

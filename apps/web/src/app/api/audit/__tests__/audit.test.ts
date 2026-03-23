@@ -9,7 +9,7 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 const { mockSelect, mockFrom, mockWhere, mockOrderBy, mockLimit } = vi.hoisted(() => ({

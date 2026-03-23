@@ -34,7 +34,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@/lib/api-rate-limit", () => ({

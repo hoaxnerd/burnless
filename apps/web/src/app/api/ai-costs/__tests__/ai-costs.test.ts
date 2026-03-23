@@ -8,7 +8,7 @@ const { mockRequireCompanyAccess, mockGetBudgetStatus } = vi.hoisted(() => ({
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({

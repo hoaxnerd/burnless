@@ -11,7 +11,7 @@ vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   parseBody: mockParseBody,
   errorResponse: mockErrorResponse,
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 const { mockExtractMerchantKey } = vi.hoisted(() => ({

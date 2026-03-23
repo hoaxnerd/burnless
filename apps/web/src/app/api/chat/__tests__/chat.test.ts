@@ -76,7 +76,7 @@ vi.mock("@/lib/api-helpers", () => ({
   getCompanyPlan: mockGetCompanyPlan,
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
-  withErrorHandler: (fn: Function) => fn,
+  withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@/lib/api-rate-limit", () => ({
