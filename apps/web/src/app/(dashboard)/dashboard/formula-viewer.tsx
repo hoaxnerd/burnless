@@ -5,7 +5,8 @@
  * and what metrics depend on it, in a visual card/tree layout.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ArrowDown, ArrowUp, Info } from "lucide-react";
 import {
   getMetricDef,
@@ -50,9 +51,12 @@ export function FormulaViewer() {
       .filter((d): d is MetricDefinition => !!d);
   }, [metric]);
 
-  if (!metric || !formulaViewerSlug) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  return (
+  if (!metric || !formulaViewerSlug || !mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -197,7 +201,8 @@ export function FormulaViewer() {
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

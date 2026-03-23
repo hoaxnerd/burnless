@@ -3,9 +3,10 @@
 /**
  * HeroCardGrid — mode-aware hero KPI card grid.
  *
- * In Dynamic mode: auto-hides empty cards and swaps in available alternatives.
- * In Custom mode: keeps user-pinned cards visible even if empty (ghost state).
- * In Intelligence mode: shows original cards (AI manages separately).
+ * In ALL modes: empty cards are swapped with available alternatives when possible.
+ * Ghost state only appears when no metric in the entire system has data.
+ * In Dynamic/Intelligence modes: empty cards with no swap are hidden.
+ * In Custom mode: empty cards with no swap remain visible with an actionable prompt.
  */
 
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
@@ -53,12 +54,12 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
     swapBySlot.set(swap.slotIndex, swap);
   }
 
-  // In Dynamic mode, filter out empty cards with no available swap
-  // In Custom/Intelligence mode, keep all cards (ghost state for user-pinned)
+  // Hide empty cards with no available swap in Dynamic & Intelligence modes.
+  // In Custom mode, keep empty cards visible (user's explicit choice).
   const visibleEntries = cards
     .map((card, index) => ({ card, index }))
     .filter(({ card, index }) => {
-      if (mode === "dynamic" && !card.hasData && !swapBySlot.has(index)) {
+      if ((mode === "dynamic" || mode === "intelligence") && !card.hasData && !swapBySlot.has(index)) {
         return false;
       }
       return true;
@@ -77,8 +78,8 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
   return (
     <div className={`grid ${gridCols} gap-4 sm:gap-6 mb-8 sm:mb-12`}>
       {visibleEntries.map(({ card, index }) => {
-        // In Dynamic mode, swap empty cards with alternatives
-        if (mode === "dynamic" && !card.hasData && swapBySlot.has(index)) {
+        // In ANY mode, swap empty cards with available alternatives
+        if (!card.hasData && swapBySlot.has(index)) {
           const swap = swapBySlot.get(index)!;
           return (
             <HeroKpiCard
@@ -97,7 +98,7 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
           );
         }
 
-        // Default: render the original card (ghost state if no data in Custom mode)
+        // Default: render the original card
         return (
           <HeroKpiCard
             key={card.variant}
