@@ -67,6 +67,13 @@ const nextConfig: NextConfig = {
     "@auth/drizzle-adapter",
     "drizzle-orm",
     "ioredis",
+    "otplib",
+    "@otplib/core",
+    "@otplib/totp",
+    "@otplib/hotp",
+    "@otplib/plugin-crypto-noble",
+    "@otplib/plugin-base32-scure",
+    "qrcode",
   ],
   experimental: {
     optimizePackageImports: ["recharts"],
