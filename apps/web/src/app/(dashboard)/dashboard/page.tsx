@@ -17,15 +17,8 @@ import {
   seriesToArray,
   monthKey,
   DEFAULT_HERO_CARDS,
-  getHeroSwaps,
-  extractMetricValue,
-  formatMetricValue,
-  getMetricMissingDataHint,
-  getMetricDef,
-  isMetricDataAvailable,
 } from "@burnless/engine";
-import { type KpiVariant } from "./hero-kpi-card";
-import { HeroCardGrid, type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
+import { HeroCardGrid } from "./hero-card-grid";
 import { HeroCardSlot } from "./hero-card-slot";
 import {
   DashboardChartCard,
@@ -45,25 +38,8 @@ import { CustomizableMetrics } from "./customizable-metrics";
 import { StatsCatalog } from "./stats-catalog";
 import { FormulaViewer } from "./formula-viewer";
 import { DashboardGrid } from "./dashboard-grid";
-
-/* ── Helpers ──────────────────────────────────────────────────────────────── */
-
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
-
-function pctChange(current: number, previous: number): string | null {
-  if (previous === 0) return null;
-  const pct = ((current - previous) / Math.abs(previous)) * 100;
-  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
-}
-
-/** Extract last N values from a MetricValue array for sparklines */
-function sparkline(data: Array<{ month: string; value: number }>, n = 8): number[] {
-  return data.slice(-n).map((d) => d.value);
-}
+import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
+import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
@@ -133,140 +109,15 @@ export default async function DashboardPage({
       ? (dashPrefs!.heroCards as string[])
       : DEFAULT_HERO_CARDS;
 
-  // Known default slug → variant mapping for the 4 built-in hero cards
-  const SLUG_VARIANT: Record<string, KpiVariant> = {
-    cashPosition: "cash",
-    netBurnRate: "burn",
-    cashRunwayMonths: "runway",
-    mrr: "revenue",
-  };
-  const variantOrder: KpiVariant[] = ["cash", "burn", "runway", "revenue"];
-
-  // Special hasData checks for known defaults (context-dependent, not just data presence)
-  const SLUG_HAS_DATA: Record<string, boolean> = {
+  const slugHasData: Record<string, boolean> = {
     cashPosition: hasFunding,
     netBurnRate: hasExpenses,
     cashRunwayMonths: hasFunding && hasExpenses,
     mrr: hasRevenue,
   };
 
-  // Build hero card data for each slug
-  const heroCards: HeroCardDatum[] = heroSlugs.map((slug, i) => {
-    const def = getMetricDef(slug);
-    const variant: KpiVariant = SLUG_VARIANT[slug] ?? variantOrder[i % variantOrder.length]!;
-    const hasData: boolean = slug in SLUG_HAS_DATA
-      ? SLUG_HAS_DATA[slug]!
-      : isMetricDataAvailable(metrics, slug, currentMonth);
-
-    const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
-    const prevVal = extractMetricValue(metrics, slug, prevMonth) ?? 0;
-
-    // Format value based on metric definition
-    let formattedValue: string;
-    if (!hasData) {
-      formattedValue = def?.format === "months" ? "-- mo" : "$---";
-    } else if (def) {
-      formattedValue = formatMetricValue(currentVal, def.format);
-    } else {
-      formattedValue = formatCurrency(currentVal);
-    }
-
-    // MoM change
-    let change: string | undefined;
-    let changeLabel: string | undefined;
-    if (hasData && prevVal !== 0) {
-      if (def?.format === "percent") {
-        const diff = currentVal - prevVal;
-        if (diff !== 0 && Number.isFinite(diff)) {
-          change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
-          changeLabel = "vs last month";
-        }
-      } else {
-        change = pctChange(currentVal, prevVal) ?? undefined;
-        changeLabel = change ? "vs last month" : undefined;
-      }
-    }
-
-    // Sparkline data
-    const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
-    const sparkData = hasData && Array.isArray(series) ? sparkline(series) : undefined;
-
-    // For non-default metrics, use metricStyle from the registry
-    const isKnownDefault = slug in SLUG_VARIANT;
-    const metricStyle = !isKnownDefault && def
-      ? { icon: def.icon, color: def.color, href: def.href }
-      : undefined;
-
-    return {
-      variant,
-      hasData,
-      props: {
-        slug,
-        label: def?.name ?? slug,
-        value: formattedValue,
-        change,
-        changeLabel,
-        description: !hasData
-          ? (getMetricMissingDataHint(slug) ?? (def?.description))
-          : undefined,
-        sparkData,
-        metricStyle,
-      },
-    };
-  });
-
-  // Build swap cards from engine's hero swap computation (only for the known defaults)
-  const heroSwaps = getHeroSwaps(DEFAULT_HERO_CARDS, metrics, currentMonth);
-  const heroSwapCards: SwapCardDatum[] = [];
-  for (let i = 0; i < heroSwaps.length; i++) {
-    const swap = heroSwaps[i];
-    if (!swap || !swap.replacedSlug) continue;
-
-    // Find the actual index in heroSlugs for this default slug
-    const defaultSlug = DEFAULT_HERO_CARDS[i]!;
-    const heroIndex = heroSlugs.indexOf(defaultSlug);
-    if (heroIndex === -1) continue; // User removed this default card
-
-    const swapCurrentVal = extractMetricValue(metrics, swap.displaySlug, currentMonth) ?? 0;
-    const swapPrevVal = extractMetricValue(metrics, swap.displaySlug, prevMonth) ?? 0;
-    const formattedSwapValue = formatMetricValue(swapCurrentVal, swap.displayDef.format);
-
-    let swapChange: string | undefined;
-    if (swap.displayDef.format === "percent") {
-      const diff = swapCurrentVal - swapPrevVal;
-      if (swapPrevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
-        swapChange = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
-      }
-    } else if (swapPrevVal !== 0) {
-      const pct = ((swapCurrentVal - swapPrevVal) / Math.abs(swapPrevVal)) * 100;
-      if (pct !== 0 && Number.isFinite(pct)) {
-        swapChange = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
-      }
-    }
-
-    const swapSeries = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
-    const _swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries) : undefined;
-
-    heroSwapCards.push({
-      slotIndex: heroIndex,
-      originalLabel: heroCards[heroIndex]?.props.label ?? "",
-      originalSlug: swap.replacedSlug,
-      restoreHint: swap.restoreHint ?? getMetricMissingDataHint(swap.replacedSlug),
-      variant: variantOrder[heroIndex % variantOrder.length]!,
-      props: {
-        slug: swap.displaySlug,
-        label: swap.displayDef.name,
-        value: formattedSwapValue,
-        change: swapChange,
-        changeLabel: swapChange ? "vs last month" : undefined,
-        metricStyle: {
-          icon: swap.displayDef.icon,
-          color: swap.displayDef.color,
-          href: swap.displayDef.href,
-        },
-      },
-    });
-  }
+  const heroCards = buildHeroCards(heroSlugs, metrics, currentMonth, prevMonth, slugHasData);
+  const heroSwapCards = buildHeroSwapCards(heroSlugs, heroCards, metrics, currentMonth, prevMonth);
 
   /* ── Pinned secondary metrics ───────────────────────────────────── */
   const pinnedScenarios = allScenarios.filter((s) => !s.isDefault).slice(0, 4);
@@ -513,51 +364,5 @@ export default async function DashboardPage({
         <FormulaViewer />
       </div>
     </DashboardIntelligenceProvider>
-  );
-}
-
-/* ── Supporting Components ────────────────────────────────────────────────── */
-
-function SetupPrompt() {
-  return (
-    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-12 text-center animate-scale-in">
-      <div className="inline-flex items-center justify-center rounded-2xl bg-brand-500/10 p-4 mb-5">
-        <svg className="h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-        </svg>
-      </div>
-      <h3 className="text-xl font-bold text-surface-900 mb-2">Welcome to Burnless</h3>
-      <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
-        Your AI-powered financial companion. Complete onboarding to set up your company.
-      </p>
-      <Link
-        href="/onboarding"
-        className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg"
-      >
-        Get started
-      </Link>
-    </div>
-  );
-}
-
-function NoScenarioPrompt() {
-  return (
-    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-12 text-center animate-scale-in">
-      <div className="inline-flex items-center justify-center rounded-2xl bg-brand-500/10 p-4 mb-5">
-        <svg className="h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-        </svg>
-      </div>
-      <h3 className="text-xl font-bold text-surface-900 mb-2">Create Your First Scenario</h3>
-      <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
-        A scenario is your financial model. Start with a base case and explore alternatives.
-      </p>
-      <Link
-        href="/scenarios/new"
-        className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors shadow-md hover:shadow-lg"
-      >
-        Create scenario
-      </Link>
-    </div>
   );
 }
