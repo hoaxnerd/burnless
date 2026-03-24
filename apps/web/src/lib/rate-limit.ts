@@ -6,7 +6,12 @@
  *   2. `checkRateLimitAsync` — async, Redis-first with in-memory fallback
  *      (used by route handlers running in Node.js runtime)
  */
-import { getRedis } from "./redis";
+// Dynamic import to avoid loading ioredis in Edge middleware runtime.
+// Only checkRateLimitAsync (Node.js route handlers) needs Redis.
+async function getRedisLazy() {
+  const { getRedis } = await import("./redis");
+  return getRedis();
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,7 +109,7 @@ export async function checkRateLimitAsync(
   key: string,
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
-  const redis = getRedis();
+  const redis = await getRedisLazy();
   if (!redis) {
     return checkRateLimit(key, config);
   }

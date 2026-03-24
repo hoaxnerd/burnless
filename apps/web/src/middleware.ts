@@ -15,11 +15,12 @@ function getAllowedOrigins(): Set<string> {
   if (process.env.ALLOWED_ORIGINS) {
     process.env.ALLOWED_ORIGINS.split(",").forEach((o) => origins.add(o.trim()));
   }
-  // Always allow localhost in development
+  // Always allow localhost in development (any common dev port)
   if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:3000");
-    origins.add("http://localhost:3001");
-    origins.add("http://127.0.0.1:3000");
+    for (const port of [3000, 3001, 3002, 3003]) {
+      origins.add(`http://localhost:${port}`);
+      origins.add(`http://127.0.0.1:${port}`);
+    }
   }
   return origins;
 }
