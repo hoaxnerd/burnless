@@ -92,7 +92,7 @@ describe("Exports API", () => {
 
   describe("GET /api/exports", () => {
     it("returns usage stats with remaining allowance", async () => {
-      const res = await GET(jsonRequest("/api/exports", "GET"));
+      const res = await GET();
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.used).toBe(3);
@@ -103,7 +103,7 @@ describe("Exports API", () => {
     it("returns -1 for unlimited plans", async () => {
       mockGetPlanLimits.mockReturnValue({ maxExports: Infinity });
 
-      const res = await GET(jsonRequest("/api/exports", "GET"));
+      const res = await GET();
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.limit).toBe(-1);
@@ -113,7 +113,7 @@ describe("Exports API", () => {
     it("returns 0 remaining when at limit", async () => {
       mockWhere.mockResolvedValue([{ cnt: 50 }]);
 
-      const res = await GET(jsonRequest("/api/exports", "GET"));
+      const res = await GET();
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.used).toBe(50);
@@ -125,7 +125,7 @@ describe("Exports API", () => {
         error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       });
 
-      const res = await GET(jsonRequest("/api/exports", "GET"));
+      const res = await GET();
       expect(res.status).toBe(401);
     });
   });
