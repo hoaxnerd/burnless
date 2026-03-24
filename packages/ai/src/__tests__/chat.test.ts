@@ -308,6 +308,6 @@ describe("chatStream", () => {
     const doneChunks = chunks.filter((c) => c.type === "done");
     expect(doneChunks).toHaveLength(1);
     const textChunks = chunks.filter((c) => c.type === "text");
-    expect(textChunks.some((c) => c.content.includes("maximum number of tool steps"))).toBe(true);
+    expect(textChunks.some((c) => c.content?.includes("maximum number of tool steps"))).toBe(true);
   });
 });

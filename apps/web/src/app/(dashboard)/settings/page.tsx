@@ -27,6 +27,7 @@ export default function SettingsPage() {
     region: "us-east",
     industry: null,
     businessModel: "saas",
+    fiscalYearEnd: 12,
   });
   const [companyLoaded, setCompanyLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,6 +54,7 @@ export default function SettingsPage() {
             region: data.region || "us-east",
             industry: data.industry,
             businessModel: data.businessModel || "saas",
+            fiscalYearEnd: data.fiscalYearEnd ?? 12,
           });
         }
         setCompanyLoaded(true);

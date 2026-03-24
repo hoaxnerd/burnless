@@ -217,6 +217,99 @@ describe("PATCH /api/company", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("updates businessModel, industry, and fiscalYearEnd", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "admin",
+    });
+    mockRequireRole.mockReturnValue(null);
+
+    const updatedCompany = {
+      id: "comp-1",
+      name: "Acme Corp",
+      businessModel: "marketplace",
+      industry: "Fintech",
+      fiscalYearEnd: 3,
+    };
+    mockReturning.mockResolvedValue([updatedCompany]);
+
+    const req = jsonRequest("http://localhost/api/company", "PATCH", {
+      businessModel: "marketplace",
+      industry: "Fintech",
+      fiscalYearEnd: 3,
+    });
+    const res = await PATCH(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.businessModel).toBe("marketplace");
+    expect(body.industry).toBe("Fintech");
+    expect(body.fiscalYearEnd).toBe(3);
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("rejects invalid fiscalYearEnd values", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "admin",
+    });
+    mockRequireRole.mockReturnValue(null);
+
+    const req = jsonRequest("http://localhost/api/company", "PATCH", {
+      fiscalYearEnd: 13,
+    });
+    const res = await PATCH(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Validation failed");
+  });
+
+  it("rejects invalid businessModel values", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "admin",
+    });
+    mockRequireRole.mockReturnValue(null);
+
+    const req = jsonRequest("http://localhost/api/company", "PATCH", {
+      businessModel: "invalid_model",
+    });
+    const res = await PATCH(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Validation failed");
+  });
+
+  it("allows setting industry to null", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "admin",
+    });
+    mockRequireRole.mockReturnValue(null);
+
+    const updatedCompany = {
+      id: "comp-1",
+      name: "Acme Corp",
+      industry: null,
+    };
+    mockReturning.mockResolvedValue([updatedCompany]);
+
+    const req = jsonRequest("http://localhost/api/company", "PATCH", {
+      industry: null,
+    });
+    const res = await PATCH(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.industry).toBeNull();
+  });
+
   it("returns 400 for invalid data", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       userId: "user-1",
