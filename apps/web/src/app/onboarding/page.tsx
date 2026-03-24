@@ -25,6 +25,7 @@ export default function OnboardingPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
+  const movedToReviewRef = useRef(false);
 
   useEffect(() => {
     if (step === "website") {
@@ -40,6 +41,7 @@ export default function OnboardingPage() {
 
     setStep("enriching");
     setGreeting("Analyzing...");
+    movedToReviewRef.current = false;
     trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
 
     try {
@@ -51,12 +53,14 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         // AI not available — go straight to manual form
+        movedToReviewRef.current = true;
         setStep("review");
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
+        movedToReviewRef.current = true;
         setStep("review");
         return;
       }
@@ -103,6 +107,7 @@ export default function OnboardingPage() {
               setGreeting(event.message);
             } else if (event.type === "done") {
               // Move to review
+              movedToReviewRef.current = true;
               setStep("review");
             }
           } catch {
@@ -111,12 +116,14 @@ export default function OnboardingPage() {
         }
       }
 
-      // If stream ended without done event
-      if (step !== "review") {
+      // If stream ended without a done event, move to review
+      if (!movedToReviewRef.current) {
+        movedToReviewRef.current = true;
         setStep("review");
       }
     } catch {
       // Network error — fall back to manual form
+      movedToReviewRef.current = true;
       setStep("review");
     }
   };
@@ -126,9 +133,38 @@ export default function OnboardingPage() {
     setStep("review");
   };
 
-  const skipOnboarding = () => {
+  const skipOnboarding = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     trackEvent("onboarding_skip_all", { from_step: step });
-    router.push("/dashboard");
+    setStep("creating");
+
+    try {
+      const res = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: fields.company_name.value.trim() || "My Company",
+          stage: fields.stage.value || "Pre-seed",
+          business_model: fields.business_model.value || "SaaS",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not create company");
+      }
+
+      setStep("done");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong";
+      trackEvent("onboarding_skip_error", { error: message });
+      setCreateError(message);
+      setStep("review");
+      submittingRef.current = false;
+    }
   };
 
   // ── Field update ────────────────────────────────────────────────────────

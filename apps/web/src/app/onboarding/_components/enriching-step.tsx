@@ -23,16 +23,16 @@ export function EnrichingStep({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setElapsed((prev) => {
-        if (prev + 1 >= ENRICHMENT_TIMEOUT_SECS) {
-          clearInterval(interval);
-          onSkipToForm();
-        }
-        return prev + 1;
-      });
+      setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [onSkipToForm]);
+  }, []);
+
+  useEffect(() => {
+    if (elapsed >= ENRICHMENT_TIMEOUT_SECS) {
+      onSkipToForm();
+    }
+  }, [elapsed, onSkipToForm]);
 
   const remaining = ENRICHMENT_TIMEOUT_SECS - elapsed;
 
