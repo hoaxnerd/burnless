@@ -8,7 +8,6 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
 
 const {
   mockSelect,
-  _mockFrom,
   mockWhere,
   mockUpdate,
   mockSet,
@@ -16,7 +15,6 @@ const {
   mockReturning,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
-  _mockFrom: vi.fn(),
   mockWhere: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
@@ -79,6 +77,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 
 import { PATCH, DELETE } from "../[id]/route";
 
@@ -107,6 +106,43 @@ describe("PATCH /api/headcount/[id]", () => {
     mockSet.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ returning: mockReturning });
     mockDelete.mockReturnValue({ where: mockWhere });
+  });
+
+  it("returns 401 when not authorized", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest("http://localhost/api/headcount/hc-1", "PATCH", {
+      title: "Should Not Update",
+    });
+    const res = await PATCH(req, makeParams("hc-1"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for viewer", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "viewer",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest("http://localhost/api/headcount/hc-1", "PATCH", {
+      title: "Should Not Update",
+    });
+    const res = await PATCH(req, makeParams("hc-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("updates headcount plan", async () => {
@@ -180,6 +216,39 @@ describe("DELETE /api/headcount/[id]", () => {
     mockDelete.mockReturnValue({ where: mockWhere });
   });
 
+  it("returns 401 when not authorized", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest("http://localhost/api/headcount/hc-1", "DELETE");
+    const res = await DELETE(req, makeParams("hc-1"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for editor (requires admin)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "editor",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest("http://localhost/api/headcount/hc-1", "DELETE");
+    const res = await DELETE(req, makeParams("hc-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
   it("deletes headcount plan", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       userId: "user-1",
@@ -222,24 +291,5 @@ describe("DELETE /api/headcount/[id]", () => {
 
     expect(res.status).toBe(404);
     expect(body.error).toBe("Headcount plan not found");
-  });
-
-  it("returns 403 for editor (requires admin)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/headcount/hc-1", "DELETE");
-    const res = await DELETE(req, makeParams("hc-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockDelete).not.toHaveBeenCalled();
   });
 });

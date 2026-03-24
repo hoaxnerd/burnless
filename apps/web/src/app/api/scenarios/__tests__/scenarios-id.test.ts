@@ -62,6 +62,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 
 import { GET, PATCH, DELETE } from "../[id]/route";
 
@@ -78,9 +79,25 @@ function makeParams(id: string): { params: Promise<{ id: string }> } {
   return { params: Promise.resolve({ id }) };
 }
 
+/* ─── GET /api/scenarios/[id] ─────────────────────────────── */
+
 describe("GET /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest("http://localhost/api/scenarios/scen-1", "GET");
+    const res = await GET(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(body.error).toBe("Unauthorized");
+    expect(mockFindByIdForCompany).not.toHaveBeenCalled();
   });
 
   it("returns scenario by id", async () => {
@@ -134,9 +151,52 @@ describe("GET /api/scenarios/[id]", () => {
   });
 });
 
+/* ─── PATCH /api/scenarios/[id] ───────────────────────────── */
+
 describe("PATCH /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest(
+      "http://localhost/api/scenarios/scen-1",
+      "PATCH",
+      { name: "Should Not Update" }
+    );
+    const res = await PATCH(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(body.error).toBe("Unauthorized");
+    expect(mockUpdateForCompany).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for viewer role", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "viewer",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest(
+      "http://localhost/api/scenarios/scen-1",
+      "PATCH",
+      { name: "Should Not Update" }
+    );
+    const res = await PATCH(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockUpdateForCompany).not.toHaveBeenCalled();
   });
 
   it("updates scenario", async () => {
@@ -195,11 +255,90 @@ describe("PATCH /api/scenarios/[id]", () => {
     expect(res.status).toBe(404);
     expect(body.error).toBe("Scenario not found");
   });
+
+  it("sets budgetLockedAt when isBudget is true", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "editor",
+    });
+    mockRequireRole.mockReturnValue(null);
+
+    const updatedScenario = {
+      id: "scen-1",
+      companyId: "comp-1",
+      name: "Budget Scenario",
+      isBudget: true,
+      budgetLockedAt: new Date().toISOString(),
+    };
+    mockUpdateForCompany.mockResolvedValue(updatedScenario);
+
+    const req = jsonRequest(
+      "http://localhost/api/scenarios/scen-1",
+      "PATCH",
+      { isBudget: true }
+    );
+    const res = await PATCH(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.isBudget).toBe(true);
+    expect(mockUpdateForCompany).toHaveBeenCalledWith(
+      expect.anything(),
+      "scen-1",
+      "comp-1",
+      expect.objectContaining({
+        isBudget: true,
+        budgetLockedAt: expect.any(Date),
+      })
+    );
+  });
 });
+
+/* ─── DELETE /api/scenarios/[id] ──────────────────────────── */
 
 describe("DELETE /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest(
+      "http://localhost/api/scenarios/scen-1",
+      "DELETE"
+    );
+    const res = await DELETE(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(body.error).toBe("Unauthorized");
+    expect(mockDeleteForCompany).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for editor (requires admin)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "editor",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest(
+      "http://localhost/api/scenarios/scen-1",
+      "DELETE"
+    );
+    const res = await DELETE(req, makeParams("scen-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockDeleteForCompany).not.toHaveBeenCalled();
   });
 
   it("deletes scenario", async () => {
@@ -252,27 +391,5 @@ describe("DELETE /api/scenarios/[id]", () => {
 
     expect(res.status).toBe(404);
     expect(body.error).toBe("Scenario not found");
-  });
-
-  it("returns 403 for editor (requires admin)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest(
-      "http://localhost/api/scenarios/scen-1",
-      "DELETE"
-    );
-    const res = await DELETE(req, makeParams("scen-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
   });
 });

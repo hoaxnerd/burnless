@@ -53,6 +53,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 
 import { PATCH, DELETE } from "../[id]/route";
 
@@ -72,6 +73,43 @@ function makeParams(id: string): { params: Promise<{ id: string }> } {
 describe("PATCH /api/departments/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authorized", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
+      name: "Should Not Update",
+    });
+    const res = await PATCH(req, makeParams("dept-1"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(mockUpdateForCompany).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for viewer", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "viewer",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
+      name: "Should Not Update",
+    });
+    const res = await PATCH(req, makeParams("dept-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockUpdateForCompany).not.toHaveBeenCalled();
   });
 
   it("updates department", async () => {
@@ -126,32 +164,44 @@ describe("PATCH /api/departments/[id]", () => {
     expect(res.status).toBe(404);
     expect(body.error).toBe("Department not found");
   });
-
-  it("returns 403 for viewer", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
-      name: "Should Not Update",
-    });
-    const res = await PATCH(req, makeParams("dept-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockUpdateForCompany).not.toHaveBeenCalled();
-  });
 });
 
 describe("DELETE /api/departments/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authorized", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
+    const res = await DELETE(req, makeParams("dept-1"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(mockDeleteForCompany).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for editor (requires admin)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "editor",
+    });
+    mockRequireRole.mockReturnValue(
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
+    const res = await DELETE(req, makeParams("dept-1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("Forbidden");
+    expect(mockDeleteForCompany).not.toHaveBeenCalled();
   });
 
   it("deletes department", async () => {
@@ -200,24 +250,5 @@ describe("DELETE /api/departments/[id]", () => {
 
     expect(res.status).toBe(404);
     expect(body.error).toBe("Department not found");
-  });
-
-  it("returns 403 for editor (requires admin)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
-    const res = await DELETE(req, makeParams("dept-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
   });
 });
