@@ -47,6 +47,9 @@ interface ChatOptions {
   };
 }
 
+/** Max tool-use round-trips before we force a text response. */
+const MAX_TOOL_ITERATIONS = 10;
+
 /** Non-streaming chat — sends message and returns complete response. */
 export async function chat(options: ChatOptions): Promise<{
   response: string;
@@ -72,8 +75,8 @@ export async function chat(options: ChatOptions): Promise<{
 
   const toolResults: ToolCallResult[] = [];
 
-  // Loop to handle multi-turn tool use
-  while (true) {
+  // Loop to handle multi-turn tool use (capped to prevent runaway costs)
+  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const response = await provider.complete({
       messages,
       system,
@@ -117,6 +120,18 @@ export async function chat(options: ChatOptions): Promise<{
 
     return { response: text, toolResults };
   }
+
+  // Exhausted iterations — return whatever text we have
+  const fallback = messages
+    .filter((m) => m.role === "assistant")
+    .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+    .filter((b): b is ContentBlock & { type: "text" } => typeof b === "object" && b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  return {
+    response: fallback || "I've reached the maximum number of tool steps. Please try a simpler request.",
+    toolResults,
+  };
 }
 
 /** Streaming chat — yields chunks as they arrive. */
@@ -138,7 +153,8 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       : m.content,
   }));
 
-  while (true) {
+  // Capped to prevent runaway tool loops
+  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const events = provider.stream({
       messages,
       system,
@@ -185,4 +201,8 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     yield { type: "done" };
     return;
   }
+
+  // Exhausted iterations
+  yield { type: "text", content: "I've reached the maximum number of tool steps. Please try a simpler request." };
+  yield { type: "done" };
 }

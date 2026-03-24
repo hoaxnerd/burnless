@@ -130,6 +130,28 @@ describe("chat (non-streaming)", () => {
     });
   });
 
+  it("caps tool iterations at MAX_TOOL_ITERATIONS", async () => {
+    // Every call triggers another tool use — simulate runaway loop
+    mockComplete.mockImplementation(async () => ({
+      content: [
+        { type: "tool_use", id: `tool_${Date.now()}`, name: "suggest_cost_cuts", input: {} },
+      ],
+      stopReason: "tool_use",
+    }));
+
+    const toolCallback = vi.fn().mockResolvedValue("{}");
+
+    const result = await chat({
+      messages: [{ role: "user", content: "loop forever" }],
+      financialContext: "",
+      onToolCall: toolCallback,
+    });
+
+    // Should stop after 10 iterations, not infinite
+    expect(toolCallback).toHaveBeenCalledTimes(10);
+    expect(result.response).toContain("maximum number of tool steps");
+  });
+
   it("uses explicit provider config when provided", async () => {
     mockComplete.mockResolvedValueOnce({
       content: [{ type: "text", text: "ok" }],
@@ -251,5 +273,41 @@ describe("chatStream", () => {
     expect(toolResultChunks).toHaveLength(1);
     const textChunks = chunks.filter((c) => c.type === "text");
     expect(textChunks.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("caps tool iterations at MAX_TOOL_ITERATIONS during streaming", async () => {
+    // Every stream triggers another tool use
+    mockStream.mockImplementation(() =>
+      (async function* () {
+        yield { type: "tool_use", id: "t_loop", name: "suggest_cost_cuts", input: {} };
+        yield {
+          type: "done",
+          response: {
+            content: [
+              { type: "tool_use", id: "t_loop", name: "suggest_cost_cuts", input: {} },
+            ],
+            stopReason: "tool_use",
+          },
+        };
+      })()
+    );
+
+    const toolCallback = vi.fn().mockResolvedValue("{}");
+
+    const chunks: StreamChunk[] = [];
+    for await (const chunk of chatStream({
+      messages: [{ role: "user", content: "loop forever" }],
+      financialContext: "",
+      onToolCall: toolCallback,
+    })) {
+      chunks.push(chunk);
+    }
+
+    // Should stop after 10 iterations, not infinite
+    expect(toolCallback).toHaveBeenCalledTimes(10);
+    const doneChunks = chunks.filter((c) => c.type === "done");
+    expect(doneChunks).toHaveLength(1);
+    const textChunks = chunks.filter((c) => c.type === "text");
+    expect(textChunks.some((c) => c.content.includes("maximum number of tool steps"))).toBe(true);
   });
 });
