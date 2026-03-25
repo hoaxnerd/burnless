@@ -117,6 +117,58 @@ describe("feature-gate", () => {
       });
     });
 
+    describe("custom_integrations", () => {
+      it("blocks free plan", () => {
+        const result = canPerformAction("free", "custom_integrations");
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toContain("Team plan");
+        expect(result.upgradeTarget).toBe("team");
+      });
+
+      it("blocks pro plan", () => {
+        const result = canPerformAction("pro", "custom_integrations");
+        expect(result.allowed).toBe(false);
+        expect(result.upgradeTarget).toBe("team");
+      });
+
+      it("allows team plan", () => {
+        const result = canPerformAction("team", "custom_integrations");
+        expect(result.allowed).toBe(true);
+      });
+    });
+
+    describe("upgradeTarget", () => {
+      it("suggests pro for scenario limits", () => {
+        const result = canPerformAction("free", "create_scenario", 1);
+        expect(result.upgradeTarget).toBe("pro");
+      });
+
+      it("suggests pro for AI message limits", () => {
+        const result = canPerformAction("free", "ai_message", 10);
+        expect(result.upgradeTarget).toBe("pro");
+      });
+
+      it("suggests pro for export limits", () => {
+        const result = canPerformAction("free", "export", 3);
+        expect(result.upgradeTarget).toBe("pro");
+      });
+
+      it("suggests pro for data room", () => {
+        const result = canPerformAction("free", "data_room");
+        expect(result.upgradeTarget).toBe("pro");
+      });
+
+      it("suggests team for team access", () => {
+        const result = canPerformAction("free", "team_access");
+        expect(result.upgradeTarget).toBe("team");
+      });
+
+      it("does not include upgradeTarget when allowed", () => {
+        const result = canPerformAction("team", "custom_integrations");
+        expect(result.upgradeTarget).toBeUndefined();
+      });
+    });
+
     describe("boundary conditions", () => {
       it("blocks at exact limit (not just above)", () => {
         // Free plan: maxAiMessages = 10

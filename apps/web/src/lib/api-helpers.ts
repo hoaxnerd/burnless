@@ -3,6 +3,7 @@ import { auth } from "./auth";
 import { db, companies, getCompanyForUser } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { canPerformAction, type GatedAction, type Plan } from "./feature-gate";
 
 /** Standard JSON error response. */
 export function errorResponse(message: string, status: number) {
@@ -111,6 +112,35 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
     }
   };
   return wrapped as (...args: Parameters<T>) => Promise<NextResponse>;
+}
+
+/**
+ * One-liner plan feature gate for API routes.
+ * Returns null if allowed, or a 403 response with upgrade hint.
+ *
+ * Usage:
+ *   const gate = await requirePlanFeature(ctx.companyId, "data_room");
+ *   if (gate) return gate;
+ */
+export async function requirePlanFeature(
+  companyId: string,
+  action: GatedAction,
+  currentUsage?: number,
+  plan?: Plan
+): Promise<NextResponse | null> {
+  const resolvedPlan = plan ?? (await getCompanyPlan(companyId));
+  const result = canPerformAction(resolvedPlan, action, currentUsage);
+  if (!result.allowed) {
+    return NextResponse.json(
+      {
+        error: result.reason,
+        upgradeTarget: result.upgradeTarget,
+        code: "PLAN_LIMIT_REACHED",
+      },
+      { status: 403 }
+    );
+  }
+  return null;
 }
 
 /** Parse JSON body with Zod schema. */

@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
-const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireRole, mockRequirePlanFeature } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
   mockRequireRole: vi.fn(),
+  mockRequirePlanFeature: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -13,6 +14,7 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
+  requirePlanFeature: mockRequirePlanFeature,
   parseBody: async (
     req: Request,
     schema: { parse: (d: unknown) => unknown }
@@ -111,6 +113,7 @@ describe("GET /api/integrations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRole.mockReturnValue(null);
+    mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
     dbResultIdx = 0;
   });
@@ -163,6 +166,7 @@ describe("POST /api/integrations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRole.mockReturnValue(null);
+    mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
     dbResultIdx = 0;
   });
@@ -190,6 +194,27 @@ describe("POST /api/integrations", () => {
       type: "quickbooks",
     }));
     expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when plan does not include custom integrations", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1", companyId: "company-1", role: "admin",
+    });
+    mockRequirePlanFeature.mockResolvedValue(
+      NextResponse.json(
+        { error: "Custom integrations require a Team plan.", upgradeTarget: "team", code: "PLAN_LIMIT_REACHED" },
+        { status: 403 }
+      )
+    );
+
+    const res = await POST(jsonRequest("http://localhost/api/integrations", "POST", {
+      type: "quickbooks",
+    }));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("PLAN_LIMIT_REACHED");
+    expect(body.upgradeTarget).toBe("team");
   });
 
   it("returns 400 for invalid integration type", async () => {
@@ -279,6 +304,7 @@ describe("PATCH /api/integrations/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRole.mockReturnValue(null);
+    mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
     dbResultIdx = 0;
   });
@@ -364,6 +390,7 @@ describe("DELETE /api/integrations/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRole.mockReturnValue(null);
+    mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
     dbResultIdx = 0;
   });

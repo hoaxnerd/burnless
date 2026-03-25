@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { createIntegrationSchema } from "@burnless/types";
-import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, requirePlanFeature, parseBody, withErrorHandler } from "@/lib/api-helpers";
 
 // ── GET /api/integrations — List all integrations for company ───────────────
 
@@ -25,6 +25,10 @@ export const POST = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  // Integrations require Team plan
+  const planGate = await requirePlanFeature(ctx.companyId, "custom_integrations");
+  if (planGate) return planGate;
 
   const parsed = await parseBody(request, createIntegrationSchema);
   if ("error" in parsed) return parsed.error;

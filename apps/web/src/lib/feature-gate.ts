@@ -48,11 +48,19 @@ export function getPlanLimits(plan: Plan): PlanLimits {
   return PLAN_LIMITS[plan];
 }
 
+export type GatedAction =
+  | "create_scenario"
+  | "ai_message"
+  | "export"
+  | "data_room"
+  | "team_access"
+  | "custom_integrations";
+
 export function canPerformAction(
   plan: Plan,
-  action: "create_scenario" | "ai_message" | "export" | "data_room" | "team_access",
+  action: GatedAction,
   currentUsage?: number
-): { allowed: boolean; reason?: string } {
+): { allowed: boolean; reason?: string; upgradeTarget?: Plan } {
   const limits = PLAN_LIMITS[plan];
 
   switch (action) {
@@ -61,6 +69,7 @@ export function canPerformAction(
         return {
           allowed: false,
           reason: `Free plan is limited to ${limits.maxScenarios} scenario. Upgrade to Pro for unlimited scenarios.`,
+          upgradeTarget: "pro",
         };
       }
       return { allowed: true };
@@ -70,6 +79,7 @@ export function canPerformAction(
         return {
           allowed: false,
           reason: `You've used all ${limits.maxAiMessages} AI messages this month. Upgrade to Pro for unlimited AI access.`,
+          upgradeTarget: "pro",
         };
       }
       return { allowed: true };
@@ -79,6 +89,7 @@ export function canPerformAction(
         return {
           allowed: false,
           reason: `Free plan is limited to ${limits.maxExports} exports per month. Upgrade to Pro for unlimited exports.`,
+          upgradeTarget: "pro",
         };
       }
       return { allowed: true };
@@ -88,6 +99,7 @@ export function canPerformAction(
         return {
           allowed: false,
           reason: "Data Room is a Pro feature. Upgrade to access investor data room.",
+          upgradeTarget: "pro",
         };
       }
       return { allowed: true };
@@ -97,6 +109,17 @@ export function canPerformAction(
         return {
           allowed: false,
           reason: "Team access requires a Team plan.",
+          upgradeTarget: "team",
+        };
+      }
+      return { allowed: true };
+
+    case "custom_integrations":
+      if (!limits.hasCustomIntegrations) {
+        return {
+          allowed: false,
+          reason: "Custom integrations require a Team plan. Upgrade to connect accounting and banking tools.",
+          upgradeTarget: "team",
         };
       }
       return { allowed: true };
