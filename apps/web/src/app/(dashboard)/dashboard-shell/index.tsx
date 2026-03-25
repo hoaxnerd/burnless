@@ -35,6 +35,7 @@ import { CommandPalette } from "@/components/ui/command-palette";
 import { LocaleProvider } from "@/components/locale/locale-context";
 import { useProactiveAlerts } from "@/components/ai/use-proactive-alerts";
 import { MetricsProvider } from "@/components/providers/metrics-context";
+import { SWRProvider } from "@/lib/swr/provider";
 import { SharedFormulaViewer } from "@/components/ui/shared-formula-viewer";
 
 import {
@@ -84,6 +85,7 @@ export function DashboardShell({
 
   return (
     <ThemeProvider>
+    <SWRProvider>
     <ToastProvider>
     <LocaleProvider>
     <AiFeatureProvider>
@@ -104,6 +106,7 @@ export function DashboardShell({
     </AiFeatureProvider>
     </LocaleProvider>
     </ToastProvider>
+    </SWRProvider>
     </ThemeProvider>
   );
 }

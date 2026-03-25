@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useAiDashboard } from "@/lib/swr";
 import {
   Activity,
   BarChart3,
@@ -69,20 +70,8 @@ interface DashboardData {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function AiDashboardTab() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/ai-dashboard?days=${days}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setData(d))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [days]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  const { data, isLoading: loading } = useAiDashboard<DashboardData>(days);
 
   if (loading) {
     return (

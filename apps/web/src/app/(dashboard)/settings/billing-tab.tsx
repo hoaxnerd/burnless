@@ -1,21 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, Check, ExternalLink, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
-
-interface BillingData {
-  plan: "free" | "pro" | "team";
-  status: string;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  seats: number;
-  usage: {
-    scenarios: { used: number; limit: number };
-    aiMessages: { used: number; limit: number };
-    exports: { used: number; limit: number };
-  };
-}
+import { useBilling, billingAction } from "@/lib/swr";
 
 const TIERS = [
   {
@@ -60,32 +48,18 @@ const TIERS = [
 ];
 
 export function BillingTab() {
-  const [billing, setBilling] = useState<BillingData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: billing, isLoading: loading } = useBilling();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
-
-  useEffect(() => {
-    fetch("/api/billing")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setBilling(data))
-      .catch(() => toastError("Failed to load billing information"))
-      .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpgrade = async (plan: "pro" | "team") => {
     setActionLoading(plan);
     try {
-      const res = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "checkout", plan }),
-      });
-      const data = await res.json();
+      const data = await billingAction("checkout", { plan });
       if (data.url) {
         window.location.href = data.url;
       } else {
-        toastError(data.error || "Failed to start checkout");
+        toastError("Failed to start checkout");
       }
     } catch {
       toastError("Unable to connect to billing service");
@@ -97,16 +71,11 @@ export function BillingTab() {
   const handlePortal = async () => {
     setActionLoading("portal");
     try {
-      const res = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "portal" }),
-      });
-      const data = await res.json();
+      const data = await billingAction("portal");
       if (data.url) {
         window.location.href = data.url;
       } else {
-        toastError(data.error || "Failed to open billing portal");
+        toastError("Failed to open billing portal");
       }
     } catch {
       toastError("Unable to connect to billing service");
@@ -118,21 +87,8 @@ export function BillingTab() {
   const handleCancel = async () => {
     setActionLoading("cancel");
     try {
-      const res = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "cancel" }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBilling((prev) =>
-          prev ? { ...prev, cancelAtPeriodEnd: true, currentPeriodEnd: data.currentPeriodEnd } : prev
-        );
-        toastSuccess("Subscription will cancel at the end of the billing period");
-      } else {
-        const data = await res.json();
-        toastError(data.error || "Failed to cancel subscription");
-      }
+      await billingAction("cancel");
+      toastSuccess("Subscription will cancel at the end of the billing period");
     } catch {
       toastError("Unable to connect to billing service");
     } finally {
@@ -143,18 +99,8 @@ export function BillingTab() {
   const handleReactivate = async () => {
     setActionLoading("reactivate");
     try {
-      const res = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reactivate" }),
-      });
-      if (res.ok) {
-        setBilling((prev) => (prev ? { ...prev, cancelAtPeriodEnd: false } : prev));
-        toastSuccess("Subscription reactivated");
-      } else {
-        const data = await res.json();
-        toastError(data.error || "Failed to reactivate subscription");
-      }
+      await billingAction("reactivate");
+      toastSuccess("Subscription reactivated");
     } catch {
       toastError("Unable to connect to billing service");
     } finally {
