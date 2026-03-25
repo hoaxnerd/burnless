@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { usePlanLimit } from "@/hooks/use-plan-limit";
 import type { DataRoomViewProps } from "./data-room-config";
 import { exportItems, reportSections } from "./data-room-config";
 
@@ -22,6 +23,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
   } = props;
 
   const { success: toastSuccess, error: toastError } = useToast();
+  const { planLimit, checkErrorBody, clearLimit } = usePlanLimit();
   const [exporting, setExporting] = useState<string | null>(null);
   const [exported, setExported] = useState<Set<string>>(new Set());
   const [builderSections, setBuilderSections] = useState<Set<string>>(
@@ -32,6 +34,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
 
   const handleExport = async (id: string) => {
     setExporting(id);
+    clearLimit();
     await new Promise((r) => setTimeout(r, 100));
 
     try {
@@ -42,8 +45,12 @@ export function useDataRoomExports(props: DataRoomViewProps) {
         body: JSON.stringify({ exportType: id, format }),
       });
       if (gateRes.status === 403) {
-        const { error } = await gateRes.json();
-        toastError("Export limit reached", { description: error ?? "Upgrade your plan for more exports." });
+        const body = await gateRes.json().catch(() => ({}));
+        if (body.code === "PLAN_LIMIT_REACHED" && body.upgradeTarget) {
+          checkErrorBody(403, body);
+          return;
+        }
+        toastError("Export limit reached", { description: body.error ?? "Upgrade your plan for more exports." });
         return;
       }
 
@@ -218,6 +225,8 @@ export function useDataRoomExports(props: DataRoomViewProps) {
     exporting,
     exported,
     builderSections,
+    planLimit,
+    clearLimit,
     handleExport,
     handleExportAll,
     handleBuildReport,

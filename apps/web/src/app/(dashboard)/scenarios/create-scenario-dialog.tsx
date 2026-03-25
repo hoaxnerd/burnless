@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { UpgradePromptCompact } from "@/components/ui/upgrade-prompt";
+import { usePlanLimit } from "@/hooks/use-plan-limit";
 
 interface Template {
   name: string;
@@ -78,6 +80,7 @@ export function CreateScenarioDialog() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { planLimit, checkResponse, clearLimit } = usePlanLimit();
 
   useEffect(() => {
     setNameError(null);
@@ -87,12 +90,14 @@ export function CreateScenarioDialog() {
   const aiGenerate = async () => {
     setAiGenerating(true);
     setError(null);
+    clearLimit();
     try {
       const res = await fetch("/api/scenarios/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "best_worst" }),
       });
+      if (await checkResponse(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to generate scenarios");
@@ -113,12 +118,14 @@ export function CreateScenarioDialog() {
   const createScenario = async (name: string, type: string, description: string) => {
     setCreating(true);
     setError(null);
+    clearLimit();
     try {
       const res = await fetch("/api/scenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, type, description }),
       });
+      if (await checkResponse(res)) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to create scenario");
@@ -149,7 +156,12 @@ export function CreateScenarioDialog() {
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create Scenario" size="lg">
-        {error && (
+        {planLimit && (
+          <div className="mb-4">
+            <UpgradePromptCompact limit={planLimit} />
+          </div>
+        )}
+        {error && !planLimit && (
           <div className="mb-4 rounded-xl bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
             {error}
           </div>

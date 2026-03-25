@@ -9,6 +9,7 @@ import { tabs, exportItems, reports } from "./data-room-config";
 import { useDataRoomExports } from "./use-data-room-exports";
 import { ReportsTab } from "./reports-tab";
 import { ExportsTab } from "./exports-tab";
+import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
 
 export type { DataRoomViewProps };
 
@@ -22,7 +23,7 @@ export function DataRoomView(props: DataRoomViewProps) {
   );
 
   const {
-    exporting, exported, builderSections,
+    exporting, exported, builderSections, planLimit, clearLimit,
     handleExport, handleExportAll, handleBuildReport, toggleBuilderSection,
   } = useDataRoomExports(props);
 
@@ -93,6 +94,13 @@ export function DataRoomView(props: DataRoomViewProps) {
           );
         })}
       </div>
+
+      {/* Plan limit upgrade prompt */}
+      {planLimit && (
+        <div className="mb-6">
+          <UpgradePrompt limit={planLimit} dismissable onDismiss={clearLimit} />
+        </div>
+      )}
 
       {/* Tab content */}
       {activeTab === "reports" && (

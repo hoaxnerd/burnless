@@ -15,6 +15,8 @@ import {
   Wifi,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
+import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
 import { ConversationSidebar } from "./_components/conversation-sidebar";
@@ -94,6 +96,7 @@ export default function AiCompanionPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
+  const { planLimit, checkResponse, clearLimit } = usePlanLimit();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { success } = useToast();
@@ -189,6 +192,7 @@ export default function AiCompanionPage() {
 
     setInput("");
     setIsLoading(true);
+    clearLimit();
 
     // Add user message
     setMessages((prev) => [
@@ -219,6 +223,16 @@ export default function AiCompanionPage() {
       });
 
       if (!res.ok) {
+        // Check for plan limit before generic error handling
+        if (res.status === 403) {
+          const cloned = res.clone();
+          if (await checkResponse(cloned)) {
+            // Remove the streaming placeholder
+            setMessages((prev) => prev.slice(0, -1));
+            setIsLoading(false);
+            return;
+          }
+        }
         const error = await res
           .json()
           .catch(() => ({ error: "Failed to connect to AI" }));
@@ -480,9 +494,14 @@ export default function AiCompanionPage() {
               messagesEndRef={messagesEndRef}
               isLoading={isLoading}
             />
+            {planLimit && (
+              <div className="mx-4 mb-3">
+                <UpgradePrompt limit={planLimit} dismissable onDismiss={clearLimit} />
+              </div>
+            )}
             <ChatInput
               input={input}
-              isLoading={isLoading}
+              isLoading={isLoading || !!planLimit}
               inputRef={inputRef}
               onInputChange={setInput}
               onSubmit={(e) => handleSend(e)}
