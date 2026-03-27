@@ -180,16 +180,23 @@ export const accounts = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.provider, table.providerAccountId] }),
+    index("accounts_user_idx").on(table.userId),
   ]
 );
 
-export const sessions = pgTable("sessions", {
-  sessionToken: text("session_token").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expires: timestamp("expires", { mode: "date" }).notNull(),
-});
+export const sessions = pgTable(
+  "sessions",
+  {
+    sessionToken: text("session_token").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (table) => [
+    index("sessions_user_idx").on(table.userId),
+  ]
+);
 
 export const verificationTokens = pgTable(
   "verification_tokens",
@@ -391,6 +398,7 @@ export const importBatches = pgTable(
   },
   (table) => [
     index("import_batches_company_idx").on(table.companyId),
+    index("import_batches_account_idx").on(table.accountId),
   ]
 );
 
@@ -508,6 +516,7 @@ export const headcountPlans = pgTable(
   },
   (table) => [
     index("headcount_plans_scenario_idx").on(table.scenarioId),
+    index("headcount_plans_department_idx").on(table.departmentId),
   ]
 );
 
@@ -689,6 +698,7 @@ export const aiConversations = pgTable(
   },
   (table) => [
     index("ai_conversations_company_idx").on(table.companyId),
+    index("ai_conversations_company_user_idx").on(table.companyId, table.userId),
   ]
 );
 
@@ -1192,6 +1202,7 @@ export const merchantCategoryMappings = pgTable(
   (table) => [
     index("merchant_mappings_company_idx").on(table.companyId),
     index("merchant_mappings_pattern_idx").on(table.merchantPattern),
+    index("merchant_mappings_account_idx").on(table.accountId),
     uniqueIndex("merchant_mappings_company_pattern_idx").on(
       table.companyId,
       table.merchantPattern
@@ -1312,6 +1323,7 @@ export const aiToolAuditLogs = pgTable(
     index("ai_tool_audit_user_idx").on(table.companyId, table.userId),
     index("ai_tool_audit_created_idx").on(table.companyId, table.createdAt),
     index("ai_tool_audit_tool_idx").on(table.companyId, table.toolName),
+    index("ai_tool_audit_conversation_idx").on(table.conversationId),
   ]
 );
 
@@ -1515,5 +1527,6 @@ export const exportLogs = pgTable(
   (table) => [
     index("export_logs_company_idx").on(table.companyId),
     index("export_logs_company_created_idx").on(table.companyId, table.createdAt),
+    index("export_logs_user_idx").on(table.userId),
   ]
 );

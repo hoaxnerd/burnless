@@ -51,8 +51,9 @@ export function getRedis(): Redis | null {
     });
 
     return client;
-  } catch {
-    connectionFailed = false;
+  } catch (err) {
+    console.warn("[redis] Initialization failed, falling back to in-memory:", err instanceof Error ? err.message : err);
+    connectionFailed = true;
     return null;
   }
 }
