@@ -2,7 +2,8 @@
  * Scenario comparison engine — delta analysis between two financial scenarios.
  */
 
-import { type MonthlySeries, round2, seriesToArray } from "./utils";
+import { type MonthlySeries, seriesToArray } from "./utils";
+import { D, dRound2 } from "./decimal";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,11 +97,14 @@ function buildComparisonLine(
   for (const month of allMonths) {
     const bVal = baseSeries.get(month) ?? 0;
     const cVal = compareSeries.get(month) ?? 0;
-    const delta = round2(cVal - bVal);
-    const pct = bVal !== 0 ? round2((delta / Math.abs(bVal)) * 100) : 0;
+    const delta = dRound2(D(cVal).minus(bVal));
+    const bDec = D(bVal);
+    const pct = !bDec.isZero()
+      ? dRound2(D(delta).div(bDec.abs()).mul(100))
+      : 0;
 
-    baseValues.push({ month, value: round2(bVal) });
-    compareValues.push({ month, value: round2(cVal) });
+    baseValues.push({ month, value: dRound2(D(bVal)) });
+    compareValues.push({ month, value: dRound2(D(cVal)) });
     deltaAbsolute.push({ month, value: delta });
     deltaPercent.push({ month, value: pct });
   }

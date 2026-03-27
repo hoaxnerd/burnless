@@ -318,7 +318,7 @@ describe("metrics — edge cases", () => {
       expect(metrics.ltv[0]?.value).toBeCloseTo(1680.67, 0);
     });
 
-    it("returns 0 LTV when no revenue churn", () => {
+    it("returns capped LTV when no revenue churn (100% retention)", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
@@ -337,7 +337,58 @@ describe("metrics — edge cases", () => {
         subscriptionDetails: subDetails,
       });
       const metrics = computeAllMetrics(input);
-      // No revenue churn → LTV = 0 (infinite)
+      // No revenue churn → LTV is infinite, capped at sentinel
+      expect(metrics.ltv[0]?.value).toBe(999999);
+    });
+
+    it("computes normal LTV when churn is positive (even with expansion)", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 100,
+          newCustomers: 10,
+          churnedCustomers: 2,
+          mrr: 10000,
+          newMrr: 1000,
+          expansionMrr: 800,
+          churnedMrr: 200,
+          netNewMrr: 1600,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        cogs: new Map([["2026-01", 2000]]), // 80% gross margin
+        subscriptionDetails: subDetails,
+      });
+      const metrics = computeAllMetrics(input);
+      // Revenue churn rate = churnedMrr / (mrr + churnedMrr) * 100
+      // = 200 / (10000 + 200) * 100 ≈ 1.96%
+      // ARPA = 10000/100 = 100, GM = 80%
+      // LTV = (100 * 0.80) / 0.0196 ≈ 4081.63
+      expect(metrics.ltv[0]?.value).toBeGreaterThan(4000);
+      expect(metrics.ltv[0]?.value).toBeLessThan(999999);
+    });
+
+    it("returns 0 LTV when no revenue (even with zero churn)", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 0,
+          newCustomers: 0,
+          churnedCustomers: 0,
+          mrr: 0,
+          newMrr: 0,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 0,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 0]]),
+        subscriptionDetails: subDetails,
+      });
+      const metrics = computeAllMetrics(input);
+      // No ARPA → LTV = 0 (not capped)
       expect(metrics.ltv[0]?.value).toBe(0);
     });
   });

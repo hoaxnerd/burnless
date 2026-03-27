@@ -241,11 +241,17 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // LTV = (ARPA × Gross Margin%) / Revenue Churn Rate
+  // When churn ≤ 0 (zero churn = 100% retention, negative = net expansion),
+  // LTV is effectively infinite. Cap at a high sentinel value.
+  const LTV_CAP = 999999;
   const ltv = months.map((m, i) => {
     const arpaVal = D(arpa[i]?.value ?? 0);
     const gmFraction = D(grossMarginPercent[i]?.value ?? 0).div(100);
     const revChurnFraction = D(revenueChurnRate[i]?.value ?? 0).div(100);
-    if (revChurnFraction.isZero()) return { month: m, value: 0 };
+    if (revChurnFraction.lte(0)) {
+      // Zero or negative churn → infinite LTV; return cap if there's revenue, 0 otherwise
+      return { month: m, value: arpaVal.gt(0) ? LTV_CAP : 0 };
+    }
     return { month: m, value: dRound2(arpaVal.mul(gmFraction).div(revChurnFraction)) };
   });
 

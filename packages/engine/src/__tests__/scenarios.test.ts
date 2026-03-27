@@ -122,4 +122,35 @@ describe("scenario comparison", () => {
     expect(result.cashPosition).toBeDefined();
     expect(result.headcount).toBeDefined();
   });
+
+  it("uses Decimal precision for delta calculations (no float artifacts)", () => {
+    // Classic float issue: 0.1 + 0.2 = 0.30000000000000004
+    const base = makeScenario("s1", "Base", {
+      revenue: new Map([["2026-01", 0.1]]),
+    });
+    const compare = makeScenario("s2", "Compare", {
+      revenue: new Map([["2026-01", 0.3]]),
+    });
+
+    const result = compareScenarios(base, compare);
+    // 0.3 - 0.1 should be exactly 0.2, not 0.19999999999999998
+    expect(result.revenue.deltaAbsolute[0]?.value).toBe(0.2);
+    // (0.2 / 0.1) * 100 = 200%
+    expect(result.revenue.deltaPercent[0]?.value).toBe(200);
+  });
+
+  it("handles negative base values correctly for percent calculation", () => {
+    const base = makeScenario("s1", "Base", {
+      netIncome: new Map([["2026-01", -50000]]),
+    });
+    const compare = makeScenario("s2", "Better", {
+      netIncome: new Map([["2026-01", -20000]]),
+    });
+
+    const result = compareScenarios(base, compare);
+    // Delta = -20000 - (-50000) = 30000
+    expect(result.netIncome.deltaAbsolute[0]?.value).toBe(30000);
+    // Percent = 30000 / abs(-50000) * 100 = 60%
+    expect(result.netIncome.deltaPercent[0]?.value).toBe(60);
+  });
 });
