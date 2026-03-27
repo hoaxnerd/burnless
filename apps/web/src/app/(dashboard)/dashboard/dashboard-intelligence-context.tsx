@@ -67,8 +67,8 @@ export interface DashboardIntelligenceState {
   heroCards: string[];
   /** Secondary metric slugs (ordered) */
   secondaryMetrics: string[];
-  /** Swap a hero card with a new metric */
-  swapHeroCard: (index: number, newSlug: string) => void;
+  /** Swap a hero card with a new metric (resolves after API save) */
+  swapHeroCard: (index: number, newSlug: string) => Promise<void>;
   /** Reorder hero cards */
   reorderHeroCards: (cards: string[]) => void;
   /** Add a secondary metric */
@@ -244,7 +244,7 @@ export function DashboardIntelligenceProvider({
 
   // Save preferences to API with retry on failure
   const savePrefs = useCallback(
-    (updated: DashboardPreferences) => {
+    (updated: DashboardPreferences): Promise<void> => {
       setIsSaving(true);
       const body = JSON.stringify(updated);
 
@@ -274,17 +274,19 @@ export function DashboardIntelligenceProvider({
         setIsSaving(false);
       });
       pendingSaveRef.current = savePromise;
+      return savePromise;
     },
     []
   );
 
   const updatePrefs = useCallback(
-    (updater: (prev: DashboardPreferences) => DashboardPreferences) => {
+    (updater: (prev: DashboardPreferences) => DashboardPreferences): Promise<void> => {
+      let next: DashboardPreferences | undefined;
       setPrefs((prev) => {
-        const next = updater(prev);
-        savePrefs(next);
+        next = updater(prev);
         return next;
       });
+      return savePrefs(next!);
     },
     [savePrefs]
   );

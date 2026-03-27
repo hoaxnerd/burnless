@@ -325,7 +325,9 @@ export function HeroKpiCard({
     usedSlugs: allUsedSlugs,
     heroSlugs: heroCards,
     onSelect: isHeroSwapMode
-      ? (newSlug: string) => swapHeroCard(heroCardIndex, newSlug)
+      ? (newSlug: string) => {
+          swapHeroCard(heroCardIndex, newSlug).then(() => router.refresh());
+        }
       : addSecondaryMetric,
     onRemove: removeSecondaryMetric,
     onViewFormula: openFormulaViewer,
@@ -334,7 +336,7 @@ export function HeroKpiCard({
     getDependents: getMetricDependents,
     getMetricDef: getMetricDef as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
     swapMode: isHeroSwapMode,
-  }), [registry, allUsedSlugs, heroCards, isHeroSwapMode, heroCardIndex, swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
+  }), [registry, allUsedSlugs, heroCards, isHeroSwapMode, heroCardIndex, swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, router]);
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
