@@ -17,6 +17,7 @@
 
 import { db, insightInvalidations } from "@burnless/db";
 import { logger } from "./logger";
+import { markInsightsStale } from "./insight-staleness";
 
 const log = logger("insight-invalidation");
 
@@ -80,6 +81,12 @@ export async function invalidateInsights(
           })
       )
     );
+
+    // Surgically mark individual cache records as stale via metric DAG tracing
+    await markInsightsStale(companyId, source).catch((err) => {
+      log.warn({ companyId, source, err: err instanceof Error ? err : undefined },
+        "markInsightsStale failed (non-blocking)");
+    });
 
     log.debug(
       { companyId, source, types },

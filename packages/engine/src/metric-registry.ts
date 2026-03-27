@@ -1047,6 +1047,66 @@ export function getMetricDependents(slug: string): string[] {
 }
 
 /**
+ * Get all metrics that transitively depend on the given metric.
+ * Walks the reverse dependency graph (BFS).
+ */
+export function getTransitiveDependents(slug: string): string[] {
+  const visited = new Set<string>();
+  const queue = [slug];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    for (const dep of getMetricDependents(current)) {
+      if (!visited.has(dep)) queue.push(dep);
+    }
+  }
+
+  visited.delete(slug); // Don't include self
+  return Array.from(visited);
+}
+
+/**
+ * Maps data entity types to the base metrics they directly affect.
+ * When a data entity changes, these metrics (and all their transitive
+ * dependents) may produce stale insights.
+ */
+export const ENTITY_METRIC_IMPACT: Record<string, string[]> = {
+  revenue:         ["mrr", "arr", "totalRevenue", "revenueGrowthPercent", "netNewMrr", "newMrr"],
+  headcount:       ["headcount", "totalOpex", "burnRate", "headcountCost"],
+  "forecast-lines": ["burnRate", "totalOpex", "totalRevenue"],
+  funding:         ["cashPosition"],
+  expenses:        ["burnRate", "totalOpex", "netBurnRate"],
+  scenarios:       ["*"], // scenario change affects all metrics
+  accounts:        ["totalOpex", "totalRevenue"],
+  departments:     ["totalOpex", "headcountCost"],
+};
+
+/**
+ * Given a data entity type (e.g. "revenue", "headcount"), returns all
+ * metric slugs that could be affected — base metrics + transitive dependents.
+ *
+ * Returns `["*"]` for entity types that affect everything (e.g. scenarios).
+ */
+export function getAffectedMetricSlugs(entityType: string): string[] {
+  const baseMetrics = ENTITY_METRIC_IMPACT[entityType];
+  if (!baseMetrics) return [];
+  if (baseMetrics.includes("*")) return ["*"];
+
+  const affected = new Set<string>();
+  for (const base of baseMetrics) {
+    affected.add(base);
+    for (const dep of getTransitiveDependents(base)) {
+      affected.add(dep);
+    }
+  }
+
+  return Array.from(affected);
+}
+
+/**
  * Extract the current value for a metric from ComputedMetrics.
  */
 export function extractMetricValue(

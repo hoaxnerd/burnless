@@ -741,6 +741,8 @@ export const aiInsightCache = pgTable(
     key: text("key").notNull(),
     content: jsonb("content").notNull(),
     expiresAt: timestamp("expires_at", { mode: "date" }),
+    staleAt: timestamp("stale_at", { mode: "date" }),
+    staleReason: text("stale_reason"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

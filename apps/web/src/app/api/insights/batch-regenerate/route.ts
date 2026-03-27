@@ -209,6 +209,8 @@ export const POST = withErrorHandler(async function POST(request: Request) {
             set: {
               content: insights,
               expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+              staleAt: null,
+              staleReason: null,
             },
           });
 

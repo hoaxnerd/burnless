@@ -45,6 +45,18 @@ interface AiPageInsightsProps {
   pageData?: Record<string, unknown>;
 }
 
+/** Human-readable labels for stale reasons. */
+const STALE_REASON_LABELS: Record<string, string> = {
+  revenue_edited: "revenue data",
+  headcount_edited: "headcount data",
+  expenses_edited: "expense data",
+  funding_edited: "funding data",
+  scenarios_edited: "scenario data",
+  accounts_edited: "account data",
+  departments_edited: "department data",
+  "forecast-lines_edited": "forecast data",
+};
+
 // ── Severity styles ─────────────────────────────────────────────────────────
 
 const severityConfig = {
@@ -110,6 +122,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [dataChanged, setDataChanged] = useState(false);
   const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
   const [canRefresh, setCanRefresh] = useState(true);
+  const [staleReason, setStaleReason] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [slow, setSlow] = useState(false);
   const _insightFeature = useAiFeature("insights");
@@ -131,6 +144,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
           setDataChanged(data.dataChanged ?? false);
           setGraceRemaining(data.graceRemaining ?? null);
           setCanRefresh(data.canRefresh ?? true);
+          setStaleReason(data.staleReason ?? null);
         }
       }
     } catch (err) {
@@ -172,6 +186,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
       setDataChanged(false);
       setGraceRemaining(null);
       setCanRefresh(true);
+      setStaleReason(null);
     } catch (err) {
       setError(true);
       setErrorVariant(classifyError(err));
@@ -293,7 +308,9 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
           <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
             <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
             <p className="text-xs text-warning-700">
-              These insights may not reflect your recent data changes.
+              {staleReason && STALE_REASON_LABELS[staleReason]
+                ? `These insights were generated before your recent changes to ${STALE_REASON_LABELS[staleReason]}. They may no longer be accurate.`
+                : "These insights may not reflect your recent data changes."}
               {canRefresh && (
                 <button
                   onClick={() => refreshInsights()}
@@ -333,14 +350,16 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
               const style = severityConfig[insight.severity];
               const Icon = typeIcons[insight.type] ?? TrendingUp;
 
+              const isStale = stale && (dataChanged || staleReason);
+
               return (
                 <div
                   key={`${insight.type}-${i}`}
-                  className={`rounded-xl border ${style.border} ${style.bg} p-3.5 transition-all`}
+                  className={`rounded-xl border ${isStale ? "border-warning-500/30" : style.border} ${isStale ? "bg-warning-50/20" : style.bg} p-3.5 transition-all`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
-                      <Icon className={`h-4 w-4 ${style.iconColor}`} />
+                      <Icon className={`h-4 w-4 ${isStale ? "text-warning-400" : style.iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-surface-900 leading-snug">
@@ -352,7 +371,13 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
                         className="mt-1"
                       />
                     </div>
-                    <div className={`flex-shrink-0 h-2 w-2 rounded-full mt-1.5 ${style.dot}`} />
+                    {isStale ? (
+                      <div className="flex-shrink-0 mt-0.5" title={staleReason && STALE_REASON_LABELS[staleReason] ? `Data changed: ${STALE_REASON_LABELS[staleReason]}` : "Data may have changed since this insight was generated"}>
+                        <Info className="h-3.5 w-3.5 text-warning-400" />
+                      </div>
+                    ) : (
+                      <div className={`flex-shrink-0 h-2 w-2 rounded-full mt-1.5 ${style.dot}`} />
+                    )}
                   </div>
                 </div>
               );

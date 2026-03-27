@@ -67,7 +67,9 @@ export const GET = withErrorHandler(async (request: Request) => {
   // Check if underlying data has changed since insights were generated
   const freshness = await checkInsightFreshness(ctx.companyId, cachedAt);
   const dataChanged = freshness.dataChangedAt !== null && freshness.dataChangedAt > cachedAt.getTime();
-  const stale = timeStale || dataChanged;
+  // Consider stale if: time-based, data-changed, or explicitly marked stale via DAG tracing
+  const markedStale = cached[0].staleAt !== null;
+  const stale = timeStale || dataChanged || markedStale;
 
   return NextResponse.json({
     insights: cached[0].content,
@@ -78,10 +80,13 @@ export const GET = withErrorHandler(async (request: Request) => {
     ageMs,
     canRefresh: status.canGenerate,
     // Data mutation awareness
-    dataChanged,
+    dataChanged: dataChanged || markedStale,
     dataChangedAt: freshness.dataChangedAt ? new Date(freshness.dataChangedAt).toISOString() : null,
     graceRemaining: freshness.graceRemaining,
     gracePeriodMs: MUTATION_GRACE_PERIOD_MS,
+    // Surgical staleness from metric DAG tracing
+    staleAt: cached[0].staleAt?.toISOString() ?? null,
+    staleReason: cached[0].staleReason ?? null,
   });
 });
 
@@ -231,6 +236,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       set: {
         content: insights,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        staleAt: null,
+        staleReason: null,
       },
     });
 
