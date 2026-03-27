@@ -87,6 +87,13 @@ export function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
+    // Block mutations without any origin header in production (prevents CSRF from non-browser clients)
+    if (process.env.NODE_ENV === "production" && !source) {
+      return NextResponse.json(
+        { error: "Forbidden: missing origin" },
+        { status: 403 }
+      );
+    }
     if (allowed.size > 0 && source && !allowed.has(source)) {
       return NextResponse.json(
         { error: "Forbidden: invalid origin" },

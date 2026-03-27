@@ -33,7 +33,7 @@ import { withErrorHandler } from "@/lib/api-helpers";
 const log = logger("batch-regenerate");
 
 const CRON_SECRET = process.env.CRON_SECRET;
-const IS_DEV = process.env.NODE_ENV === "development";
+const SKIP_CRON_AUTH = process.env.DISABLE_CRON_AUTH === "true";
 
 /** Grace period: wait 5 minutes after the last mutation before regenerating. */
 const GRACE_PERIOD_MS = 5 * 60 * 1000;
@@ -65,8 +65,8 @@ interface RegenerationResult {
 }
 
 export const POST = withErrorHandler(async function POST(request: Request) {
-  // Auth: Vercel Cron secret or dev mode
-  if (!IS_DEV) {
+  // Auth: Vercel Cron secret (DISABLE_CRON_AUTH=true for local dev only)
+  if (!SKIP_CRON_AUTH) {
     if (!CRON_SECRET) {
       log.error("CRON_SECRET is not configured");
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });

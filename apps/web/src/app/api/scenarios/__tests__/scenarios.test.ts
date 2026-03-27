@@ -80,6 +80,8 @@ vi.mock("@/lib/feature-gate", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  gt: vi.fn(),
+  sql: Object.assign(vi.fn(() => "count(*)"), { raw: vi.fn() }),
 }));
 
 import { GET, POST } from "../route";
@@ -161,8 +163,8 @@ describe("POST /api/scenarios", () => {
     });
     mockRequireRole.mockReturnValue(null);
     mockGetCompanyPlan.mockResolvedValue("starter");
-    // Feature gate check: current scenarios count query
-    mockWhere.mockResolvedValueOnce([{ id: "scen-1" }]);
+    // Feature gate check: COUNT(*) query returns [{count: N}]
+    mockWhere.mockResolvedValueOnce([{ count: 1 }]);
     mockCanPerformAction.mockReturnValue({ allowed: true });
 
     const createdScenario = {

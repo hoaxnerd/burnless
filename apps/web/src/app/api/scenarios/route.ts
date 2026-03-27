@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { db, scenarios } from "@burnless/db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { createScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, getCompanyPlan, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
@@ -40,13 +40,13 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
-  // Feature gate: check scenario limit
+  // Feature gate: check scenario limit (COUNT(*) — never load all rows)
   const plan = await getCompanyPlan(ctx.companyId);
-  const currentCount = await db
-    .select()
+  const [{ count: scenarioCount }] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
     .where(eq(scenarios.companyId, ctx.companyId));
-  const gate = canPerformAction(plan, "create_scenario", currentCount.length);
+  const gate = canPerformAction(plan, "create_scenario", scenarioCount);
   if (!gate.allowed) return errorResponse(gate.reason!, 403);
 
   const parsed = await parseBody(request, createScenarioSchema);

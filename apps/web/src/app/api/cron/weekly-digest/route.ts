@@ -21,11 +21,11 @@ import { logger } from "@/lib/logger";
 import { withErrorHandler } from "@/lib/api-helpers";
 
 const CRON_SECRET = process.env.CRON_SECRET;
-const IS_DEV = process.env.NODE_ENV === "development";
+const SKIP_CRON_AUTH = process.env.DISABLE_CRON_AUTH === "true";
 
 export const GET = withErrorHandler(async function GET(request: Request) {
-  // Verify Vercel Cron secret — required in production
-  if (!IS_DEV) {
+  // Verify Vercel Cron secret (DISABLE_CRON_AUTH=true for local dev only)
+  if (!SKIP_CRON_AUTH) {
     if (!CRON_SECRET) {
       logger("cron").error("CRON_SECRET is not configured");
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
