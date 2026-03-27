@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import type { MetricValue } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, SwappableMetricCard } from "@/components/ui";
+import { ChartCard, SwappableMetricCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { usePageLayout } from "@/components/ui/use-page-layout";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 
 interface RunwayViewProps {
@@ -70,14 +72,25 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     downloadPDF(doc, "runway-summary");
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Summary cards with export */}
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "reports/runway" });
+
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "export",        x: 0,  w: 12, h: 2, minH: 2 },
+    { i: "metric-cards",  x: 0,  w: 12, h: 5, minH: 4 },
+    { i: "cash-charts",   x: 0,  w: 12, h: 12, minH: 8 },
+    { i: "burn-chart",    x: 0,  w: 12, h: 12, minH: 8 },
+    { i: "warning",       x: 0,  w: 12, h: 3, minH: 2 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "export": (
       <div className="flex items-center justify-between">
         <div />
         <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
       </div>
-
+    ),
+    "metric-cards": (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <SwappableMetricCard
           slug="startingCash"
@@ -106,8 +119,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
           description={zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway"}
         />
       </div>
-
-      {/* Charts */}
+    ),
+    "cash-charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cash Position Over Time" subtitle="Projected ending cash balance">
           <AreaChartWidget data={cashPosition} color={chartColors.success} />
@@ -120,7 +133,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
           />
         </ChartCard>
       </div>
-
+    ),
+    "burn-chart": (
       <ChartCard title="Gross vs Net Burn Rate" subtitle="Monthly expense comparison">
         <MultiLineChart
           data={burnData}
@@ -130,14 +144,24 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
           ]}
         />
       </ChartCard>
+    ),
+    "warning": zeroCashMonth ? (
+      <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+        <p className="text-sm text-red-800 font-medium">
+          Warning: Cash is projected to reach zero in {zeroCashMonth.month}. Consider reducing expenses or raising additional funding.
+        </p>
+      </div>
+    ) : <div />,
+  }), [handleExportCSV, handleExportPDF, startingCash, latest, latestBurn, latestRunway, zeroCashMonth, cashPosition, runway, burnData]);
 
-      {zeroCashMonth && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-4">
-          <p className="text-sm text-red-800 font-medium">
-            Warning: Cash is projected to reach zero in {zeroCashMonth.month}. Consider reducing expenses or raising additional funding.
-          </p>
-        </div>
-      )}
-    </div>
+  const staticHiddenWidgets = useMemo(() => zeroCashMonth ? [] : ["warning"], [zeroCashMonth]);
+
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      staticHiddenWidgets={staticHiddenWidgets}
+      {...pageLayout}
+    />
   );
 }

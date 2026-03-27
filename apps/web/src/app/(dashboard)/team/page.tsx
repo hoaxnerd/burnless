@@ -2,16 +2,9 @@ import { Suspense } from "react";
 import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey } from "@burnless/engine";
-import { TeamDetails } from "./team-details";
+import { TeamView } from "./team-view";
 import { AddHireForm } from "./add-hire-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
-import { SwappableMetricCard } from "@/components/ui";
-
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
 
 export default async function TeamPage({
   searchParams,
@@ -119,43 +112,16 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
         />
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 sm:mb-10">
-        <SwappableMetricCard
-          slug="totalHeadcount"
-          pageId="team"
-          label="Total Headcount"
-          value={String(totalHeadcount)}
-          description={plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + h.count, 0)} planned` : undefined}
-        />
-        <SwappableMetricCard
-          slug="monthlyPeopleCost"
-          pageId="team"
-          label="Monthly People Cost"
-          value={formatCurrency(totalMonthlyCost)}
-          description={costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits"}
-        />
-        <SwappableMetricCard
-          slug="revenuePerEmployee"
-          pageId="team"
-          label="Revenue / Employee"
-          value={`${formatCurrency(revPerEmployee)}/mo`}
-          description="Efficiency metric"
-        />
-        <SwappableMetricCard
-          slug="departments"
-          pageId="team"
-          label="Departments"
-          value={String(deptGroups.size)}
-          description={`${departments.length} total defined`}
-        />
-      </div>
-
-      {/* Team details */}
-      <TeamDetails
+      <TeamView
+        totalHeadcount={totalHeadcount}
+        plannedCount={plannedHires.reduce((s, h) => s + h.count, 0)}
+        totalMonthlyCost={totalMonthlyCost}
+        costPercentOfBurn={costPercentOfBurn}
+        revPerEmployee={revPerEmployee}
+        deptGroupCount={deptGroups.size}
+        departmentsCount={departments.length}
         departmentBreakdown={departmentBreakdown}
         plannedHires={plannedHiresData}
-        totalMonthlyCost={totalMonthlyCost}
         scenarioId={scenarioId}
         departments={departments.map((d) => ({ id: d.id, name: d.name }))}
       />
