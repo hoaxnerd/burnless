@@ -554,7 +554,7 @@ export const fundingRounds = pgTable(
       precision: 18,
       scale: 2,
     }),
-    dilutionPercent: numeric("dilution_percent", { precision: 5, scale: 4 }),
+    dilutionPercent: numeric("dilution_percent", { precision: 7, scale: 4 }),
     isProjected: boolean("is_projected").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
