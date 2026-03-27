@@ -1,12 +1,9 @@
 "use client";
 
 /**
- * CardModePopover — per-card/per-widget mode selector.
- * Shows a settings gear on hover; clicking opens a popover to choose
- * Intelligence / Dynamic / Custom mode for that specific card.
- *
- * Uses createPortal to render the dropdown at document.body,
- * escaping all parent stacking contexts (z-index traps).
+ * @deprecated Use `CardSettings` from `./card-settings` instead.
+ * This file is retained for backward compatibility but has no active consumers.
+ * The unified CardSettings component adapts between popover and modal automatically.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";

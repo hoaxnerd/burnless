@@ -20,7 +20,7 @@ import {
 } from "@burnless/engine";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { useDashboardLayout } from "./dashboard-layout-context";
-import { CardSettingsModal } from "@/components/ui/card-settings-modal";
+import { CardSettings } from "@/components/ui/card-settings";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import {
   CATEGORY_META,
@@ -215,7 +215,7 @@ function MetricRowDynamic({
         {def.name}
       </span>
       <div className="flex items-center gap-2">
-        <CardSettingsModal
+        <CardSettings
           currentMode={cardMode}
           onModeChange={(mode) => setCardMode(slug, mode)}
           isOverride={isOverride}

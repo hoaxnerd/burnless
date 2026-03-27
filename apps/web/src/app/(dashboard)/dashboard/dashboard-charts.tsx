@@ -9,6 +9,7 @@ import {
   chartColors,
   formatCompactCurrency,
 } from "@/components/charts";
+import { WidgetCard } from "@/components/ui/widget-card";
 
 interface MetricPoint {
   month: string;
@@ -80,6 +81,7 @@ export function DashboardChartCard({
   children,
   expandedChildren,
   stagger = 0,
+  slug,
 }: {
   title: string;
   subtitle: string;
@@ -87,6 +89,8 @@ export function DashboardChartCard({
   /** Content to render in expanded modal (defaults to children with taller height) */
   expandedChildren?: React.ReactNode;
   stagger?: number;
+  /** Chart identifier for per-card mode switching (e.g., "chart:cash-position") */
+  slug?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -96,15 +100,10 @@ export function DashboardChartCard({
 
   return (
     <>
-      <div
-        className={`
-          h-full flex flex-col
-          rounded-2xl bg-surface-0 border border-surface-200
-          p-5 sm:p-6
-          hover:border-surface-300
-          hover-lift
-          animate-slide-up stagger-${stagger}
-        `}
+      <WidgetCard
+        slug={slug}
+        pageId={slug ? "dashboard" : undefined}
+        stagger={stagger}
       >
         {/* Header — collapsible toggle on mobile, expand button on desktop */}
         <div className="flex items-center justify-between mb-4">
@@ -148,7 +147,7 @@ export function DashboardChartCard({
         >
           {children}
         </div>
-      </div>
+      </WidgetCard>
 
       {/* Expanded modal */}
       {expanded && (
@@ -193,6 +192,7 @@ export function DashboardCharts({
         <DashboardChartCard
           title="Cash Position"
           subtitle="Cash balance over time"
+          slug="chart:cash-position"
           stagger={1}
           expandedChildren={
             <AreaChartWidget data={cashData} color={chartColors.success} height={420} />
@@ -204,6 +204,7 @@ export function DashboardCharts({
         <DashboardChartCard
           title="Revenue vs Expenses"
           subtitle="Monthly comparison"
+          slug="chart:revenue-vs-expenses"
           stagger={2}
           expandedChildren={
             <BarChartWidget data={revenueVsExpenses} bars={[...revExpBars]} height={420} />
@@ -217,6 +218,7 @@ export function DashboardCharts({
         <DashboardChartCard
           title="Burn Rate & Runway"
           subtitle="Net burn and months of runway"
+          slug="chart:burn-runway"
           stagger={3}
           expandedChildren={
             <MultiLineChart
@@ -238,6 +240,7 @@ export function DashboardCharts({
           <DashboardChartCard
             title="MRR"
             subtitle="Monthly recurring revenue"
+            slug="chart:mrr"
             stagger={4}
             expandedChildren={
               <AreaChartWidget data={mrrData} color="#7c3aed" height={420} />
@@ -249,6 +252,7 @@ export function DashboardCharts({
           <DashboardChartCard
             title="Revenue Trend"
             subtitle="Total monthly revenue"
+            slug="chart:revenue-trend"
             stagger={4}
             expandedChildren={
               <AreaChartWidget data={cashData} color={chartColors.brand} height={420} />

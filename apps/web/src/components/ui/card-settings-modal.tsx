@@ -1,10 +1,9 @@
 "use client";
 
 /**
- * CardSettingsModal — unified modal for per-card/per-widget settings.
- * Replaces the old CardModePopover with a full modal that presents
- * Intelligence / Dynamic / Custom modes, and in Custom mode lets
- * users browse and select from the stats catalog inline.
+ * @deprecated Use `CardSettings` from `./card-settings` instead.
+ * This file is retained for backward compatibility but has no active consumers.
+ * The unified CardSettings component adapts between popover and modal automatically.
  */
 
 import { useState, useMemo, useCallback } from "react";

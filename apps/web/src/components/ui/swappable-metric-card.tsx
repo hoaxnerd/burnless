@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * SwappableMetricCard — a MetricCard wrapped with the gear icon for
- * mode switching. Works on any page via the MetricsProvider.
+ * SwappableMetricCard — a MetricCard wrapped with WidgetCard for
+ * consistent card chrome and mode switching across all pages.
  *
  * Drop-in replacement for MetricCard when you want the card to be
  * configurable (Intelligence / Dynamic / Custom modes).
  */
 
-import { useOptionalMetrics, type CardMode } from "@/components/providers/metrics-context";
-import { CardModePopover } from "./card-mode-popover";
+import { useOptionalMetrics } from "@/components/providers/metrics-context";
+import { WidgetCard } from "./widget-card";
 import { MetricCard } from "./metric-card";
 import type { LucideIcon } from "lucide-react";
 
@@ -34,7 +34,6 @@ interface SwappableMetricCardProps {
 export function SwappableMetricCard({
   slug,
   pageId,
-  aiEnabled = false,
   label,
   value,
   change,
@@ -62,19 +61,12 @@ export function SwappableMetricCard({
     );
   }
 
-  const currentMode = metrics.getCardMode(pageId, slug);
-  const isOverride = metrics.hasOverride(pageId, slug);
-
-  const handleModeChange = (mode: CardMode | null) => {
-    metrics.setCardMode(pageId, slug, mode);
-  };
-
   if (loading) {
     return <MetricCard label={label} value="" loading />;
   }
 
   return (
-    <div className="relative group">
+    <WidgetCard slug={slug} pageId={pageId} bare>
       <MetricCard
         label={label}
         value={value}
@@ -85,16 +77,6 @@ export function SwappableMetricCard({
         variant={variant}
         loading={loading}
       />
-      {/* Gear icon — appears on hover */}
-      <div className="absolute top-3 right-3">
-        <CardModePopover
-          currentMode={currentMode}
-          onModeChange={handleModeChange}
-          isOverride={isOverride}
-          aiEnabled={aiEnabled}
-          align="right"
-        />
-      </div>
-    </div>
+    </WidgetCard>
   );
 }

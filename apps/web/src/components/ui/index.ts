@@ -1,5 +1,7 @@
 export { MetricCard } from "./metric-card";
 export { SwappableMetricCard } from "./swappable-metric-card";
+export { WidgetCard, type WidgetCardProps } from "./widget-card";
+export { CardSettings, type CardSettingsProps, type CatalogProps } from "./card-settings";
 export { Button } from "./button";
 export { ChartCard } from "./chart-card";
 export { DataTable } from "./data-table";

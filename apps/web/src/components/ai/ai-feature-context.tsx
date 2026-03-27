@@ -189,6 +189,13 @@ export function useAiFlags() {
 }
 
 /**
+ * Optional variant — returns null outside AiFeatureProvider.
+ */
+export function useOptionalAiFlags(): AiFeatureContextValue | null {
+  return useContext(AiFeatureContext);
+}
+
+/**
  * Check a specific AI feature's status.
  * Returns { enabled, canGenerate, showCached }.
  */

@@ -16,10 +16,9 @@ import {
   Info,
   type LucideIcon,
 } from "lucide-react";
-import { CardSettingsModal } from "@/components/ui/card-settings-modal";
+import { WidgetCard } from "@/components/ui/widget-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { useDashboardLayout } from "./dashboard-layout-context";
-import { useAiFlags } from "@/components/ai/ai-feature-context";
 import {
   CATEGORY_META,
   getMetricDef,
@@ -306,43 +305,65 @@ export function HeroKpiCard({
   // For change color, use direction-aware logic
   const isLowerBetter = variant === "burn" || metricStyle?.color === "orange";
 
-  // Per-card mode from intelligence context
+  // Build catalog props for the settings modal (metric swap/catalog)
+  const { registry, openFormulaViewer } = useMetrics();
   const {
-    getCardMode: getCardModeRaw, setCardMode: setCardModeRaw, mode: globalMode,
-    registry, openFormulaViewer,
-  } = useMetrics();
-  const {
-    heroCards, secondaryMetrics,
-    swapHeroCard, addSecondaryMetric, removeSecondaryMetric,
+    heroCards,
+    secondaryMetrics,
+    swapHeroCard,
+    addSecondaryMetric,
+    removeSecondaryMetric,
   } = useDashboardLayout();
-  const getCardMode = (slug: string) => getCardModeRaw("dashboard", slug);
-  const setCardMode = (slug: string, mode: typeof globalMode | null) => setCardModeRaw("dashboard", slug, mode);
-  const { masterEnabled: aiEnabled } = useAiFlags();
   const cardSlug = slug ?? variant;
-  const cardMode = getCardMode(cardSlug);
-  const isOverride = cardMode !== globalMode;
   const isHeroSwapMode = heroCardIndex !== undefined;
   const allUsedSlugs = useMemo(
     () => new Set([...heroCards, ...secondaryMetrics]),
     [heroCards, secondaryMetrics]
   );
-  const catalogProps = useMemo(() => ({
-    registry,
-    usedSlugs: allUsedSlugs,
-    heroSlugs: heroCards,
-    onSelect: isHeroSwapMode
-      ? (newSlug: string) => {
-          swapHeroCard(heroCardIndex, newSlug).then(() => router.refresh());
-        }
-      : addSecondaryMetric,
-    onRemove: removeSecondaryMetric,
-    onViewFormula: openFormulaViewer,
-    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
-    getDependencyTree: getMetricDependencyTree,
-    getDependents: getMetricDependents,
-    getMetricDef: getMetricDef as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
-    swapMode: isHeroSwapMode,
-  }), [registry, allUsedSlugs, heroCards, isHeroSwapMode, heroCardIndex, swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, router]);
+  const catalogProps = useMemo(
+    () => ({
+      registry,
+      usedSlugs: allUsedSlugs,
+      heroSlugs: heroCards,
+      onSelect: isHeroSwapMode
+        ? (newSlug: string) => {
+            swapHeroCard(heroCardIndex, newSlug).then(() => router.refresh());
+          }
+        : addSecondaryMetric,
+      onRemove: removeSecondaryMetric,
+      onViewFormula: openFormulaViewer,
+      categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+      getDependencyTree: getMetricDependencyTree,
+      getDependents: getMetricDependents,
+      getMetricDef: getMetricDef as (
+        slug: string
+      ) =>
+        | {
+            slug: string;
+            name: string;
+            description: string;
+            formula: string;
+            category: string;
+            tier: string;
+            requiresSaaS?: boolean;
+            benchmark?: { label: string };
+          }
+        | undefined,
+      swapMode: isHeroSwapMode,
+    }),
+    [
+      registry,
+      allUsedSlugs,
+      heroCards,
+      isHeroSwapMode,
+      heroCardIndex,
+      swapHeroCard,
+      addSecondaryMetric,
+      removeSecondaryMetric,
+      openFormulaViewer,
+      router,
+    ]
+  );
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -358,30 +379,25 @@ export function HeroKpiCard({
         ? "text-danger-500"
         : "text-surface-400";
 
-  // Track whether settings popover was recently used to prevent accidental navigation
-  const settingsActiveRef = useRef(false);
-
   return (
-    <div
+    <WidgetCard
+      slug={cardSlug}
+      pageId="dashboard"
+      settingsPosition="floating"
+      catalogProps={catalogProps}
+      stagger={stagger + 1}
+      onClick={() => router.push(resolvedConfig.href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ")
+          router.push(resolvedConfig.href);
+      }}
       role="link"
       tabIndex={0}
-      onClick={() => {
-        if (settingsActiveRef.current) {
-          settingsActiveRef.current = false;
-          return;
-        }
-        router.push(resolvedConfig.href);
-      }}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(resolvedConfig.href); }}
       className={`
-        h-full flex flex-col group relative cursor-pointer overflow-visible
-        rounded-2xl border
-        p-5 sm:p-6
-        transition-all duration-300
-        animate-slide-up stagger-${stagger + 1}
-        ${ghost
-          ? "bg-surface-0 border-surface-200/80 hover:border-brand-300 hover:bg-brand-50/30"
-          : "bg-surface-0 border-surface-200 hover:border-surface-300 hover-lift"
+        ${
+          ghost
+            ? "!border-surface-200/80 hover:!border-brand-300 hover:!bg-brand-50/30"
+            : ""
         }
         ${celebrate ? "animate-celebrate" : ""}
       `}
@@ -390,20 +406,6 @@ export function HeroKpiCard({
       <div
         className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${ghost ? "from-brand-500/5 to-transparent" : resolvedConfig.glowClass} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
       />
-
-      {/* Per-card mode gear — always visible so users can switch metrics even on empty cards */}
-      <div
-        className="absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
-        onMouseDown={() => { settingsActiveRef.current = true; }}
-      >
-        <CardSettingsModal
-          currentMode={cardMode}
-          onModeChange={(mode) => setCardMode(cardSlug, mode)}
-          isOverride={isOverride}
-          aiEnabled={aiEnabled}
-          catalogProps={catalogProps}
-        />
-      </div>
 
       {/* Auto-swap indicator */}
       {swapInfo && (
@@ -416,7 +418,9 @@ export function HeroKpiCard({
             <span className="hidden sm:inline">Swapped</span>
           </div>
           <div className="absolute left-0 top-full mt-1 w-48 rounded-lg bg-surface-900 text-surface-0 text-xs p-2.5 shadow-lg opacity-0 pointer-events-none group-hover/swap:opacity-100 group-hover/swap:pointer-events-auto transition-opacity z-30">
-            <p className="font-medium mb-1">Replaces: {swapInfo.replacedLabel}</p>
+            <p className="font-medium mb-1">
+              Replaces: {swapInfo.replacedLabel}
+            </p>
             <p className="text-surface-300">{swapInfo.restoreHint}</p>
           </div>
         </div>
@@ -426,17 +430,26 @@ export function HeroKpiCard({
         {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className={ghost ? "text-surface-400" : resolvedConfig.accentColor}>
+            <div
+              className={
+                ghost ? "text-surface-400" : resolvedConfig.accentColor
+              }
+            >
               <Icon className="h-4 w-4" strokeWidth={2} />
             </div>
-            <span className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-400" : "text-surface-400"}`}>
+            <span
+              className={`text-xs font-medium uppercase tracking-wider ${ghost ? "text-surface-400" : "text-surface-400"}`}
+            >
               {label}
             </span>
           </div>
           <div className="flex items-center gap-1">
             {!ghost && sparkData && sparkData.length >= 2 && (
               <div className="hidden sm:block">
-                <Sparkline data={sparkData} color={resolvedConfig.sparkColor} />
+                <Sparkline
+                  data={sparkData}
+                  color={resolvedConfig.sparkColor}
+                />
               </div>
             )}
           </div>
@@ -483,6 +496,6 @@ export function HeroKpiCard({
           </>
         )}
       </div>
-    </div>
+    </WidgetCard>
   );
 }
