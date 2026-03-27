@@ -36,9 +36,11 @@ export const GET = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
 
+  // Only show codes created by the current user (multi-tenant isolation)
   const codes = await db
     .select()
     .from(inviteCodes)
+    .where(eq(inviteCodes.createdBy, ctx.userId))
     .orderBy(desc(inviteCodes.createdAt));
 
   // Fetch redemptions for each code
