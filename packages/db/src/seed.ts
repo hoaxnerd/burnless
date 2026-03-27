@@ -1,5 +1,10 @@
 /**
- * Database seed script for dev and test environments.
+ * ⚠️  DEV / TEST ONLY — DO NOT RUN IN PRODUCTION ⚠️
+ *
+ * Database seed script for development and test environments.
+ * This file is NEVER called during production signup or account creation.
+ * Production accounts get their initial data exclusively through the
+ * onboarding flow (POST /api/onboarding).
  *
  * Creates a realistic demo company ("Acme SaaS Inc.") with:
  *   - 1 demo user + company membership
@@ -11,8 +16,8 @@
  *   - 2 historical + 1 projected funding round
  *   - 6 months of historical transactions
  *   - System metrics (MRR, ARR, burn rate, runway, CAC, LTV)
- *   - AI feature flags enabled
- *   - Privacy consents granted
+ *   - AI feature flags enabled (dev convenience)
+ *   - Privacy consents granted (dev convenience)
  *
  * Idempotent: safe to run multiple times (uses fixed IDs + ON CONFLICT DO NOTHING).
  *
@@ -23,6 +28,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import * as schema from "./schema";
+
+// Guard: block execution in production environments
+if (process.env.NODE_ENV === "production") {
+  console.error("❌ seed.ts must not run in production. Aborting.");
+  process.exit(1);
+}
 
 const connectionString =
   process.env.DATABASE_URL ?? "postgresql://localhost:5432/burnless";

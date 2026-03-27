@@ -15,6 +15,7 @@ import {
   financialAccounts,
   departments,
   revenueStreams,
+  aiFeatureFlags,
 } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -163,6 +164,22 @@ export const POST = withErrorHandler(async (request: Request) => {
           parameters: revenueParams,
         });
       }
+
+      // AI features start disabled — user must opt in via Settings > AI Features.
+      // This ensures no AI calls are made without explicit consent.
+      await tx.insert(aiFeatureFlags).values({
+        companyId: company.id,
+        masterEnabled: false,
+        dataMode: "full",
+        features: {
+          onboarding: true,
+          chat: true,
+          insights: true,
+          uiPersonalization: true,
+          autoCategorization: true,
+          weeklyDigest: true,
+        },
+      });
 
       // Note: We no longer auto-generate expense forecast lines during onboarding.
       // Users should add their real expenses explicitly via the expenses page.
