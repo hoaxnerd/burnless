@@ -10,3 +10,5 @@ export { DataLoadError, classifyError } from "./data-load-error";
 export { FormField, CurrencyInput } from "./form-field";
 export { ThemeProvider, ThemeToggle, useTheme } from "./theme-toggle";
 export { KeyboardShortcutsProvider } from "./keyboard-shortcuts";
+export { PageGrid, type PageGridProps, type PageWidgetLayout, type DefaultLayoutItem } from "./page-grid";
+export { usePageLayout } from "./use-page-layout";

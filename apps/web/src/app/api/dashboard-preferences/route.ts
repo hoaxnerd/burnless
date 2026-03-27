@@ -37,6 +37,7 @@ export const GET = withErrorHandler(async () => {
     customMetrics: [],
     layout: [],
     closedWidgets: [],
+    pageLayouts: {},
   };
 
   // Compute whether any card uses Intelligence mode — server-side equivalent
@@ -84,6 +85,26 @@ const patchSchema = z.object({
     .max(20)
     .optional(),
   closedWidgets: z.array(z.string()).max(20).optional(),
+  pageLayouts: z
+    .record(
+      z.string(),
+      z.object({
+        layout: z
+          .array(
+            z.object({
+              widgetId: z.string(),
+              x: z.number().int().min(0).max(12).optional().default(0),
+              y: z.number().int().min(0).max(200).optional().default(0),
+              w: z.number().int().min(1).max(12),
+              h: z.number().int().min(1).max(50),
+              autoH: z.boolean().optional(),
+            })
+          )
+          .max(30),
+        closedWidgets: z.array(z.string()).max(20).optional(),
+      })
+    )
+    .optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
@@ -107,9 +128,19 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     .limit(1);
 
   if (existing) {
+    // Merge pageLayouts: new pages are added/updated, existing pages are preserved
+    const setData = { ...body } as Record<string, unknown>;
+    if (body.pageLayouts) {
+      const [current] = await db
+        .select({ pageLayouts: dashboardPreferences.pageLayouts })
+        .from(dashboardPreferences)
+        .where(eq(dashboardPreferences.id, existing.id))
+        .limit(1);
+      setData.pageLayouts = { ...(current?.pageLayouts ?? {}), ...body.pageLayouts };
+    }
     const [updated] = await db
       .update(dashboardPreferences)
-      .set(body)
+      .set(setData)
       .where(eq(dashboardPreferences.id, existing.id))
       .returning();
     return NextResponse.json(updated);

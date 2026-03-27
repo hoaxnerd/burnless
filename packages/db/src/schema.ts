@@ -842,6 +842,26 @@ export const dashboardPreferences = pgTable(
       .default([]),
     /** Widget IDs the user has explicitly closed/hidden */
     closedWidgets: jsonb("closed_widgets").$type<string[]>().notNull().default([]),
+    /** Per-page layout overrides: { [pageId]: { layout: [...], closedWidgets: [...] } } */
+    pageLayouts: jsonb("page_layouts")
+      .$type<
+        Record<
+          string,
+          {
+            layout: Array<{
+              widgetId: string;
+              x?: number;
+              y?: number;
+              w: number;
+              h: number;
+              autoH?: boolean;
+            }>;
+            closedWidgets?: string[];
+          }
+        >
+      >()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
