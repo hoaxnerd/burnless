@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { scenarios, findByIdForCompany, updateForCompany, deleteForCompany } from "@burnless/db";
+import { db, scenarios, updateForCompany } from "@burnless/db";
+import { eq, and, isNull } from "drizzle-orm";
 import { updateScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+
+/** Find a non-deleted scenario by ID scoped to company. */
+async function findScenario(id: string, companyId: string) {
+  const [row] = await db
+    .select()
+    .from(scenarios)
+    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)))
+    .limit(1);
+  return row ?? null;
+}
 
 export const GET = withErrorHandler(async (
   _request: Request,
@@ -14,7 +25,7 @@ export const GET = withErrorHandler(async (
   if ("error" in ctx) return ctx.error;
   const { id } = await params;
 
-  const row = await findByIdForCompany(scenarios, id, ctx.companyId);
+  const row = await findScenario(id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
   return NextResponse.json(row);
 });
@@ -28,6 +39,10 @@ export const PATCH = withErrorHandler(async (
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
   const { id } = await params;
+
+  // Verify scenario exists and is not soft-deleted
+  const existing = await findScenario(id, ctx.companyId);
+  if (!existing) return errorResponse("Scenario not found", 404);
 
   const parsed = await parseBody(request, updateScenarioSchema);
   if ("error" in parsed) return parsed.error;
@@ -58,7 +73,12 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const row = await deleteForCompany(scenarios, id, ctx.companyId);
+  // Soft-delete: set deletedAt instead of hard delete
+  const [row] = await db
+    .update(scenarios)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)))
+    .returning();
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "delete", { before: row });
   await trackDataMutation(ctx.companyId, "scenarios");

@@ -4,7 +4,7 @@
 
 import { db } from "@burnless/db";
 import { revenueStreams, fundingRounds, scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ToolContext, ToolHandler } from "./types";
 import {
@@ -187,7 +187,7 @@ async function updateRevenueStream(
     .select({ id: revenueStreams.id, name: revenueStreams.name })
     .from(revenueStreams)
     .innerJoin(scenarios, eq(revenueStreams.scenarioId, scenarios.id))
-    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
@@ -219,7 +219,7 @@ async function deleteRevenueStream(
     .select({ id: revenueStreams.id, name: revenueStreams.name })
     .from(revenueStreams)
     .innerJoin(scenarios, eq(revenueStreams.scenarioId, scenarios.id))
-    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }

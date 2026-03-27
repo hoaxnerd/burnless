@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
@@ -31,8 +31,8 @@ export const GET = withErrorHandler(async (request: Request) => {
   if (!baseId || !compareId) return errorResponse("baseId and compareId required", 400);
 
   const [baseScenario, compareScenario] = await Promise.all([
-    db.select().from(scenarios).where(and(eq(scenarios.id, baseId), eq(scenarios.companyId, ctx.companyId))).then((r) => r[0]),
-    db.select().from(scenarios).where(and(eq(scenarios.id, compareId), eq(scenarios.companyId, ctx.companyId))).then((r) => r[0]),
+    db.select().from(scenarios).where(and(eq(scenarios.id, baseId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt))).then((r) => r[0]),
+    db.select().from(scenarios).where(and(eq(scenarios.id, compareId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt))).then((r) => r[0]),
   ]);
 
   if (!baseScenario || !compareScenario) return errorResponse("Scenario not found", 404);

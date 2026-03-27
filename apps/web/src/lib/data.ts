@@ -19,7 +19,7 @@ import {
   fundingRounds,
   dashboardPreferences,
 } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { auth } from "./auth";
 
@@ -46,10 +46,10 @@ export const getCompany = cache(async function getCompany() {
   return getCompanyForAuthUser(session.user.id);
 });
 
-/** Get all scenarios for a company. */
+/** Get all scenarios for a company (excludes soft-deleted). */
 export const getScenarios = unstable_cache(
   async (companyId: string) => {
-    return db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).orderBy(scenarios.createdAt);
+    return db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).orderBy(scenarios.createdAt);
   },
   ["scenarios"],
   { revalidate: 30, tags: ["scenarios"] }
@@ -61,11 +61,11 @@ export const getDefaultScenario = unstable_cache(
     const rows = await db
       .select()
       .from(scenarios)
-      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true)))
+      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true), isNull(scenarios.deletedAt)))
       .limit(1);
     if (rows[0]) return rows[0];
     // Fallback to first scenario
-    const [first] = await db.select().from(scenarios).where(eq(scenarios.companyId, companyId)).limit(1);
+    const [first] = await db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).limit(1);
     return first ?? null;
   },
   ["default-scenario"],
@@ -129,7 +129,7 @@ export const getFundingRounds = unstable_cache(
 /** Get a scenario by ID. */
 export const getScenarioById = unstable_cache(
   async (scenarioId: string) => {
-    const [scenario] = await db.select().from(scenarios).where(eq(scenarios.id, scenarioId));
+    const [scenario] = await db.select().from(scenarios).where(and(eq(scenarios.id, scenarioId), isNull(scenarios.deletedAt)));
     return scenario ?? null;
   },
   ["scenario-by-id"],
@@ -157,7 +157,7 @@ export const getBudgetScenario = unstable_cache(
     const [scenario] = await db
       .select()
       .from(scenarios)
-      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true)))
+      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true), isNull(scenarios.deletedAt)))
       .limit(1);
     return scenario ?? null;
   },

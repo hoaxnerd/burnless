@@ -22,7 +22,7 @@ import {
   aiMessages,
   aiInsightCache,
 } from "@burnless/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
 /**
@@ -101,7 +101,7 @@ export const GET = withErrorHandler(async () => {
       db
         .select()
         .from(scenarios)
-        .where(inArray(scenarios.companyId, companyIds)),
+        .where(and(inArray(scenarios.companyId, companyIds), isNull(scenarios.deletedAt))),
       db
         .select()
         .from(departments)

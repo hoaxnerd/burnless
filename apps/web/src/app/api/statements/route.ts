@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
   computeAllForecastLines,
@@ -37,7 +37,7 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   // Verify scenario ownership
   const [scenario] = await db.select().from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
+    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   // Parse YYYY-MM strings via numeric constructor to avoid UTC-vs-local timezone drift

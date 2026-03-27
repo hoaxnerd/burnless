@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { db, headcountPlans, scenarios } from "@burnless/db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { createHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
@@ -17,7 +17,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   if (!scenarioId) return errorResponse("scenarioId required", 400);
 
   const [scenario] = await db.select().from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId)));
+    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const usePagination = url.searchParams.has("limit");

@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { db } from "../index";
 import {
   scenarios,
@@ -9,11 +9,13 @@ import {
   headcountPlans,
   fundingRounds,
 } from "../schema";
-import { inArray } from "drizzle-orm";
+
+/** Reusable filter: only non-deleted scenarios. */
+const notDeleted = isNull(scenarios.deletedAt);
 
 /**
  * Verify a scenario belongs to a company and return it.
- * Returns the scenario row or null.
+ * Returns the scenario row or null. Excludes soft-deleted.
  */
 export async function getScenarioForCompany(
   scenarioId: string,
@@ -22,7 +24,7 @@ export async function getScenarioForCompany(
   const [row] = await db
     .select()
     .from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, companyId)));
+    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, companyId), notDeleted));
   return row ?? null;
 }
 
@@ -34,7 +36,7 @@ export async function getDefaultScenario(companyId: string) {
     .select()
     .from(scenarios)
     .where(
-      and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true)),
+      and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true), notDeleted),
     )
     .limit(1);
   return row ?? null;

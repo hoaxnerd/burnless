@@ -62,6 +62,7 @@ vi.mock("@burnless/db", () => ({
     name: "name",
     type: "type",
     createdAt: "createdAt",
+    deletedAt: "deletedAt",
   },
   financialAuditLogs: {},
 }));
@@ -74,6 +75,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
   gt: vi.fn(),
+  isNull: vi.fn(),
   sql: Object.assign(vi.fn(() => "count(*)"), { raw: vi.fn() }),
 }));
 

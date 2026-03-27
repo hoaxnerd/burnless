@@ -4,7 +4,7 @@
 
 import { db } from "@burnless/db";
 import { scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import type { ToolContext, ToolHandler } from "./types";
@@ -99,7 +99,7 @@ async function updateScenario(
   const [existing] = await db
     .select({ id: scenarios.id })
     .from(scenarios)
-    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
   }
@@ -136,7 +136,7 @@ async function deleteScenario(
   const [existing] = await db
     .select({ id: scenarios.id, name: scenarios.name, isDefault: scenarios.isDefault })
     .from(scenarios)
-    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
   }
@@ -144,11 +144,11 @@ async function deleteScenario(
     return JSON.stringify({ success: false, error: "Cannot delete the default scenario" });
   }
 
-  await db.delete(scenarios).where(eq(scenarios.id, data.id));
+  await db.update(scenarios).set({ deletedAt: new Date() }).where(eq(scenarios.id, data.id));
 
   return JSON.stringify({
     success: true,
-    message: `Deleted scenario "${existing.name}". All associated forecast lines, headcount plans, and revenue streams were also removed.`,
+    message: `Deleted scenario "${existing.name}". It can be restored if needed.`,
   });
 }
 

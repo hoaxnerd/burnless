@@ -82,7 +82,7 @@ vi.mock("@/lib/compute-dashboard", () => ({
 
 vi.mock("@burnless/db", () => ({
   db: { select: mockSelect, insert: mockInsert },
-  scenarios: { companyId: "companyId" },
+  scenarios: { companyId: "companyId", deletedAt: "deletedAt" },
   forecastLines: {},
   revenueStreams: {},
 }));
@@ -98,6 +98,7 @@ vi.mock("@burnless/engine", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  isNull: vi.fn(),
   sql: Object.assign(vi.fn(() => "count(*)"), { raw: vi.fn() }),
 }));
 

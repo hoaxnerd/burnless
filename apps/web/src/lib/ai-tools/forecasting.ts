@@ -4,7 +4,7 @@
 
 import { db } from "@burnless/db";
 import { forecastLines, scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
@@ -240,7 +240,7 @@ async function updateForecastLine(
     .select({ id: forecastLines.id, accountId: forecastLines.accountId })
     .from(forecastLines)
     .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
-    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
@@ -273,7 +273,7 @@ async function deleteForecastLine(
     .select({ id: forecastLines.id, accountId: forecastLines.accountId })
     .from(forecastLines)
     .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
-    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { db, headcountPlans, scenarios } from "@burnless/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { updateHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
@@ -9,7 +9,7 @@ import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 /** Subquery: scenario IDs belonging to the authenticated company */
 function companyScenarioIds(companyId: string) {
-  return db.select({ id: scenarios.id }).from(scenarios).where(eq(scenarios.companyId, companyId));
+  return db.select({ id: scenarios.id }).from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)));
 }
 
 export const PATCH = withErrorHandler(async (

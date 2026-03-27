@@ -16,7 +16,7 @@ import {
   departments,
   revenueStreams,
 } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getAuthUser, getUserCompany, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import {
@@ -52,7 +52,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       .where(
         and(
           eq(scenarios.companyId, existingMembership.companyId),
-          eq(scenarios.isDefault, true)
+          eq(scenarios.isDefault, true),
+          isNull(scenarios.deletedAt)
         )
       )
       .limit(1);

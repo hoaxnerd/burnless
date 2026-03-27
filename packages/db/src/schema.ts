@@ -411,6 +411,7 @@ export const scenarios = pgTable(
     isBudget: boolean("is_budget").notNull().default(false),
     budgetLockedAt: timestamp("budget_locked_at", { mode: "date" }),
     description: text("description"),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

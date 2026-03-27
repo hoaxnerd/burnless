@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, scenarios, forecastLines, revenueStreams } from "@burnless/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, errorResponse, parseBody, requirePlanFeature, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
@@ -42,7 +42,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const [{ count: scenarioCount }] = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
-    .where(eq(scenarios.companyId, ctx.companyId));
+    .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount + scenariosToCreate - 1);
   if (gateErr) return gateErr;
 

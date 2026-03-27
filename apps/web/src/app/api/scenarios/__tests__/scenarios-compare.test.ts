@@ -21,7 +21,7 @@ vi.mock("@/lib/api-helpers", () => ({
 
 vi.mock("@burnless/db", () => ({
   db: { select: mockSelect },
-  scenarios: { id: "id", companyId: "companyId", name: "name" },
+  scenarios: { id: "id", companyId: "companyId", name: "name", deletedAt: "deletedAt" },
   forecastLines: { scenarioId: "scenarioId" },
   financialAccounts: { companyId: "companyId" },
   revenueStreams: { scenarioId: "scenarioId" },
@@ -29,7 +29,7 @@ vi.mock("@burnless/db", () => ({
   fundingRounds: { companyId: "companyId" },
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn() }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), isNull: vi.fn() }));
 
 vi.mock("@burnless/engine", () => ({
   computeAllForecastLines: vi.fn().mockReturnValue([]),

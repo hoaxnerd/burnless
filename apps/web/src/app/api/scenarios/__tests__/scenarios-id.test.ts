@@ -6,14 +6,28 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
-const {
-  mockFindByIdForCompany,
-  mockUpdateForCompany,
-  mockDeleteForCompany,
-} = vi.hoisted(() => ({
-  mockFindByIdForCompany: vi.fn(),
+const { mockUpdateForCompany } = vi.hoisted(() => ({
   mockUpdateForCompany: vi.fn(),
-  mockDeleteForCompany: vi.fn(),
+}));
+
+const {
+  mockSelect,
+  mockSelectFrom,
+  mockSelectWhere,
+  mockSelectLimit,
+  mockUpdate,
+  mockUpdateSet,
+  mockUpdateWhere,
+  mockUpdateReturning,
+} = vi.hoisted(() => ({
+  mockSelect: vi.fn(),
+  mockSelectFrom: vi.fn(),
+  mockSelectWhere: vi.fn(),
+  mockSelectLimit: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockUpdateSet: vi.fn(),
+  mockUpdateWhere: vi.fn(),
+  mockUpdateReturning: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -41,6 +55,10 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
+  db: {
+    select: mockSelect,
+    update: mockUpdate,
+  },
   scenarios: {
     id: "id",
     companyId: "companyId",
@@ -49,15 +67,15 @@ vi.mock("@burnless/db", () => ({
     isDefault: "isDefault",
     isBudget: "isBudget",
     description: "description",
+    deletedAt: "deletedAt",
   },
-  findByIdForCompany: mockFindByIdForCompany,
   updateForCompany: mockUpdateForCompany,
-  deleteForCompany: mockDeleteForCompany,
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
@@ -84,6 +102,11 @@ function makeParams(id: string): { params: Promise<{ id: string }> } {
 describe("GET /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default: select chain for findScenario()
+    mockSelect.mockReturnValue({ from: mockSelectFrom });
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
+    mockSelectWhere.mockReturnValue({ limit: mockSelectLimit });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -97,7 +120,7 @@ describe("GET /api/scenarios/[id]", () => {
 
     expect(res.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
-    expect(mockFindByIdForCompany).not.toHaveBeenCalled();
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it("returns scenario by id", async () => {
@@ -115,7 +138,7 @@ describe("GET /api/scenarios/[id]", () => {
       isDefault: true,
       description: "Primary planning scenario",
     };
-    mockFindByIdForCompany.mockResolvedValue(scenario);
+    mockSelectLimit.mockResolvedValue([scenario]);
 
     const req = jsonRequest("http://localhost/api/scenarios/scen-1", "GET");
     const res = await GET(req, makeParams("scen-1"));
@@ -124,11 +147,6 @@ describe("GET /api/scenarios/[id]", () => {
     expect(res.status).toBe(200);
     expect(body.id).toBe("scen-1");
     expect(body.name).toBe("Base Case");
-    expect(mockFindByIdForCompany).toHaveBeenCalledWith(
-      expect.anything(),
-      "scen-1",
-      "comp-1"
-    );
   });
 
   it("returns 404 when not found", async () => {
@@ -137,7 +155,7 @@ describe("GET /api/scenarios/[id]", () => {
       companyId: "comp-1",
       role: "viewer",
     });
-    mockFindByIdForCompany.mockResolvedValue(null);
+    mockSelectLimit.mockResolvedValue([]);
 
     const req = jsonRequest(
       "http://localhost/api/scenarios/nonexistent",
@@ -156,6 +174,11 @@ describe("GET /api/scenarios/[id]", () => {
 describe("PATCH /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default: select chain for findScenario()
+    mockSelect.mockReturnValue({ from: mockSelectFrom });
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
+    mockSelectWhere.mockReturnValue({ limit: mockSelectLimit });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -207,6 +230,14 @@ describe("PATCH /api/scenarios/[id]", () => {
     });
     mockRequireRole.mockReturnValue(null);
 
+    // findScenario returns existing
+    mockSelectLimit.mockResolvedValue([{
+      id: "scen-1",
+      companyId: "comp-1",
+      name: "Base Case",
+      type: "base",
+    }]);
+
     const updatedScenario = {
       id: "scen-1",
       companyId: "comp-1",
@@ -242,7 +273,8 @@ describe("PATCH /api/scenarios/[id]", () => {
       role: "editor",
     });
     mockRequireRole.mockReturnValue(null);
-    mockUpdateForCompany.mockResolvedValue(null);
+    // findScenario returns empty
+    mockSelectLimit.mockResolvedValue([]);
 
     const req = jsonRequest(
       "http://localhost/api/scenarios/nonexistent",
@@ -263,6 +295,13 @@ describe("PATCH /api/scenarios/[id]", () => {
       role: "editor",
     });
     mockRequireRole.mockReturnValue(null);
+
+    // findScenario returns existing
+    mockSelectLimit.mockResolvedValue([{
+      id: "scen-1",
+      companyId: "comp-1",
+      name: "Budget Scenario",
+    }]);
 
     const updatedScenario = {
       id: "scen-1",
@@ -300,6 +339,11 @@ describe("PATCH /api/scenarios/[id]", () => {
 describe("DELETE /api/scenarios/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default: update chain for soft-delete
+    mockUpdate.mockReturnValue({ set: mockUpdateSet });
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -316,7 +360,7 @@ describe("DELETE /api/scenarios/[id]", () => {
 
     expect(res.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("returns 403 for editor (requires admin)", async () => {
@@ -338,10 +382,10 @@ describe("DELETE /api/scenarios/[id]", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toBe("Forbidden");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("deletes scenario", async () => {
+  it("soft-deletes scenario", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       userId: "user-1",
       companyId: "comp-1",
@@ -354,8 +398,9 @@ describe("DELETE /api/scenarios/[id]", () => {
       companyId: "comp-1",
       name: "Base Case",
       type: "base",
+      deletedAt: new Date(),
     };
-    mockDeleteForCompany.mockResolvedValue(deletedScenario);
+    mockUpdateReturning.mockResolvedValue([deletedScenario]);
 
     const req = jsonRequest(
       "http://localhost/api/scenarios/scen-1",
@@ -366,11 +411,7 @@ describe("DELETE /api/scenarios/[id]", () => {
 
     expect(res.status).toBe(200);
     expect(body.deleted).toBe(true);
-    expect(mockDeleteForCompany).toHaveBeenCalledWith(
-      expect.anything(),
-      "scen-1",
-      "comp-1"
-    );
+    expect(mockUpdate).toHaveBeenCalled();
   });
 
   it("returns 404 when not found", async () => {
@@ -380,7 +421,7 @@ describe("DELETE /api/scenarios/[id]", () => {
       role: "admin",
     });
     mockRequireRole.mockReturnValue(null);
-    mockDeleteForCompany.mockResolvedValue(null);
+    mockUpdateReturning.mockResolvedValue([]);
 
     const req = jsonRequest(
       "http://localhost/api/scenarios/nonexistent",

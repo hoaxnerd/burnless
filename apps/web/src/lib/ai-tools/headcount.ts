@@ -4,7 +4,7 @@
 
 import { db } from "@burnless/db";
 import { headcountPlans, departments, scenarios } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { ToolContext, ToolHandler } from "./types";
 import {
@@ -122,7 +122,7 @@ async function updateHeadcount(
     .select({ id: headcountPlans.id, scenarioId: headcountPlans.scenarioId, title: headcountPlans.title })
     .from(headcountPlans)
     .innerJoin(scenarios, eq(headcountPlans.scenarioId, scenarios.id))
-    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
@@ -158,7 +158,7 @@ async function deleteHeadcount(
     .select({ id: headcountPlans.id, title: headcountPlans.title })
     .from(headcountPlans)
     .innerJoin(scenarios, eq(headcountPlans.scenarioId, scenarios.id))
-    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId)));
+    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }

@@ -148,6 +148,13 @@
       "when": 1774915200000,
       "tag": "0020_add_insight_staleness",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1775001600000,
+      "tag": "0021_scenario_soft_delete",
+      "breakpoints": true
     }
   ]
 }

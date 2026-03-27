@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { db, scenarios } from "@burnless/db";
-import { eq, and, gt, sql } from "drizzle-orm";
+import { eq, and, gt, sql, isNull } from "drizzle-orm";
 import { createScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, requirePlanFeature, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
@@ -18,8 +18,8 @@ export const GET = withErrorHandler(async (request: Request) => {
   if (usePagination) {
     const { limit, cursor } = parsePaginationParams(request);
     const where = cursor
-      ? and(eq(scenarios.companyId, ctx.companyId), gt(scenarios.id, cursor))
-      : eq(scenarios.companyId, ctx.companyId);
+      ? and(eq(scenarios.companyId, ctx.companyId), gt(scenarios.id, cursor), isNull(scenarios.deletedAt))
+      : and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt));
     const rows = await db.select().from(scenarios).where(where).orderBy(scenarios.createdAt).limit(limit + 1);
     return NextResponse.json(paginatedResponse(rows, limit));
   }
@@ -27,7 +27,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const rows = await db
     .select()
     .from(scenarios)
-    .where(eq(scenarios.companyId, ctx.companyId))
+    .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)))
     .orderBy(scenarios.createdAt);
 
   return NextResponse.json(rows);
@@ -43,7 +43,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const [{ count: scenarioCount }] = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
-    .where(eq(scenarios.companyId, ctx.companyId));
+    .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount);
   if (gateErr) return gateErr;
 

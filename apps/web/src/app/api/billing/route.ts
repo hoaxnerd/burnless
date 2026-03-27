@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { db, companies, scenarios, aiMessages, aiConversations, exportLogs, users } from "@burnless/db";
-import { eq, and, gte, count } from "drizzle-orm";
+import { eq, and, gte, count, isNull } from "drizzle-orm";
 import { getPlanLimits } from "@/lib/feature-gate";
 import { env } from "@/lib/env";
 import {
@@ -47,7 +47,7 @@ export const GET = withErrorHandler(async (_request: Request) => {
   const scenarioRows = await db
     .select({ cnt: count() })
     .from(scenarios)
-    .where(eq(scenarios.companyId, ctx.companyId));
+    .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   const scenarioCount = scenarioRows[0]?.cnt ?? 0;
 
   // Monthly AI messages
