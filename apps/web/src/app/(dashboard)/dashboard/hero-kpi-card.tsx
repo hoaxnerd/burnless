@@ -17,7 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { CardSettingsModal } from "@/components/ui/card-settings-modal";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import {
   CATEGORY_META,
@@ -307,10 +308,15 @@ export function HeroKpiCard({
 
   // Per-card mode from intelligence context
   const {
-    getCardMode, setCardMode, mode: globalMode,
-    registry, heroCards, secondaryMetrics,
-    swapHeroCard, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer,
-  } = useDashboardIntelligence();
+    getCardMode: getCardModeRaw, setCardMode: setCardModeRaw, mode: globalMode,
+    registry, openFormulaViewer,
+  } = useMetrics();
+  const {
+    heroCards, secondaryMetrics,
+    swapHeroCard, addSecondaryMetric, removeSecondaryMetric,
+  } = useDashboardLayout();
+  const getCardMode = (slug: string) => getCardModeRaw("dashboard", slug);
+  const setCardMode = (slug: string, mode: typeof globalMode | null) => setCardModeRaw("dashboard", slug, mode);
   const { masterEnabled: aiEnabled } = useAiFlags();
   const cardSlug = slug ?? variant;
   const cardMode = getCardMode(cardSlug);

@@ -31,7 +31,7 @@ import { AiCommandCenter } from "./ai-command-center";
 import { QuickActions } from "./quick-actions";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
-import { DashboardIntelligenceProvider } from "./dashboard-intelligence-context";
+import { DashboardLayoutProvider } from "./dashboard-layout-context";
 import { DashboardHeader } from "./dashboard-header";
 import { CustomizableMetrics } from "./customizable-metrics";
 import { StatsCatalog } from "./stats-catalog";
@@ -139,13 +139,10 @@ export default async function DashboardPage({
   };
 
   return (
-    <DashboardIntelligenceProvider
+    <DashboardLayoutProvider
       initialPreferences={dashPrefs ? {
-        mode: (dashPrefs.mode as "intelligence" | "dynamic" | "custom") ?? "dynamic",
         heroCards: (dashPrefs.heroCards as string[]) ?? [],
         secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
-        cardModeOverrides: (dashPrefs.cardModeOverrides as Record<string, "intelligence" | "dynamic" | "custom">) ?? {},
-        cardScenarioOverrides: (dashPrefs.cardScenarioOverrides as Record<string, string>) ?? {},
         layout: (dashPrefs.layout as Array<{ widgetId: string; x: number; y: number; w: number; h: number; autoH?: boolean }>) ?? [],
         customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
         closedWidgets: (dashPrefs.closedWidgets as string[]) ?? [],
@@ -326,6 +323,6 @@ export default async function DashboardPage({
         {/* Formula Dependency Viewer */}
         <FormulaViewer />
       </div>
-    </DashboardIntelligenceProvider>
+    </DashboardLayoutProvider>
   );
 }

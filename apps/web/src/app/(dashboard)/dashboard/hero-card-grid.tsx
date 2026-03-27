@@ -9,7 +9,7 @@
  * In Custom mode: empty cards with no swap remain visible with an actionable prompt.
  */
 
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
 import { HeroKpiCard, type KpiVariant, type HeroKpiCardProps } from "./hero-kpi-card";
 
 export interface HeroCardDatum {
@@ -46,7 +46,7 @@ interface HeroCardGridProps {
 }
 
 export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) {
-  const { mode } = useDashboardIntelligence();
+  const { mode } = useMetrics();
 
   // Build a map of slot index → swap datum for quick lookup
   const swapBySlot = new Map<number, SwapCardDatum>();

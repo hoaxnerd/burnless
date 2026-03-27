@@ -24,7 +24,8 @@ import {
   type MetricDefinition,
   type MetricTier,
 } from "@burnless/engine";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 
 // ── Tier badges ──────────────────────────────────────────────────────────────
 
@@ -48,6 +49,9 @@ export function StatsCatalog() {
     catalogMode,
     setCatalogOpen,
     registry,
+    openFormulaViewer,
+  } = useMetrics();
+  const {
     heroCards,
     secondaryMetrics,
     swapHeroCard,
@@ -55,8 +59,7 @@ export function StatsCatalog() {
     removeHeroCard,
     addSecondaryMetric,
     removeSecondaryMetric,
-    openFormulaViewer,
-  } = useDashboardIntelligence();
+  } = useDashboardLayout();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<MetricCategory | "all">("all");

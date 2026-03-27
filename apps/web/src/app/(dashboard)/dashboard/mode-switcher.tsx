@@ -6,11 +6,12 @@
  */
 
 import { Brain, Zap, SlidersHorizontal, Loader2 } from "lucide-react";
-import { useDashboardIntelligence, type DashboardMode } from "./dashboard-intelligence-context";
+import { useMetrics, type CardMode } from "@/components/providers/metrics-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 
 const modes: Array<{
-  value: DashboardMode;
+  value: CardMode;
   label: string;
   shortLabel: string;
   icon: typeof Brain;
@@ -40,7 +41,8 @@ const modes: Array<{
 ];
 
 export function ModeSwitcher() {
-  const { mode, setMode, isSaving } = useDashboardIntelligence();
+  const { mode, setMode } = useMetrics();
+  const { isSaving } = useDashboardLayout();
   const { masterEnabled: aiEnabled } = useAiFlags();
 
   return (

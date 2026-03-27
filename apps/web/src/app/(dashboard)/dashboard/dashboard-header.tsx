@@ -7,7 +7,7 @@
 
 import { LayoutGrid } from "lucide-react";
 import { BoardMeetingMode } from "./board-meeting-mode";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 interface DashboardHeaderProps {
@@ -27,7 +27,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ companyName, hasData, boardData }: DashboardHeaderProps) {
-  const { setCatalogOpen } = useDashboardIntelligence();
+  const { setCatalogOpen } = useMetrics();
 
   return (
     <div className="mb-8 sm:mb-12 animate-slide-up">

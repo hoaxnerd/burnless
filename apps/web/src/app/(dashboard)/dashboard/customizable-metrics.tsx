@@ -18,7 +18,8 @@ import {
   DEFAULT_SECONDARY_METRICS,
   type ComputedMetrics,
 } from "@burnless/engine";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 import { CardSettingsModal } from "@/components/ui/card-settings-modal";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import {
@@ -42,11 +43,8 @@ export function CustomizableMetrics({
   prevMonth,
   headcount,
 }: CustomizableMetricsProps) {
-  const {
-    secondaryMetrics,
-    setCatalogOpen,
-    mode: _mode,
-  } = useDashboardIntelligence();
+  const { setCatalogOpen } = useMetrics();
+  const { secondaryMetrics } = useDashboardLayout();
 
   const activeMetrics = secondaryMetrics.length > 0 ? secondaryMetrics : DEFAULT_SECONDARY_METRICS;
 
@@ -92,10 +90,15 @@ function MetricRowDynamic({
   headcount?: { current: number; previous: number };
 }) {
   const {
-    openFormulaViewer, getCardMode, setCardMode, mode: globalMode,
-    registry, heroCards, secondaryMetrics,
+    openFormulaViewer, getCardMode: getCardModeRaw, setCardMode: setCardModeRaw, mode: globalMode,
+    registry,
+  } = useMetrics();
+  const {
+    heroCards, secondaryMetrics,
     addSecondaryMetric, swapSecondaryMetric, removeSecondaryMetric,
-  } = useDashboardIntelligence();
+  } = useDashboardLayout();
+  const getCardMode = (slug: string) => getCardModeRaw("dashboard", slug);
+  const setCardMode = (slug: string, mode: typeof globalMode | null) => setCardModeRaw("dashboard", slug, mode);
   const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
   const cardMode = getCardMode(slug);

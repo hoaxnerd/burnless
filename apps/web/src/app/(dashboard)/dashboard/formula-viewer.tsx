@@ -16,7 +16,7 @@ import {
   type MetricDefinition,
   type MetricTier,
 } from "@burnless/engine";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useMetrics } from "@/components/providers/metrics-context";
 
 const tierColors: Record<MetricTier, string> = {
   core: "border-brand-500/30 bg-brand-500/5",
@@ -25,7 +25,7 @@ const tierColors: Record<MetricTier, string> = {
 };
 
 export function FormulaViewer() {
-  const { formulaViewerSlug, closeFormulaViewer } = useDashboardIntelligence();
+  const { formulaViewerSlug, closeFormulaViewer } = useMetrics();
 
   const metric = formulaViewerSlug ? getMetricDef(formulaViewerSlug) : null;
 

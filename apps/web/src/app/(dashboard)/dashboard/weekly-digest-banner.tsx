@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useDashboardIntelligence } from "./dashboard-intelligence-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 
 interface DigestData {
   id: string;
@@ -45,7 +45,7 @@ export function WeeklyDigestBanner() {
     };
   }, []);
 
-  const { reportWidgetReady, reportWidgetNotReady } = useDashboardIntelligence();
+  const { reportWidgetReady, reportWidgetNotReady } = useDashboardLayout();
 
   // Report readiness to the grid
   const isReady = !dismissed && !loading && !!digest;

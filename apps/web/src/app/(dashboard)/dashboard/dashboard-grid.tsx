@@ -10,7 +10,7 @@
 
 import { type ReactNode, useMemo } from "react";
 import { PageGrid, type DefaultLayoutItem, type PageWidgetLayout } from "@/components/ui/page-grid";
-import { useDashboardIntelligence, type WidgetLayout } from "./dashboard-intelligence-context";
+import { useDashboardLayout, type WidgetLayout } from "./dashboard-layout-context";
 
 // ── Widget ID type ──────────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     closedWidgets,
     closeWidget,
     openWidget,
-  } = useDashboardIntelligence();
+  } = useDashboardLayout();
 
   const heroCount = heroCards.length || 4;
 
