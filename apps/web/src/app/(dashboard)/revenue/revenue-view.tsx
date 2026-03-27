@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { DollarSign, TrendingUp, Users, BarChart3 } from "lucide-react";
-import { SwappableMetricCard } from "@/components/ui";
+import { SwappableMetricCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { usePageLayout } from "@/components/ui/use-page-layout";
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { RevenueWaterfallChart } from "./revenue-waterfall-chart";
@@ -32,9 +34,20 @@ export function RevenueView({
 }: RevenueViewProps) {
   const { growthMetrics: g, hasSaaS, streamBreakdown, waterfall, monthlyByStream, streamNames } = revenueDetails;
 
-  return (
-    <div className="space-y-6">
-      {/* Hero metrics */}
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "revenue" });
+
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "metric-cards",  x: 0, w: 12, h: 5, minH: 4 },
+    { i: "ai-insights",   x: 0, w: 12, h: 4, minH: 3 },
+    { i: "insights",      x: 0, w: 12, h: 4, minH: 3 },
+    { i: "trend-charts",  x: 0, w: 12, h: 12, minH: 8 },
+    { i: "waterfall",     x: 0, w: 12, h: 10, minH: 6 },
+    { i: "stream-breakdown", x: 0, w: 12, h: 14, minH: 8 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "metric-cards": (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
         <div className="stagger-1 animate-slide-up">
           <SwappableMetricCard
@@ -124,8 +137,8 @@ export function RevenueView({
           </>
         )}
       </div>
-
-      {/* AI-powered proactive insights (LLM-generated, cached daily) */}
+    ),
+    "ai-insights": (
       <AiPageInsights
         page="revenue"
         scenarioId={scenarioId}
@@ -140,8 +153,8 @@ export function RevenueView({
           })),
         }}
       />
-
-      {/* Deterministic insights (always available, no LLM) */}
+    ),
+    "insights": (
       <div className="animate-fade-in">
         <RevenueInsights
           growthMetrics={g}
@@ -149,8 +162,8 @@ export function RevenueView({
           hasSaaS={hasSaaS}
         />
       </div>
-
-      {/* Revenue trend charts */}
+    ),
+    "trend-charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Revenue Over Time" subtitle="Total monthly revenue trend">
           <AreaChartWidget data={revenueTimeline} color={chartColors.brand} />
@@ -161,11 +174,11 @@ export function RevenueView({
           </ChartCard>
         )}
       </div>
-
-      {/* MRR Waterfall (SaaS only) */}
-      {hasSaaS && <RevenueWaterfallChart waterfall={waterfall} />}
-
-      {/* Revenue stream breakdown */}
+    ),
+    "waterfall": hasSaaS ? (
+      <RevenueWaterfallChart waterfall={waterfall} />
+    ) : <div />,
+    "stream-breakdown": (
       <RevenueStreamBreakdown
         streams={streamBreakdown}
         monthlyByStream={monthlyByStream}
@@ -173,6 +186,17 @@ export function RevenueView({
         totalRevenue={g.currentRevenue}
         scenarioId={scenarioId}
       />
-    </div>
+    ),
+  }), [g, hasSaaS, revenueDetails, streamBreakdown, waterfall, monthlyByStream, streamNames, revenueTimeline, mrrTimeline, scenarioId]);
+
+  const staticHiddenWidgets = useMemo(() => hasSaaS ? [] : ["waterfall"], [hasSaaS]);
+
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      staticHiddenWidgets={staticHiddenWidgets}
+      {...pageLayout}
+    />
   );
 }
