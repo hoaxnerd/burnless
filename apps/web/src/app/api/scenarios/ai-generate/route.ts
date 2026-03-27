@@ -39,10 +39,11 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Feature gate: check scenario limit before generating
   const scenariosToCreate = parsed.data.type === "best_worst" ? 2 : 1;
-  const [{ count: scenarioCount }] = await db
+  const countResult = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
     .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
+  const scenarioCount = countResult[0]?.count ?? 0;
   const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount + scenariosToCreate - 1);
   if (gateErr) return gateErr;
 

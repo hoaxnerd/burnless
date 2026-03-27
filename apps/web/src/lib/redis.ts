@@ -24,7 +24,7 @@ export function getRedis(): Redis | null {
   try {
     client = new Redis(url, {
       maxRetriesPerRequest: 1,
-      retryStrategy(times) {
+      retryStrategy(times: number) {
         // Retry once quickly, then stop — don't block request handling
         if (times > 1) {
           connectionFailed = true;

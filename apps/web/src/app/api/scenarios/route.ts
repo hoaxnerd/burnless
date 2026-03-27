@@ -40,10 +40,11 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (roleErr) return roleErr;
 
   // Feature gate: check scenario limit (COUNT(*) — never load all rows)
-  const [{ count: scenarioCount }] = await db
+  const countResult = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
     .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
+  const scenarioCount = countResult[0]?.count ?? 0;
   const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount);
   if (gateErr) return gateErr;
 
