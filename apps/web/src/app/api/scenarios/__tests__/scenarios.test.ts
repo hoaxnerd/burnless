@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockRequireRole, mockGetCompanyPlan } =
+const { mockRequireCompanyAccess, mockRequireRole, mockRequirePlanFeature } =
   vi.hoisted(() => ({
     mockRequireCompanyAccess: vi.fn(),
     mockRequireRole: vi.fn().mockReturnValue(null),
-    mockGetCompanyPlan: vi.fn(),
+    mockRequirePlanFeature: vi.fn(),
   }));
 
 const {
@@ -26,14 +26,10 @@ const {
   mockReturning: vi.fn(),
 }));
 
-const { mockCanPerformAction } = vi.hoisted(() => ({
-  mockCanPerformAction: vi.fn(),
-}));
-
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
-  getCompanyPlan: mockGetCompanyPlan,
+  requirePlanFeature: mockRequirePlanFeature,
   parseBody: async (
     req: Request,
     schema: { parse: (d: unknown) => unknown }
@@ -72,10 +68,7 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
-
-vi.mock("@/lib/feature-gate", () => ({
-  canPerformAction: mockCanPerformAction,
-}));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
@@ -162,10 +155,9 @@ describe("POST /api/scenarios", () => {
       role: "editor",
     });
     mockRequireRole.mockReturnValue(null);
-    mockGetCompanyPlan.mockResolvedValue("starter");
-    // Feature gate check: COUNT(*) query returns [{count: N}]
+    // Feature gate: COUNT(*) query returns [{count: N}], requirePlanFeature returns null (allowed)
     mockWhere.mockResolvedValueOnce([{ count: 1 }]);
-    mockCanPerformAction.mockReturnValue({ allowed: true });
+    mockRequirePlanFeature.mockResolvedValue(null);
 
     const createdScenario = {
       id: "scen-new",
@@ -190,6 +182,34 @@ describe("POST /api/scenarios", () => {
     expect(body.type).toBe("worst");
     expect(mockInsert).toHaveBeenCalled();
     expect(mockReturning).toHaveBeenCalled();
+  });
+
+  it("returns 403 with PLAN_LIMIT_REACHED when at limit", async () => {
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1",
+      companyId: "comp-1",
+      role: "editor",
+    });
+    mockRequireRole.mockReturnValue(null);
+    mockWhere.mockResolvedValueOnce([{ count: 3 }]);
+    mockRequirePlanFeature.mockResolvedValue(
+      NextResponse.json(
+        { error: "Free plan is limited to 3 scenarios.", code: "PLAN_LIMIT_REACHED", upgradeTarget: "pro" },
+        { status: 403 }
+      )
+    );
+
+    const req = jsonRequest("http://localhost/api/scenarios", "POST", {
+      name: "Over Limit",
+      type: "custom",
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("PLAN_LIMIT_REACHED");
+    expect(body.upgradeTarget).toBe("pro");
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("returns 403 for viewer", async () => {

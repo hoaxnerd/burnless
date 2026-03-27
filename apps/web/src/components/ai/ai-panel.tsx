@@ -7,6 +7,7 @@ import { usePinnedInsights } from "./use-pinned-insights";
 import { getPageContext } from "./page-context";
 import { InlineChart } from "./inline-chart";
 import { MarkdownRenderer } from "./markdown-renderer";
+import { useScenario } from "@/components/scenarios/scenario-context";
 
 interface ToolResult {
   tool: string;
@@ -29,6 +30,7 @@ interface AiPanelProps {
 export function AiPanel({ open, onClose }: AiPanelProps) {
   const pathname = usePathname();
   const pageContext = getPageContext(pathname);
+  const { activeScenarioId } = useScenario();
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,7 +75,7 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, conversationId }),
+        body: JSON.stringify({ message: text, conversationId, scenarioId: activeScenarioId }),
       });
 
       if (!res.ok) {

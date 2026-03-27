@@ -5,7 +5,7 @@ describe("feature-gate", () => {
   describe("getPlanLimits", () => {
     it("returns correct free plan limits", () => {
       const limits = getPlanLimits("free");
-      expect(limits.maxScenarios).toBe(1);
+      expect(limits.maxScenarios).toBe(3);
       expect(limits.maxAiMessages).toBe(10);
       expect(limits.maxExports).toBe(3);
       expect(limits.hasDataRoom).toBe(false);
@@ -34,13 +34,13 @@ describe("feature-gate", () => {
   describe("canPerformAction", () => {
     describe("create_scenario", () => {
       it("blocks free plan at limit", () => {
-        const result = canPerformAction("free", "create_scenario", 1);
+        const result = canPerformAction("free", "create_scenario", 3);
         expect(result.allowed).toBe(false);
         expect(result.reason).toContain("Free plan");
       });
 
       it("allows free plan under limit", () => {
-        const result = canPerformAction("free", "create_scenario", 0);
+        const result = canPerformAction("free", "create_scenario", 2);
         expect(result.allowed).toBe(true);
       });
 
@@ -139,7 +139,7 @@ describe("feature-gate", () => {
 
     describe("upgradeTarget", () => {
       it("suggests pro for scenario limits", () => {
-        const result = canPerformAction("free", "create_scenario", 1);
+        const result = canPerformAction("free", "create_scenario", 3);
         expect(result.upgradeTarget).toBe("pro");
       });
 

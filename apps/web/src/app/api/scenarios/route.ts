@@ -3,8 +3,7 @@ import { revalidateTag } from "next/cache";
 import { db, scenarios } from "@burnless/db";
 import { eq, and, gt, sql } from "drizzle-orm";
 import { createScenarioSchema } from "@burnless/types";
-import { requireCompanyAccess, requireRole, getCompanyPlan, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { canPerformAction } from "@/lib/feature-gate";
+import { requireCompanyAccess, requireRole, parseBody, requirePlanFeature, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
@@ -41,13 +40,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (roleErr) return roleErr;
 
   // Feature gate: check scenario limit (COUNT(*) — never load all rows)
-  const plan = await getCompanyPlan(ctx.companyId);
   const [{ count: scenarioCount }] = await db
     .select({ count: sql<number>`cast(count(*) as int)` })
     .from(scenarios)
     .where(eq(scenarios.companyId, ctx.companyId));
-  const gate = canPerformAction(plan, "create_scenario", scenarioCount);
-  if (!gate.allowed) return errorResponse(gate.reason!, 403);
+  const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount);
+  if (gateErr) return gateErr;
 
   const parsed = await parseBody(request, createScenarioSchema);
   if ("error" in parsed) return parsed.error;

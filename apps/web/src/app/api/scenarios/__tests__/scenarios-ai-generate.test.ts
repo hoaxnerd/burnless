@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
-const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireRole, mockRequirePlanFeature } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
   mockRequireRole: vi.fn().mockReturnValue(null),
+  mockRequirePlanFeature: vi.fn().mockResolvedValue(null),
 }));
 
 const { mockApplyRateLimit } = vi.hoisted(() => ({
@@ -26,7 +27,10 @@ const { mockComputeDashboardData } = vi.hoisted(() => ({
   mockComputeDashboardData: vi.fn(),
 }));
 
-const { mockInsert, mockValues, mockReturning } = vi.hoisted(() => ({
+const { mockSelect, mockSelectFrom, mockSelectWhere, mockInsert, mockValues, mockReturning } = vi.hoisted(() => ({
+  mockSelect: vi.fn(),
+  mockSelectFrom: vi.fn(),
+  mockSelectWhere: vi.fn(),
   mockInsert: vi.fn(),
   mockValues: vi.fn(),
   mockReturning: vi.fn(),
@@ -36,6 +40,7 @@ const { mockInsert, mockValues, mockReturning } = vi.hoisted(() => ({
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
+  requirePlanFeature: mockRequirePlanFeature,
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
   parseBody: async (
@@ -76,8 +81,8 @@ vi.mock("@/lib/compute-dashboard", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: { insert: mockInsert },
-  scenarios: {},
+  db: { select: mockSelect, insert: mockInsert },
+  scenarios: { companyId: "companyId" },
   forecastLines: {},
   revenueStreams: {},
 }));
@@ -93,6 +98,7 @@ vi.mock("@burnless/engine", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  sql: Object.assign(vi.fn(() => "count(*)"), { raw: vi.fn() }),
 }));
 
 vi.mock("next/cache", () => ({
@@ -155,6 +161,12 @@ describe("POST /api/scenarios/ai-generate", () => {
       totalExpenses: new Map(),
       metrics: {},
     });
+
+    // Default: select chain (for COUNT(*) feature gate)
+    mockSelect.mockReturnValue({ from: mockSelectFrom });
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
+    mockSelectWhere.mockResolvedValue([{ count: 1 }]);
+    mockRequirePlanFeature.mockResolvedValue(null);
 
     // Default: insert chain
     mockInsert.mockReturnValue({ values: mockValues });

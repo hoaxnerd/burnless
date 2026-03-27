@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
+import { useScenario } from "@/components/scenarios/scenario-context";
 import {
   type AiCommandCenterProps,
   type AlertData,
@@ -32,6 +33,7 @@ export function AiCommandCenter({
   mrrGrowth,
   cash,
 }: AiCommandCenterProps) {
+  const { activeScenarioId } = useScenario();
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [query, setQuery] = useState("");
@@ -82,6 +84,7 @@ export function AiCommandCenter({
         body: JSON.stringify({
           message: trimmed,
           conversationId,
+          scenarioId: activeScenarioId,
         }),
         signal: abortRef.current.signal,
       });

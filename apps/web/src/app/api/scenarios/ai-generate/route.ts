@@ -8,7 +8,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, scenarios, forecastLines, revenueStreams } from "@burnless/db";
-import { requireCompanyAccess, requireRole, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { eq, sql } from "drizzle-orm";
+import { requireCompanyAccess, requireRole, errorResponse, parseBody, requirePlanFeature, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { computeDashboardData } from "@/lib/compute-dashboard";
@@ -35,6 +36,15 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const parsed = await parseBody(request, generateSchema);
   if ("error" in parsed) return parsed.error;
+
+  // Feature gate: check scenario limit before generating
+  const scenariosToCreate = parsed.data.type === "best_worst" ? 2 : 1;
+  const [{ count: scenarioCount }] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(scenarios)
+    .where(eq(scenarios.companyId, ctx.companyId));
+  const gateErr = await requirePlanFeature(ctx.companyId, "create_scenario", scenarioCount + scenariosToCreate - 1);
+  if (gateErr) return gateErr;
 
   // Get base scenario to derive from
   const baseScenario = await getDefaultScenario(ctx.companyId);

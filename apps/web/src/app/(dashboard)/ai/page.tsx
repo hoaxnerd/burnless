@@ -22,6 +22,7 @@ import { ChatInput } from "./_components/chat-input";
 import { ConversationSidebar } from "./_components/conversation-sidebar";
 import { InsightsPanel } from "./_components/insights-panel";
 import type { Message, Insight, Conversation } from "./_components/types";
+import { useScenario } from "@/components/scenarios/scenario-context";
 
 /* ─── Quick-Start Template Definitions ─────────────────────────────── */
 
@@ -97,6 +98,7 @@ export default function AiCompanionPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
   const { planLimit, checkResponse, clearLimit } = usePlanLimit();
+  const { activeScenarioId } = useScenario();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { success } = useToast();
@@ -219,6 +221,7 @@ export default function AiCompanionPage() {
         body: JSON.stringify({
           message: userMessage,
           conversationId,
+          scenarioId: activeScenarioId,
         }),
       });
 

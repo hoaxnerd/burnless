@@ -19,7 +19,7 @@ export interface PlanLimits {
 
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
-    maxScenarios: 1,
+    maxScenarios: 3,
     maxAiMessages: 10,
     maxExports: 3,
     hasDataRoom: false,
@@ -68,7 +68,7 @@ export function canPerformAction(
       if (currentUsage !== undefined && currentUsage >= limits.maxScenarios) {
         return {
           allowed: false,
-          reason: `Free plan is limited to ${limits.maxScenarios} scenario. Upgrade to Pro for unlimited scenarios.`,
+          reason: `Free plan is limited to ${limits.maxScenarios} scenarios. Upgrade to Pro for unlimited scenarios.`,
           upgradeTarget: "pro",
         };
       }
