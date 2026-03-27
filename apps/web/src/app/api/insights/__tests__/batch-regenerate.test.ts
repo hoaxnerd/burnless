@@ -124,6 +124,7 @@ describe("POST /api/insights/batch-regenerate", () => {
     // Reset env
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
+    vi.stubEnv("DISABLE_CRON_AUTH", "true");
 
     // Re-set mock defaults after resetAllMocks
     mockCheckAiFeatureAllowed.mockResolvedValue({ allowed: true });
@@ -156,6 +157,7 @@ describe("POST /api/insights/batch-regenerate", () => {
 
   it("returns 401 in production without valid CRON_SECRET", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DISABLE_CRON_AUTH", "false");
 
     const { POST } = await import("../batch-regenerate/route");
     const res = await POST(
@@ -166,6 +168,7 @@ describe("POST /api/insights/batch-regenerate", () => {
 
   it("returns 401 in production with wrong CRON_SECRET", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DISABLE_CRON_AUTH", "false");
 
     const { POST } = await import("../batch-regenerate/route");
     const res = await POST(
@@ -178,6 +181,7 @@ describe("POST /api/insights/batch-regenerate", () => {
 
   it("allows access in development without CRON_SECRET", async () => {
     vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DISABLE_CRON_AUTH", "true");
 
     const { POST } = await import("../batch-regenerate/route");
     const res = await POST(

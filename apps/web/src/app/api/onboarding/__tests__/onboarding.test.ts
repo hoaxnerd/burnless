@@ -61,6 +61,7 @@ vi.mock("@burnless/db", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({

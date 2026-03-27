@@ -81,6 +81,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   lt: vi.fn(),
   inArray: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));

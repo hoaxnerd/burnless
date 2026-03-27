@@ -106,7 +106,7 @@ describe("Admin Invite Codes API", () => {
     mockInnerJoin.mockReturnValue({ where: mockWhere });
     // mockWhere must support both `.limit()` chaining and direct `await`
     mockWhere.mockImplementation(() => {
-      const chain = { limit: mockLimit, then: (resolve: (v: unknown[]) => void) => resolve([]) };
+      const chain = { limit: mockLimit, orderBy: mockOrderBy, then: (resolve: (v: unknown[]) => void) => resolve([]) };
       return chain;
     });
     mockLimit.mockResolvedValue([]);
@@ -124,9 +124,16 @@ describe("Admin Invite Codes API", () => {
         { id: "code-1", code: "ABC123", type: "single_use", isActive: true, createdAt: new Date() },
       ];
       mockOrderBy.mockResolvedValue(codes);
-      mockWhere.mockResolvedValue([
+      // First where() call chains into orderBy; subsequent calls resolve directly (redemptions query)
+      const redemptions = [
         { id: "r1", userId: "user-2", userName: "Alice", userEmail: "alice@test.com", redeemedAt: new Date() },
-      ]);
+      ];
+      mockWhere.mockImplementationOnce(() => ({
+        limit: mockLimit,
+        orderBy: mockOrderBy,
+        then: (resolve: (v: unknown[]) => void) => resolve([]),
+      }));
+      mockWhere.mockResolvedValue(redemptions);
 
       const res = await GET(jsonRequest("/api/admin/invite-codes", "GET"));
       expect(res.status).toBe(200);

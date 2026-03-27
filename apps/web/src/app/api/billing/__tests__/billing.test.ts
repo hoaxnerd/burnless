@@ -87,6 +87,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   gte: vi.fn(),
   count: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("@/lib/feature-gate", () => ({

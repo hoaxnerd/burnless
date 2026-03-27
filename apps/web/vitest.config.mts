@@ -10,6 +10,11 @@ export default defineConfig({
     environment: "happy-dom",
     setupFiles: ["./vitest.setup.ts"],
     css: false,
+    server: {
+      deps: {
+        external: ["ioredis"],
+      },
+    },
     coverage: {
       provider: "v8",
       include: ["src/components/**/*.tsx", "src/lib/**/*.ts"],

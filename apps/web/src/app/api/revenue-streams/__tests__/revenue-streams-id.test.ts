@@ -32,7 +32,7 @@ vi.mock("@burnless/db", () => ({
   revenueStreams: { id: "id", scenarioId: "scenarioId" },
   scenarios: { id: "id", companyId: "companyId" },
 }));
-vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), inArray: vi.fn() }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), inArray: vi.fn(), isNull: vi.fn() }));
 vi.mock("@burnless/types", () => ({ updateRevenueStreamSchema: { parse: (d: unknown) => d } }));
 
 import { PATCH, DELETE } from "../[id]/route";
