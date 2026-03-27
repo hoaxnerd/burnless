@@ -366,7 +366,7 @@ export function HeroKpiCard({
       }}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(resolvedConfig.href); }}
       className={`
-        group relative cursor-pointer overflow-visible
+        h-full flex flex-col group relative cursor-pointer overflow-visible
         rounded-2xl border
         p-5 sm:p-6
         transition-all duration-300
@@ -414,7 +414,7 @@ export function HeroKpiCard({
         </div>
       )}
 
-      <div className="relative z-10">
+      <div className="relative z-10 flex-1 flex flex-col justify-between">
         {/* Header: icon + label */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">

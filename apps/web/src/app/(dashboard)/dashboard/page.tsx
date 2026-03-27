@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import Link from "next/link";
 import {
   getCompany,
   getActiveScenario,
@@ -40,6 +39,7 @@ import { FormulaViewer } from "./formula-viewer";
 import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
+import { ScenariosWidget } from "./scenarios-widget";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
@@ -146,8 +146,9 @@ export default async function DashboardPage({
         secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
         cardModeOverrides: (dashPrefs.cardModeOverrides as Record<string, "intelligence" | "dynamic" | "custom">) ?? {},
         cardScenarioOverrides: (dashPrefs.cardScenarioOverrides as Record<string, string>) ?? {},
-        layout: (dashPrefs.layout as Array<{ widgetId: string; x: number; y: number; w: number; h: number }>) ?? [],
+        layout: (dashPrefs.layout as Array<{ widgetId: string; x: number; y: number; w: number; h: number; autoH?: boolean }>) ?? [],
         customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
+        closedWidgets: (dashPrefs.closedWidgets as string[]) ?? [],
       } : null}
     >
       <div>
@@ -302,46 +303,8 @@ export default async function DashboardPage({
               ),
 
               /* ── Scenarios Panel ────────────────────────────────────── */
-              "scenarios": pinnedScenarios.length > 0 ? (
-                <div className="h-full rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 hover-lift">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-surface-900">Scenarios</h2>
-                    <Link
-                      href="/scenarios"
-                      className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
-                    >
-                      View all
-                    </Link>
-                  </div>
-                  <div className="space-y-2">
-                    {pinnedScenarios.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-surface-900">{s.name}</p>
-                          <span className="text-xs text-surface-400 capitalize">{s.type}</span>
-                        </div>
-                        <Link
-                          href="/scenarios"
-                          className="text-xs font-medium text-brand-500 hover:text-brand-600 transition-colors"
-                        >
-                          View
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full rounded-2xl bg-surface-50/50 border border-dashed border-surface-200 p-5 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-sm text-surface-400 mb-2">No scenarios yet</p>
-                    <Link href="/scenarios/new" className="text-xs font-medium text-brand-500 hover:text-brand-600">
-                      Create scenario
-                    </Link>
-                  </div>
-                </div>
+              "scenarios": (
+                <ScenariosWidget scenarios={pinnedScenarios.map((s) => ({ id: s.id, name: s.name, type: s.type }))} />
               ),
 
               /* ── Customizable Metrics ───────────────────────────────── */

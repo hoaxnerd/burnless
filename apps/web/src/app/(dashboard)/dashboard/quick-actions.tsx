@@ -200,7 +200,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 sm:gap-3 mb-6 sm:mb-8 animate-slide-up stagger-5">
+      <div className="flex flex-wrap gap-2 sm:gap-3 animate-slide-up stagger-5 content-start">
         {actions.slice(0, 5).map((action) => {
           const Icon = action.icon;
           const baseClasses = `

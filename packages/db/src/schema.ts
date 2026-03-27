@@ -838,6 +838,8 @@ export const dashboardPreferences = pgTable(
       >()
       .notNull()
       .default([]),
+    /** Widget IDs the user has explicitly closed/hidden */
+    closedWidgets: jsonb("closed_widgets").$type<string[]>().notNull().default([]),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

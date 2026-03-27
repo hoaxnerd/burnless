@@ -37,6 +37,8 @@ export interface WidgetLayout {
   y: number;
   w: number;
   h: number;
+  /** true (default) = content-driven height; false = user-locked via resize */
+  autoH?: boolean;
 }
 
 export interface DashboardPreferences {
@@ -52,6 +54,8 @@ export interface DashboardPreferences {
     formula: string;
     dependsOn: string[];
   }>;
+  /** Widget IDs the user has explicitly closed/hidden */
+  closedWidgets: string[];
 }
 
 export interface DashboardIntelligenceState {
@@ -71,6 +75,8 @@ export interface DashboardIntelligenceState {
   addSecondaryMetric: (slug: string) => void;
   /** Remove a secondary metric */
   removeSecondaryMetric: (slug: string) => void;
+  /** Swap a secondary metric at its current position */
+  swapSecondaryMetric: (oldSlug: string, newSlug: string) => void;
   /** Reorder secondary metrics */
   reorderSecondaryMetrics: (metrics: string[]) => void;
   /** Get effective mode for a specific card (respects overrides) */
@@ -109,6 +115,22 @@ export interface DashboardIntelligenceState {
   isLoading: boolean;
   /** Whether preferences are being saved */
   isSaving: boolean;
+  /** Whether the dashboard is in edit/drag mode (transient, not persisted) */
+  isEditMode: boolean;
+  /** Toggle edit/drag mode */
+  setIsEditMode: (editing: boolean) => void;
+  /** Widget readiness — false means no data yet (transient, widget-reported) */
+  widgetReadiness: Record<string, boolean>;
+  /** Widget reports it has data and is ready to display */
+  reportWidgetReady: (id: string) => void;
+  /** Widget reports it has no data / is not ready */
+  reportWidgetNotReady: (id: string) => void;
+  /** Widget IDs the user has explicitly closed (persistent) */
+  closedWidgets: string[];
+  /** Close/hide a widget (user action, persisted) */
+  closeWidget: (id: string) => void;
+  /** Reopen a closed widget */
+  openWidget: (id: string) => void;
   /** Reset to defaults */
   resetToDefaults: () => void;
 }
@@ -139,6 +161,22 @@ export function DashboardIntelligenceProvider({
 }: ProviderProps) {
   const [isLoading, setIsLoading] = useState(!initialPreferences);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Widget readiness — transient, widget self-reports (default: ready)
+  const [widgetReadiness, setWidgetReadiness] = useState<Record<string, boolean>>({});
+  const reportWidgetReady = useCallback((id: string) => {
+    setWidgetReadiness((prev) => {
+      if (prev[id] === true) return prev;
+      return { ...prev, [id]: true };
+    });
+  }, []);
+  const reportWidgetNotReady = useCallback((id: string) => {
+    setWidgetReadiness((prev) => {
+      if (prev[id] === false) return prev;
+      return { ...prev, [id]: false };
+    });
+  }, []);
   const [catalogOpen, setCatalogOpenRaw] = useState(false);
   const [catalogMode, setCatalogMode] = useState<"manage" | "secondary">("manage");
   const setCatalogOpen = useCallback((open: boolean, mode?: "manage" | "secondary") => {
@@ -161,6 +199,7 @@ export function DashboardIntelligenceProvider({
     cardScenarioOverrides: initialPreferences?.cardScenarioOverrides ?? {},
     layout: initialPreferences?.layout ?? [],
     customMetrics: initialPreferences?.customMetrics ?? [],
+    closedWidgets: initialPreferences?.closedWidgets ?? [],
   }));
 
   // Load preferences from API if not provided server-side
@@ -181,6 +220,7 @@ export function DashboardIntelligenceProvider({
           cardScenarioOverrides: data.cardScenarioOverrides ?? {},
           layout: data.layout ?? [],
           customMetrics: data.customMetrics ?? [],
+          closedWidgets: data.closedWidgets ?? [],
         });
         setIsLoading(false);
       })
@@ -300,6 +340,15 @@ export function DashboardIntelligenceProvider({
     [updatePrefs]
   );
 
+  const swapSecondaryMetric = useCallback(
+    (oldSlug: string, newSlug: string) =>
+      updatePrefs((p) => ({
+        ...p,
+        secondaryMetrics: p.secondaryMetrics.map((s) => (s === oldSlug ? newSlug : s)),
+      })),
+    [updatePrefs]
+  );
+
   const removeSecondaryMetric = useCallback(
     (slug: string) =>
       updatePrefs((p) => ({
@@ -316,6 +365,24 @@ export function DashboardIntelligenceProvider({
 
   const reorderLayout = useCallback(
     (layout: WidgetLayout[]) => updatePrefs((p) => ({ ...p, layout })),
+    [updatePrefs]
+  );
+
+  const closeWidget = useCallback(
+    (id: string) =>
+      updatePrefs((p) => ({
+        ...p,
+        closedWidgets: p.closedWidgets.includes(id) ? p.closedWidgets : [...p.closedWidgets, id],
+      })),
+    [updatePrefs]
+  );
+
+  const openWidget = useCallback(
+    (id: string) =>
+      updatePrefs((p) => ({
+        ...p,
+        closedWidgets: p.closedWidgets.filter((w) => w !== id),
+      })),
     [updatePrefs]
   );
 
@@ -368,6 +435,7 @@ export function DashboardIntelligenceProvider({
         cardScenarioOverrides: {},
         layout: [],
         customMetrics: [],
+        closedWidgets: [],
       })),
     [updatePrefs]
   );
@@ -398,6 +466,7 @@ export function DashboardIntelligenceProvider({
       removeHeroCard,
       reorderHeroCards,
       addSecondaryMetric,
+      swapSecondaryMetric,
       removeSecondaryMetric,
       reorderSecondaryMetrics,
       getCardMode,
@@ -416,6 +485,14 @@ export function DashboardIntelligenceProvider({
       hasIntelligenceCards,
       isLoading,
       isSaving,
+      isEditMode,
+      setIsEditMode,
+      widgetReadiness,
+      reportWidgetReady,
+      reportWidgetNotReady,
+      closedWidgets: prefs.closedWidgets,
+      closeWidget,
+      openWidget,
       resetToDefaults,
     }),
     [
@@ -423,6 +500,7 @@ export function DashboardIntelligenceProvider({
       prefs.heroCards,
       prefs.secondaryMetrics,
       prefs.layout,
+      prefs.closedWidgets,
       hasIntelligenceCards,
       setMode,
       swapHeroCard,
@@ -430,9 +508,12 @@ export function DashboardIntelligenceProvider({
       removeHeroCard,
       reorderHeroCards,
       addSecondaryMetric,
+      swapSecondaryMetric,
       removeSecondaryMetric,
       reorderSecondaryMetrics,
       reorderLayout,
+      closeWidget,
+      openWidget,
       getCardMode,
       setCardMode,
       getCardScenario,
@@ -443,6 +524,11 @@ export function DashboardIntelligenceProvider({
       formulaViewerSlug,
       isLoading,
       isSaving,
+      isEditMode,
+      setIsEditMode,
+      widgetReadiness,
+      reportWidgetReady,
+      reportWidgetNotReady,
       resetToDefaults,
     ]
   );

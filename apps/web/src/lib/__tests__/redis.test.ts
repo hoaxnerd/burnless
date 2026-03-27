@@ -31,14 +31,14 @@ describe("redis", () => {
   });
 
   it("creates client when REDIS_URL is set", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
+    process.env.REDIS_URL = "redis://localhost:6380";
     const { getRedis } = await import("../redis");
     const client = getRedis();
     expect(client).not.toBeNull();
   });
 
   it("returns same instance on multiple calls", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
+    process.env.REDIS_URL = "redis://localhost:6380";
     const { getRedis } = await import("../redis");
     const client1 = getRedis();
     const client2 = getRedis();
@@ -46,7 +46,7 @@ describe("redis", () => {
   });
 
   it("resetRedis clears the client", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
+    process.env.REDIS_URL = "redis://localhost:6380";
     const { getRedis, resetRedis } = await import("../redis");
     const client1 = getRedis();
     expect(client1).not.toBeNull();

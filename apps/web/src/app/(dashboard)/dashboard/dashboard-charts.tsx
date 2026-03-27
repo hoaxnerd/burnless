@@ -98,6 +98,7 @@ export function DashboardChartCard({
     <>
       <div
         className={`
+          h-full flex flex-col
           rounded-2xl bg-surface-0 border border-surface-200
           p-5 sm:p-6
           hover:border-surface-300

@@ -6,6 +6,7 @@
  * In Custom/Intelligence mode: shows the original card (ghost state if no data).
  */
 
+import { useEffect } from "react";
 import { useDashboardIntelligence } from "./dashboard-intelligence-context";
 import { HeroKpiCard, type HeroKpiCardProps, type KpiVariant } from "./hero-kpi-card";
 
@@ -15,7 +16,6 @@ export interface HeroCardSlotProps {
   hasData: boolean;
   allPopulated: boolean;
   cardProps: Omit<HeroKpiCardProps, "variant">;
-  /** Swap data for Dynamic mode (when original has no data) */
   swapProps?: {
     originalSlug: string;
     originalLabel: string;
@@ -33,7 +33,18 @@ export function HeroCardSlot({
   cardProps,
   swapProps,
 }: HeroCardSlotProps) {
-  const { mode } = useDashboardIntelligence();
+  const { mode, reportWidgetReady, reportWidgetNotReady } = useDashboardIntelligence();
+
+  // Report readiness based on data availability
+  const isReady = !(mode === "dynamic" && !hasData && !swapProps);
+  useEffect(() => {
+    const widgetId = `hero-${index}`;
+    if (isReady) {
+      reportWidgetReady(widgetId);
+    } else {
+      reportWidgetNotReady(widgetId);
+    }
+  }, [isReady, index, reportWidgetReady, reportWidgetNotReady]);
 
   // Dynamic mode: swap empty cards with alternatives
   if (mode === "dynamic" && !hasData && swapProps) {
@@ -53,10 +64,8 @@ export function HeroCardSlot({
     );
   }
 
-  // Dynamic mode: hide card if no data and no swap available
-  if (mode === "dynamic" && !hasData && !swapProps) {
-    return null;
-  }
+  // Not ready (no data, no swap) — return null, grid shows "Not Available"
+  if (!isReady) return null;
 
   // Default: render the original card (ghost state if no data in Custom mode)
   return (

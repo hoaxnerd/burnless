@@ -173,19 +173,19 @@ export function AiCommandCenter({
 
   return (
     <AiGate feature="insights" hideWhenOff>
-      <div className="relative mb-6 animate-slide-up">
+      <div className="relative h-full animate-slide-up">
         {/* Gradient border wrapper */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-accent-500/20 via-accent-400/20 to-accent-500/10 pointer-events-none" />
 
         {/* Main card */}
-        <div className="relative rounded-2xl bg-surface-0 overflow-hidden">
+        <div className="relative rounded-2xl bg-surface-0 overflow-hidden h-full flex flex-col">
           {/* Ambient glow */}
           <div
             className="absolute inset-0 bg-gradient-to-br from-accent-500/[0.03] via-transparent to-accent-400/[0.03] pointer-events-none"
             style={{ animation: "ambientBreath 6s ease-in-out infinite" }}
           />
 
-          <div className="relative p-5 sm:p-6">
+          <div className="relative p-5 sm:p-6 flex-1 flex flex-col min-h-0">
             {/* Header */}
             <div className="flex items-center gap-2.5 mb-4">
               <div className="relative">
@@ -243,12 +243,15 @@ export function AiCommandCenter({
               </div>
             </div>
 
+            {/* Scrollable content area — prevents clipping when cell is shorter than content */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+
             {/* Inline Response Area */}
             {(hasResponse || isStreaming) && (
               <div className="mb-4 animate-slide-up">
                 <div
                   ref={responseRef}
-                  className="rounded-xl bg-surface-50/80 border border-surface-100 p-4 max-h-64 overflow-y-auto"
+                  className="rounded-xl bg-surface-50/80 border border-surface-100 p-4 flex-1 min-h-0 overflow-y-auto"
                 >
                   {error ? (
                     <p className="text-sm text-red-500">{error}</p>
@@ -386,6 +389,7 @@ export function AiCommandCenter({
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

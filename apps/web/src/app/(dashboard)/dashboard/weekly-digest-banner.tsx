@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useDashboardIntelligence } from "./dashboard-intelligence-context";
 
 interface DigestData {
   id: string;
@@ -17,6 +18,7 @@ export function WeeklyDigestBanner() {
   const [digest, setDigest] = useState<DigestData | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -28,12 +30,14 @@ export function WeeklyDigestBanner() {
         if (data.digest) setDigest(data.digest);
       })
       .catch((err) => {
-        // Log — digest is non-critical but we want visibility
         if (!(err instanceof DOMException && err.name === "AbortError")) {
           captureException(err);
         }
       })
-      .finally(() => clearTimeout(timer));
+      .finally(() => {
+        clearTimeout(timer);
+        setLoading(false);
+      });
 
     return () => {
       controller.abort();
@@ -41,6 +45,20 @@ export function WeeklyDigestBanner() {
     };
   }, []);
 
+  const { reportWidgetReady, reportWidgetNotReady } = useDashboardIntelligence();
+
+  // Report readiness to the grid
+  const isReady = !dismissed && !loading && !!digest;
+  useEffect(() => {
+    if (loading) return; // Don't report until fetch completes
+    if (isReady) {
+      reportWidgetReady("weekly-digest");
+    } else {
+      reportWidgetNotReady("weekly-digest");
+    }
+  }, [isReady, loading, reportWidgetReady, reportWidgetNotReady]);
+
+  // Nothing to show yet or dismissed
   if (!digest || dismissed) return null;
 
   const content = digest.narrative || digest.deterministicSummary;
@@ -68,7 +86,7 @@ export function WeeklyDigestBanner() {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-brand-500/20 bg-gradient-to-r from-brand-50/50 via-surface-0 to-surface-0 p-4 sm:p-5 mb-6 animate-slide-up">
+    <div className="relative overflow-hidden rounded-2xl border border-brand-500/20 bg-gradient-to-r from-brand-50/50 via-surface-0 to-surface-0 p-4 sm:p-5 h-full animate-slide-up">
       {/* Ambient glow */}
       <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 via-transparent to-transparent opacity-50 pointer-events-none" />
 

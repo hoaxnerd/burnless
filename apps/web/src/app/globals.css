@@ -614,6 +614,17 @@ a,
   }
 }
 
+/* ── Dashboard edit-mode: card border becomes dashed indicator ──── */
+[data-editing] > .widget-content > :first-child {
+  border-style: dashed !important;
+  border-color: color-mix(in srgb, var(--color-brand-200) 60%, transparent) !important;
+}
+
+/* ── Dashboard closed widget: red dashed border in edit mode ──── */
+[data-widget-closed] > .widget-content > :first-child {
+  border-color: rgb(252 165 165 / 0.8) !important;
+}
+
 /* ── Print Styles ──────────────────────────────────────────────────────────── */
 @media print {
   body {

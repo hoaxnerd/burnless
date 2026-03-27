@@ -51,7 +51,7 @@ export function CustomizableMetrics({
   const activeMetrics = secondaryMetrics.length > 0 ? secondaryMetrics : DEFAULT_SECONDARY_METRICS;
 
   return (
-    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6 hover-lift">
+    <div className="h-full flex flex-col rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6 hover-lift">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-surface-900">Key Metrics</h2>
         <button
@@ -62,7 +62,7 @@ export function CustomizableMetrics({
           Customize
         </button>
       </div>
-      <div className="space-y-1">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
         {activeMetrics.map((slug) => (
           <MetricRowDynamic
             key={slug}
@@ -94,7 +94,7 @@ function MetricRowDynamic({
   const {
     openFormulaViewer, getCardMode, setCardMode, mode: globalMode,
     registry, heroCards, secondaryMetrics,
-    addSecondaryMetric, removeSecondaryMetric,
+    addSecondaryMetric, swapSecondaryMetric, removeSecondaryMetric,
   } = useDashboardIntelligence();
   const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
@@ -108,14 +108,15 @@ function MetricRowDynamic({
     registry,
     usedSlugs: allUsedSlugs,
     heroSlugs: heroCards,
-    onSelect: addSecondaryMetric,
+    onSelect: (newSlug: string) => swapSecondaryMetric(slug, newSlug),
     onRemove: removeSecondaryMetric,
     onViewFormula: openFormulaViewer,
     categoryMeta: CATEGORY_META as Record<string, { label: string }>,
     getDependencyTree: getMetricDependencyTree,
     getDependents: getMetricDependents,
     getMetricDef: getMetricDefFn as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
-  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
+    swapMode: true,
+  }), [registry, allUsedSlugs, heroCards, slug, swapSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   if (!def) return null;
 

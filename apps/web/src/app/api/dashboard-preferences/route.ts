@@ -36,6 +36,7 @@ export const GET = withErrorHandler(async () => {
     cardScenarioOverrides: {},
     customMetrics: [],
     layout: [],
+    closedWidgets: [],
   };
 
   // Compute whether any card uses Intelligence mode — server-side equivalent
@@ -66,6 +67,7 @@ const patchSchema = z.object({
         y: z.number().int().min(0).max(200).optional().default(0),
         w: z.number().int().min(1).max(12),
         h: z.number().int().min(1).max(50),
+        autoH: z.boolean().optional(),
       })
     )
     .max(30)
@@ -81,6 +83,7 @@ const patchSchema = z.object({
     )
     .max(20)
     .optional(),
+  closedWidgets: z.array(z.string()).max(20).optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
