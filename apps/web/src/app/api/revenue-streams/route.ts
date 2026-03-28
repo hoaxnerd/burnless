@@ -49,7 +49,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const [scenario] = await db
     .select()
     .from(scenarios)
-    .where(and(eq(scenarios.id, parsed.data.scenarioId), eq(scenarios.companyId, ctx.companyId)));
+    .where(and(eq(scenarios.id, parsed.data.scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!scenario) return errorResponse("Scenario not found", 404);
 
   const [row] = await db.insert(revenueStreams).values(parsed.data).returning();

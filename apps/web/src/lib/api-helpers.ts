@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { auth } from "./auth";
 import { db, companies, getCompanyForUser } from "@burnless/db";
 import { eq } from "drizzle-orm";
@@ -100,6 +101,15 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
       const pathname = new URL(request.url).pathname;
       const requestId = request.headers.get("x-request-id") ?? undefined;
       const log = logger("api");
+
+      // Return 400 for validation errors instead of 500
+      if (error instanceof ZodError) {
+        return NextResponse.json(
+          { error: error.errors[0]?.message ?? "Invalid request body" },
+          { status: 400 }
+        );
+      }
+
       log.error(
         { requestId, method: request.method, pathname, err: error instanceof Error ? error : undefined },
         `${request.method} ${pathname} failed`
