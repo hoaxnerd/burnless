@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, transactions } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { monetaryAmount } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+import { parseISODate } from "@/lib/date-validation";
 
 const createSchema = z.object({
   accountId: z.string(),
@@ -24,14 +25,22 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   const url = new URL(request.url);
   const accountId = url.searchParams.get("accountId");
-  const startDate = url.searchParams.get("startDate");
-  const endDate = url.searchParams.get("endDate");
+  const startDateStr = url.searchParams.get("startDate");
+  const endDateStr = url.searchParams.get("endDate");
   const { limit, cursor } = parsePaginationParams(request);
 
   const conditions = [eq(transactions.companyId, ctx.companyId)];
   if (accountId) conditions.push(eq(transactions.accountId, accountId));
-  if (startDate) conditions.push(gte(transactions.date, new Date(startDate)));
-  if (endDate) conditions.push(lte(transactions.date, new Date(endDate)));
+  if (startDateStr) {
+    const d = parseISODate(startDateStr);
+    if (!d) return errorResponse("Invalid startDate format. Expected YYYY-MM-DD.", 400);
+    conditions.push(gte(transactions.date, d));
+  }
+  if (endDateStr) {
+    const d = parseISODate(endDateStr);
+    if (!d) return errorResponse("Invalid endDate format. Expected YYYY-MM-DD.", 400);
+    conditions.push(lte(transactions.date, d));
+  }
   if (cursor) conditions.push(gt(transactions.id, cursor));
 
   const rows = await db

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
+import { parseDateRange } from "@/lib/date-validation";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -25,6 +27,9 @@ import {
  * Returns computed P&L, Cash Flow, and Balance Sheet for a scenario.
  */
 export const GET = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "heavy");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -40,11 +45,9 @@ export const GET = withErrorHandler(async (request: Request) => {
     .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!scenario) return errorResponse("Scenario not found", 404);
 
-  // Parse YYYY-MM strings via numeric constructor to avoid UTC-vs-local timezone drift
-  const [sY, sM] = startDateStr.split("-").map(Number);
-  const [eY, eM] = endDateStr.split("-").map(Number);
-  const periodStart = new Date(sY!, sM! - 1, 1);
-  const periodEnd = new Date(eY!, eM!, 0); // day 0 = last day of target month
+  const dateRange = parseDateRange(startDateStr, endDateStr);
+  if ("error" in dateRange) return errorResponse(dateRange.error, 400);
+  const { periodStart, periodEnd } = dateRange;
 
   // Fetch all data in parallel
   const [fLines, accounts, revStreams, hcPlans, funding] = await Promise.all([

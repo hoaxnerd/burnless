@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getScenarioForCompany, getScenarioData } from "@burnless/db";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
+import { parseDateRange } from "@/lib/date-validation";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -24,6 +26,9 @@ import {
  * Returns all computed financial and SaaS metrics for a scenario.
  */
 export const GET = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "heavy");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
@@ -37,12 +42,9 @@ export const GET = withErrorHandler(async (request: Request) => {
   const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
   if (!scenario) return errorResponse("Scenario not found", 404);
 
-  // Parse YYYY-MM strings via numeric constructor to avoid UTC-vs-local timezone drift
-  // (new Date("2026-01-01") is UTC midnight, which in UTC-8 becomes Dec 31 — wrong month)
-  const [sY, sM] = startDateStr.split("-").map(Number);
-  const [eY, eM] = endDateStr.split("-").map(Number);
-  const periodStart = new Date(sY!, sM! - 1, 1);
-  const periodEnd = new Date(eY!, eM!, 0); // day 0 = last day of target month
+  const dateRange = parseDateRange(startDateStr, endDateStr);
+  if ("error" in dateRange) return errorResponse(dateRange.error, 400);
+  const { periodStart, periodEnd } = dateRange;
 
   const data = await getScenarioData(scenarioId, ctx.companyId);
 

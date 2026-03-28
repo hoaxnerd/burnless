@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, scenarios, forecastLines, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { applyRateLimit } from "@/lib/api-rate-limit";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -21,6 +22,9 @@ import {
  * GET /api/scenarios/compare?baseId=xxx&compareId=yyy
  */
 export const GET = withErrorHandler(async (request: Request) => {
+  const blocked = await applyRateLimit(request, "heavy");
+  if (blocked) return blocked;
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
