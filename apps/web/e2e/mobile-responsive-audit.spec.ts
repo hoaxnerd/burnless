@@ -231,7 +231,7 @@ const PROTECTED_PAGES = [
   { path: "/revenue", name: "Revenue" },
   { path: "/scenarios", name: "Scenarios" },
   { path: "/scenarios/compare", name: "Scenario Compare" },
-  { path: "/ai", name: "AI Chat" },
+  { path: "/ai", name: "Companion Chat" },
   { path: "/reports", name: "Reports" },
   { path: "/reports/profit-loss", name: "Profit & Loss" },
   { path: "/reports/cash-flow", name: "Cash Flow" },

@@ -60,7 +60,7 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("Your burn rate is $50k/mo")).toBeInTheDocument();
   });
 
-  it("shows AI Financial Companion badge on first assistant message", () => {
+  it("shows Financial Companion badge on first assistant message", () => {
     render(
       <ChatMessageList
         {...defaultProps}
@@ -70,7 +70,7 @@ describe("ChatMessageList", () => {
         ]}
       />
     );
-    expect(screen.getByText("AI Financial Companion")).toBeInTheDocument();
+    expect(screen.getByText("Financial Companion")).toBeInTheDocument();
   });
 
   it("shows typing indicator when streaming with empty content", () => {

@@ -1,5 +1,5 @@
 /**
- * Web search service abstraction — gives the AI companion web search capability.
+ * Web search service abstraction — gives the Companion web search capability.
  *
  * Local dev: SearXNG (self-hosted meta search engine) via Docker Compose
  * Production: Tavily API (purpose-built for LLM web search), or Serper/Brave

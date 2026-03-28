@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
  *   - Floating layout with rounded corners and shadow
  *   - Search trigger (Cmd+K)
  *   - Quick actions section
- *   - AI Companion prominence
+ *   - Companion prominence
  *   - Drag-and-drop reorder (basic verification)
  *   - Collapse/expand behavior
  *   - Mobile hamburger menu + overlay

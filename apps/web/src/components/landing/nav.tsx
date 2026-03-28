@@ -42,7 +42,7 @@ export function LandingNav() {
               href="#ai-demo"
               className="relative text-sm font-medium text-surface-500 hover:text-surface-900 transition-colors py-2.5 after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-brand-500 after:transition-all after:duration-300 hover:after:w-full"
             >
-              AI Companion
+              Companion
             </a>
             <Link
               href="/login"

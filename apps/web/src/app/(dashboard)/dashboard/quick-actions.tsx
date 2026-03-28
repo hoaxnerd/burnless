@@ -11,6 +11,7 @@ import {
   Upload,
   FileText,
 } from "lucide-react";
+import { useAiFlags } from "@/components/ai/ai-feature-context";
 
 interface QuickActionsProps {
   scenarioId: string;
@@ -26,6 +27,7 @@ interface QuickActionsProps {
 
 export function QuickActions({ scenarioId, accounts: _accounts, context }: QuickActionsProps) {
   const router = useRouter();
+  const { companionName } = useAiFlags();
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [revenueOpen, setRevenueOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -138,7 +140,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
   // AI is always available and prominent
   actions.push({
     key: "ai",
-    label: "Ask AI",
+    label: `Ask ${companionName}`,
     icon: Sparkles,
     href: "/ai",
     primary: true,

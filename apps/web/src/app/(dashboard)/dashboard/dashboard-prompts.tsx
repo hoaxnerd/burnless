@@ -10,7 +10,7 @@ export function SetupPrompt() {
       </div>
       <h3 className="text-xl font-bold text-surface-900 mb-2">Welcome to Burnless</h3>
       <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
-        Your AI-powered financial companion. Complete onboarding to set up your company.
+        Your financial companion. Complete onboarding to set up your company.
       </p>
       <Link
         href="/onboarding"

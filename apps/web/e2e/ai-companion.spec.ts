@@ -1,17 +1,17 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * AI Companion page E2E tests.
+ * Companion page E2E tests.
  * Smoke tests run without auth. Content tests gated behind DATABASE_URL.
  */
 
-test.describe("AI Companion smoke tests", () => {
-  test("AI companion page does not return 500", async ({ page }) => {
+test.describe("Companion smoke tests", () => {
+  test("Companion page does not return 500", async ({ page }) => {
     const response = await page.goto("/ai", { waitUntil: "commit" });
     expect(response?.status()).toBeLessThan(500);
   });
 
-  test("AI companion page redirects unauthenticated users", async ({
+  test("Companion page redirects unauthenticated users", async ({
     page,
   }) => {
     await page.goto("/ai", { waitUntil: "networkidle" });
@@ -21,18 +21,18 @@ test.describe("AI Companion smoke tests", () => {
 
 const dbAvailable = !!process.env.DATABASE_URL;
 
-test.describe("AI Companion UI (requires auth)", () => {
+test.describe("Companion UI (requires auth)", () => {
   test.skip(!dbAvailable, "Requires DATABASE_URL for authenticated tests");
 
-  test("shows AI Companion heading", async ({ page }) => {
+  test("shows Companion heading", async ({ page }) => {
     await page.goto("/ai");
-    await expect(page.getByText("AI Companion")).toBeVisible();
+    await expect(page.getByText("Companion")).toBeVisible();
   });
 
   test("shows welcome message on initial load", async ({ page }) => {
     await page.goto("/ai");
     await expect(
-      page.getByText("I'm your AI financial companion")
+      page.getByText("I'm your financial companion")
     ).toBeVisible();
   });
 

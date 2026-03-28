@@ -72,7 +72,7 @@ test.describe("Settings page UI (requires auth)", () => {
     await page.goto("/settings");
     await page.getByRole("tab", { name: /ai features/i }).click();
     // Should show individual feature toggles
-    await expect(page.getByText("AI Chat Companion")).toBeVisible();
+    await expect(page.getByText("Chat Companion")).toBeVisible();
     await expect(page.getByText("AI Insights")).toBeVisible();
   });
 

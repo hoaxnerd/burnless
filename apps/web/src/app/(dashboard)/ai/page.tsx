@@ -372,7 +372,7 @@ export default function AiCompanionPage() {
                 <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-accent-600" />
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white" />
               </div>
-              AI Financial Companion
+              Financial Companion
             </h1>
             <p className="mt-1 text-sm text-surface-500">
               Your personal CFO that understands your numbers

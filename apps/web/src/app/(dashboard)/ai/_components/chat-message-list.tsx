@@ -94,7 +94,7 @@ export function ChatMessageList({
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-100 px-2 py-0.5 text-[10px] font-medium text-accent-600">
                       <Sparkles className="h-2.5 w-2.5" />
-                      AI Financial Companion
+                      Financial Companion
                     </span>
                   </div>
                 )}

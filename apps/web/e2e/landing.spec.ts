@@ -411,7 +411,7 @@ test.describe("Landing page — mobile responsive", () => {
 
     test("desktop nav links are hidden on mobile", async ({ page }) => {
       await page.goto("/");
-      // Desktop nav (Features, AI Companion, Log in) should be hidden
+      // Desktop nav (Features, Companion, Log in) should be hidden
       const featuresLink = page.locator('nav a[href="#features"]');
       if ((await featuresLink.count()) > 0) {
         await expect(featuresLink).not.toBeVisible();

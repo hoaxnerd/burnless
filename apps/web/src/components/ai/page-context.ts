@@ -1,6 +1,6 @@
 /**
  * Maps the current page path to context-aware AI suggested prompts.
- * The AI companion uses these to offer relevant quick actions.
+ * The Companion uses these to offer relevant quick actions.
  */
 
 interface PageContext {
@@ -112,7 +112,7 @@ const pageContextMap: Record<string, PageContext> = {
 };
 
 /**
- * Get context-aware page info and suggested prompts for the AI companion.
+ * Get context-aware page info and suggested prompts for the Companion.
  * Falls back to generic prompts for unknown pages.
  */
 export function getPageContext(pathname: string): PageContext {

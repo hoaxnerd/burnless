@@ -69,7 +69,7 @@ export function SetupPrompt({ context }: { context?: string }) {
       description={`Complete onboarding to set up your company${context ? ` and start ${context}` : ""}.`}
       ctaLabel="Get started"
       ctaHref="/onboarding"
-      aiHint="AI will guide you through setup in under 2 minutes"
+      aiHint="Companion will guide you through setup in under 2 minutes"
     />
   );
 }
@@ -82,7 +82,7 @@ export function ScenarioPrompt({ context }: { context?: string }) {
       description={`A scenario is your financial model.${context ? ` You need one to ${context}.` : " Start with a base case and explore alternatives."}`}
       ctaLabel="Create scenario"
       ctaHref="/scenarios/new"
-      aiHint="Try asking AI: &ldquo;Create a base scenario for my startup&rdquo;"
+      aiHint="Try asking Companion: &ldquo;Create a base scenario for my startup&rdquo;"
     />
   );
 }
@@ -97,7 +97,7 @@ export function ExpensesEmptyState() {
       description="Add your first expense or import from a CSV. AI will auto-categorize everything and flag anomalies."
       ctaLabel="Add expenses"
       ctaHref="/import"
-      aiHint="Drag &amp; drop a CSV and AI handles the rest"
+      aiHint="Drag &amp; drop a CSV and Companion handles the rest"
     />
   );
 }
@@ -110,7 +110,7 @@ export function RevenueEmptyState() {
       description="Add revenue streams — subscriptions, one-time sales, or usage-based pricing. See MRR, ARR, and growth projections instantly."
       ctaLabel="Add revenue stream"
       ctaHref="/revenue"
-      aiHint="Ask AI: &ldquo;Help me model my SaaS revenue&rdquo;"
+      aiHint="Ask Companion: &ldquo;Help me model my SaaS revenue&rdquo;"
     />
   );
 }
@@ -123,7 +123,7 @@ export function FundingEmptyState() {
       description="Record funding rounds to calculate runway, cash position, and ownership dilution. Plan your next raise with confidence."
       ctaLabel="Add funding round"
       ctaHref="/funding"
-      aiHint="AI can suggest optimal raise timing based on your burn rate"
+      aiHint="Companion can suggest optimal raise timing based on your burn rate"
     />
   );
 }
@@ -136,7 +136,7 @@ export function TeamEmptyState() {
       description="Map your org structure and model hiring plans. See how each hire impacts runway and per-employee efficiency."
       ctaLabel="Add team member"
       ctaHref="/team"
-      aiHint="Ask AI: &ldquo;What&rsquo;s the runway impact of hiring 3 engineers?&rdquo;"
+      aiHint="Ask Companion: &ldquo;What&rsquo;s the runway impact of hiring 3 engineers?&rdquo;"
     />
   );
 }

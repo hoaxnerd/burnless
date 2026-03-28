@@ -81,13 +81,13 @@ export function AIDemoSection() {
         >
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 border border-brand-500/20 px-4 py-1.5 text-sm font-medium text-brand-400 mb-6">
             <Bot className="w-4 h-4" />
-            AI Companion
+            Companion
           </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-surface-900 tracking-tight">
             Ask anything. Get clarity.
           </h2>
           <p className="mt-4 text-lg text-surface-500 max-w-2xl mx-auto">
-            Your AI financial companion analyzes your data and answers questions
+            Your financial companion analyzes your data and answers questions
             in plain English — like having a CFO on speed dial.
           </p>
         </div>

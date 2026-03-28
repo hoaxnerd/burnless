@@ -21,17 +21,17 @@ test.describe("AI UX — authenticated", () => {
     await page.goto("/ai");
 
     await expect(
-      page.getByRole("heading", { name: /ai companion/i }).first()
+      page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
     await expect(
-      page.getByText("I'm your AI financial companion")
+      page.getByText("I'm your financial companion")
     ).toBeVisible();
   });
 
   test("AI page shows template cards", async ({ page }) => {
     await page.goto("/ai");
     await expect(
-      page.getByRole("heading", { name: /ai companion/i }).first()
+      page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
 
     // Template cards should be visible
@@ -115,7 +115,7 @@ test.describe("AI UX — authenticated", () => {
 
     await newChatButton.click();
     await expect(
-      page.getByText("I'm your AI financial companion")
+      page.getByText("I'm your financial companion")
     ).toBeVisible();
   });
 
@@ -142,7 +142,7 @@ test.describe("AI UX — authenticated", () => {
     await page.goto("/ai");
 
     await expect(
-      page.getByRole("heading", { name: /ai companion/i }).first()
+      page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
 
     // Click a template card (e.g., "Monthly Briefing")
@@ -175,7 +175,7 @@ test.describe("AI UX — mobile viewport", () => {
     await page.goto("/ai");
 
     await expect(
-      page.getByRole("heading", { name: /ai companion/i }).first()
+      page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
 
     // Chat input should be visible

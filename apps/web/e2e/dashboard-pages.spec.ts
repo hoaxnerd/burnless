@@ -15,7 +15,7 @@ const dashboardRoutes = [
   { path: "/reports", name: "Reports" },
   { path: "/import", name: "Import" },
   { path: "/data-room", name: "Data Room" },
-  { path: "/ai", name: "AI Companion" },
+  { path: "/ai", name: "Companion" },
   { path: "/settings", name: "Settings" },
 ];
 

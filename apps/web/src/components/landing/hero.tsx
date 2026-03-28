@@ -206,7 +206,7 @@ export function HeroSection() {
             className="mt-6 text-lg sm:text-xl text-surface-500 max-w-2xl mx-auto leading-relaxed"
             style={{ animation: "heroTextReveal 0.8s var(--ease-smooth) 0.35s both" }}
           >
-            Your AI financial companion that understands burn rate, forecasts runway,
+            Your financial companion that understands burn rate, forecasts runway,
             and helps you make confident decisions — not spreadsheet guesses.
           </p>
 

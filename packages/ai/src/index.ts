@@ -1,4 +1,4 @@
-// @burnless/ai — AI companion for financial planning
+// @burnless/ai — Companion for financial planning
 // Provider-agnostic: supports Anthropic, OpenAI, OpenRouter, and more.
 // Configure via AI_PROVIDER + AI_MODEL + AI_API_KEY env vars.
 

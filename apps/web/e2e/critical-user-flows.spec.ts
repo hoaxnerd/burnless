@@ -514,19 +514,19 @@ test.describe("Expense management: add and view expenses", () => {
 // 5. AI CHAT — open → send message → response renders
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test.describe("AI Companion: chat interaction", () => {
+test.describe("Companion: chat interaction", () => {
   test.skip(!dbAvailable, "Requires DATABASE_URL");
   test.use({ storageState: "e2e/.auth/user.json" });
 
   test("AI page loads with welcome message", async ({ page }) => {
     await page.goto("/ai");
 
-    // Use heading to avoid matching multiple "AI Companion" elements
+    // Use heading to avoid matching multiple "Companion" elements
     await expect(
-      page.getByRole("heading", { name: /ai companion/i }).first()
+      page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
     await expect(
-      page.getByText("I'm your AI financial companion")
+      page.getByText("I'm your financial companion")
     ).toBeVisible();
   });
 
@@ -587,7 +587,7 @@ test.describe("AI Companion: chat interaction", () => {
 
     await newChatButton.click();
     await expect(
-      page.getByText("I'm your AI financial companion")
+      page.getByText("I'm your financial companion")
     ).toBeVisible();
   });
 

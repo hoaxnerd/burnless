@@ -26,7 +26,7 @@ const TIERS = [
     popular: true,
     features: [
       "Unlimited scenarios",
-      "Unlimited AI companion",
+      "Unlimited Companion",
       "PDF & CSV export",
       "Data room",
       "Priority support",
