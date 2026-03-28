@@ -1,7 +1,8 @@
 "use client";
 
-import { Power, Database, Sparkles, Shield } from "lucide-react";
-import { AI_FEATURE_LIST, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
+import { useState } from "react";
+import { Power, Database, Sparkles, Shield, Pencil } from "lucide-react";
+import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
 import type { BudgetStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
 import { ProviderSection } from "./ai-provider-section";
 import { BudgetSection } from "./ai-budget-section";
@@ -67,6 +68,14 @@ export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, 
           </button>
         </div>
       </div>
+
+      {/* Companion Name */}
+      {flags.masterEnabled && (
+        <CompanionNameField
+          value={flags.companionName ?? DEFAULT_COMPANION_NAME}
+          onChange={(name) => updateFlags({ companionName: name })}
+        />
+      )}
 
       {/* AI Provider Selector */}
       {flags.masterEnabled && (
@@ -173,6 +182,62 @@ export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Companion name inline editor ────────────────────────────── */
+
+function CompanionNameField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const save = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onChange(trimmed);
+    else setDraft(value);
+    setEditing(false);
+  };
+
+  return (
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+      <div className="flex items-center gap-4">
+        <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
+          <Pencil className="h-[18px] w-[18px] text-surface-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-semibold text-surface-900">Companion Name</h2>
+          <p className="text-sm text-surface-500 mt-0.5">
+            Personalize the name shown throughout the app
+          </p>
+        </div>
+      </div>
+      <div className="mt-4">
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              type="text"
+              maxLength={50}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
+              className="flex-1 rounded-lg border border-surface-300 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+            <button onClick={save} className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors">Save</button>
+            <button onClick={() => { setDraft(value); setEditing(false); }} className="rounded-lg border border-surface-300 px-3 py-2 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-colors">Cancel</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setDraft(value); setEditing(true); }}
+            className="group flex items-center gap-2 rounded-lg border border-surface-200 px-3 py-2 text-sm text-surface-900 hover:border-surface-300 hover:bg-surface-50 transition-all"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+            <span className="font-medium">{value}</span>
+            <Pencil className="h-3 w-3 text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
