@@ -32,6 +32,7 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  inArray: vi.fn(),
 }));
 
 const { mockComputeWeeklyDigest, mockBuildDeterministicSummary } = vi.hoisted(() => ({
@@ -124,7 +125,13 @@ describe("GET /api/cron/weekly-digest", () => {
   });
 
   it("skips companies with digest feature disabled", async () => {
-    mockSelect.mockReturnValue({ from: mockFrom });
+    // First select: companies; second select: owners batch
+    let selectCall = 0;
+    mockSelect.mockImplementation(() => {
+      selectCall++;
+      if (selectCall === 1) return { from: mockFrom };
+      return { from: () => ({ where: vi.fn().mockResolvedValue([{ id: "u1", email: "u1@test.com" }]) }) };
+    });
     mockFrom.mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]);
 
     mockGetAiFlags.mockResolvedValue({
@@ -140,7 +147,12 @@ describe("GET /api/cron/weekly-digest", () => {
   });
 
   it("skips companies without scenario data", async () => {
-    mockSelect.mockReturnValue({ from: mockFrom });
+    let selectCall = 0;
+    mockSelect.mockImplementation(() => {
+      selectCall++;
+      if (selectCall === 1) return { from: mockFrom };
+      return { from: () => ({ where: vi.fn().mockResolvedValue([{ id: "u1", email: "u1@test.com" }]) }) };
+    });
     mockFrom.mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]);
 
     mockGetAiFlags.mockResolvedValue({
@@ -155,7 +167,15 @@ describe("GET /api/cron/weekly-digest", () => {
   });
 
   it("handles errors gracefully and continues processing", async () => {
-    mockSelect.mockReturnValue({ from: mockFrom });
+    let selectCall = 0;
+    mockSelect.mockImplementation(() => {
+      selectCall++;
+      if (selectCall === 1) return { from: mockFrom };
+      return { from: () => ({ where: vi.fn().mockResolvedValue([
+        { id: "u1", email: "u1@test.com" },
+        { id: "u2", email: "u2@test.com" },
+      ]) }) };
+    });
     mockFrom.mockResolvedValue([
       { id: "c1", name: "Co1", ownerId: "u1" },
       { id: "c2", name: "Co2", ownerId: "u2" },

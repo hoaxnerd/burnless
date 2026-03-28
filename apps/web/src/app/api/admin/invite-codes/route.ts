@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, inviteCodes, inviteCodeRedemptions, users } from "@burnless/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import {
   requireCompanyAccess,
@@ -43,12 +43,13 @@ export const GET = withErrorHandler(async (request: Request) => {
     .where(eq(inviteCodes.createdBy, ctx.userId))
     .orderBy(desc(inviteCodes.createdAt));
 
-  // Fetch redemptions for each code
-  const codesWithRedemptions = await Promise.all(
-    codes.map(async (code) => {
-      const redemptions = await db
+  // Batch fetch all redemptions in a single query (avoids N+1)
+  const codeIds = codes.map((c) => c.id);
+  const allRedemptions = codeIds.length
+    ? await db
         .select({
           id: inviteCodeRedemptions.id,
+          inviteCodeId: inviteCodeRedemptions.inviteCodeId,
           userId: inviteCodeRedemptions.userId,
           userName: users.name,
           userEmail: users.email,
@@ -56,11 +57,23 @@ export const GET = withErrorHandler(async (request: Request) => {
         })
         .from(inviteCodeRedemptions)
         .innerJoin(users, eq(users.id, inviteCodeRedemptions.userId))
-        .where(eq(inviteCodeRedemptions.inviteCodeId, code.id));
+        .where(inArray(inviteCodeRedemptions.inviteCodeId, codeIds))
+    : [];
 
-      return { ...code, redemptions };
-    })
-  );
+  // Group redemptions by code ID
+  const redemptionsByCode = new Map<string, typeof allRedemptions>();
+  for (const r of allRedemptions) {
+    const list = redemptionsByCode.get(r.inviteCodeId) ?? [];
+    list.push(r);
+    redemptionsByCode.set(r.inviteCodeId, list);
+  }
+
+  const codesWithRedemptions = codes.map((code) => ({
+    ...code,
+    redemptions: (redemptionsByCode.get(code.id) ?? []).map(
+      ({ inviteCodeId: _, ...rest }) => rest
+    ),
+  }));
 
   return NextResponse.json(codesWithRedemptions);
 });

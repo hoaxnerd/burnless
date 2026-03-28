@@ -74,6 +74,7 @@ vi.mock("@burnless/db", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   desc: vi.fn(),
+  inArray: vi.fn(),
 }));
 
 import { GET, POST } from "../route";
@@ -124,16 +125,28 @@ describe("Admin Invite Codes API", () => {
         { id: "code-1", code: "ABC123", type: "single_use", isActive: true, createdAt: new Date() },
       ];
       mockOrderBy.mockResolvedValue(codes);
-      // First where() call chains into orderBy; subsequent calls resolve directly (redemptions query)
+
+      // Batch redemptions query: select({...}).from().innerJoin().where(inArray(...))
       const redemptions = [
-        { id: "r1", userId: "user-2", userName: "Alice", userEmail: "alice@test.com", redeemedAt: new Date() },
+        { id: "r1", inviteCodeId: "code-1", userId: "user-2", userName: "Alice", userEmail: "alice@test.com", redeemedAt: new Date() },
       ];
-      mockWhere.mockImplementationOnce(() => ({
-        limit: mockLimit,
-        orderBy: mockOrderBy,
-        then: (resolve: (v: unknown[]) => void) => resolve([]),
-      }));
-      mockWhere.mockResolvedValue(redemptions);
+      // Second select call (for redemptions batch) uses: select -> from -> innerJoin -> where
+      let selectCallCount = 0;
+      mockSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          // First call: codes query
+          return { from: mockFrom };
+        }
+        // Second call: batch redemptions query
+        return {
+          from: () => ({
+            innerJoin: () => ({
+              where: vi.fn().mockResolvedValue(redemptions),
+            }),
+          }),
+        };
+      });
 
       const res = await GET(jsonRequest("/api/admin/invite-codes", "GET"));
       expect(res.status).toBe(200);

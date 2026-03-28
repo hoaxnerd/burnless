@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { db, companies, users, weeklyDigests } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { computeWeeklyDigest, buildDeterministicSummary } from "@/lib/compute-digest";
 import { generateDigestNarrative } from "@/lib/digest-narrative";
 import { email } from "@/lib/email";
@@ -38,6 +38,13 @@ export const GET = withErrorHandler(async function GET(request: Request) {
 
   const allCompanies = await db.select().from(companies);
   const results: { companyId: string; status: string }[] = [];
+
+  // Pre-fetch all owners in a single query (avoids N+1)
+  const ownerIds = [...new Set(allCompanies.map((c) => c.ownerId).filter(Boolean))] as string[];
+  const owners = ownerIds.length
+    ? await db.select().from(users).where(inArray(users.id, ownerIds))
+    : [];
+  const ownerMap = new Map(owners.map((u) => [u.id, u]));
 
   for (const company of allCompanies) {
     try {
@@ -83,12 +90,8 @@ export const GET = withErrorHandler(async function GET(request: Request) {
           },
         });
 
-      // Send email to company owner
-      const [owner] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, company.ownerId))
-        .limit(1);
+      // Send email to company owner (pre-fetched above)
+      const owner = company.ownerId ? ownerMap.get(company.ownerId) : undefined;
 
       if (owner?.email) {
         const emailData = weeklyDigestEmail({
