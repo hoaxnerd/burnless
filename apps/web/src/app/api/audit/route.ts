@@ -43,7 +43,10 @@ export const GET = withErrorHandler(async (request: Request) => {
     conditions.push(eq(financialAuditLogs.entityId, entityId));
   }
   if (cursor) {
-    conditions.push(lt(financialAuditLogs.createdAt, new Date(cursor)));
+    const cursorDate = new Date(cursor);
+    if (!isNaN(cursorDate.getTime())) {
+      conditions.push(lt(financialAuditLogs.createdAt, cursorDate));
+    }
   }
 
   const rows = await db
