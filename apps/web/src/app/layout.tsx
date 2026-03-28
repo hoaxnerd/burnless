@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://burnless.com"),
   title: "Burnless — AI Financial Planning for Startups",
   description:
-    "Manage revenue, funding, and expenses with an AI companion that helps you make smarter financial decisions.",
+    "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Burnless — AI Financial Planning for Startups",
     description:
-      "Manage revenue, funding, and expenses with an AI companion that helps you make smarter financial decisions.",
+      "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
     siteName: "Burnless",
     type: "website",
   },
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Burnless — AI Financial Planning for Startups",
     description:
-      "Manage revenue, funding, and expenses with an AI companion that helps you make smarter financial decisions.",
+      "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
   },
 };
 

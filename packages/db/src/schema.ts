@@ -659,6 +659,8 @@ export const aiFeatureFlags = pgTable(
       }),
     // AI write mode — guardrail for AI mutations (full = execute, confirm = ask first, read_only = block)
     writeMode: aiWriteModeEnum("write_mode").notNull().default("full"),
+    // Configurable companion name (default: "Companion")
+    companionName: text("companion_name").notNull().default("Companion"),
     // AI Provider config — per-company provider override (null = use env vars)
     aiProvider: text("ai_provider"), // "anthropic" | "openai" | "openrouter"
     aiApiKey: text("ai_api_key"), // user's own API key (masked in API responses)

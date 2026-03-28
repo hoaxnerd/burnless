@@ -64,6 +64,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
       ...body.features,
     };
   }
+  if (body.companionName !== undefined) {
+    updates.companionName = body.companionName;
+  }
   // Provider config — null clears to env-var fallback
   if (body.aiProvider !== undefined) updates.aiProvider = body.aiProvider;
   if (body.aiApiKey !== undefined) updates.aiApiKey = body.aiApiKey;
@@ -91,6 +94,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     dataMode: updated.dataMode,
     writeMode: updated.writeMode,
     features: updated.features,
+    companionName: updated.companionName ?? DEFAULT_AI_FLAGS.companionName,
     monthlyBudgetCents: updated.monthlyBudgetCents,
     aiProvider: updated.aiProvider,
     aiApiKey: maskApiKey(updated.aiApiKey),
@@ -115,6 +119,7 @@ async function getOrCreateFlags(companyId: string) {
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
       writeMode: (existing.writeMode ?? "full") as "full" | "confirm" | "read_only",
       features: existing.features as AiFeatureConfig,
+      companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
       monthlyBudgetCents: existing.monthlyBudgetCents,
       aiProvider: existing.aiProvider,
       aiApiKey: maskApiKey(existing.aiApiKey),
@@ -139,6 +144,7 @@ async function getOrCreateFlags(companyId: string) {
     dataMode: (created?.dataMode ?? DEFAULT_AI_FLAGS.dataMode) as "full" | "show_cached" | "hide_all",
     writeMode: (created?.writeMode ?? DEFAULT_AI_FLAGS.writeMode) as "full" | "confirm" | "read_only",
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
+    companionName: created?.companionName ?? DEFAULT_AI_FLAGS.companionName,
     monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
     aiProvider: null,
     aiApiKey: null,

@@ -53,7 +53,7 @@ export default function AboutPage() {
             </h2>
             <p>
               Burnless is built specifically for startup founders and finance
-              leads. We combine intuitive design with an AI companion that
+              leads. We combine intuitive design with a companion that
               understands startup financial patterns — from burn rate
               optimization to fundraising runway modeling to scenario planning.
             </p>

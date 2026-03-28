@@ -67,6 +67,7 @@ export {
   canMakeLlmCall,
   canFeatureCallLlm,
   DEFAULT_AI_FLAGS,
+  DEFAULT_COMPANION_NAME,
   AI_FEATURE_LIST,
 } from "./feature-flags";
 export type {

@@ -29,7 +29,7 @@ export const coreNavItems: NavItem[] = [
   { id: "data-room", href: "/data-room", label: "Data Room", icon: FolderOpen },
 ];
 
-export const aiNavItem: NavItem = { id: "ai", href: "/ai", label: "AI Companion", icon: Sparkles };
+export const aiNavItem: NavItem = { id: "ai", href: "/ai", label: "Companion", icon: Sparkles };
 
 export const NAV_ITEM_MAP = new Map<string, NavItem>(
   [...coreNavItems, aiNavItem].map((item) => [item.id, item])

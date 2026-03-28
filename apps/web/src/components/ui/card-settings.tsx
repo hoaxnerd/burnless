@@ -47,7 +47,7 @@ const MODES: ModeOption[] = [
     icon: Brain,
     description: "AI decides what to show",
     detail:
-      "The AI companion analyzes your data and chooses the most relevant metric for this card based on context and trends.",
+      "The companion analyzes your data and chooses the most relevant metric for this card based on context and trends.",
   },
   {
     value: "dynamic",

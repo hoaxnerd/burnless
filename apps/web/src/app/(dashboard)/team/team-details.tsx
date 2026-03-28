@@ -167,7 +167,7 @@ export function TeamDetails({
             Add your current team and planned hires to see how headcount affects your burn rate and runway.
           </p>
           <p className="text-xs text-surface-400">
-            Use the &quot;Add Team Member&quot; button above or the AI companion to get started.
+            Use the &quot;Add Team Member&quot; button above or the companion to get started.
           </p>
         </div>
       </div>
@@ -440,7 +440,7 @@ export function TeamDetails({
                   )}
                   /mo
                 </span>{" "}
-                to your burn rate. Ask the AI companion to model the impact on runway
+                to your burn rate. Ask the companion to model the impact on runway
                 and suggest optimal hiring timing.
               </p>
             </div>

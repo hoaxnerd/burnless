@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 
 interface Shortcut {
   key: string;
@@ -63,10 +64,12 @@ export function KeyboardShortcutsProvider({
   const router = useRouter();
   const [showHelp, setShowHelp] = useState(false);
   const [pageShortcuts, setPageShortcuts] = useState<Shortcut[]>([]);
+  const aiFlags = useOptionalAiFlags();
+  const companionName = aiFlags?.companionName ?? "Companion";
 
   const globalShortcuts: Shortcut[] = useMemo(
     () => [
-      { key: "k", label: "Cmd+K", description: "Toggle AI Companion", action: onToggleAI, meta: true },
+      { key: "k", label: "Cmd+K", description: `Toggle ${companionName}`, action: onToggleAI, meta: true },
       { key: "d", label: "G then D", description: "Go to Dashboard", action: () => router.push("/dashboard") },
       { key: "e", label: "G then E", description: "Go to Expenses", action: () => router.push("/expenses") },
       { key: "r", label: "G then R", description: "Go to Revenue", action: () => router.push("/revenue") },

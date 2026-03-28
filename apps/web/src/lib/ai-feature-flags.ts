@@ -45,6 +45,7 @@ export async function getAiFlags(
     dataMode: row.dataMode as AiFeatureFlagsState["dataMode"],
     writeMode: (row.writeMode ?? "full") as AiWriteMode,
     features: row.features as AiFeatureConfig,
+    companionName: row.companionName ?? DEFAULT_AI_FLAGS.companionName,
     monthlyBudgetCents: row.monthlyBudgetCents,
   };
 }

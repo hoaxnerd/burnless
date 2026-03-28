@@ -138,7 +138,7 @@ export function FundingDetails({
               Track your fundraising history — amounts, valuations, dilution, and investors.
             </p>
             <p className="text-xs text-surface-400">
-              Use the &quot;Add Funding Round&quot; button above or the AI companion to get started.
+              Use the &quot;Add Funding Round&quot; button above or the companion to get started.
             </p>
           </div>
         </div>
@@ -348,7 +348,7 @@ export function FundingDetails({
                   : currentRunway <= 12
                   ? " consider starting fundraising conversations in the next few months."
                   : " you have time to focus on growth before your next raise."}
-                {" "}Ask the AI companion for a detailed fundraising readiness assessment.
+                {" "}Ask the companion for a detailed fundraising readiness assessment.
               </p>
             </div>
           </div>

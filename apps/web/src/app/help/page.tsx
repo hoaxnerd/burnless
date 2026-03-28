@@ -16,9 +16,9 @@ const faqs = [
       "Burnless is an AI-powered financial planning platform built for startups. It helps you track expenses, monitor your burn rate, forecast runway, model scenarios, and generate investor-ready reports — all in one place.",
   },
   {
-    question: "How does the AI companion work?",
+    question: "How does the companion work?",
     answer:
-      "The AI companion analyzes your financial data to surface insights, categorize transactions, and suggest optimizations. It can answer questions about your finances in natural language. Your data is processed securely and is never used to train AI models.",
+      "The companion analyzes your financial data to surface insights, categorize transactions, and suggest optimizations. It can answer questions about your finances in natural language. Your data is processed securely and is never used to train AI models.",
   },
   {
     question: "Is my financial data secure?",

@@ -58,7 +58,7 @@ export async function chat(options: ChatOptions): Promise<{
   const provider = resolveProvider(options);
   if (!provider) {
     return {
-      response: "AI is not configured. Please set an API key to enable the AI companion.",
+      response: "AI is not configured. Please set an API key in Settings to enable the companion.",
       toolResults: [],
     };
   }
@@ -138,7 +138,7 @@ export async function chat(options: ChatOptions): Promise<{
 export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamChunk> {
   const provider = resolveProvider(options);
   if (!provider) {
-    yield { type: "text", content: "AI is not configured. Please set an API key to enable the AI companion." };
+    yield { type: "text", content: "AI is not configured. Please set an API key in Settings to enable the companion." };
     yield { type: "done" };
     return;
   }

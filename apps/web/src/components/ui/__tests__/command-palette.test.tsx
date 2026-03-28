@@ -90,16 +90,16 @@ describe("CommandPalette", () => {
 
     it("does not show AI commands when onToggleAI is not provided", () => {
       renderPalette();
-      expect(screen.queryByText("Ask AI")).not.toBeInTheDocument();
+      expect(screen.queryByText("Ask Companion")).not.toBeInTheDocument();
     });
 
     it("shows AI commands when onToggleAI is provided", () => {
       renderPalette({ onToggleAI: vi.fn() });
-      // "Ask AI" appears as command label and also as suggested query hover text
-      expect(screen.getAllByText("Ask AI").length).toBeGreaterThanOrEqual(1);
+      // "Ask Companion" appears as command label and also as suggested query hover text
+      expect(screen.getAllByText("Ask Companion").length).toBeGreaterThanOrEqual(1);
       // The AI command should render as an option
       const options = screen.getAllByRole("option");
-      const aiOption = options.find((o) => o.textContent?.includes("Ask AI"));
+      const aiOption = options.find((o) => o.textContent?.includes("Ask Companion"));
       expect(aiOption).toBeDefined();
     });
   });
@@ -162,7 +162,7 @@ describe("CommandPalette", () => {
       expect(screen.getByText(/No results for/)).toBeInTheDocument();
     });
 
-    it("shows 'Ask AI' button in no-results when onToggleAI provided", async () => {
+    it("shows 'Ask Companion' button in no-results when onToggleAI provided", async () => {
       const onToggleAI = vi.fn();
       renderPalette({ onToggleAI });
       const input = screen.getByPlaceholderText(
@@ -171,7 +171,7 @@ describe("CommandPalette", () => {
 
       await userEvent.type(input, "zzzznonexistent");
       const askAI = screen.getByRole("button", {
-        name: /Ask AI about/,
+        name: /Ask Companion about/,
       });
       expect(askAI).toBeInTheDocument();
     });
@@ -368,10 +368,10 @@ describe("CommandPalette", () => {
       const onClose = vi.fn();
       renderPalette({ onClose, onToggleAI });
 
-      // Click the AI command option (not the suggested query "Ask AI" text)
+      // Click the AI command option (not the suggested query "Ask Companion" text)
       const aiOption = screen
         .getAllByRole("option")
-        .find((o) => o.textContent?.includes("Ask AI"));
+        .find((o) => o.textContent?.includes("Ask Companion"));
       expect(aiOption).toBeDefined();
       await userEvent.click(aiOption!);
 

@@ -189,6 +189,7 @@ export const updateAiFeaturesSchema = z.object({
       autoCategorization: z.boolean().optional(),
     })
     .optional(),
+  companionName: z.string().min(1).max(50).optional(),
   aiProvider: aiProviderEnum.nullable().optional(),
   aiApiKey: z.string().max(256).nullable().optional(),
   aiModel: z.string().max(128).nullable().optional(),

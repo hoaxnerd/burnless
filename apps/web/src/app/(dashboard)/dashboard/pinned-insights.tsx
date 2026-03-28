@@ -2,9 +2,12 @@
 
 import { Sparkles, X, Pin } from "lucide-react";
 import { usePinnedInsights } from "@/components/ai/use-pinned-insights";
+import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 
 export function PinnedInsights() {
   const { pins, unpin } = usePinnedInsights();
+  const aiFlags = useOptionalAiFlags();
+  const companionName = aiFlags?.companionName ?? "Companion";
 
   if (pins.length === 0) return null;
 
@@ -13,7 +16,7 @@ export function PinnedInsights() {
       <div className="flex items-center gap-2 mb-4">
         <Pin className="h-3.5 w-3.5 text-brand-500" />
         <h2 className="text-sm font-semibold text-surface-900">Pinned Insights</h2>
-        <span className="text-[10px] text-surface-400">from AI Companion</span>
+        <span className="text-[10px] text-surface-400">from {companionName}</span>
       </div>
       <div className="space-y-2">
         {pins.map((insight) => (

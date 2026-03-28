@@ -8,6 +8,7 @@ import { getPageContext } from "./page-context";
 import { InlineChart } from "./inline-chart";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { useScenario } from "@/components/scenarios/scenario-context";
+import { useOptionalAiFlags } from "./ai-feature-context";
 
 interface ToolResult {
   tool: string;
@@ -31,6 +32,8 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
   const pathname = usePathname();
   const pageContext = getPageContext(pathname);
   const { activeScenarioId } = useScenario();
+  const aiFlags = useOptionalAiFlags();
+  const companionName = aiFlags?.companionName ?? "Companion";
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -191,7 +194,7 @@ export function AiPanel({ open, onClose }: AiPanelProps) {
               <Sparkles className="h-4 w-4 text-brand-600" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-surface-900">AI Companion</h2>
+              <h2 className="text-sm font-semibold text-surface-900">{companionName}</h2>
               <p className="text-[10px] text-surface-400">{pageContext.pageName} context</p>
             </div>
           </div>

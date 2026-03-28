@@ -34,6 +34,8 @@ export interface AiFeatureFlagsState {
   dataMode: AiDataMode;
   writeMode: AiWriteMode;
   features: AiFeatureConfig;
+  /** Configurable companion name (default: "Companion") */
+  companionName: string;
 }
 
 export interface AiFeatureStatus {
@@ -44,10 +46,13 @@ export interface AiFeatureStatus {
 
 // ── Defaults ────────────────────────────────────────────────────────────────
 
+export const DEFAULT_COMPANION_NAME = "Companion";
+
 export const DEFAULT_AI_FLAGS: AiFeatureFlagsState = {
   masterEnabled: true,
   dataMode: "full",
   writeMode: "full",
+  companionName: DEFAULT_COMPANION_NAME,
   features: {
     onboarding: true,
     chat: true,
@@ -74,8 +79,8 @@ export const AI_FEATURE_LIST: AiFeatureMeta[] = [
   },
   {
     name: "chat",
-    label: "AI Chat Companion",
-    description: "Conversational AI for financial planning (Cmd+K)",
+    label: "Chat Companion",
+    description: "Conversational companion for financial planning (Cmd+K)",
   },
   {
     name: "insights",

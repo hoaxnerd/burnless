@@ -73,7 +73,7 @@ export function RevenueStreamsList({
               Model your revenue sources — subscriptions, services, one-time sales, usage-based billing.
             </p>
             <p className="text-xs text-surface-400">
-              Use the AI companion or the API: <code className="text-brand-600">POST /api/revenue-streams</code>
+              Use the companion or the API: <code className="text-brand-600">POST /api/revenue-streams</code>
             </p>
           </div>
         ) : (
@@ -117,7 +117,7 @@ export function RevenueStreamsList({
               <p className="text-sm font-medium text-surface-900">SaaS Metrics</p>
               <p className="text-xs text-surface-600 mt-0.5">
                 Track your subscription health with MRR, churn, ARPA, LTV, and more.
-                Use the AI companion to analyze trends and get recommendations for improving unit economics.
+                Use the companion to analyze trends and get recommendations for improving unit economics.
               </p>
             </div>
           </div>

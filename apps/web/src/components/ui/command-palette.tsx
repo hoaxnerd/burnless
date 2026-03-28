@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -56,7 +57,7 @@ const SUGGESTED_QUERIES = [
 
 /* ── Commands registry ─────────────────────────────────────────────────────── */
 
-function buildCommands(onToggleAI?: () => void): CommandItem[] {
+function buildCommands(onToggleAI?: () => void, companionName = "Companion"): CommandItem[] {
   return [
     // Pages
     { id: "nav-dashboard", label: "Dashboard", description: "Financial overview & KPIs", icon: LayoutDashboard, href: "/dashboard", keywords: ["home", "overview", "kpi"], section: "Pages", category: "page" },
@@ -84,8 +85,8 @@ function buildCommands(onToggleAI?: () => void): CommandItem[] {
       ? [
           {
             id: "ai-open",
-            label: "Ask AI",
-            description: "Open AI companion",
+            label: `Ask ${companionName}`,
+            description: `Open ${companionName}`,
             icon: Sparkles,
             action: onToggleAI,
             keywords: ["ai", "chat", "assistant", "help", "intelligence"],
@@ -150,8 +151,10 @@ export function CommandPalette({
   const [activeIndex, setActiveIndex] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const aiFlags = useOptionalAiFlags();
+  const companionName = aiFlags?.companionName ?? "Companion";
 
-  const commands = useMemo(() => buildCommands(onToggleAI), [onToggleAI]);
+  const commands = useMemo(() => buildCommands(onToggleAI, companionName), [onToggleAI, companionName]);
 
   const filtered = useMemo(() => {
     let items = commands;
@@ -378,7 +381,7 @@ export function CommandPalette({
                     <Sparkles className="h-3.5 w-3.5 text-accent-400 flex-shrink-0" />
                     <span className="text-sm">{suggestion}</span>
                     <span className="ml-auto text-[10px] text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Ask AI
+                      Ask {companionName}
                     </span>
                   </button>
                 ))}
@@ -401,7 +404,7 @@ export function CommandPalette({
                     className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-50 dark:bg-accent-950 text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900 transition-colors"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Ask AI about &ldquo;{query}&rdquo;
+                    Ask {companionName} about &ldquo;{query}&rdquo;
                   </button>
                 )}
               </div>

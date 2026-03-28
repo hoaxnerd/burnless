@@ -11,6 +11,7 @@ import {
 import {
   resolveFeatureStatus,
   DEFAULT_AI_FLAGS,
+  DEFAULT_COMPANION_NAME,
   type AiFeatureName,
   type AiFeatureFlagsState,
   type AiFeatureStatus,
@@ -52,6 +53,8 @@ interface AiFeatureContextValue {
   budget: BudgetStatus | null;
   /** AI provider configuration (masked API key) */
   providerConfig: AiProviderConfig;
+  /** Configurable companion name */
+  companionName: string;
 }
 
 const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
@@ -79,6 +82,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             masterEnabled: data.masterEnabled,
             dataMode: data.dataMode,
             writeMode: data.writeMode ?? "full",
+            companionName: data.companionName ?? DEFAULT_COMPANION_NAME,
             features: data.features,
           });
           if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
@@ -109,12 +113,13 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
       const prevBudgetCents = monthlyBudgetCents;
       const prevProvider = providerConfig;
 
-      if (patch.masterEnabled !== undefined || patch.dataMode || patch.writeMode || patch.features) {
+      if (patch.masterEnabled !== undefined || patch.dataMode || patch.writeMode || patch.features || patch.companionName) {
         setFlags((prev) => ({
           ...prev,
           ...(patch.masterEnabled !== undefined ? { masterEnabled: patch.masterEnabled } : {}),
           ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
           ...(patch.writeMode ? { writeMode: patch.writeMode } : {}),
+          ...(patch.companionName ? { companionName: patch.companionName } : {}),
           ...(patch.features ? { features: { ...prev.features, ...patch.features } } : {}),
         }));
       }
@@ -131,6 +136,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             masterEnabled: updated.masterEnabled,
             dataMode: updated.dataMode,
             writeMode: updated.writeMode ?? "full",
+            companionName: updated.companionName ?? DEFAULT_COMPANION_NAME,
             features: updated.features,
           });
           if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
@@ -170,6 +176,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         monthlyBudgetCents,
         budget,
         providerConfig,
+        companionName: flags.companionName ?? DEFAULT_COMPANION_NAME,
       }}
     >
       {children}
