@@ -108,6 +108,9 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   asc: vi.fn(),
   gte: vi.fn(),
+  sql: Object.assign((strings: TemplateStringsArray, ..._values: unknown[]) => strings.join("?"), {
+    raw: (s: string) => s,
+  }),
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({

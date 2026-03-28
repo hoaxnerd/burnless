@@ -29,7 +29,8 @@ export const GET = withErrorHandler(async (request: Request) => {
   if (roleErr) return roleErr;
 
   const url = new URL(request.url);
-  const days = Math.min(parseInt(url.searchParams.get("days") ?? "30", 10), 90);
+  const rawDays = parseInt(url.searchParams.get("days") ?? "30", 10);
+  const days = Math.min(Math.max(1, Number.isFinite(rawDays) ? rawDays : 30), 90);
   const since = new Date();
   since.setDate(since.getDate() - days);
 

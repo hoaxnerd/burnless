@@ -50,7 +50,9 @@ vi.mock("@burnless/db", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
-  sql: vi.fn(),
+  sql: Object.assign((strings: TemplateStringsArray, ..._values: unknown[]) => strings.join("?"), {
+    raw: (s: string) => s,
+  }),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -99,32 +101,35 @@ const validInvite = {
 };
 
 describe("POST /api/auth/redeem-invite", () => {
+  // Helper: create a tx mock where select().from().where().limit() returns the given values
+  function setupTransaction(limitResults: unknown[][]) {
+    let limitCall = 0;
+    const txLimit = vi.fn().mockImplementation(() => limitResults[limitCall++] ?? []);
+    const txWhere = vi.fn().mockReturnValue({ limit: txLimit });
+    const txFrom = vi.fn().mockReturnValue({ where: txWhere });
+    const txSelect = vi.fn().mockReturnValue({ from: txFrom });
+    const txReturning = vi.fn().mockResolvedValue([{ id: "inv-1" }]);
+    const txUpdateWhere = vi.fn().mockReturnValue({ returning: txReturning });
+    const txSet = vi.fn().mockReturnValue({ where: txUpdateWhere });
+    const txUpdate = vi.fn().mockReturnValue({ set: txSet });
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
+
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) => {
+      const tx = { select: txSelect, insert: txInsert, update: txUpdate };
+      return fn(tx);
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Default DB mock chain
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockUpdate.mockReturnValue({ set: mockSet });
-    mockSet.mockReturnValue({ where: mockWhere });
   });
 
   it("redeems a valid invite code", async () => {
-    // First query: find the invite
-    mockLimit.mockResolvedValueOnce([validInvite]);
-    // Second query: check no existing redemption
-    mockLimit.mockResolvedValueOnce([]);
-    // Transaction
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = {
-        insert: mockInsert,
-        update: mockUpdate,
-      };
-      await fn(tx);
-    });
-    mockValues.mockResolvedValue(undefined);
+    setupTransaction([
+      [validInvite],   // find invite
+      [],              // no existing redemption
+    ]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();
@@ -153,7 +158,7 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("returns 404 for non-existent code", async () => {
-    mockLimit.mockResolvedValueOnce([]);
+    setupTransaction([[]]);
 
     const res = await POST(jsonRequest({ code: "INVALID", userId: "user-1" }));
     const body = await res.json();
@@ -163,7 +168,7 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("returns 410 for inactive code", async () => {
-    mockLimit.mockResolvedValueOnce([{ ...validInvite, isActive: false }]);
+    setupTransaction([[{ ...validInvite, isActive: false }]]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();
@@ -173,10 +178,10 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("returns 410 for expired code", async () => {
-    mockLimit.mockResolvedValueOnce([{
+    setupTransaction([[{
       ...validInvite,
-      expiresAt: new Date(Date.now() - 86400000), // yesterday
-    }]);
+      expiresAt: new Date(Date.now() - 86400000),
+    }]]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();
@@ -186,11 +191,11 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("returns 410 when max redemptions reached", async () => {
-    mockLimit.mockResolvedValueOnce([{
+    setupTransaction([[{
       ...validInvite,
       currentRedemptions: 100,
       maxRedemptions: 100,
-    }]);
+    }]]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();
@@ -200,8 +205,10 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("returns 409 when user already redeemed", async () => {
-    mockLimit.mockResolvedValueOnce([validInvite]);
-    mockLimit.mockResolvedValueOnce([{ id: "redemption-1" }]);
+    setupTransaction([
+      [validInvite],
+      [{ id: "redemption-1" }],
+    ]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();
@@ -211,13 +218,10 @@ describe("POST /api/auth/redeem-invite", () => {
   });
 
   it("handles invite with no expiration", async () => {
-    mockLimit.mockResolvedValueOnce([{ ...validInvite, expiresAt: null }]);
-    mockLimit.mockResolvedValueOnce([]);
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      const tx = { insert: mockInsert, update: mockUpdate };
-      await fn(tx);
-    });
-    mockValues.mockResolvedValue(undefined);
+    setupTransaction([
+      [{ ...validInvite, expiresAt: null }],
+      [],
+    ]);
 
     const res = await POST(jsonRequest({ code: "ABC123", userId: "user-1" }));
     const body = await res.json();

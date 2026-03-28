@@ -5,9 +5,12 @@ vi.hoisted(() => {
   process.env.CRON_SECRET = "test-cron-secret";
 });
 
-const { mockSelect, mockFrom, mockInsert, mockValues, mockOnConflictDoUpdate, mockUpdate, mockSet, mockUpdateWhere } = vi.hoisted(() => ({
+const { mockSelect, mockFrom, mockOrderBy, mockLimit, mockWhere, mockInsert, mockValues, mockOnConflictDoUpdate, mockUpdate, mockSet, mockUpdateWhere } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
+  mockOrderBy: vi.fn(),
+  mockLimit: vi.fn(),
+  mockWhere: vi.fn(),
   mockInsert: vi.fn(),
   mockValues: vi.fn(),
   mockOnConflictDoUpdate: vi.fn(),
@@ -32,6 +35,7 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  gt: vi.fn(),
   inArray: vi.fn(),
 }));
 
@@ -113,7 +117,9 @@ describe("GET /api/cron/weekly-digest", () => {
 
   it("returns ok with empty results when no companies exist", async () => {
     mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockResolvedValue([]);
+    mockFrom.mockReturnValue({ orderBy: mockOrderBy, where: mockWhere });
+    mockOrderBy.mockReturnValue({ limit: mockLimit });
+    mockLimit.mockResolvedValue([]);
 
     const res = await GET(makeRequest());
     const body = await res.json();
@@ -125,14 +131,17 @@ describe("GET /api/cron/weekly-digest", () => {
   });
 
   it("skips companies with digest feature disabled", async () => {
-    // First select: companies; second select: owners batch
+    // First select: companies batch; second select: owners batch
     let selectCall = 0;
     mockSelect.mockImplementation(() => {
       selectCall++;
-      if (selectCall === 1) return { from: mockFrom };
+      if (selectCall === 1) {
+        // Companies batch query: select().from().orderBy().limit()
+        return { from: () => ({ orderBy: () => ({ limit: vi.fn().mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]) }) }) };
+      }
+      // Owners query
       return { from: () => ({ where: vi.fn().mockResolvedValue([{ id: "u1", email: "u1@test.com" }]) }) };
     });
-    mockFrom.mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]);
 
     mockGetAiFlags.mockResolvedValue({
       features: { weeklyDigest: false },
@@ -150,10 +159,11 @@ describe("GET /api/cron/weekly-digest", () => {
     let selectCall = 0;
     mockSelect.mockImplementation(() => {
       selectCall++;
-      if (selectCall === 1) return { from: mockFrom };
+      if (selectCall === 1) {
+        return { from: () => ({ orderBy: () => ({ limit: vi.fn().mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]) }) }) };
+      }
       return { from: () => ({ where: vi.fn().mockResolvedValue([{ id: "u1", email: "u1@test.com" }]) }) };
     });
-    mockFrom.mockResolvedValue([{ id: "c1", name: "Co1", ownerId: "u1" }]);
 
     mockGetAiFlags.mockResolvedValue({
       features: { weeklyDigest: true },
@@ -170,16 +180,17 @@ describe("GET /api/cron/weekly-digest", () => {
     let selectCall = 0;
     mockSelect.mockImplementation(() => {
       selectCall++;
-      if (selectCall === 1) return { from: mockFrom };
+      if (selectCall === 1) {
+        return { from: () => ({ orderBy: () => ({ limit: vi.fn().mockResolvedValue([
+          { id: "c1", name: "Co1", ownerId: "u1" },
+          { id: "c2", name: "Co2", ownerId: "u2" },
+        ]) }) }) };
+      }
       return { from: () => ({ where: vi.fn().mockResolvedValue([
         { id: "u1", email: "u1@test.com" },
         { id: "u2", email: "u2@test.com" },
       ]) }) };
     });
-    mockFrom.mockResolvedValue([
-      { id: "c1", name: "Co1", ownerId: "u1" },
-      { id: "c2", name: "Co2", ownerId: "u2" },
-    ]);
 
     mockGetAiFlags.mockRejectedValueOnce(new Error("DB error"));
     mockGetAiFlags.mockResolvedValueOnce({

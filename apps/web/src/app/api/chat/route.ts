@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { db } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc, gte } from "drizzle-orm";
+import { eq, and, asc, gte, sql } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
@@ -54,8 +54,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   const plan = await getCompanyPlan(ctx.companyId);
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthlyMessages = await db
-    .select()
+  const messageCountResult = await db
+    .select({ count: sql<number>`count(*)::int` })
     .from(aiMessages)
     .innerJoin(
       aiConversations,
@@ -68,7 +68,8 @@ export const POST = withErrorHandler(async (request: Request) => {
         gte(aiMessages.createdAt, monthStart)
       )
     );
-  const gate = canPerformAction(plan, "ai_message", monthlyMessages.length);
+  const monthlyMessageCount = messageCountResult[0]?.count ?? 0;
+  const gate = canPerformAction(plan, "ai_message", monthlyMessageCount);
   if (!gate.allowed) {
     return errorResponse(gate.reason!, 403);
   }

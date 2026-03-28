@@ -73,33 +73,45 @@ export const POST = withErrorHandler(async (request: Request) => {
   let inviteRedemption: { freePlatformDays: number; aiCreditsCents: number } | null = null;
   if (body.inviteCode && user) {
     try {
-      const [invite] = await db
-        .select()
-        .from(inviteCodes)
-        .where(eq(inviteCodes.code, body.inviteCode))
-        .limit(1);
+      // Atomic redemption: SELECT + conditional UPDATE inside a single transaction
+      // to prevent race conditions where concurrent requests over-redeem
+      inviteRedemption = await db.transaction(async (tx) => {
+        const [invite] = await tx
+          .select()
+          .from(inviteCodes)
+          .where(eq(inviteCodes.code, body.inviteCode!))
+          .limit(1);
 
-      if (
-        invite &&
-        invite.isActive &&
-        invite.currentRedemptions < invite.maxRedemptions &&
-        (!invite.expiresAt || invite.expiresAt >= new Date())
-      ) {
-        await db.transaction(async (tx) => {
-          await tx.insert(inviteCodeRedemptions).values({
-            inviteCodeId: invite.id,
-            userId: user.id,
-          });
-          await tx
-            .update(inviteCodes)
-            .set({ currentRedemptions: sql`${inviteCodes.currentRedemptions} + 1` })
-            .where(eq(inviteCodes.id, invite.id));
+        if (
+          !invite ||
+          !invite.isActive ||
+          invite.currentRedemptions >= invite.maxRedemptions ||
+          (invite.expiresAt && invite.expiresAt < new Date())
+        ) {
+          return null;
+        }
+
+        // Atomic increment with count guard — prevents over-redemption even under concurrency
+        const [updated] = await tx
+          .update(inviteCodes)
+          .set({ currentRedemptions: sql`${inviteCodes.currentRedemptions} + 1` })
+          .where(
+            sql`${inviteCodes.id} = ${invite.id} AND ${inviteCodes.currentRedemptions} < ${inviteCodes.maxRedemptions}`
+          )
+          .returning({ id: inviteCodes.id });
+
+        if (!updated) return null; // Another request got there first
+
+        await tx.insert(inviteCodeRedemptions).values({
+          inviteCodeId: invite.id,
+          userId: user.id,
         });
-        inviteRedemption = {
+
+        return {
           freePlatformDays: invite.freePlatformDays,
           aiCreditsCents: invite.aiCreditsCents,
         };
-      }
+      });
     } catch (err) {
       logger("register").error("Failed to redeem invite code:", err);
       // Non-blocking — account creation succeeded even if invite fails

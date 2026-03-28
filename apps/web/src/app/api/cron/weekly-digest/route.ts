@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { db, companies, users, weeklyDigests } from "@burnless/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, gt, inArray } from "drizzle-orm";
 import { computeWeeklyDigest, buildDeterministicSummary } from "@/lib/compute-digest";
 import { generateDigestNarrative } from "@/lib/digest-narrative";
 import { email } from "@/lib/email";
@@ -22,6 +22,13 @@ import { withErrorHandler } from "@/lib/api-helpers";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const SKIP_CRON_AUTH = process.env.DISABLE_CRON_AUTH === "true";
+
+async function fetchCompanyBatch(cursor: string | null, limit: number) {
+  if (cursor) {
+    return db.select().from(companies).where(gt(companies.id, cursor)).orderBy(companies.id).limit(limit);
+  }
+  return db.select().from(companies).orderBy(companies.id).limit(limit);
+}
 
 export const GET = withErrorHandler(async function GET(request: Request) {
   // Verify Vercel Cron secret (DISABLE_CRON_AUTH=true for local dev only)
@@ -36,17 +43,29 @@ export const GET = withErrorHandler(async function GET(request: Request) {
     }
   }
 
-  const allCompanies = await db.select().from(companies);
   const results: { companyId: string; status: string }[] = [];
+  const BATCH_SIZE = 100;
+  let cursor: string | null = null;
+  let totalCompanies = 0;
+  let hasMore = true;
 
-  // Pre-fetch all owners in a single query (avoids N+1)
-  const ownerIds = [...new Set(allCompanies.map((c) => c.ownerId).filter(Boolean))] as string[];
-  const owners = ownerIds.length
-    ? await db.select().from(users).where(inArray(users.id, ownerIds))
-    : [];
-  const ownerMap = new Map(owners.map((u) => [u.id, u]));
+  // Process companies in batches to avoid OOM at scale
+  while (hasMore) {
+    const batch = await fetchCompanyBatch(cursor, BATCH_SIZE);
 
-  for (const company of allCompanies) {
+    if (batch.length === 0) break;
+    hasMore = batch.length === BATCH_SIZE;
+    cursor = batch[batch.length - 1]!.id;
+    totalCompanies += batch.length;
+
+    // Pre-fetch owners for this batch (avoids N+1)
+    const ownerIds = [...new Set(batch.map((c) => c.ownerId).filter(Boolean))] as string[];
+    const owners = ownerIds.length
+      ? await db.select().from(users).where(inArray(users.id, ownerIds))
+      : [];
+    const ownerMap = new Map(owners.map((u) => [u.id, u]));
+
+  for (const company of batch) {
     try {
       // Check if weekly digest is enabled for this company
       const flags = await getAiFlags(company.id);
@@ -133,11 +152,12 @@ export const GET = withErrorHandler(async function GET(request: Request) {
       results.push({ companyId: company.id, status: `error: ${message}` });
     }
   }
+  }
 
   return NextResponse.json({
     ok: true,
     generated: results.filter((r) => r.status === "sent").length,
-    total: allCompanies.length,
+    total: totalCompanies,
     results,
   });
 });
