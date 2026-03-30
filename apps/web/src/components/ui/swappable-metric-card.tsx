@@ -9,6 +9,7 @@
  */
 
 import { useOptionalMetrics } from "@/components/providers/metrics-context";
+import { usePageId } from "@/components/providers/page-context";
 import { WidgetCard } from "./widget-card";
 import { MetricCard } from "./metric-card";
 import type { LucideIcon } from "lucide-react";
@@ -44,6 +45,8 @@ export function SwappableMetricCard({
   loading,
 }: SwappableMetricCardProps) {
   const metrics = useOptionalMetrics();
+  const contextPageId = usePageId();
+  const resolvedPageId = pageId || contextPageId || "";
 
   // If no provider, render a plain MetricCard
   if (!metrics) {
@@ -66,7 +69,7 @@ export function SwappableMetricCard({
   }
 
   return (
-    <WidgetCard slug={slug} pageId={pageId} bare>
+    <WidgetCard slug={slug} pageId={resolvedPageId} bare>
       <MetricCard
         label={label}
         value={value}

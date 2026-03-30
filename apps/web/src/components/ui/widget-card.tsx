@@ -8,7 +8,7 @@
  * are provided. Reads card mode state from MetricsContext automatically.
  *
  * Usage:
- *   <WidgetCard slug="mrr" pageId="dashboard" stagger={2} catalogProps={...}>
+ *   <WidgetCard slug="mrr" pageId="dashboard" stagger={2}>
  *     {/* card content *\/}
  *   </WidgetCard>
  */
@@ -19,7 +19,8 @@ import {
   type CardMode,
 } from "@/components/providers/metrics-context";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
-import { CardSettings, type CatalogProps } from "./card-settings";
+import { useOptionalCardCatalog } from "@/components/providers/card-catalog-context";
+import { CardSettings } from "./card-settings";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -35,9 +36,6 @@ export interface WidgetCardProps {
   showSettings?: boolean;
   /** "floating" positions gear above the card border; "inset" positions inside the card. */
   settingsPosition?: "floating" | "inset";
-  /** Catalog props — when provided, settings opens as modal with metric catalog. */
-  catalogProps?: CatalogProps;
-
   /** Extra class names appended to the card container. */
   className?: string;
   /** Animation stagger index (maps to stagger-N utility class). */
@@ -68,8 +66,7 @@ export function WidgetCard({
   slug,
   pageId,
   showSettings,
-  settingsPosition = "inset",
-  catalogProps,
+  settingsPosition = "floating",
   className = "",
   stagger,
   noPadding = false,
@@ -81,6 +78,7 @@ export function WidgetCard({
   title,
 }: WidgetCardProps) {
   const metrics = useOptionalMetrics();
+  const catalog = useOptionalCardCatalog();
   const aiFlags = useOptionalAiFlags();
   const aiEnabled = aiFlags?.masterEnabled ?? false;
   const settingsActiveRef = useRef(false);
@@ -156,7 +154,7 @@ export function WidgetCard({
             onModeChange={handleModeChange}
             isOverride={isOverride}
             aiEnabled={aiEnabled}
-            catalogProps={catalogProps}
+            catalogProps={catalog ?? undefined}
           />
         </div>
       )}
