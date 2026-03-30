@@ -18,15 +18,12 @@ export interface ComparisonData {
   lines: ComparisonLine[];
 }
 
-export function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${Math.round(value)}`;
-}
+import { formatCurrency } from "@burnless/types";
+export { formatCurrency };
 
 export function formatDelta(value: number, isCurrency: boolean): string {
   const sign = value >= 0 ? "+" : "";
-  if (isCurrency) return `${sign}${formatCurrency(value)}`;
+  if (isCurrency) return `${sign}${formatCurrency(value, "USD", undefined, { compact: true })}`;
   return `${sign}${Math.round(value)}`;
 }
 

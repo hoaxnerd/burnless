@@ -196,7 +196,7 @@ export function ScenarioBuilder({
         <StatCard icon={Settings2} label="Forecast Lines" value={String(forecastLineCount)} />
         <StatCard icon={TrendingUp} label="Revenue Streams" value={String(revenueStreamCount)} />
         <StatCard icon={Users} label="Headcount Plans" value={String(headcountPlanCount)} />
-        <StatCard icon={DollarSign} label="Total Funding" value={formatCurrency(totalFunding)} />
+        <StatCard icon={DollarSign} label="Total Funding" value={formatCurrency(totalFunding, "USD", undefined, { compact: true })} />
       </div>
 
       {/* What-If Builder */}
@@ -212,14 +212,14 @@ export function ScenarioBuilder({
             label="Cash on Hand"
             value={params.cashOnHand}
             min={0} max={5000000} step={25000}
-            format={formatCurrency}
+            format={(v) => formatCurrency(v, "USD", undefined, { compact: true })}
             onChange={(v) => updateParam("cashOnHand", v)}
           />
           <SliderInput
             label="Monthly Burn"
             value={params.monthlyBurn}
             min={0} max={500000} step={5000}
-            format={formatCurrency}
+            format={(v) => formatCurrency(v, "USD", undefined, { compact: true })}
             onChange={(v) => updateParam("monthlyBurn", v)}
           />
           <SliderInput
@@ -233,7 +233,7 @@ export function ScenarioBuilder({
             label="Monthly Revenue"
             value={params.monthlyRevenue}
             min={0} max={500000} step={1000}
-            format={formatCurrency}
+            format={(v) => formatCurrency(v, "USD", undefined, { compact: true })}
             onChange={(v) => updateParam("monthlyRevenue", v)}
           />
           <SliderInput
@@ -254,7 +254,7 @@ export function ScenarioBuilder({
             label="Avg Cost per Hire"
             value={params.monthlyHireCost}
             min={3000} max={25000} step={500}
-            format={formatCurrency}
+            format={(v) => formatCurrency(v, "USD", undefined, { compact: true })}
             onChange={(v) => updateParam("monthlyHireCost", v)}
           />
         </div>
@@ -281,6 +281,7 @@ export function ScenarioBuilder({
                 params.monthlyBurn +
                   params.headcount * params.monthlyHireCost -
                   params.monthlyRevenue,
+                "USD", undefined, { compact: true }
               )}
               color="danger"
               icon={TrendingUp}
@@ -293,7 +294,7 @@ export function ScenarioBuilder({
             />
             <KpiCard
               label="End Cash (24mo)"
-              value={formatCurrency(Math.max(lastMonth?.cash ?? 0, 0))}
+              value={formatCurrency(Math.max(lastMonth?.cash ?? 0, 0), "USD", undefined, { compact: true })}
               color={
                 (lastMonth?.cash ?? 0) <= 0
                   ? "danger"

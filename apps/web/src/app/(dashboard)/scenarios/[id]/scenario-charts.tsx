@@ -69,7 +69,7 @@ export function RunwayChart({
         const v = minCash + pct * range;
         return (
           <text key={pct} x={padding.left - 6} y={scaleY(v) + 3} textAnchor="end" fill="var(--color-surface-400)" fontSize="9">
-            {formatCurrency(v)}
+            {formatCurrency(v, "USD", undefined, { compact: true })}
           </text>
         );
       })}
@@ -132,7 +132,7 @@ export function RevenueBurnChart({
         const v = pct * maxVal;
         return (
           <text key={pct} x={padding.left - 6} y={scaleY(v) + 3} textAnchor="end" fill="var(--color-surface-400)" fontSize="9">
-            {formatCurrency(v)}
+            {formatCurrency(v, "USD", undefined, { compact: true })}
           </text>
         );
       })}

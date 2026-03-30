@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { formatCurrency } from "@burnless/types";
 import { AddHireForm, type EditHire } from "./add-hire-form";
 
 interface Department {
@@ -46,12 +47,6 @@ interface TeamDetailsProps {
   totalMonthlyCost: number;
   scenarioId: string;
   departments: Department[];
-}
-
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
 }
 
 const deptColors = [
@@ -228,7 +223,7 @@ export function TeamDetails({
                             {pct.toFixed(0)}%
                           </span>
                           <span className="text-sm font-semibold tabular-nums text-surface-900">
-                            {formatCurrency(dept.monthlyCost)}
+                            {formatCurrency(dept.monthlyCost, "USD", undefined, { compact: true })}
                             <span className="text-xs font-normal text-surface-400">/mo</span>
                           </span>
                         </div>
@@ -264,10 +259,10 @@ export function TeamDetails({
                               </div>
                               <div className="flex items-center gap-4 text-right">
                                 <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(member.salary)}/yr
+                                  {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
                                 </span>
                                 <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  {formatCurrency(monthlyCost)}/mo
+                                  {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
                                 </span>
                                 <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                   <button
@@ -330,6 +325,7 @@ export function TeamDetails({
                       (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
                       0,
                     ),
+                    "USD", undefined, { compact: true }
                   )}
                   /mo
                 </span>
@@ -356,7 +352,7 @@ export function TeamDetails({
                       <div className="flex items-center justify-between px-4 py-3 bg-surface-50">
                         <span className="text-sm font-semibold text-surface-900">{q.quarter}</span>
                         <span className="text-xs tabular-nums font-medium text-danger-600">
-                          +{formatCurrency(q.totalMonthlyImpact)}/mo
+                          +{formatCurrency(q.totalMonthlyImpact, "USD", undefined, { compact: true })}/mo
                         </span>
                       </div>
                       <div className="divide-y divide-surface-100">
@@ -380,10 +376,10 @@ export function TeamDetails({
                               </div>
                               <div className="flex items-center gap-4">
                                 <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(hire.salary)}/yr
+                                  {formatCurrency(hire.salary, "USD", undefined, { compact: true })}/yr
                                 </span>
                                 <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  +{formatCurrency(impact)}/mo
+                                  +{formatCurrency(impact, "USD", undefined, { compact: true })}/mo
                                 </span>
                                 <div className="flex items-center gap-1 opacity-0 group-hover/hire:opacity-100 transition-opacity">
                                   <button
@@ -437,6 +433,7 @@ export function TeamDetails({
                       (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
                       0,
                     ),
+                    "USD", undefined, { compact: true }
                   )}
                   /mo
                 </span>{" "}

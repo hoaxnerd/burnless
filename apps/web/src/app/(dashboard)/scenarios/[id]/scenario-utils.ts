@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { formatCurrency } from "@burnless/types";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -51,20 +52,18 @@ export const paramLabels: Record<keyof WhatIfParams, string> = {
   monthlyHireCost: "Avg Cost per Hire",
 };
 
-export function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${Math.round(value)}`;
-}
+export { formatCurrency };
+
+const fmtCompact = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
 export const paramFormats: Record<keyof WhatIfParams, (v: number) => string> = {
-  cashOnHand: formatCurrency,
-  monthlyBurn: formatCurrency,
+  cashOnHand: fmtCompact,
+  monthlyBurn: fmtCompact,
   burnGrowthRate: (v) => `${v}%/mo`,
-  monthlyRevenue: formatCurrency,
+  monthlyRevenue: fmtCompact,
   revenueGrowthRate: (v) => `${v}%/mo`,
   headcount: (v) => `${v} people`,
-  monthlyHireCost: formatCurrency,
+  monthlyHireCost: fmtCompact,
 };
 
 /* ── Undo/Redo Hook ──────────────────────────────────────────────────────── */

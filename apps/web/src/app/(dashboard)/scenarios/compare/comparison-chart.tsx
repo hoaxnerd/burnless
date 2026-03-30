@@ -52,7 +52,7 @@ export function ComparisonChart({
     );
   }
 
-  const fmt = (v: number) => isCurrency ? formatCurrency(v) : String(Math.round(v));
+  const fmt = (v: number) => isCurrency ? formatCurrency(v, "USD", undefined, { compact: true }) : String(Math.round(v));
 
   return (
     <div className="rounded-xl bg-surface-0 border border-surface-200 p-5">

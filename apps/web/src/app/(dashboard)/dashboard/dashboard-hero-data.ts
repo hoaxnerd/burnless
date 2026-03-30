@@ -44,7 +44,7 @@ export function buildHeroCards(
     } else if (def) {
       formattedValue = formatMetricValue(currentVal, def.format);
     } else {
-      formattedValue = formatCurrency(currentVal);
+      formattedValue = formatCurrency(currentVal, "USD", undefined, { compact: true });
     }
 
     // MoM change

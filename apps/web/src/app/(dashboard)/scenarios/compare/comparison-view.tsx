@@ -182,7 +182,7 @@ export function ComparisonView({
                       </span>
                       <span className="text-sm font-semibold text-surface-900">
                         {isCurrency
-                          ? formatCurrency(lastBase?.value ?? 0)
+                          ? formatCurrency(lastBase?.value ?? 0, "USD", undefined, { compact: true })
                           : Math.round(lastBase?.value ?? 0)}
                       </span>
                     </div>
@@ -192,7 +192,7 @@ export function ComparisonView({
                       </span>
                       <span className="text-sm font-semibold text-surface-900">
                         {isCurrency
-                          ? formatCurrency(lastCompare?.value ?? 0)
+                          ? formatCurrency(lastCompare?.value ?? 0, "USD", undefined, { compact: true })
                           : Math.round(lastCompare?.value ?? 0)}
                       </span>
                     </div>

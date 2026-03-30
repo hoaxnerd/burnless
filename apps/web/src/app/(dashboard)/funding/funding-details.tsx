@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { DollarSign, Calculator, TrendingUp, Clock, Pencil } from "lucide-react";
 import { AddFundingForm, type EditRound } from "./add-funding-form";
+import { formatCurrency } from "@burnless/types";
 
 interface FundingRound {
   id: string;
@@ -21,12 +22,6 @@ interface FundingDetailsProps {
   currentCash: number;
   currentBurn: number;
   currentRunway: number;
-}
-
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
 }
 
 const roundTypeLabels: Record<string, string> = {
@@ -257,12 +252,12 @@ export function FundingDetails({
                     </button>
                     <div className="text-right">
                       <p className="text-sm font-bold tabular-nums text-surface-900">
-                        {formatCurrency(round.amount)}
+                        {formatCurrency(round.amount, "USD", undefined, { compact: true })}
                       </p>
                       <div className="flex items-center gap-3 mt-0.5">
                         {round.preMoneyValuation && (
                           <span className="text-[10px] text-surface-400">
-                            {formatCurrency(round.preMoneyValuation)} pre
+                            {formatCurrency(round.preMoneyValuation, "USD", undefined, { compact: true })} pre
                           </span>
                         )}
                         {round.dilutionPercent && (
@@ -305,7 +300,7 @@ export function FundingDetails({
                     </button>
                     <div className="text-right">
                       <p className="text-sm font-medium tabular-nums text-surface-500 italic">
-                        {formatCurrency(round.amount)}
+                        {formatCurrency(round.amount, "USD", undefined, { compact: true })}
                       </p>
                       {round.dilutionPercent && (
                         <span className="text-[10px] text-surface-400 italic">
@@ -342,7 +337,7 @@ export function FundingDetails({
               <p className="text-sm font-semibold text-surface-900">Fundraising Readiness</p>
               <p className="text-xs text-surface-600 mt-1 leading-relaxed">
                 With <span className="font-semibold">{Math.round(currentRunway)} months</span> of runway at{" "}
-                <span className="font-semibold tabular-nums">{formatCurrency(currentBurn)}/mo</span> burn,
+                <span className="font-semibold tabular-nums">{formatCurrency(currentBurn, "USD", undefined, { compact: true })}/mo</span> burn,
                 {currentRunway <= 6
                   ? " you should be actively fundraising now. Most rounds take 3-6 months."
                   : currentRunway <= 12
@@ -477,7 +472,7 @@ function DilutionCalculator({
               Post-Money
             </p>
             <p className="text-xl font-bold tabular-nums text-surface-900">
-              {formatCurrency(calcDilution.postMoney)}
+              {formatCurrency(calcDilution.postMoney, "USD", undefined, { compact: true })}
             </p>
           </div>
           <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">

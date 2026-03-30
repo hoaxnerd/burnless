@@ -15,7 +15,7 @@ export function ComparisonRow({
   isCurrency: boolean;
 }) {
   const fmt = (v: number) =>
-    isCurrency ? formatCurrency(v) : String(Math.round(v));
+    isCurrency ? formatCurrency(v, "USD", undefined, { compact: true }) : String(Math.round(v));
 
   return (
     <>

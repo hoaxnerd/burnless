@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui";
+import { formatCurrency } from "@burnless/types";
 import { autoMapColumns } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, MappingConfidence,
@@ -231,8 +232,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
     setEditingRow(null);
   };
 
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+  const fmtCurrency = (n: number) => formatCurrency(n, "USD");
 
   const activePreview = preview.filter((t) => !t.isDuplicate && !t._excluded);
 
@@ -333,7 +333,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
         <PreviewStep preview={preview} activePreview={activePreview} loading={loading}
           importProgress={importProgress} editingRow={editingRow} setEditingRow={setEditingRow}
           toggleRowExclusion={toggleRowExclusion} updatePreviewRow={updatePreviewRow}
-          executeImport={executeImport} formatCurrency={formatCurrency} setStep={setStep} />
+          executeImport={executeImport} formatCurrency={fmtCurrency} setStep={setStep} />
       )}
       {step === "result" && result && (
         <ResultStep result={result} reset={reset} rollbackBatch={rollbackBatch} />

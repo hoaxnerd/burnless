@@ -1,3 +1,5 @@
+import { formatCurrency } from "@burnless/types";
+
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
 function layout(content: string): string {
@@ -107,12 +109,6 @@ interface DigestEmailData {
     anomalyCount: number;
     headcount: number;
   };
-}
-
-function formatCurrencyEmail(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
 }
 
 function changeArrow(pct: number): string {
@@ -253,11 +249,11 @@ export function weeklyDigestEmail(
       ${narrativeHtml}
 
       <table style="width:100%;border-collapse:collapse;">
-        ${metricRow("Cash Position", formatCurrencyEmail(m.cashPosition), m.cashChangePercent)}
-        ${metricRow("Monthly Burn", formatCurrencyEmail(m.burnRate), m.burnChangePercent)}
+        ${metricRow("Cash Position", formatCurrency(m.cashPosition, "USD", undefined, { compact: true }), m.cashChangePercent)}
+        ${metricRow("Monthly Burn", formatCurrency(m.burnRate, "USD", undefined, { compact: true }), m.burnChangePercent)}
         ${metricRow("Runway", `${Math.round(m.runway)} mo`)}
-        ${m.mrr > 0 ? metricRow("MRR", formatCurrencyEmail(m.mrr), m.mrrChangePercent) : ""}
-        ${metricRow("Total Expenses", formatCurrencyEmail(m.totalExpenses), m.expenseChangePercent)}
+        ${m.mrr > 0 ? metricRow("MRR", formatCurrency(m.mrr, "USD", undefined, { compact: true }), m.mrrChangePercent) : ""}
+        ${metricRow("Total Expenses", formatCurrency(m.totalExpenses, "USD", undefined, { compact: true }), m.expenseChangePercent)}
         ${m.headcount > 0 ? metricRow("Headcount", String(m.headcount)) : ""}
       </table>
 
