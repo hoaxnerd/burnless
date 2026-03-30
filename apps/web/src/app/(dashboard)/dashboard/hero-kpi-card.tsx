@@ -17,14 +17,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { WidgetCard } from "@/components/ui/widget-card";
-import { useMetrics } from "@/components/providers/metrics-context";
-import { useDashboardLayout } from "./dashboard-layout-context";
-import {
-  CATEGORY_META,
-  getMetricDef,
-  getMetricDependencyTree,
-  getMetricDependents,
-} from "@burnless/engine";
 
 /* ── Mini sparkline — pure SVG, zero dependencies ─────────────────────────── */
 
@@ -280,7 +272,7 @@ export function HeroKpiCard({
   slug,
   swapInfo,
   metricStyle,
-  heroCardIndex,
+  heroCardIndex: _heroCardIndex,
 }: HeroKpiCardProps) {
   // Resolve visual config: use metricStyle (for swapped cards) or variant config
   const resolvedConfig = useMemo(() => {
@@ -305,65 +297,7 @@ export function HeroKpiCard({
   // For change color, use direction-aware logic
   const isLowerBetter = variant === "burn" || metricStyle?.color === "orange";
 
-  // Build catalog props for the settings modal (metric swap/catalog)
-  const { registry, openFormulaViewer } = useMetrics();
-  const {
-    heroCards,
-    secondaryMetrics,
-    swapHeroCard,
-    addSecondaryMetric,
-    removeSecondaryMetric,
-  } = useDashboardLayout();
   const cardSlug = slug ?? variant;
-  const isHeroSwapMode = heroCardIndex !== undefined;
-  const allUsedSlugs = useMemo(
-    () => new Set([...heroCards, ...secondaryMetrics]),
-    [heroCards, secondaryMetrics]
-  );
-  const catalogProps = useMemo(
-    () => ({
-      registry,
-      usedSlugs: allUsedSlugs,
-      heroSlugs: heroCards,
-      onSelect: isHeroSwapMode
-        ? (newSlug: string) => {
-            swapHeroCard(heroCardIndex, newSlug).then(() => router.refresh());
-          }
-        : addSecondaryMetric,
-      onRemove: removeSecondaryMetric,
-      onViewFormula: openFormulaViewer,
-      categoryMeta: CATEGORY_META as Record<string, { label: string }>,
-      getDependencyTree: getMetricDependencyTree,
-      getDependents: getMetricDependents,
-      getMetricDef: getMetricDef as (
-        slug: string
-      ) =>
-        | {
-            slug: string;
-            name: string;
-            description: string;
-            formula: string;
-            category: string;
-            tier: string;
-            requiresSaaS?: boolean;
-            benchmark?: { label: string };
-          }
-        | undefined,
-      swapMode: isHeroSwapMode,
-    }),
-    [
-      registry,
-      allUsedSlugs,
-      heroCards,
-      isHeroSwapMode,
-      heroCardIndex,
-      swapHeroCard,
-      addSecondaryMetric,
-      removeSecondaryMetric,
-      openFormulaViewer,
-      router,
-    ]
-  );
 
   const isPositive = change?.startsWith("+");
   const isNegative = change?.startsWith("-");
@@ -384,7 +318,6 @@ export function HeroKpiCard({
       slug={cardSlug}
       pageId="dashboard"
       settingsPosition="floating"
-      catalogProps={catalogProps}
       stagger={stagger + 1}
       onClick={() => router.push(resolvedConfig.href)}
       onKeyDown={(e) => {

@@ -10,6 +10,10 @@
 
 import { type ReactNode, useMemo } from "react";
 import { PageGrid, type DefaultLayoutItem, type PageWidgetLayout } from "@/components/ui/page-grid";
+import { PageProvider } from "@/components/providers/page-context";
+import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { useDashboardLayout, type WidgetLayout } from "./dashboard-layout-context";
 
 // ── Widget ID type ──────────────────────────────────────────────────────────
@@ -103,11 +107,15 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
+  const { registry, openFormulaViewer } = useMetrics();
   const {
     layout: savedLayout,
     reorderLayout,
     isLoading,
     heroCards,
+    secondaryMetrics,
+    addSecondaryMetric,
+    removeSecondaryMetric,
     isEditMode,
     setIsEditMode,
     widgetReadiness,
@@ -115,6 +123,26 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     closeWidget,
     openWidget,
   } = useDashboardLayout();
+
+  const allUsedSlugs = useMemo(
+    () => new Set([...heroCards, ...secondaryMetrics]),
+    [heroCards, secondaryMetrics]
+  );
+
+  const catalogValue: CardCatalogValue = useMemo(() => ({
+    registry,
+    usedSlugs: allUsedSlugs,
+    heroSlugs: heroCards,
+    onSelect: addSecondaryMetric,
+    onRemove: removeSecondaryMetric,
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDef as CardCatalogValue["getMetricDef"],
+    swapMode: false,
+    cardType: "metric" as const,
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   const heroCount = heroCards.length || 4;
 
@@ -130,22 +158,26 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
   const pageLayout = useMemo(() => toPageLayout(savedLayout), [savedLayout]);
 
   return (
-    <PageGrid
-      widgets={widgets as Record<string, ReactNode>}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={pageLayout}
-      onLayoutChange={(layout) => reorderLayout(toWidgetLayout(layout))}
-      closedWidgets={closedWidgets}
-      onCloseWidget={closeWidget}
-      onOpenWidget={openWidget}
-      onReset={() => { reorderLayout([]); setIsEditMode(false); }}
-      widgetReadiness={widgetReadiness}
-      isLoading={isLoading}
-      staticHiddenWidgets={hiddenWidgets}
-      isEditMode={isEditMode}
-      setIsEditMode={setIsEditMode}
-    />
+    <PageProvider pageId="dashboard">
+      <CardCatalogProvider value={catalogValue}>
+        <PageGrid
+          widgets={widgets as Record<string, ReactNode>}
+          defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
+          savedLayout={pageLayout}
+          onLayoutChange={(layout) => reorderLayout(toWidgetLayout(layout))}
+          closedWidgets={closedWidgets}
+          onCloseWidget={closeWidget}
+          onOpenWidget={openWidget}
+          onReset={() => { reorderLayout([]); setIsEditMode(false); }}
+          widgetReadiness={widgetReadiness}
+          isLoading={isLoading}
+          staticHiddenWidgets={hiddenWidgets}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
+        />
+      </CardCatalogProvider>
+    </PageProvider>
   );
 }
 

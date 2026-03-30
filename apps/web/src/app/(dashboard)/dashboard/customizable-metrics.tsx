@@ -5,7 +5,6 @@
  * metric selection and mode-aware display. Replaces the static MetricRow list.
  */
 
-import { useMemo } from "react";
 import { LayoutGrid } from "lucide-react";
 import {
   getMetricDef,
@@ -19,15 +18,10 @@ import {
   type ComputedMetrics,
 } from "@burnless/engine";
 import { useMetrics } from "@/components/providers/metrics-context";
+import { usePageId } from "@/components/providers/page-context";
 import { useDashboardLayout } from "./dashboard-layout-context";
 import { CardSettings } from "@/components/ui/card-settings";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
-import {
-  CATEGORY_META,
-  getMetricDef as getMetricDefFn,
-  getMetricDependencyTree,
-  getMetricDependents,
-} from "@burnless/engine";
 
 interface CustomizableMetricsProps {
   metrics: ComputedMetrics;
@@ -91,35 +85,12 @@ function MetricRowDynamic({
 }) {
   const {
     openFormulaViewer, getCardMode: getCardModeRaw, setCardMode: setCardModeRaw, mode: globalMode,
-    registry,
   } = useMetrics();
-  const {
-    heroCards, secondaryMetrics,
-    addSecondaryMetric, swapSecondaryMetric, removeSecondaryMetric,
-  } = useDashboardLayout();
-  const getCardMode = (slug: string) => getCardModeRaw("dashboard", slug);
-  const setCardMode = (slug: string, mode: typeof globalMode | null) => setCardModeRaw("dashboard", slug, mode);
+  const pageId = usePageId() ?? "dashboard";
   const { masterEnabled: aiEnabled } = useAiFlags();
   const def = getMetricDef(slug);
-  const cardMode = getCardMode(slug);
+  const cardMode = getCardModeRaw(pageId, slug);
   const isOverride = cardMode !== globalMode;
-  const allUsedSlugs = useMemo(
-    () => new Set([...heroCards, ...secondaryMetrics]),
-    [heroCards, secondaryMetrics]
-  );
-  const catalogProps = useMemo(() => ({
-    registry,
-    usedSlugs: allUsedSlugs,
-    heroSlugs: heroCards,
-    onSelect: (newSlug: string) => swapSecondaryMetric(slug, newSlug),
-    onRemove: removeSecondaryMetric,
-    onViewFormula: openFormulaViewer,
-    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
-    getDependencyTree: getMetricDependencyTree,
-    getDependents: getMetricDependents,
-    getMetricDef: getMetricDefFn as (slug: string) => { slug: string; name: string; description: string; formula: string; category: string; tier: string; requiresSaaS?: boolean; benchmark?: { label: string } } | undefined,
-    swapMode: true,
-  }), [registry, allUsedSlugs, heroCards, slug, swapSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
 
   if (!def) return null;
 
@@ -217,10 +188,9 @@ function MetricRowDynamic({
       <div className="flex items-center gap-2">
         <CardSettings
           currentMode={cardMode}
-          onModeChange={(mode) => setCardMode(slug, mode)}
+          onModeChange={(mode) => setCardModeRaw(pageId, slug, mode)}
           isOverride={isOverride}
           aiEnabled={aiEnabled}
-          catalogProps={catalogProps}
         />
         <div className="flex items-center gap-3">
           {change && (
