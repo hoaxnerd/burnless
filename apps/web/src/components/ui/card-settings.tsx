@@ -3,15 +3,10 @@
 /**
  * CardSettings — unified per-card settings component.
  *
- * Adapts its UI based on context:
- *   - With `catalogProps`: opens a full modal (mode selector + inline metric catalog)
- *   - Without `catalogProps`: opens a lightweight portal-based popover (mode selector only)
- *
- * Replaces both CardSettingsModal and CardModePopover with a single component.
+ * Opens a modal with mode selector and optional inline metric catalog.
  */
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useMemo, useCallback } from "react";
 import {
   Settings,
   Brain,
@@ -27,10 +22,10 @@ import {
   Check,
 } from "lucide-react";
 import { Modal } from "./modal";
+import { type CardMode } from "@/components/providers/metrics-context";
+export type { CardMode };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export type CardMode = "intelligence" | "dynamic" | "custom";
 
 interface ModeOption {
   value: CardMode;
@@ -102,10 +97,8 @@ export interface CardSettingsProps {
   onModeChange: (mode: CardMode | null) => void;
   isOverride?: boolean;
   aiEnabled?: boolean;
-  /** When provided, settings opens as modal with inline catalog. Otherwise opens as popover. */
+  /** When provided, settings opens as modal with inline catalog. */
   catalogProps?: CatalogProps;
-  /** Popover alignment (only used in popover variant) */
-  align?: "left" | "right";
 }
 
 export function CardSettings({
@@ -114,7 +107,6 @@ export function CardSettings({
   isOverride = false,
   aiEnabled = false,
   catalogProps,
-  align = "right",
 }: CardSettingsProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -123,9 +115,6 @@ export function CardSettings({
     setOpen(false);
     setHovered(false);
   }, []);
-
-  // Catalog present → use modal; otherwise → use popover
-  const variant = catalogProps ? "modal" : "popover";
 
   return (
     <div
@@ -157,29 +146,15 @@ export function CardSettings({
         <Settings className="h-3 w-3" />
       </button>
 
-      {/* Variant-specific UI */}
-      {variant === "modal" ? (
-        <SettingsModal
-          open={open}
-          onClose={close}
-          currentMode={currentMode}
-          onModeChange={onModeChange}
-          isOverride={isOverride}
-          aiEnabled={aiEnabled}
-          catalogProps={catalogProps!}
-        />
-      ) : (
-        <SettingsPopover
-          open={open}
-          onClose={close}
-          currentMode={currentMode}
-          onModeChange={onModeChange}
-          isOverride={isOverride}
-          aiEnabled={aiEnabled}
-          align={align}
-          triggerRef={null}
-        />
-      )}
+      <SettingsModal
+        open={open}
+        onClose={close}
+        currentMode={currentMode}
+        onModeChange={onModeChange}
+        isOverride={isOverride}
+        aiEnabled={aiEnabled}
+        catalogProps={catalogProps}
+      />
     </div>
   );
 }
@@ -201,7 +176,7 @@ function SettingsModal({
   onModeChange: (mode: CardMode | null) => void;
   isOverride: boolean;
   aiEnabled: boolean;
-  catalogProps: CatalogProps;
+  catalogProps?: CatalogProps;
 }) {
   const [stagedSlug, setStagedSlug] = useState<string | null>(null);
 
@@ -237,7 +212,7 @@ function SettingsModal({
         />
 
         {/* Inline catalog: shown in Custom mode, or always when swapping a hero card */}
-        {(currentMode === "custom" || catalogProps.swapMode) && (
+        {catalogProps && (currentMode === "custom" || catalogProps.swapMode) && (
           <InlineCatalog
             {...catalogProps}
             onSelect={
@@ -269,7 +244,7 @@ function SettingsModal({
           )}
           <button
             onClick={() => {
-              if (stagedSlug && catalogProps.swapMode) {
+              if (stagedSlug && catalogProps?.swapMode) {
                 catalogProps.onSelect(stagedSlug);
               }
               setStagedSlug(null);
@@ -282,191 +257,6 @@ function SettingsModal({
         </div>
       </div>
     </Modal>
-  );
-}
-
-// ── Popover Variant ───────────────────────────────────────────────────────────
-
-function SettingsPopover({
-  open,
-  onClose,
-  currentMode,
-  onModeChange,
-  isOverride,
-  aiEnabled,
-  align,
-}: {
-  open: boolean;
-  onClose: () => void;
-  currentMode: CardMode;
-  onModeChange: (mode: CardMode | null) => void;
-  isOverride: boolean;
-  aiEnabled: boolean;
-  align: "left" | "right";
-  triggerRef: null; // Unused — we find the trigger via parent
-}) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-
-  // Position relative to the gear button (parent's first button child)
-  useEffect(() => {
-    if (!open) return;
-    const trigger = popoverRef.current
-      ?.closest(".relative")
-      ?.querySelector("button");
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setPopoverPos({
-      top: rect.bottom + 4,
-      left: align === "right" ? rect.right - 192 : rect.left,
-    });
-  }, [open, align]);
-
-  // Reposition on scroll/resize
-  useEffect(() => {
-    if (!open) return;
-    function reposition() {
-      const trigger = popoverRef.current
-        ?.closest(".relative")
-        ?.querySelector("button");
-      if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      setPopoverPos({
-        top: rect.bottom + 4,
-        left: align === "right" ? rect.right - 192 : rect.left,
-      });
-    }
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
-    return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
-    };
-  }, [open, align]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      const parent = popoverRef.current?.closest(".relative");
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) &&
-        parent &&
-        !parent.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open, onClose]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
-
-  const handleSelect = useCallback(
-    (mode: CardMode) => {
-      onModeChange(mode);
-      onClose();
-    },
-    [onModeChange, onClose]
-  );
-
-  const handleReset = useCallback(() => {
-    onModeChange(null);
-    onClose();
-  }, [onModeChange, onClose]);
-
-  if (!open || !popoverPos) return null;
-
-  return createPortal(
-    <div
-      ref={popoverRef}
-      style={{
-        position: "fixed",
-        top: popoverPos.top,
-        left: popoverPos.left,
-        zIndex: 9999,
-      }}
-      className="w-48 rounded-xl bg-surface-0 border border-surface-200 shadow-lg shadow-black/5 py-1 animate-scale-in origin-top-right"
-      role="menu"
-    >
-      <div className="px-3 py-1.5 border-b border-surface-100">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
-          Card Mode
-        </span>
-      </div>
-
-      {MODES.map((m) => {
-        const Icon = m.icon;
-        const isActive = currentMode === m.value;
-        const isDisabled = m.value === "intelligence" && !aiEnabled;
-
-        return (
-          <button
-            key={m.value}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isDisabled) handleSelect(m.value);
-            }}
-            disabled={isDisabled}
-            className={`
-              w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors
-              ${
-                isActive
-                  ? "bg-brand-50 text-brand-700"
-                  : isDisabled
-                    ? "text-surface-300 cursor-not-allowed"
-                    : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
-              }
-            `}
-            role="menuitem"
-          >
-            <Icon
-              className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? "text-brand-600" : ""}`}
-            />
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-medium block">{m.label}</span>
-              <span className="text-[10px] text-surface-400 block">
-                {isDisabled ? "Requires AI" : m.description}
-              </span>
-            </div>
-            {isActive && (
-              <div className="h-1.5 w-1.5 rounded-full bg-brand-500 flex-shrink-0" />
-            )}
-          </button>
-        );
-      })}
-
-      {isOverride && (
-        <>
-          <div className="border-t border-surface-100 my-1" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleReset();
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
-            role="menuitem"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset to default</span>
-          </button>
-        </>
-      )}
-    </div>,
-    document.body
   );
 }
 
