@@ -686,4 +686,16 @@ a,
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Print: restore natural flow for react-grid-layout pages */
+  .react-grid-layout {
+    position: static !important;
+    height: auto !important;
+  }
+  .react-grid-item {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+  }
 }
