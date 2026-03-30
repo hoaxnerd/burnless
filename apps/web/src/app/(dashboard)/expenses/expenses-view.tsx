@@ -101,6 +101,11 @@ export function ExpensesView({
     { i: "table",        x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const metricCards: MetricCardConfig[] = useMemo(() => [
     {
       slug: "totalMonthly",
@@ -276,6 +281,7 @@ export function ExpensesView({
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           {...pageLayout}
         />
       </CardCatalogProvider>

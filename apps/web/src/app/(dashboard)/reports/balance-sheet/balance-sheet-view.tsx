@@ -69,6 +69,11 @@ export function BalanceSheetView({
     { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const widgets = useMemo(() => ({
     "chart": (
       <ChartCard title="Assets, Liabilities & Equity" subtitle="Monthly snapshot">
@@ -105,6 +110,7 @@ export function BalanceSheetView({
       <PageGrid
         widgets={widgets}
         defaultLayoutLG={defaultLayoutLG}
+        defaultLayoutSM={defaultLayoutSM}
         {...pageLayout}
       />
     </PageProvider>

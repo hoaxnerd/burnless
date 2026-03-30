@@ -109,6 +109,11 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "warning",       x: 0,  w: 12, h: 3, minH: 2 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const metricCards: MetricCardConfig[] = useMemo(() => [
     {
       slug: "startingCash",
@@ -184,6 +189,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           staticHiddenWidgets={staticHiddenWidgets}
           {...pageLayout}
         />

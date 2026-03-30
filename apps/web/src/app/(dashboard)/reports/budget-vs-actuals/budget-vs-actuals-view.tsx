@@ -45,6 +45,11 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
     { i: "detail-table", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const widgets = useMemo(() => ({
     "summary-cards": (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -140,6 +145,7 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
       <PageGrid
         widgets={widgets}
         defaultLayoutLG={defaultLayoutLG}
+        defaultLayoutSM={defaultLayoutSM}
         {...pageLayout}
       />
     </PageProvider>

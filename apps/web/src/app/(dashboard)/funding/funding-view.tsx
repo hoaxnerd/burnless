@@ -66,6 +66,11 @@ export function FundingView({
     { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
   const metricCards: MetricCardConfig[] = useMemo(() => [
@@ -115,6 +120,7 @@ export function FundingView({
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           {...pageLayout}
         />
       </CardCatalogProvider>

@@ -87,6 +87,11 @@ export function TeamView({
     { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const metricCards: MetricCardConfig[] = useMemo(() => [
     {
       slug: "totalHeadcount",
@@ -133,6 +138,7 @@ export function TeamView({
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           {...pageLayout}
         />
       </CardCatalogProvider>

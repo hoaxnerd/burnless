@@ -69,6 +69,11 @@ export function RevenueView({
     { i: "stream-breakdown", x: 0, w: 12, h: 14, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const metricCards: MetricCardConfig[] = useMemo(() => {
     const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
     const first: MetricCardConfig = {
@@ -202,6 +207,7 @@ export function RevenueView({
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           staticHiddenWidgets={staticHiddenWidgets}
           {...pageLayout}
         />

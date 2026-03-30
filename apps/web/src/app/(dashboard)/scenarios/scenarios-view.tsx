@@ -25,6 +25,11 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
     { i: "scenario-cards", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const widgets = useMemo(() => ({
     "insights": <ScenarioInsightsWrapper scenarios={scenarios} />,
     "scenario-cards": <ScenarioCards scenarios={scenarios} />,
@@ -35,6 +40,7 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
       <PageGrid
         widgets={widgets}
         defaultLayoutLG={defaultLayoutLG}
+        defaultLayoutSM={defaultLayoutSM}
         {...pageLayout}
       />
     </PageProvider>

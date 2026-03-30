@@ -196,6 +196,11 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
     { i: "pnl-table", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
+    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
+    [defaultLayoutLG]
+  );
+
   const widgets = useMemo(() => ({
     "kpis": (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-3">
@@ -415,6 +420,7 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
         <PageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
           {...pageLayout}
         />
 
