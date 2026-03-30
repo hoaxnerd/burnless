@@ -14,6 +14,7 @@ import {
   ChevronRight,
   GitBranch,
   Info,
+  Loader2,
 } from "lucide-react";
 import {
   CATEGORY_META,
@@ -65,6 +66,7 @@ export function StatsCatalog() {
   const [selectedCategory, setSelectedCategory] = useState<MetricCategory | "all">("all");
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
+  const [removingSlug, setRemovingSlug] = useState<string | null>(null);
 
   const allUsedSlugs = useMemo(
     () => new Set([...heroCards, ...secondaryMetrics]),
@@ -216,14 +218,20 @@ export function StatsCatalog() {
                         addSecondaryMetric(metric.slug);
                       }
                     }}
-                    onRemove={() => {
-                      if (catalogMode === "manage") {
-                        removeHeroCard(metric.slug);
-                      } else {
-                        removeSecondaryMetric(metric.slug);
+                    onRemove={async () => {
+                      setRemovingSlug(metric.slug);
+                      try {
+                        if (catalogMode === "manage") {
+                          await removeHeroCard(metric.slug);
+                        } else {
+                          await removeSecondaryMetric(metric.slug);
+                        }
+                      } finally {
+                        setRemovingSlug(null);
                       }
                     }}
                     onViewFormula={() => openFormulaViewer(metric.slug)}
+                    isRemoving={removingSlug === metric.slug}
                     swapMode={swapTarget !== null}
                     manageMode={catalogMode === "manage"}
                   />
@@ -299,6 +307,7 @@ function MetricRow({
   onAdd,
   onRemove,
   onViewFormula,
+  isRemoving,
   swapMode,
   manageMode,
 }: {
@@ -310,6 +319,7 @@ function MetricRow({
   onAdd: () => void;
   onRemove: () => void;
   onViewFormula: () => void;
+  isRemoving?: boolean;
   swapMode: boolean;
   manageMode: boolean;
 }) {
@@ -359,10 +369,19 @@ function MetricRow({
             manageMode || !isHero ? (
               <button
                 onClick={onRemove}
-                className="p-1.5 rounded-lg bg-danger-500/10 text-danger-500 hover:bg-danger-500/20 transition-colors"
+                disabled={isRemoving}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isRemoving
+                    ? "bg-surface-100 text-surface-300 cursor-not-allowed"
+                    : "bg-danger-500/10 text-danger-500 hover:bg-danger-500/20"
+                }`}
                 title={manageMode ? "Remove card from dashboard" : "Remove from Key Metrics"}
               >
-                <Minus className="h-3.5 w-3.5" />
+                {isRemoving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Minus className="h-3.5 w-3.5" />
+                )}
               </button>
             ) : (
               <span className="text-[10px] text-surface-400 px-2">Hero</span>

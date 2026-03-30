@@ -185,12 +185,11 @@ export function DashboardLayoutProvider({
   }, [initialPreferences]);
 
   // Track pending save for beforeunload guard
-  const pendingSaveRef = useRef<Promise<void> | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const isSavePendingRef = useRef(false);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (pendingSaveRef.current) {
-        e.preventDefault();
-      }
+      if (isSavePendingRef.current) e.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
@@ -223,11 +222,15 @@ export function DashboardLayoutProvider({
           console.error("Failed to save dashboard layout:", err);
         });
 
-      const savePromise = attempt(2, 500).finally(() => {
-        pendingSaveRef.current = null;
-        setIsSaving(false);
-      });
-      pendingSaveRef.current = savePromise;
+      isSavePendingRef.current = true;
+      const savePromise = saveQueueRef.current
+        .then(() => attempt(2, 500))
+        .catch(() => {}) // don't stall queue on persistent failure
+        .finally(() => {
+          isSavePendingRef.current = false;
+          setIsSaving(false);
+        });
+      saveQueueRef.current = savePromise;
       return savePromise;
     },
     []
