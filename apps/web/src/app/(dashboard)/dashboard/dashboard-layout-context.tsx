@@ -63,11 +63,11 @@ export interface DashboardLayoutState {
   /** Add a metric as a new dashboard card (hero slot) */
   addHeroCard: (slug: string) => void;
   /** Remove a metric card from the dashboard */
-  removeHeroCard: (slug: string) => void;
+  removeHeroCard: (slug: string) => Promise<void>;
   /** Add a secondary metric */
   addSecondaryMetric: (slug: string) => void;
   /** Remove a secondary metric */
-  removeSecondaryMetric: (slug: string) => void;
+  removeSecondaryMetric: (slug: string) => Promise<void>;
   /** Swap a secondary metric at its current position */
   swapSecondaryMetric: (oldSlug: string, newSlug: string) => void;
   /** Reorder secondary metrics */
@@ -223,15 +223,18 @@ export function DashboardLayoutProvider({
         });
 
       isSavePendingRef.current = true;
-      const savePromise = saveQueueRef.current
+      const thisPromise = saveQueueRef.current
         .then(() => attempt(2, 500))
         .catch(() => {}) // don't stall queue on persistent failure
         .finally(() => {
-          isSavePendingRef.current = false;
+          // Only clear pending flag if this is the last queued save
+          if (saveQueueRef.current === thisPromise) {
+            isSavePendingRef.current = false;
+          }
           setIsSaving(false);
         });
-      saveQueueRef.current = savePromise;
-      return savePromise;
+      saveQueueRef.current = thisPromise;
+      return thisPromise;
     },
     []
   );
