@@ -17,7 +17,7 @@ interface SwappableMetricCardProps {
   /** Unique metric identifier for this card */
   slug: string;
   /** Page this card belongs to (e.g., "expenses", "revenue", "reports/runway") */
-  pageId: string;
+  pageId?: string;
   /** All standard MetricCard props */
   label: string;
   value: string;
