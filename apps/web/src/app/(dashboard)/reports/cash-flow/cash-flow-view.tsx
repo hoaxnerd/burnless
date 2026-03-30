@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import type { CashFlowStatement } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { AreaChartWidget, BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
+import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageProvider } from "@/components/providers/page-context";
 
 export function CashFlowView({
   cashFlow,
@@ -70,8 +74,16 @@ export function CashFlowView({
     downloadPDF(doc, "cash-flow");
   };
 
-  return (
-    <div className="space-y-6">
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "reports/cash-flow" });
+
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cash Flow Components" subtitle="Operating, investing, and financing">
           <BarChartWidget
@@ -87,7 +99,8 @@ export function CashFlowView({
           <AreaChartWidget data={cashData} color={chartColors.success} />
         </ChartCard>
       </div>
-
+    ),
+    "statement": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Cash Flow Statement</h2>
@@ -104,6 +117,16 @@ export function CashFlowView({
           ]}
         />
       </div>
-    </div>
+    ),
+  }), [barData, cashData, cf, handleExportCSV, handleExportPDF]);
+
+  return (
+    <PageProvider pageId="reports/cash-flow">
+      <PageGrid
+        widgets={widgets}
+        defaultLayoutLG={defaultLayoutLG}
+        {...pageLayout}
+      />
+    </PageProvider>
   );
 }

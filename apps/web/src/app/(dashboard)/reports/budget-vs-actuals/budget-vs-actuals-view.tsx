@@ -1,9 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import type { BudgetVsActuals } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { ExportCSVButton } from "@/components/reports/export-button";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
+import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageProvider } from "@/components/providers/page-context";
 
 export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
   const { lineItems, totalBudget, totalActual, totalVariance } = bva;
@@ -32,19 +36,17 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
     return row;
   });
 
-  if (lineItems.length === 0) {
-    return (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 p-8 text-center">
-        <p className="text-sm text-surface-500">
-          No budget or actual data to compare. Add forecast lines and import transactions to see variance analysis.
-        </p>
-      </div>
-    );
-  }
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "reports/budget-vs-actuals" });
 
-  return (
-    <div className="space-y-6">
-      {/* Summary cards */}
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "summary-cards", x: 0, w: 12, h: 5, minH: 4 },
+    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "detail-table", x: 0, w: 12, h: 16, minH: 8 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "summary-cards": (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <SwappableMetricCard slug="totalBudget" pageId="reports/bva" label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} />
         <SwappableMetricCard slug="totalActual" pageId="reports/bva" label="Total Actual" value={formatCompactCurrency(totalActualSum)} />
@@ -56,8 +58,8 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
           change={totalVarianceSum >= 0 ? "Favorable" : "Unfavorable"}
         />
       </div>
-
-      {/* Summary chart */}
+    ),
+    "charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Budget vs Actual" subtitle="Monthly net position">
           <MultiLineChart
@@ -72,8 +74,8 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
           <VarianceBarChart data={totalVariance} />
         </ChartCard>
       </div>
-
-      {/* Line item detail */}
+    ),
+    "detail-table": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Variance by Account</h2>
@@ -119,6 +121,27 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
           </table>
         </div>
       </div>
-    </div>
+    ),
+  }), [totalBudgetSum, totalActualSum, totalVarianceSum, summaryChartData, totalVariance, lineItems, csvData, headers]);
+
+  // Empty state: show before PageGrid
+  if (lineItems.length === 0) {
+    return (
+      <div className="rounded-xl bg-surface-0 border border-surface-200 p-8 text-center">
+        <p className="text-sm text-surface-500">
+          No budget or actual data to compare. Add forecast lines and import transactions to see variance analysis.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <PageProvider pageId="reports/budget-vs-actuals">
+      <PageGrid
+        widgets={widgets}
+        defaultLayoutLG={defaultLayoutLG}
+        {...pageLayout}
+      />
+    </PageProvider>
   );
 }

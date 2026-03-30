@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ProfitAndLoss } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { MultiLineChart, chartColors, formatPercent } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
+import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageProvider } from "@/components/providers/page-context";
 
 export function ProfitLossView({
   profitAndLoss,
@@ -74,9 +78,16 @@ export function ProfitLossView({
     downloadPDF(doc, "profit-and-loss");
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Charts */}
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "reports/profit-loss" });
+
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Revenue, Expenses & Net Income" subtitle="Monthly trend">
           <MultiLineChart
@@ -99,8 +110,8 @@ export function ProfitLossView({
           />
         </ChartCard>
       </div>
-
-      {/* Statement table */}
+    ),
+    "statement": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Income Statement</h2>
@@ -120,6 +131,16 @@ export function ProfitLossView({
           ]}
         />
       </div>
-    </div>
+    ),
+  }), [chartData, marginData, pnl, handleExportCSV, handleExportPDF]);
+
+  return (
+    <PageProvider pageId="reports/profit-loss">
+      <PageGrid
+        widgets={widgets}
+        defaultLayoutLG={defaultLayoutLG}
+        {...pageLayout}
+      />
+    </PageProvider>
   );
 }

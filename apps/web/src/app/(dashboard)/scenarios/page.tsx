@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import { getCompany, getScenarios } from "@/lib/data";
-import { ScenarioCards } from "./scenario-cards";
 import { CreateScenarioDialog } from "./create-scenario-dialog";
-import { ScenarioInsightsWrapper } from "./scenario-insights-wrapper";
+import { ScenariosView } from "./scenarios-view";
 
 async function ScenariosContent() {
   const company = await getCompany();
@@ -18,12 +17,7 @@ async function ScenariosContent() {
     createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
   }));
 
-  return (
-    <>
-      <ScenarioInsightsWrapper scenarios={scenarioData} />
-      <ScenarioCards scenarios={scenarioData} />
-    </>
-  );
+  return <ScenariosView scenarios={scenarioData} />;
 }
 
 export default function ScenariosPage() {

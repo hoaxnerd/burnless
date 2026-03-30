@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import type { BalanceSheet } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
+import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageProvider } from "@/components/providers/page-context";
 
 export function BalanceSheetView({
   balanceSheet,
@@ -57,8 +61,16 @@ export function BalanceSheetView({
     downloadPDF(doc, "balance-sheet");
   };
 
-  return (
-    <div className="space-y-6">
+  // ── PageGrid layout ──────────────────────────────────────────────────────
+  const pageLayout = usePageLayout({ pageId: "reports/balance-sheet" });
+
+  const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
+    { i: "chart", x: 0, w: 12, h: 10, minH: 6 },
+    { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
+  ], []);
+
+  const widgets = useMemo(() => ({
+    "chart": (
       <ChartCard title="Assets, Liabilities & Equity" subtitle="Monthly snapshot">
         <BarChartWidget
           data={barData}
@@ -69,7 +81,8 @@ export function BalanceSheetView({
           ]}
         />
       </ChartCard>
-
+    ),
+    "statement": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Balance Sheet</h2>
@@ -84,6 +97,16 @@ export function BalanceSheetView({
           ]}
         />
       </div>
-    </div>
+    ),
+  }), [barData, bs, handleExportCSV, handleExportPDF]);
+
+  return (
+    <PageProvider pageId="reports/balance-sheet">
+      <PageGrid
+        widgets={widgets}
+        defaultLayoutLG={defaultLayoutLG}
+        {...pageLayout}
+      />
+    </PageProvider>
   );
 }
