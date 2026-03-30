@@ -2,10 +2,16 @@
 
 import { useMemo } from "react";
 import type { MetricValue } from "@burnless/engine";
-import { AreaChartWidget, MultiLineChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, SwappableMetricCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { AreaChartWidget, MultiLineChart, chartColors } from "@/components/charts";
+import { ChartCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { usePageLayout } from "@/components/ui/use-page-layout";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
+import { PageProvider } from "@/components/providers/page-context";
+import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
+import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import { formatCurrency } from "@burnless/types";
 
 interface RunwayViewProps {
   cashPosition: MetricValue[];
@@ -72,8 +78,28 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     downloadPDF(doc, "runway-summary");
   };
 
+  // ── Context wiring ──────────────────────────────────────────────────────
+  const { registry, openFormulaViewer } = useMetrics();
+  const usedSlugs = useMemo(() => new Set(["startingCash", "currentCash", "netBurnRate", "runway"]), []);
+  const catalogValue: CardCatalogValue = useMemo(() => ({
+    registry,
+    usedSlugs,
+    heroSlugs: [],
+    onSelect: () => {},
+    onRemove: () => {},
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDef as CardCatalogValue["getMetricDef"],
+    swapMode: false,
+    cardType: "metric" as const,
+  }), [registry, usedSlugs, openFormulaViewer]);
+
   // ── PageGrid layout ──────────────────────────────────────────────────────
   const pageLayout = usePageLayout({ pageId: "reports/runway" });
+
+  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "export",        x: 0,  w: 12, h: 2, minH: 2 },
@@ -83,6 +109,31 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "warning",       x: 0,  w: 12, h: 3, minH: 2 },
   ], []);
 
+  const metricCards: MetricCardConfig[] = useMemo(() => [
+    {
+      slug: "startingCash",
+      label: "Starting Cash",
+      value: fc(startingCash),
+    },
+    {
+      slug: "currentCash",
+      label: "Current Cash",
+      value: fc(latest?.value ?? 0),
+    },
+    {
+      slug: "netBurnRate",
+      label: "Net Burn Rate",
+      value: fc(latestBurn?.value ?? 0),
+      description: "Latest month",
+    },
+    {
+      slug: "runway",
+      label: "Runway",
+      value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e",
+      description: zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway",
+    },
+  ], [startingCash, latest, latestBurn, latestRunway, zeroCashMonth]);
+
   const widgets = useMemo(() => ({
     "export": (
       <div className="flex items-center justify-between">
@@ -90,36 +141,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
       </div>
     ),
-    "metric-cards": (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <SwappableMetricCard
-          slug="startingCash"
-          pageId="reports/runway"
-          label="Starting Cash"
-          value={formatCompactCurrency(startingCash)}
-        />
-        <SwappableMetricCard
-          slug="currentCash"
-          pageId="reports/runway"
-          label="Current Cash"
-          value={formatCompactCurrency(latest?.value ?? 0)}
-        />
-        <SwappableMetricCard
-          slug="netBurnRate"
-          pageId="reports/runway"
-          label="Net Burn Rate"
-          value={formatCompactCurrency(latestBurn?.value ?? 0)}
-          description="Latest month"
-        />
-        <SwappableMetricCard
-          slug="runway"
-          pageId="reports/runway"
-          label="Runway"
-          value={latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e"}
-          description={zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway"}
-        />
-      </div>
-    ),
+    "metric-cards": <MetricCardsGrid cards={metricCards} />,
     "cash-charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cash Position Over Time" subtitle="Projected ending cash balance">
@@ -152,16 +174,20 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         </p>
       </div>
     ) : <div />,
-  }), [handleExportCSV, handleExportPDF, startingCash, latest, latestBurn, latestRunway, zeroCashMonth, cashPosition, runway, burnData]);
+  }), [handleExportCSV, handleExportPDF, metricCards, zeroCashMonth, cashPosition, runway, burnData]);
 
   const staticHiddenWidgets = useMemo(() => zeroCashMonth ? [] : ["warning"], [zeroCashMonth]);
 
   return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      staticHiddenWidgets={staticHiddenWidgets}
-      {...pageLayout}
-    />
+    <PageProvider pageId="reports/runway">
+      <CardCatalogProvider value={catalogValue}>
+        <PageGrid
+          widgets={widgets}
+          defaultLayoutLG={defaultLayoutLG}
+          staticHiddenWidgets={staticHiddenWidgets}
+          {...pageLayout}
+        />
+      </CardCatalogProvider>
+    </PageProvider>
   );
 }

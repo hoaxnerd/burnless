@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { AlertTriangle, RotateCw, DollarSign, TrendingUp } from "lucide-react";
-import { SwappableMetricCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { usePageLayout } from "@/components/ui/use-page-layout";
 import { BarChartWidget, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
@@ -10,6 +10,12 @@ import { ExpenseCategoryChart } from "./expense-category-chart";
 import { ExpenseTable } from "./expense-table";
 import { ExpenseInsights } from "./expense-insights";
 import { AiPageInsights } from "@/components/ai/ai-page-insights";
+import { PageProvider } from "@/components/providers/page-context";
+import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
+import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import { formatCurrency } from "@burnless/types";
 import type { ExpenseDetails } from "@/lib/compute-expenses";
 
 interface MetricPoint {
@@ -38,12 +44,6 @@ interface ExpensesViewProps {
   scenarioId: string;
 }
 
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
-
 export function ExpensesView({
   summaryMetrics,
   expenseDetails,
@@ -55,6 +55,24 @@ export function ExpensesView({
 }: ExpensesViewProps) {
   const [view, setView] = useState<"overview" | "budget">("overview");
   const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount: _opexAmount, cogsAmount: _cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
+
+  // ── Context wiring ──────────────────────────────────────────────────────
+  const { registry, openFormulaViewer } = useMetrics();
+  const usedSlugs = useMemo(() => new Set(["totalMonthly", "personnelCost", "anomalies", "recurring"]), []);
+  const catalogValue: CardCatalogValue = useMemo(() => ({
+    registry,
+    usedSlugs,
+    heroSlugs: [],
+    onSelect: () => {},
+    onRemove: () => {},
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDef as CardCatalogValue["getMetricDef"],
+    swapMode: false,
+    cardType: "metric" as const,
+  }), [registry, usedSlugs, openFormulaViewer]);
 
   // Budget comparison data
   const budgetCompareData = budgetTimeline
@@ -83,57 +101,45 @@ export function ExpensesView({
     { i: "table",        x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const metricCards: MetricCardConfig[] = useMemo(() => [
+    {
+      slug: "totalMonthly",
+      label: "Total Monthly",
+      value: formatCurrency(totalMonthly, "USD", undefined, { compact: true }),
+      change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
+      description: "vs last month",
+      trend: changePercent !== null ? (changePercent > 1 ? "down" : changePercent < -1 ? "up" : "flat") : undefined,
+      icon: DollarSign,
+      variant: changePercent !== null && changePercent > 10 ? "danger" : "default",
+    },
+    {
+      slug: "personnelCost",
+      label: "People",
+      value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
+      description: `${personnelPercent.toFixed(0)}% of total`,
+      icon: TrendingUp,
+      variant: "brand" as const,
+    },
+    {
+      slug: "anomalies",
+      label: "Anomalies",
+      value: String(anomalyCount),
+      description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
+      icon: AlertTriangle,
+      variant: anomalyCount > 0 ? "warning" : "default",
+    },
+    {
+      slug: "recurring",
+      label: "Recurring",
+      value: String(recurringCount),
+      description: `of ${expenseDetails.lineItems.length} expenses`,
+      icon: RotateCw,
+      variant: "default" as const,
+    },
+  ], [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails.lineItems.length]);
+
   const widgets = useMemo(() => ({
-    "metric-cards": (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
-        <div className="stagger-1 animate-slide-up">
-          <SwappableMetricCard
-            slug="totalMonthly"
-            pageId="expenses"
-            label="Total Monthly"
-            value={formatCurrency(totalMonthly)}
-            change={changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined}
-            description="vs last month"
-            trend={changePercent !== null ? (changePercent > 1 ? "down" : changePercent < -1 ? "up" : "flat") : undefined}
-            icon={DollarSign}
-            variant={changePercent !== null && changePercent > 10 ? "danger" : "default"}
-          />
-        </div>
-        <div className="stagger-2 animate-slide-up">
-          <SwappableMetricCard
-            slug="personnelCost"
-            pageId="expenses"
-            label="People"
-            value={formatCurrency(personnelCost)}
-            description={`${personnelPercent.toFixed(0)}% of total`}
-            icon={TrendingUp}
-            variant="brand"
-          />
-        </div>
-        <div className="stagger-3 animate-slide-up">
-          <SwappableMetricCard
-            slug="anomalies"
-            pageId="expenses"
-            label="Anomalies"
-            value={String(anomalyCount)}
-            description={anomalyCount > 0 ? "Unusual spend detected" : "All spend normal"}
-            icon={AlertTriangle}
-            variant={anomalyCount > 0 ? "warning" : "default"}
-          />
-        </div>
-        <div className="stagger-4 animate-slide-up">
-          <SwappableMetricCard
-            slug="recurring"
-            pageId="expenses"
-            label="Recurring"
-            value={String(recurringCount)}
-            description={`of ${expenseDetails.lineItems.length} expenses`}
-            icon={RotateCw}
-            variant="default"
-          />
-        </div>
-      </div>
-    ),
+    "metric-cards": <MetricCardsGrid cards={metricCards} />,
     "ai-insights": (
       <AiPageInsights
         page="expenses"
@@ -262,14 +268,18 @@ export function ExpensesView({
         subcategories={expenseDetails.subcategories}
       />
     ),
-  }), [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [metricCards, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      {...pageLayout}
-    />
+    <PageProvider pageId="expenses">
+      <CardCatalogProvider value={catalogValue}>
+        <PageGrid
+          widgets={widgets}
+          defaultLayoutLG={defaultLayoutLG}
+          {...pageLayout}
+        />
+      </CardCatalogProvider>
+    </PageProvider>
   );
 }
 

@@ -1,9 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { SwappableMetricCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { usePageLayout } from "@/components/ui/use-page-layout";
 import { TeamDetails } from "./team-details";
+import { PageProvider } from "@/components/providers/page-context";
+import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
+import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { useMetrics } from "@/components/providers/metrics-context";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import { formatCurrency } from "@burnless/types";
 
 interface TeamViewProps {
   totalHeadcount: number;
@@ -43,12 +49,6 @@ interface TeamViewProps {
   departments: Array<{ id: string; name: string }>;
 }
 
-function formatCurrency(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
-
 export function TeamView({
   totalHeadcount,
   plannedCount,
@@ -62,6 +62,24 @@ export function TeamView({
   scenarioId,
   departments,
 }: TeamViewProps) {
+  // ── Context wiring ──────────────────────────────────────────────────────
+  const { registry, openFormulaViewer } = useMetrics();
+  const usedSlugs = useMemo(() => new Set(["totalHeadcount", "monthlyPeopleCost", "revenuePerEmployee", "departments"]), []);
+  const catalogValue: CardCatalogValue = useMemo(() => ({
+    registry,
+    usedSlugs,
+    heroSlugs: [],
+    onSelect: () => {},
+    onRemove: () => {},
+    onViewFormula: openFormulaViewer,
+    categoryMeta: CATEGORY_META as Record<string, { label: string }>,
+    getDependencyTree: getMetricDependencyTree,
+    getDependents: getMetricDependents,
+    getMetricDef: getMetricDef as CardCatalogValue["getMetricDef"],
+    swapMode: false,
+    cardType: "metric" as const,
+  }), [registry, usedSlugs, openFormulaViewer]);
+
   const pageLayout = usePageLayout({ pageId: "team" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
@@ -69,39 +87,35 @@ export function TeamView({
     { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
+  const metricCards: MetricCardConfig[] = useMemo(() => [
+    {
+      slug: "totalHeadcount",
+      label: "Total Headcount",
+      value: String(totalHeadcount),
+      description: plannedCount > 0 ? `+${plannedCount} planned` : undefined,
+    },
+    {
+      slug: "monthlyPeopleCost",
+      label: "Monthly People Cost",
+      value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
+      description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
+    },
+    {
+      slug: "revenuePerEmployee",
+      label: "Revenue / Employee",
+      value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
+      description: "Efficiency metric",
+    },
+    {
+      slug: "departments",
+      label: "Departments",
+      value: String(deptGroupCount),
+      description: `${departmentsCount} total defined`,
+    },
+  ], [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount]);
+
   const widgets = useMemo(() => ({
-    "metric-cards": (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <SwappableMetricCard
-          slug="totalHeadcount"
-          pageId="team"
-          label="Total Headcount"
-          value={String(totalHeadcount)}
-          description={plannedCount > 0 ? `+${plannedCount} planned` : undefined}
-        />
-        <SwappableMetricCard
-          slug="monthlyPeopleCost"
-          pageId="team"
-          label="Monthly People Cost"
-          value={formatCurrency(totalMonthlyCost)}
-          description={costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits"}
-        />
-        <SwappableMetricCard
-          slug="revenuePerEmployee"
-          pageId="team"
-          label="Revenue / Employee"
-          value={`${formatCurrency(revPerEmployee)}/mo`}
-          description="Efficiency metric"
-        />
-        <SwappableMetricCard
-          slug="departments"
-          pageId="team"
-          label="Departments"
-          value={String(deptGroupCount)}
-          description={`${departmentsCount} total defined`}
-        />
-      </div>
-    ),
+    "metric-cards": <MetricCardsGrid cards={metricCards} gap={6} />,
     "details": (
       <TeamDetails
         departmentBreakdown={departmentBreakdown}
@@ -111,13 +125,17 @@ export function TeamView({
         departments={departments}
       />
     ),
-  }), [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount, departmentBreakdown, plannedHires, scenarioId, departments]);
+  }), [metricCards, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
 
   return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      {...pageLayout}
-    />
+    <PageProvider pageId="team">
+      <CardCatalogProvider value={catalogValue}>
+        <PageGrid
+          widgets={widgets}
+          defaultLayoutLG={defaultLayoutLG}
+          {...pageLayout}
+        />
+      </CardCatalogProvider>
+    </PageProvider>
   );
 }
