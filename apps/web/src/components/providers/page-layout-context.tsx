@@ -29,6 +29,7 @@ import {
   type ReactNode,
 } from "react";
 import type { PageWidgetLayout } from "@/components/ui/page-grid";
+import { useInitialLayouts } from "./initial-layouts-context";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,14 +82,21 @@ export function PageLayoutProvider({
   initialLayout,
   initialClosedWidgets,
 }: PageLayoutProviderProps) {
-  const hasInitialData = initialLayout !== undefined;
+  // Read server-fetched layouts from shared context (provided by DashboardShell).
+  // Props take priority over context (for dashboard which passes explicit initial data).
+  const serverLayouts = useInitialLayouts();
+  const serverPageData = serverLayouts[pageId];
 
-  const [isLoading, setIsLoading] = useState(!hasInitialData);
+  const resolvedInitialLayout = initialLayout ?? serverPageData?.layout;
+  const resolvedInitialClosed = initialClosedWidgets ?? serverPageData?.closedWidgets;
+  const hasInitialData = resolvedInitialLayout !== undefined;
+
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
-  const [layout, setLayout] = useState<PageWidgetLayout[]>(initialLayout ?? []);
-  const [closedWidgets, setClosedWidgets] = useState<string[]>(initialClosedWidgets ?? []);
+  const [layout, setLayout] = useState<PageWidgetLayout[]>(resolvedInitialLayout ?? []);
+  const [closedWidgets, setClosedWidgets] = useState<string[]>(resolvedInitialClosed ?? []);
 
   // Widget readiness — transient, widget self-reports
   const [widgetReadiness, setWidgetReadiness] = useState<Record<string, boolean>>({});

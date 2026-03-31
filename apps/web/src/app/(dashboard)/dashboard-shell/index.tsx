@@ -35,6 +35,7 @@ import { CommandPalette } from "@/components/ui/command-palette";
 import { LocaleProvider } from "@/components/locale/locale-context";
 import { useProactiveAlerts } from "@/components/ai/use-proactive-alerts";
 import { MetricsProvider } from "@/components/providers/metrics-context";
+import { InitialLayoutsProvider } from "@/components/providers/initial-layouts-context";
 import { SWRProvider } from "@/lib/swr/provider";
 import { SharedFormulaViewer } from "@/components/ui/shared-formula-viewer";
 
@@ -54,9 +55,13 @@ import { SidebarInner } from "./sidebar-inner";
 export function DashboardShell({
   children,
   user,
+  initialSlotOverrides,
+  initialPageLayouts,
 }: {
   children: React.ReactNode;
   user: UserInfo | null;
+  initialSlotOverrides?: Record<string, unknown> | null;
+  initialPageLayouts?: Record<string, unknown> | null;
 }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
@@ -91,7 +96,8 @@ export function DashboardShell({
     <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={navigateToAi}>
     <ScenarioProvider>
-    <MetricsProvider>
+    <InitialLayoutsProvider layouts={(initialPageLayouts ?? {}) as Record<string, { layout: never[]; closedWidgets?: string[] }>}>
+    <MetricsProvider initialSlotOverrides={initialSlotOverrides as Record<string, import("@burnless/engine").CardContent> | null | undefined}>
       <DashboardContent
         commandPaletteOpen={commandPaletteOpen}
         setCommandPaletteOpen={setCommandPaletteOpen}
@@ -101,6 +107,7 @@ export function DashboardShell({
         {children}
       </DashboardContent>
     </MetricsProvider>
+    </InitialLayoutsProvider>
     </ScenarioProvider>
     </KeyboardShortcutsProvider>
     </AiFeatureProvider>

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { Suspense } from "react";
 import { getScenarioById, getCompany, getForecastLines, getRevenueStreams, getHeadcountPlans, getFundingRounds } from "@/lib/data";
 import { notFound } from "next/navigation";

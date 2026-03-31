@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getCompanyForAuthUser } from "@/lib/data";
+import { getCompanyForAuthUser, getDashboardPreferences } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
 
@@ -18,16 +18,28 @@ export default async function DashboardLayout({
   const company = await getCompanyForAuthUser(session.user.id!);
   if (!company) redirect("/onboarding");
 
-  const user = {
-    name: session.user.name ?? null,
-    email: session.user.email ?? null,
-    image: session.user.image ?? null,
-  };
+  const [user, prefs] = await Promise.all([
+    Promise.resolve({
+      name: session.user.name ?? null,
+      email: session.user.email ?? null,
+      image: session.user.image ?? null,
+    }),
+    getDashboardPreferences().catch(() => null),
+  ]);
+
+  const initialSlotOverrides = (prefs?.slotOverrides ?? null) as Record<string, unknown> | null;
+  const initialPageLayouts = (prefs?.pageLayouts ?? null) as Record<string, unknown> | null;
 
   return (
     <Suspense fallback={null}>
       <SentryUserContext userId={session?.user?.id} email={session?.user?.email} />
-      <DashboardShell user={user}>{children}</DashboardShell>
+      <DashboardShell
+        user={user}
+        initialSlotOverrides={initialSlotOverrides}
+        initialPageLayouts={initialPageLayouts}
+      >
+        {children}
+      </DashboardShell>
     </Suspense>
   );
 }

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { Suspense } from "react";
 import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";

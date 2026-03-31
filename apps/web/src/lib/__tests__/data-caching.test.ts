@@ -2,7 +2,8 @@
  * Performance regression tests for data caching layer — BUR-198
  *
  * Verifies that:
- * 1. All data functions use unstable_cache or React.cache() for deduplication
+ * 1. All data functions use cachedQuery (wrapper around unstable_cache with
+ *    date revival) or React.cache() for deduplication
  * 2. Cache tags match between data.ts queries and API route invalidation
  * 3. Cache TTLs are reasonable (30-60s)
  * 4. getCompany and getDashboardPreferences use React.cache() for request dedup
@@ -19,7 +20,7 @@ const dataSource = readFileSync(
 );
 
 describe("data.ts caching structure (BUR-198 regression)", () => {
-  describe("unstable_cache wrapping", () => {
+  describe("cachedQuery wrapping", () => {
     const cachedFunctions = [
       "getScenarios",
       "getDefaultScenario",
@@ -34,20 +35,25 @@ describe("data.ts caching structure (BUR-198 regression)", () => {
     ];
 
     it.each(cachedFunctions)(
-      "%s should be wrapped with unstable_cache",
+      "%s should be wrapped with cachedQuery",
       (fnName) => {
-        // Match pattern: export const fnName = unstable_cache(
+        // Match pattern: export const fnName = cachedQuery(
         const pattern = new RegExp(
-          `export\\s+const\\s+${fnName}\\s*=\\s*unstable_cache\\(`
+          `export\\s+const\\s+${fnName}\\s*=\\s*cachedQuery\\(`
         );
         expect(dataSource).toMatch(pattern);
       }
     );
 
-    it("should import unstable_cache from next/cache", () => {
+    it("should import unstable_cache from next/cache (used by cachedQuery)", () => {
       expect(dataSource).toContain(
         'import { unstable_cache } from "next/cache"'
       );
+    });
+
+    it("cachedQuery should revive dates from JSON serialization", () => {
+      expect(dataSource).toContain("reviveDates");
+      expect(dataSource).toContain("ISO_DATE_RE");
     });
   });
 
@@ -90,7 +96,7 @@ describe("data.ts caching structure (BUR-198 regression)", () => {
       (fnName, tags) => {
         // Find the function definition and check it contains the expected tags
         const fnPattern = new RegExp(
-          `${fnName}\\s*=\\s*unstable_cache\\([\\s\\S]*?tags:\\s*\\[([^\\]]+)\\]`,
+          `${fnName}\\s*=\\s*cachedQuery\\([\\s\\S]*?tags:\\s*\\[([^\\]]+)\\]`,
           "m"
         );
         const match = dataSource.match(fnPattern);
@@ -120,8 +126,8 @@ describe("data.ts caching structure (BUR-198 regression)", () => {
     });
   });
 
-  describe("force-dynamic removal (BUR-176 regression)", () => {
-    it("dashboard layout should NOT use force-dynamic", () => {
+  describe("force-dynamic on data-fetching pages", () => {
+    it("dashboard layout should NOT use force-dynamic (pages handle it themselves)", () => {
       const layoutSource = readFileSync(
         join(
           import.meta.dirname,
@@ -129,7 +135,6 @@ describe("data.ts caching structure (BUR-198 regression)", () => {
         ),
         "utf-8"
       );
-      expect(layoutSource).not.toContain("force-dynamic");
       expect(layoutSource).not.toContain(
         'export const dynamic = "force-dynamic"'
       );

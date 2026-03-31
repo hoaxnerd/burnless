@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import { getCompany, getScenarios } from "@/lib/data";
 import { SetupPrompt } from "@/components/ui/empty-state";

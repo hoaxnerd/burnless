@@ -326,7 +326,7 @@ export function PageGrid({
         return {
           ...item,
           h,
-          isResizable: isReady || isClosed,
+          isResizable: isEditMode && (isReady || isClosed),
         };
       });
 
@@ -337,7 +337,7 @@ export function PageGrid({
       xs: enhance(baseLayouts.xs),
       xxs: enhance(baseLayouts.xxs),
     };
-  }, [baseLayouts, autoHeights, savedLayout, widgetReadiness, closedSet]);
+  }, [baseLayouts, autoHeights, savedLayout, widgetReadiness, closedSet, isEditMode]);
 
   // Save on drag stop
   const handleDragStop = useCallback(

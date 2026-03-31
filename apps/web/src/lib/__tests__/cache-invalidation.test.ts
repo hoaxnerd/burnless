@@ -182,7 +182,7 @@ describe("cache invalidation on mutations (BUR-198 regression)", () => {
       );
       // Verify transactions are NOT cached (if this changes, add revalidateTag)
       expect(dataSource).not.toMatch(
-        /getTransactions\s*=\s*unstable_cache/
+        /getTransactions\s*=\s*(?:unstable_cache|cachedQuery)/
       );
     });
   });

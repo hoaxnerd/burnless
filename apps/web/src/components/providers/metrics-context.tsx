@@ -209,11 +209,10 @@ export function MetricsProvider({
         if (data.cardScenarioOverrides) {
           setScenarioOverrides((prev) => ({ ...data.cardScenarioOverrides, ...prev }));
         }
-        if (data.customSlugOverrides) {
-          setSlotOverridesState((prev) => ({ ...data.customSlugOverrides, ...prev }));
-        }
-        if (data.slotOverrides) {
-          setSlotOverridesState((prev) => ({ ...data.slotOverrides, ...prev }));
+        // Load typed slot overrides (new system). Ignore old customSlugOverrides
+        // (string values incompatible with CardContent typed state).
+        if (data.slotOverrides && Object.keys(data.slotOverrides).length > 0) {
+          setSlotOverridesState((prev) => ({ ...prev, ...data.slotOverrides }));
         }
         setIsLoading(false);
       })

@@ -5,6 +5,7 @@
 
 import { db } from "@burnless/db";
 import { aiToolAuditLogs } from "@burnless/db";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import type { ToolContext, ToolHandler } from "./types";
 
@@ -52,6 +53,40 @@ const MUTATION_TOOLS = new Set([
 
 function isMutationTool(toolName: string): boolean {
   return MUTATION_TOOLS.has(toolName);
+}
+
+/** Maps mutation tool names to the cache tags they should invalidate. */
+const MUTATION_CACHE_TAGS: Record<string, string[]> = {
+  create_scenario: ["scenarios"],
+  update_scenario: ["scenarios"],
+  delete_scenario: ["scenarios"],
+  add_headcount: ["headcount-plans"],
+  update_headcount: ["headcount-plans"],
+  delete_headcount: ["headcount-plans"],
+  create_department: ["departments"],
+  update_department: ["departments"],
+  delete_department: ["departments", "headcount-plans"],
+  add_revenue_stream: ["revenue-streams"],
+  update_revenue_stream: ["revenue-streams"],
+  delete_revenue_stream: ["revenue-streams"],
+  add_funding_round: ["funding-rounds"],
+  update_funding_round: ["funding-rounds"],
+  delete_funding_round: ["funding-rounds"],
+  create_forecast_line: ["forecast-lines"],
+  update_forecast_line: ["forecast-lines"],
+  delete_forecast_line: ["forecast-lines"],
+  create_account: ["accounts"],
+  update_account: ["accounts"],
+  delete_account: ["accounts"],
+};
+
+function invalidateCacheForTool(toolName: string): void {
+  const tags = MUTATION_CACHE_TAGS[toolName];
+  if (tags) {
+    for (const tag of tags) {
+      revalidateTag(tag);
+    }
+  }
 }
 
 function describeMutation(toolName: string, input: Record<string, unknown>): string {
@@ -173,6 +208,11 @@ export async function executeToolCall(
     const errorMsg = err instanceof Error ? err.message : String(err);
     logToolAudit(context, toolName, input, "error", { error: errorMsg }, durationMs);
     return JSON.stringify({ error: `Tool execution failed: ${errorMsg}` });
+  }
+
+  // Invalidate relevant caches after successful mutations so pages show fresh data
+  if (isMutationTool(toolName)) {
+    invalidateCacheForTool(toolName);
   }
 
   const durationMs = Math.round(performance.now() - startTime);
