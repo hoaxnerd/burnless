@@ -14,6 +14,7 @@
  */
 
 import { type ReactNode, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   useOptionalMetrics,
   type CardMode,
@@ -77,6 +78,7 @@ export function WidgetCard({
   tabIndex,
   title,
 }: WidgetCardProps) {
+  const router = useRouter();
   const metrics = useOptionalMetrics();
   const catalog = useOptionalCardCatalog();
   const aiFlags = useOptionalAiFlags();
@@ -155,8 +157,24 @@ export function WidgetCard({
             isOverride={isOverride}
             aiEnabled={aiEnabled}
             catalogProps={catalog ?? undefined}
-            onSaveForCard={slug && catalog?.onSaveForCard
-              ? (selectedSlug: string) => catalog.onSaveForCard!(slug, selectedSlug)
+            onSaveForCard={slug && pageId && metrics
+              ? (selectedSlug: string) => {
+                  if (catalog?.onSaveForCard) {
+                    // Dashboard-style: page manages its own card slugs.
+                    // Transfer mode since the card's slug will change.
+                    const mode = metrics.getCardMode(pageId, slug);
+                    metrics.setCardMode(pageId, selectedSlug, mode);
+                    if (metrics.hasOverride(pageId, slug)) {
+                      metrics.setCardMode(pageId, slug, null);
+                    }
+                    catalog.onSaveForCard(slug, selectedSlug);
+                  } else {
+                    // Centralized: store custom slug override in MetricsContext.
+                    // Mode stays on the original slot slug (no transfer needed).
+                    metrics.setSlotOverride(pageId, slug, { type: "metric", slug: selectedSlug });
+                  }
+                  router.refresh();
+                }
               : undefined}
           />
         </div>
