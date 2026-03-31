@@ -462,7 +462,10 @@ export const scenarioOverrides = pgTable(
     data: jsonb("data"),
     originalData: jsonb("original_data"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     uniqueIndex("scenario_overrides_unique").on(table.scenarioId, table.entityType, table.entityId),

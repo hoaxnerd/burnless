@@ -46,14 +46,14 @@ export const POST = withErrorHandler(async (request: Request) => {
   // Idempotency: if user already has a company, return it instead of creating a duplicate
   const existingMembership = await getUserCompany(userId);
   if (existingMembership) {
-    // Find their default scenario
+    // Find their first scenario
+    // TODO(Task 7): Revisit — isDefault no longer exists in overlay model
     const [defaultScenario] = await db
       .select({ id: scenarios.id })
       .from(scenarios)
       .where(
         and(
           eq(scenarios.companyId, existingMembership.companyId),
-          eq(scenarios.isDefault, true),
           isNull(scenarios.deletedAt)
         )
       )

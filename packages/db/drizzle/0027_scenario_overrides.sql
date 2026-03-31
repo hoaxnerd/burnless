@@ -26,10 +26,8 @@ ALTER TABLE "scenarios" ADD COLUMN "promoted_at" timestamp;
 ALTER TABLE "scenarios" ADD COLUMN "auto_delete_at" timestamp;
 --> statement-breakpoint
 
--- Step 3: Alter scenarios table — drop old columns
+-- Step 3: Alter scenarios table — drop old columns (is_default deferred until after data migration)
 ALTER TABLE "scenarios" DROP COLUMN IF EXISTS "type";
---> statement-breakpoint
-ALTER TABLE "scenarios" DROP COLUMN IF EXISTS "is_default";
 --> statement-breakpoint
 ALTER TABLE "scenarios" DROP COLUMN IF EXISTS "is_budget";
 --> statement-breakpoint
@@ -146,12 +144,7 @@ SELECT
 FROM "forecast_lines" fl
 INNER JOIN "scenarios" s ON fl."scenario_id" = s."id"
 WHERE s."deleted_at" IS NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM "scenarios" def
-    WHERE def."company_id" = s."company_id"
-      AND def."id" = s."id"
-      AND def."name" = 'Base'
-  );
+  AND s."is_default" = false;
 --> statement-breakpoint
 
 -- Revenue streams from non-default scenarios → overrides
@@ -172,12 +165,7 @@ SELECT
 FROM "revenue_streams" rs
 INNER JOIN "scenarios" s ON rs."scenario_id" = s."id"
 WHERE s."deleted_at" IS NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM "scenarios" def
-    WHERE def."company_id" = s."company_id"
-      AND def."id" = s."id"
-      AND def."name" = 'Base'
-  );
+  AND s."is_default" = false;
 --> statement-breakpoint
 
 -- Headcount plans from non-default scenarios → overrides
@@ -202,31 +190,30 @@ SELECT
 FROM "headcount_plans" hp
 INNER JOIN "scenarios" s ON hp."scenario_id" = s."id"
 WHERE s."deleted_at" IS NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM "scenarios" def
-    WHERE def."company_id" = s."company_id"
-      AND def."id" = s."id"
-      AND def."name" = 'Base'
-  );
+  AND s."is_default" = false;
 --> statement-breakpoint
 
 -- Delete non-default-scenario rows from entity tables (now captured in overrides)
 DELETE FROM "forecast_lines" fl
 USING "scenarios" s
 WHERE fl."scenario_id" = s."id"
-  AND s."name" != 'Base';
+  AND s."is_default" = false;
 --> statement-breakpoint
 
 DELETE FROM "revenue_streams" rs
 USING "scenarios" s
 WHERE rs."scenario_id" = s."id"
-  AND s."name" != 'Base';
+  AND s."is_default" = false;
 --> statement-breakpoint
 
 DELETE FROM "headcount_plans" hp
 USING "scenarios" s
 WHERE hp."scenario_id" = s."id"
-  AND s."name" != 'Base';
+  AND s."is_default" = false;
+--> statement-breakpoint
+
+-- Step 9b: Now safe to drop is_default (data migration above used it)
+ALTER TABLE "scenarios" DROP COLUMN IF EXISTS "is_default";
 --> statement-breakpoint
 
 -- Step 10: Replace forecast_lines index and drop scenario_id columns

@@ -102,17 +102,18 @@ export const getScenarios = cachedQuery(
   { revalidate: 30, tags: ["scenarios"] }
 );
 
-/** Get the default (or first) scenario for a company. */
+/**
+ * Get the default (or first) scenario for a company.
+ * TODO(Task 7): Remove — the overlay model no longer has a "default" scenario.
+ * Temporarily returns the first non-deleted scenario.
+ */
 export const getDefaultScenario = cachedQuery(
   async (companyId: string) => {
-    const rows = await db
+    const [first] = await db
       .select()
       .from(scenarios)
-      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true), isNull(scenarios.deletedAt)))
+      .where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)))
       .limit(1);
-    if (rows[0]) return rows[0];
-    // Fallback to first scenario
-    const [first] = await db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).limit(1);
     return first ?? null;
   },
   ["default-scenario"],
@@ -128,10 +129,16 @@ export const getAccounts = cachedQuery(
   { revalidate: 60, tags: ["accounts"] }
 );
 
-/** Get all forecast lines for a scenario. */
+/**
+ * Get all forecast lines for a scenario's company.
+ * TODO(Task 7): Refactor callers to pass companyId directly.
+ * In the overlay model, forecast lines are company-scoped base data.
+ */
 export const getForecastLines = cachedQuery(
   async (scenarioId: string) => {
-    return db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId));
+    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    if (!scenario) return [];
+    return db.select().from(forecastLines).where(eq(forecastLines.companyId, scenario.companyId));
   },
   ["forecast-lines"],
   { revalidate: 30, tags: ["forecast-lines"] }
@@ -143,19 +150,29 @@ export async function getForecastValues(lineIds: string[]) {
   return db.select().from(forecastValues).where(inArray(forecastValues.forecastLineId, lineIds));
 }
 
-/** Get revenue streams for a scenario. */
+/**
+ * Get revenue streams for a scenario's company.
+ * TODO(Task 7): Refactor callers to pass companyId directly.
+ */
 export const getRevenueStreams = cachedQuery(
   async (scenarioId: string) => {
-    return db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
+    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    if (!scenario) return [];
+    return db.select().from(revenueStreams).where(eq(revenueStreams.companyId, scenario.companyId));
   },
   ["revenue-streams"],
   { revalidate: 30, tags: ["revenue-streams"] }
 );
 
-/** Get headcount plans for a scenario. */
+/**
+ * Get headcount plans for a scenario's company.
+ * TODO(Task 7): Refactor callers to pass companyId directly.
+ */
 export const getHeadcountPlans = cachedQuery(
   async (scenarioId: string) => {
-    return db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId));
+    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    if (!scenario) return [];
+    return db.select().from(headcountPlans).where(eq(headcountPlans.companyId, scenario.companyId));
   },
   ["headcount-plans"],
   { revalidate: 30, tags: ["headcount-plans"] }
@@ -204,15 +221,14 @@ export async function getActiveScenario(
   return getDefaultScenario(companyId);
 }
 
-/** Get the budget scenario (isBudget=true) for a company. */
+/**
+ * Get the budget scenario for a company.
+ * TODO(Task 7): Remove — isBudget column no longer exists in the overlay model.
+ * Temporarily returns null.
+ */
 export const getBudgetScenario = cachedQuery(
-  async (companyId: string) => {
-    const [scenario] = await db
-      .select()
-      .from(scenarios)
-      .where(and(eq(scenarios.companyId, companyId), eq(scenarios.isBudget, true), isNull(scenarios.deletedAt)))
-      .limit(1);
-    return scenario ?? null;
+  async (_companyId: string) => {
+    return null;
   },
   ["budget-scenario"],
   { revalidate: 30, tags: ["scenarios"] }

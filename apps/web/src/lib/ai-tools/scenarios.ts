@@ -132,16 +132,14 @@ async function deleteScenario(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteScenarioSchema>;
 
-  // Verify ownership and prevent deleting default
+  // Verify ownership
+  // TODO(Task 7): Revisit deletion guard — isDefault no longer exists in overlay model
   const [existing] = await db
-    .select({ id: scenarios.id, name: scenarios.name, isDefault: scenarios.isDefault })
+    .select({ id: scenarios.id, name: scenarios.name })
     .from(scenarios)
     .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
-  }
-  if (existing.isDefault) {
-    return JSON.stringify({ success: false, error: "Cannot delete the default scenario" });
   }
 
   await db.update(scenarios).set({ deletedAt: new Date() }).where(eq(scenarios.id, data.id));

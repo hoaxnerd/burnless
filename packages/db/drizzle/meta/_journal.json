@@ -190,6 +190,13 @@
       "when": 1775433600000,
       "tag": "0026_add_slot_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1775520000000,
+      "tag": "0027_scenario_overrides",
+      "breakpoints": true
     }
   ]
 }

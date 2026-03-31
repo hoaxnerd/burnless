@@ -30,22 +30,23 @@ export async function getScenarioForCompany(
 
 /**
  * Get the default scenario for a company.
+ * TODO(Task 7): Remove — the overlay model no longer has a "default" scenario.
+ * Temporarily returns the first non-deleted scenario for the company.
  */
 export async function getDefaultScenario(companyId: string) {
   const [row] = await db
     .select()
     .from(scenarios)
-    .where(
-      and(eq(scenarios.companyId, companyId), eq(scenarios.isDefault, true), notDeleted),
-    )
+    .where(and(eq(scenarios.companyId, companyId), notDeleted))
     .limit(1);
   return row ?? null;
 }
 
 /**
- * Fetch all planning data for a scenario in parallel:
+ * Fetch all base planning data for a company in parallel:
  * forecast lines, financial accounts, revenue streams, headcount plans.
  *
+ * In the overlay model, base data is company-scoped (not scenario-scoped).
  * Use this for metrics, statements, and scenario comparison routes.
  */
 export async function getScenarioData(scenarioId: string, companyId: string) {
@@ -53,7 +54,7 @@ export async function getScenarioData(scenarioId: string, companyId: string) {
     db
       .select()
       .from(forecastLines)
-      .where(eq(forecastLines.scenarioId, scenarioId)),
+      .where(eq(forecastLines.companyId, companyId)),
     db
       .select()
       .from(financialAccounts)
@@ -61,11 +62,11 @@ export async function getScenarioData(scenarioId: string, companyId: string) {
     db
       .select()
       .from(revenueStreams)
-      .where(eq(revenueStreams.scenarioId, scenarioId)),
+      .where(eq(revenueStreams.companyId, companyId)),
     db
       .select()
       .from(headcountPlans)
-      .where(eq(headcountPlans.scenarioId, scenarioId)),
+      .where(eq(headcountPlans.companyId, companyId)),
   ]);
 
   return { forecastLines: fLines, accounts, revenueStreams: revStreams, headcountPlans: hcPlans };
