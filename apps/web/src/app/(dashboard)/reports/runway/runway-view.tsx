@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
-import type { MetricValue } from "@burnless/engine";
+import { useMemo, type ReactNode } from "react";
+import type { MetricValue, ResolvedSlotData } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors } from "@/components/charts";
 import { ChartCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
@@ -21,9 +22,10 @@ interface RunwayViewProps {
   startingCash: number;
   companyName?: string;
   scenarioName?: string;
+  resolvedSlotData: ResolvedSlotData[];
 }
 
-export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName }: RunwayViewProps) {
+export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, resolvedSlotData }: RunwayViewProps) {
   const latest = cashPosition[cashPosition.length - 1];
   const latestBurn = netBurnRate[netBurnRate.length - 1];
   const latestRunway = runway[runway.length - 1];
@@ -97,7 +99,6 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
   }), [registry, usedSlugs, openFormulaViewer]);
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "reports/runway" });
 
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
@@ -184,16 +185,51 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
   const staticHiddenWidgets = useMemo(() => zeroCashMonth ? [] : ["warning"], [zeroCashMonth]);
 
   return (
-    <PageProvider pageId="reports/runway">
-      <CardCatalogProvider value={catalogValue}>
-        <PageGrid
-          widgets={widgets}
-          defaultLayoutLG={defaultLayoutLG}
-          defaultLayoutSM={defaultLayoutSM}
-          staticHiddenWidgets={staticHiddenWidgets}
-          {...pageLayout}
-        />
-      </CardCatalogProvider>
-    </PageProvider>
+    <PageLayoutProvider pageId="reports/runway">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="reports/runway">
+          <CardCatalogProvider value={catalogValue}>
+            <RunwayPageGrid
+              widgets={widgets}
+              defaultLayoutLG={defaultLayoutLG}
+              defaultLayoutSM={defaultLayoutSM}
+              staticHiddenWidgets={staticHiddenWidgets}
+            />
+          </CardCatalogProvider>
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function RunwayPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+  staticHiddenWidgets,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+  staticHiddenWidgets: string[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      staticHiddenWidgets={staticHiddenWidgets}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }

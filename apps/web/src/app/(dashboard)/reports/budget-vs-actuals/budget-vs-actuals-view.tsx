@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import type { BudgetVsActuals } from "@burnless/engine";
+import { useMemo, type ReactNode } from "react";
+import type { BudgetVsActuals, ResolvedSlotData } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { ExportCSVButton } from "@/components/reports/export-button";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
 
-export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
+export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsActuals; resolvedSlotData: ResolvedSlotData[] }) {
   const { lineItems, totalBudget, totalActual, totalVariance } = bva;
 
   // Summary metrics
@@ -37,7 +38,6 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
   });
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "reports/budget-vs-actuals" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "summary-cards", x: 0, w: 12, h: 5, minH: 4 },
@@ -141,13 +141,45 @@ export function BudgetVsActualsView({ bva }: { bva: BudgetVsActuals }) {
   }
 
   return (
-    <PageProvider pageId="reports/budget-vs-actuals">
-      <PageGrid
-        widgets={widgets}
-        defaultLayoutLG={defaultLayoutLG}
-        defaultLayoutSM={defaultLayoutSM}
-        {...pageLayout}
-      />
-    </PageProvider>
+    <PageLayoutProvider pageId="reports/budget-vs-actuals">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="reports/budget-vs-actuals">
+          <BudgetVsActualsPageGrid
+            widgets={widgets}
+            defaultLayoutLG={defaultLayoutLG}
+            defaultLayoutSM={defaultLayoutSM}
+          />
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function BudgetVsActualsPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }

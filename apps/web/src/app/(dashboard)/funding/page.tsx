@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { monthKey } from "@burnless/engine";
+import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency } from "@burnless/types";
 import { FundingView } from "./funding-view";
 import { AddFundingForm } from "./add-funding-form";
 import { SetupPrompt } from "@/components/ui/empty-state";
@@ -58,6 +61,59 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
     isProjected: r.isProjected,
   }));
 
+  const now = new Date();
+  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = data
+    ? METRIC_REGISTRY.map((def) =>
+        buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+      )
+    : [];
+
+  // Build page-specific default cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "totalRaised" },
+      label: "Total Raised",
+      value: totalRaised > 0 ? fc(totalRaised) : "$---",
+      description: totalRaised > 0 ? `${completedRounds.length} round${completedRounds.length !== 1 ? "s" : ""} completed` : "Add a funding round",
+      hasData: totalRaised > 0,
+      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/funding" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "currentCash" },
+      label: "Current Cash",
+      value: currentCash > 0 ? fc(currentCash) : "$---",
+      description: currentCash > 0 ? "Available capital" : "Add funding to see cash",
+      hasData: currentCash > 0,
+      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/funding" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "runway" },
+      label: "Runway",
+      value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
+      description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
+      hasData: currentBurn > 0 && currentCash > 0,
+      metricStyle: { icon: "Clock", color: "text-surface-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-3",
+      content: { type: "metric", slug: "founderOwnership" },
+      label: "Founder Ownership",
+      value: completedRounds.length > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%",
+      description: completedRounds.length > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round",
+      hasData: completedRounds.length > 0,
+      metricStyle: { icon: "PieChart", color: "text-surface-500", href: "/funding" },
+    },
+  ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
   return (
     <div>
       <div className="mb-6 sm:mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -79,6 +135,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
         foundersOwnership={foundersOwnership}
         totalDilution={totalDilution}
         rounds={roundsForDisplay}
+        resolvedSlotData={resolvedSlotData}
       />
     </div>
   );

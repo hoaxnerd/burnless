@@ -5,11 +5,15 @@ import {
   computeAllForecastLines,
   aggregateByAccount,
   computeBudgetVsActuals,
+  METRIC_REGISTRY,
   type ForecastLineInput,
   type AccountBudgetInput,
   type MonthlySeries,
+  type ResolvedSlotData,
   monthKey,
 } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { computeDashboardData } from "@/lib/compute-dashboard";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { BudgetVsActualsView } from "./budget-vs-actuals-view";
@@ -92,5 +96,55 @@ async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: st
   }
 
   const bva = computeBudgetVsActuals(budgetInputs);
-  return <BudgetVsActualsView bva={bva} />;
+
+  // Compute dashboard data for engine metrics (swap targets)
+  const data = await computeDashboardData(companyId, scenarioId);
+  const { currentMonth } = data;
+  const now2 = new Date();
+  const prevMonth = monthKey(new Date(now2.getFullYear(), now2.getMonth() - 1, 1));
+
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  const totalBudgetSum = bva.totalBudget.reduce((s, v) => s + v.value, 0);
+  const totalActualSum = bva.totalActual.reduce((s, v) => s + v.value, 0);
+  const totalVarianceSum = bva.totalVariance.reduce((s, v) => s + v.value, 0);
+  const fc = (v: number) => {
+    if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+    if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
+    return `$${v.toFixed(0)}`;
+  };
+
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "totalBudget" },
+      label: "Total Budget",
+      value: fc(totalBudgetSum),
+      hasData: totalBudgetSum !== 0,
+      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/reports/budget-vs-actuals" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "totalActual" },
+      label: "Total Actual",
+      value: fc(totalActualSum),
+      hasData: totalActualSum !== 0,
+      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/budget-vs-actuals" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "totalVariance" },
+      label: "Total Variance",
+      value: fc(totalVarianceSum),
+      change: totalVarianceSum >= 0 ? "Favorable" : "Unfavorable",
+      hasData: true,
+      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/reports/budget-vs-actuals" },
+    },
+  ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
+  return <BudgetVsActualsView bva={bva} resolvedSlotData={resolvedSlotData} />;
 }

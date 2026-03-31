@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { monthKey } from "@burnless/engine";
+import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency } from "@burnless/types";
 import { TeamView } from "./team-view";
 import { AddHireForm } from "./add-hire-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -96,6 +99,56 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
     count: h.count,
   }));
 
+  const now2 = new Date();
+  const prevMonth = monthKey(new Date(now2.getFullYear(), now2.getMonth() - 1, 1));
+
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  // Build page-specific default cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "totalHeadcount" },
+      label: "Total Headcount",
+      value: String(totalHeadcount),
+      description: plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + h.count, 0)} planned` : undefined,
+      hasData: totalHeadcount > 0,
+      metricStyle: { icon: "Users", color: "text-surface-500", href: "/team" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "monthlyPeopleCost" },
+      label: "Monthly People Cost",
+      value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
+      description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
+      hasData: totalMonthlyCost > 0,
+      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/team" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "revenuePerEmployee" },
+      label: "Revenue / Employee",
+      value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
+      description: "Efficiency metric",
+      hasData: revPerEmployee > 0,
+      metricStyle: { icon: "TrendingUp", color: "text-surface-500", href: "/team" },
+    },
+    {
+      slotId: "metric-3",
+      content: { type: "metric", slug: "departments" },
+      label: "Departments",
+      value: String(deptGroups.size),
+      description: `${departments.length} total defined`,
+      hasData: true,
+      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/team" },
+    },
+  ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
   return (
     <div>
       <div className="mb-6 sm:mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -122,6 +175,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
         departmentsCount={departments.length}
         departmentBreakdown={departmentBreakdown}
         plannedHires={plannedHiresData}
+        resolvedSlotData={resolvedSlotData}
         scenarioId={scenarioId}
         departments={departments.map((d) => ({ id: d.id, name: d.name }))}
       />

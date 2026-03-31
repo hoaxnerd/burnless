@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { BalanceSheet } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
@@ -8,7 +8,7 @@ import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { BarChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 
 export function BalanceSheetView({
@@ -62,7 +62,6 @@ export function BalanceSheetView({
   };
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "reports/balance-sheet" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "chart", x: 0, w: 12, h: 10, minH: 6 },
@@ -106,13 +105,43 @@ export function BalanceSheetView({
   }), [barData, bs, handleExportCSV, handleExportPDF]);
 
   return (
-    <PageProvider pageId="reports/balance-sheet">
-      <PageGrid
-        widgets={widgets}
-        defaultLayoutLG={defaultLayoutLG}
-        defaultLayoutSM={defaultLayoutSM}
-        {...pageLayout}
-      />
-    </PageProvider>
+    <PageLayoutProvider pageId="reports/balance-sheet">
+      <PageProvider pageId="reports/balance-sheet">
+        <BalanceSheetPageGrid
+          widgets={widgets}
+          defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
+        />
+      </PageProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function BalanceSheetPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }

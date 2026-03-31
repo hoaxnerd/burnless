@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { ArrowLeft, Download, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { AiGate } from "@/components/ai/ai-gate";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
+import type { ResolvedSlotData } from "@burnless/engine";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
 
 interface MetricPoint {
@@ -180,13 +182,12 @@ function ReportSection({
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export function BoardUpdateView({ data }: { data: BoardData }) {
+export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; resolvedSlotData: ResolvedSlotData[] }) {
   const d = data;
 
   const handlePrint = () => window.print();
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "reports/board-update" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "kpis", x: 0, w: 12, h: 5, minH: 4 },
@@ -372,64 +373,96 @@ export function BoardUpdateView({ data }: { data: BoardData }) {
   }), [d]);
 
   return (
-    <PageProvider pageId="reports/board-update">
-      <div className="space-y-6 print:space-y-4">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/reports"
-              className="rounded-lg p-1.5 hover:bg-surface-100 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 text-surface-500" />
-            </Link>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Board Update</h1>
-              <p className="mt-0.5 text-sm text-surface-500">
-                {d.companyName} &mdash; {formatMonthYear(d.reportMonth)}
+    <PageLayoutProvider pageId="reports/board-update">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="reports/board-update">
+          <div className="space-y-6 print:space-y-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/reports"
+                  className="rounded-lg p-1.5 hover:bg-surface-100 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4 text-surface-500" />
+                </Link>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Board Update</h1>
+                  <p className="mt-0.5 text-sm text-surface-500">
+                    {d.companyName} &mdash; {formatMonthYear(d.reportMonth)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrint}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-50 transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print
+                </button>
+                <Link
+                  href="/data-room"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export Package
+                </Link>
+              </div>
+            </div>
+
+            {/* Print header */}
+            <div className="hidden print:block print:mb-8">
+              <h1 className="text-3xl font-bold text-surface-900">{d.companyName}</h1>
+              <p className="text-lg text-surface-600 mt-1">
+                Monthly Board Update — {formatMonthYear(d.reportMonth)}
               </p>
+              <div className="h-1 w-16 bg-brand-600 mt-3 rounded-full" />
+            </div>
+
+            <BoardUpdatePageGrid
+              widgets={widgets}
+              defaultLayoutLG={defaultLayoutLG}
+              defaultLayoutSM={defaultLayoutSM}
+            />
+
+            {/* Footer */}
+            <div className="text-center text-[10px] text-surface-400 pt-4 print:pt-8">
+              Generated by Burnless &mdash; {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 px-3 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-50 transition-colors"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print
-            </button>
-            <Link
-              href="/data-room"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export Package
-            </Link>
-          </div>
-        </div>
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
 
-        {/* Print header */}
-        <div className="hidden print:block print:mb-8">
-          <h1 className="text-3xl font-bold text-surface-900">{d.companyName}</h1>
-          <p className="text-lg text-surface-600 mt-1">
-            Monthly Board Update — {formatMonthYear(d.reportMonth)}
-          </p>
-          <div className="h-1 w-16 bg-brand-600 mt-3 rounded-full" />
-        </div>
-
-        <PageGrid
-          widgets={widgets}
-          defaultLayoutLG={defaultLayoutLG}
-          defaultLayoutSM={defaultLayoutSM}
-          {...pageLayout}
-        />
-
-        {/* Footer */}
-        <div className="text-center text-[10px] text-surface-400 pt-4 print:pt-8">
-          Generated by Burnless &mdash; {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-        </div>
-      </div>
-    </PageProvider>
+function BoardUpdatePageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }
 

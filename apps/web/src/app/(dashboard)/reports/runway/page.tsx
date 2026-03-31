@@ -2,6 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getCompany, getDefaultScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
+import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency } from "@burnless/types";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { RunwayView } from "./runway-view";
@@ -33,6 +37,62 @@ export default async function RunwayPage() {
 
 async function RunwayContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
   const data = await computeDashboardData(companyId, scenarioId);
+
+  const { currentMonth } = data;
+  const now = new Date();
+  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+
+  const latest = data.metrics.cashPosition[data.metrics.cashPosition.length - 1];
+  const latestBurn = data.metrics.netBurnRate[data.metrics.netBurnRate.length - 1];
+  const latestRunway = data.metrics.cashRunwayMonths[data.metrics.cashRunwayMonths.length - 1];
+  const zeroCashMonth = data.metrics.cashPosition.find((c) => c.value <= 0);
+
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  // Build page-specific default cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "startingCash" },
+      label: "Starting Cash",
+      value: fc(data.startingCash),
+      hasData: data.startingCash > 0,
+      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "currentCash" },
+      label: "Current Cash",
+      value: fc(latest?.value ?? 0),
+      hasData: (latest?.value ?? 0) > 0,
+      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "netBurnRate" },
+      label: "Net Burn Rate",
+      value: fc(latestBurn?.value ?? 0),
+      description: "Latest month",
+      hasData: (latestBurn?.value ?? 0) > 0,
+      metricStyle: { icon: "TrendingDown", color: "text-warning-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-3",
+      content: { type: "metric", slug: "runway" },
+      label: "Runway",
+      value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e",
+      description: zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway",
+      hasData: (latestRunway?.value ?? 0) > 0,
+      metricStyle: { icon: "Clock", color: "text-surface-500", href: "/reports/runway" },
+    },
+  ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
   return (
     <RunwayView
       cashPosition={data.metrics.cashPosition}
@@ -42,6 +102,7 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
       startingCash={data.startingCash}
       companyName={companyName}
       scenarioName={scenarioName}
+      resolvedSlotData={resolvedSlotData}
     />
   );
 }

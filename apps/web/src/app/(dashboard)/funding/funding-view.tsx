@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { FundingDetails } from "./funding-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 
 interface FundingViewProps {
@@ -29,6 +31,7 @@ interface FundingViewProps {
     dilutionPercent: number | null;
     isProjected: boolean;
   }>;
+  resolvedSlotData: ResolvedSlotData[];
 }
 
 export function FundingView({
@@ -40,6 +43,7 @@ export function FundingView({
   foundersOwnership,
   totalDilution,
   rounds,
+  resolvedSlotData,
 }: FundingViewProps) {
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
@@ -58,8 +62,6 @@ export function FundingView({
     swapMode: false,
     cardType: "metric" as const,
   }), [registry, usedSlugs, openFormulaViewer]);
-
-  const pageLayout = usePageLayout({ pageId: "funding" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "metric-cards", x: 0, w: 12, h: 5, minH: 4 },
@@ -115,15 +117,47 @@ export function FundingView({
   }), [metricCards, rounds, foundersOwnership, currentCash, currentBurn, currentRunway]);
 
   return (
-    <PageProvider pageId="funding">
-      <CardCatalogProvider value={catalogValue}>
-        <PageGrid
-          widgets={widgets}
-          defaultLayoutLG={defaultLayoutLG}
-          defaultLayoutSM={defaultLayoutSM}
-          {...pageLayout}
-        />
-      </CardCatalogProvider>
-    </PageProvider>
+    <PageLayoutProvider pageId="funding">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="funding">
+          <CardCatalogProvider value={catalogValue}>
+            <FundingPageGrid
+              widgets={widgets}
+              defaultLayoutLG={defaultLayoutLG}
+              defaultLayoutSM={defaultLayoutSM}
+            />
+          </CardCatalogProvider>
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function FundingPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }

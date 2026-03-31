@@ -3,7 +3,9 @@ import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
-import { seriesToArray, monthKey } from "@burnless/engine";
+import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { BoardUpdateView } from "./board-update-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -104,9 +106,57 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
     },
   };
 
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  // Build page-specific default KPI cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "revenue" },
+      label: "Revenue",
+      value: `$${currentRev >= 1_000_000 ? `${(currentRev / 1_000_000).toFixed(1)}M` : currentRev >= 1_000 ? `${(currentRev / 1_000).toFixed(0)}k` : currentRev.toFixed(0)}`,
+      change: `${revGrowth > 0 ? "+" : ""}${revGrowth.toFixed(1)}%`,
+      changeLabel: "MoM",
+      hasData: currentRev > 0,
+      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "netBurn" },
+      label: "Net Burn",
+      value: `$${burnRate >= 1_000_000 ? `${(burnRate / 1_000_000).toFixed(1)}M` : burnRate >= 1_000 ? `${(burnRate / 1_000).toFixed(0)}k` : burnRate.toFixed(0)}`,
+      description: "/month",
+      hasData: burnRate > 0,
+      metricStyle: { icon: "TrendingDown", color: "text-warning-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "cash" },
+      label: "Cash",
+      value: `$${currentCash >= 1_000_000 ? `${(currentCash / 1_000_000).toFixed(1)}M` : currentCash >= 1_000 ? `${(currentCash / 1_000).toFixed(0)}k` : currentCash.toFixed(0)}`,
+      description: runway > 36 ? "36+ mo runway" : `${Math.round(runway)} mo runway`,
+      hasData: currentCash > 0,
+      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/runway" },
+    },
+    {
+      slotId: "metric-3",
+      content: { type: "metric", slug: "grossMargin" },
+      label: "Gross Margin",
+      value: `${grossMargin.toFixed(1)}%`,
+      description: grossMargin >= 60 ? "Healthy" : grossMargin >= 40 ? "Average" : "Below benchmark",
+      hasData: true,
+      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/reports/profit-loss" },
+    },
+  ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
   return (
     <div>
-      <BoardUpdateView data={boardData} />
+      <BoardUpdateView data={boardData} resolvedSlotData={resolvedSlotData} />
     </div>
   );
 }

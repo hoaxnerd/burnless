@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { DollarSign, TrendingUp, Users, BarChart3 } from "lucide-react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { RevenueWaterfallChart } from "./revenue-waterfall-chart";
@@ -17,10 +18,11 @@ import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { RevenueDetails } from "@/lib/compute-revenue";
-import type { MetricValue } from "@burnless/engine";
+import type { MetricValue, ResolvedSlotData } from "@burnless/engine";
 
 interface RevenueViewProps {
   revenueDetails: RevenueDetails;
+  resolvedSlotData: ResolvedSlotData[];
   revenueTimeline: { month: string; value: number }[];
   mrrTimeline: MetricValue[];
   scenarioId: string;
@@ -28,6 +30,7 @@ interface RevenueViewProps {
 
 export function RevenueView({
   revenueDetails,
+  resolvedSlotData,
   revenueTimeline,
   mrrTimeline,
   scenarioId,
@@ -58,7 +61,6 @@ export function RevenueView({
   }), [registry, usedSlugs, openFormulaViewer]);
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "revenue" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "metric-cards",  x: 0, w: 12, h: 5, minH: 4 },
@@ -202,16 +204,51 @@ export function RevenueView({
   const staticHiddenWidgets = useMemo(() => hasSaaS ? [] : ["waterfall"], [hasSaaS]);
 
   return (
-    <PageProvider pageId="revenue">
-      <CardCatalogProvider value={catalogValue}>
-        <PageGrid
-          widgets={widgets}
-          defaultLayoutLG={defaultLayoutLG}
-          defaultLayoutSM={defaultLayoutSM}
-          staticHiddenWidgets={staticHiddenWidgets}
-          {...pageLayout}
-        />
-      </CardCatalogProvider>
-    </PageProvider>
+    <PageLayoutProvider pageId="revenue">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="revenue">
+          <CardCatalogProvider value={catalogValue}>
+            <RevenuePageGrid
+              widgets={widgets}
+              defaultLayoutLG={defaultLayoutLG}
+              defaultLayoutSM={defaultLayoutSM}
+              staticHiddenWidgets={staticHiddenWidgets}
+            />
+          </CardCatalogProvider>
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function RevenuePageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+  staticHiddenWidgets,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+  staticHiddenWidgets: string[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      staticHiddenWidgets={staticHiddenWidgets}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }

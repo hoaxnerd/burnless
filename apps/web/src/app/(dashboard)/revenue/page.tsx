@@ -2,7 +2,10 @@ import { Suspense } from "react";
 import { getCompany, getActiveScenario } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
-import { seriesToArray } from "@burnless/engine";
+import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency } from "@burnless/types";
 import { RevenueView } from "./revenue-view";
 import { AddRevenueStreamForm } from "./add-revenue-stream-form";
 import { SetupPrompt, ScenarioPrompt, RevenueEmptyState } from "@/components/ui/empty-state";
@@ -54,6 +57,101 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
   const revenueTimeline = seriesToArray(data.totalRevenue);
   const mrrTimeline = data.metrics.mrr;
 
+  const { currentMonth } = data;
+  const now = new Date();
+  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const g = revenueDetails.growthMetrics;
+  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  // Build page-specific default cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = revenueDetails.hasSaaS
+    ? [
+        {
+          slotId: "metric-0",
+          content: { type: "metric", slug: "monthlyRevenue" },
+          label: "Monthly Revenue",
+          value: fc(g.currentRevenue),
+          change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
+          changeLabel: "MoM growth",
+          hasData: g.currentRevenue > 0,
+          metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-1",
+          content: { type: "metric", slug: "mrr" },
+          label: "MRR",
+          value: fc(g.currentMrr),
+          change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
+          description: `ARR: ${fc(g.arr)}`,
+          hasData: g.currentMrr > 0,
+          metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-2",
+          content: { type: "metric", slug: "customers" },
+          label: "Customers",
+          value: String(Math.round(g.totalCustomers)),
+          description: `ARPA: ${fc(g.arpa)}/mo`,
+          hasData: g.totalCustomers > 0,
+          metricStyle: { icon: "Users", color: "text-surface-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-3",
+          content: { type: "metric", slug: "churnRate" },
+          label: "Churn Rate",
+          value: `${g.churnRate.toFixed(1)}%`,
+          description: `LTV: ${fc(g.ltv)}`,
+          hasData: true,
+          metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/revenue" },
+        },
+      ]
+    : [
+        {
+          slotId: "metric-0",
+          content: { type: "metric", slug: "monthlyRevenue" },
+          label: "Monthly Revenue",
+          value: fc(g.currentRevenue),
+          change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
+          changeLabel: "MoM growth",
+          hasData: g.currentRevenue > 0,
+          metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-1",
+          content: { type: "metric", slug: "annualRunRate" },
+          label: "Annual Run Rate",
+          value: fc(g.currentRevenue * 12),
+          description: "Based on current monthly",
+          hasData: g.currentRevenue > 0,
+          metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-2",
+          content: { type: "metric", slug: "revenueStreams" },
+          label: "Revenue Streams",
+          value: String(revenueDetails.streamCount),
+          description: "Active sources",
+          hasData: true,
+          metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/revenue" },
+        },
+        {
+          slotId: "metric-3",
+          content: { type: "metric", slug: "growth" },
+          label: "Growth",
+          value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
+          description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
+          hasData: true,
+          metricStyle: { icon: "TrendingUp", color: "text-surface-500", href: "/revenue" },
+        },
+      ];
+
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
+
   return (
     <div>
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -68,6 +166,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
 
       <RevenueView
         revenueDetails={revenueDetails}
+        resolvedSlotData={resolvedSlotData}
         revenueTimeline={revenueTimeline}
         mrrTimeline={mrrTimeline}
         scenarioId={scenarioId}
