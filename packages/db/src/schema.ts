@@ -59,11 +59,24 @@ export const transactionSourceEnum = pgEnum("transaction_source", [
   "forecast",
 ]);
 
-export const scenarioTypeEnum = pgEnum("scenario_type", [
-  "base",
-  "best",
-  "worst",
-  "custom",
+export const scenarioSourceEnum = pgEnum("scenario_source", [
+  "blank",
+  "ai",
+  "template",
+  "clone",
+  "backup",
+]);
+
+export const scenarioStatusEnum = pgEnum("scenario_status", [
+  "active",
+  "promoted",
+  "archived",
+]);
+
+export const scenarioOverrideActionEnum = pgEnum("scenario_override_action", [
+  "create",
+  "modify",
+  "delete",
 ]);
 
 export const forecastMethodEnum = pgEnum("forecast_method", [
@@ -414,11 +427,14 @@ export const scenarios = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    type: scenarioTypeEnum("type").notNull().default("base"),
-    isDefault: boolean("is_default").notNull().default(false),
-    isBudget: boolean("is_budget").notNull().default(false),
-    budgetLockedAt: timestamp("budget_locked_at", { mode: "date" }),
     description: text("description"),
+    source: scenarioSourceEnum("source").notNull().default("blank"),
+    status: scenarioStatusEnum("status").notNull().default("active"),
+    color: text("color"),
+    sourceScenarioId: text("source_scenario_id"),
+    aiConversationId: text("ai_conversation_id"),
+    promotedAt: timestamp("promoted_at", { mode: "date" }),
+    autoDeleteAt: timestamp("auto_delete_at", { mode: "date" }),
     deletedAt: timestamp("deleted_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
@@ -431,8 +447,8 @@ export const scenarios = pgTable(
   ]
 );
 
-export const forecastLines = pgTable(
-  "forecast_lines",
+export const scenarioOverrides = pgTable(
+  "scenario_overrides",
   {
     id: text("id")
       .primaryKey()
@@ -440,6 +456,29 @@ export const forecastLines = pgTable(
     scenarioId: text("scenario_id")
       .notNull()
       .references(() => scenarios.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    action: scenarioOverrideActionEnum("action").notNull(),
+    data: jsonb("data"),
+    originalData: jsonb("original_data"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("scenario_overrides_unique").on(table.scenarioId, table.entityType, table.entityId),
+    index("scenario_overrides_scenario_type").on(table.scenarioId, table.entityType),
+  ]
+);
+
+export const forecastLines = pgTable(
+  "forecast_lines",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
     accountId: text("account_id")
       .notNull()
       .references(() => financialAccounts.id, { onDelete: "cascade" }),
@@ -454,9 +493,9 @@ export const forecastLines = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("forecast_lines_scenario_idx").on(table.scenarioId),
-    uniqueIndex("forecast_lines_scenario_account_idx").on(
-      table.scenarioId,
+    index("forecast_lines_company_idx").on(table.companyId),
+    uniqueIndex("forecast_lines_company_account_idx").on(
+      table.companyId,
       table.accountId
     ),
   ]
@@ -494,9 +533,9 @@ export const headcountPlans = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    scenarioId: text("scenario_id")
+    companyId: text("company_id")
       .notNull()
-      .references(() => scenarios.id, { onDelete: "cascade" }),
+      .references(() => companies.id, { onDelete: "cascade" }),
     departmentId: text("department_id")
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
@@ -515,7 +554,7 @@ export const headcountPlans = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("headcount_plans_scenario_idx").on(table.scenarioId),
+    index("headcount_plans_company_idx").on(table.companyId),
     index("headcount_plans_department_idx").on(table.departmentId),
   ]
 );
@@ -528,9 +567,9 @@ export const revenueStreams = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    scenarioId: text("scenario_id")
+    companyId: text("company_id")
       .notNull()
-      .references(() => scenarios.id, { onDelete: "cascade" }),
+      .references(() => companies.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     type: revenueStreamTypeEnum("type").notNull().default("subscription"),
     parameters: jsonb("parameters").notNull().default({}),
@@ -541,7 +580,7 @@ export const revenueStreams = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("revenue_streams_scenario_idx").on(table.scenarioId),
+    index("revenue_streams_company_idx").on(table.companyId),
   ]
 );
 
@@ -913,6 +952,9 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   financialAccounts: many(financialAccounts),
   transactions: many(transactions),
   scenarios: many(scenarios),
+  forecastLines: many(forecastLines),
+  headcountPlans: many(headcountPlans),
+  revenueStreams: many(revenueStreams),
   departments: many(departments),
   fundingRounds: many(fundingRounds),
   metrics: many(metrics),
@@ -999,17 +1041,22 @@ export const scenariosRelations = relations(scenarios, ({ one, many }) => ({
     fields: [scenarios.companyId],
     references: [companies.id],
   }),
-  forecastLines: many(forecastLines),
-  headcountPlans: many(headcountPlans),
-  revenueStreams: many(revenueStreams),
+  overrides: many(scenarioOverrides),
+}));
+
+export const scenarioOverridesRelations = relations(scenarioOverrides, ({ one }) => ({
+  scenario: one(scenarios, {
+    fields: [scenarioOverrides.scenarioId],
+    references: [scenarios.id],
+  }),
 }));
 
 export const forecastLinesRelations = relations(
   forecastLines,
   ({ one, many }) => ({
-    scenario: one(scenarios, {
-      fields: [forecastLines.scenarioId],
-      references: [scenarios.id],
+    company: one(companies, {
+      fields: [forecastLines.companyId],
+      references: [companies.id],
     }),
     account: one(financialAccounts, {
       fields: [forecastLines.accountId],
@@ -1035,9 +1082,9 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
 }));
 
 export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
-  scenario: one(scenarios, {
-    fields: [headcountPlans.scenarioId],
-    references: [scenarios.id],
+  company: one(companies, {
+    fields: [headcountPlans.companyId],
+    references: [companies.id],
   }),
   department: one(departments, {
     fields: [headcountPlans.departmentId],
@@ -1046,9 +1093,9 @@ export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
 }));
 
 export const revenueStreamsRelations = relations(revenueStreams, ({ one }) => ({
-  scenario: one(scenarios, {
-    fields: [revenueStreams.scenarioId],
-    references: [scenarios.id],
+  company: one(companies, {
+    fields: [revenueStreams.companyId],
+    references: [companies.id],
   }),
 }));
 
