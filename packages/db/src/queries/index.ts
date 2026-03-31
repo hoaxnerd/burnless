@@ -17,3 +17,11 @@ export {
   deleteForCompany,
   listForCompany,
 } from "./crud";
+
+export {
+  getOverridesForScenario,
+  upsertOverride,
+  deleteOverride,
+  deleteOverrideByEntity,
+  getOverrideCount,
+} from "./scenario-overrides";

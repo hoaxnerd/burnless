@@ -34,7 +34,7 @@ describe("scenario queries", () => {
     const ctx = await createCompanyContext({
       user: { email: "scenario-test@test.burnless.app" },
       company: { name: "Scenario Co" },
-      scenario: { name: "Base Plan", isDefault: true },
+      scenario: { name: "Base Plan" },
     });
     companyId = ctx.company.id;
     scenarioId = ctx.scenario.id;
@@ -70,32 +70,32 @@ describe("scenario queries", () => {
   });
 
   describe("getDefaultScenario", () => {
-    it("returns the default scenario for the company", async () => {
+    it("returns a scenario for the company", async () => {
       const result = await getDefaultScenario(companyId);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(scenarioId);
-      expect(result!.isDefault).toBe(true);
+      expect(result!.companyId).toBe(companyId);
     });
 
-    it("returns null when no default scenario exists", async () => {
-      // Create company with only non-default scenarios
+    it("returns the first non-deleted scenario", async () => {
       const ctx = await createCompanyContext({
         user: { email: "no-default@test.burnless.app" },
         company: { name: "No Default Co" },
-        scenario: { isDefault: false, name: "Non-default" },
+        scenario: { name: "Only Scenario" },
       });
       const result = await getDefaultScenario(ctx.company.id);
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.name).toBe("Only Scenario");
     });
   });
 
   describe("getScenarioData", () => {
-    it("returns all planning data for a scenario", async () => {
+    it("returns all planning data for a company", async () => {
       const account = await createFinancialAccount(companyId, { name: "Office Rent" });
       const dept = await createDepartment(companyId, { name: "Engineering" });
-      await createForecastLine(scenarioId, account.id);
-      await createRevenueStream(scenarioId, { name: "SaaS Subscriptions" });
-      await createHeadcountPlan(scenarioId, dept.id, { title: "Staff Engineer" });
+      await createForecastLine(companyId, account.id);
+      await createRevenueStream(companyId, { name: "SaaS Subscriptions" });
+      await createHeadcountPlan(companyId, dept.id, { title: "Staff Engineer" });
 
       const data = await getScenarioData(scenarioId, companyId);
 
@@ -106,16 +106,11 @@ describe("scenario queries", () => {
     });
 
     it("returns empty arrays for a scenario with no data", async () => {
-      const emptyScenario = await createScenario(companyId, {
-        name: "Empty Scenario",
-        isDefault: false,
-      });
-
       // Use a fresh company so accounts list is isolated
       const ctx = await createCompanyContext({
         user: { email: "empty-scenario@test.burnless.app" },
         company: { name: "Empty Data Co" },
-        scenario: { name: "Empty", isDefault: false },
+        scenario: { name: "Empty" },
       });
 
       const data = await getScenarioData(ctx.scenario.id, ctx.company.id);
@@ -133,7 +128,7 @@ describe("scenario queries", () => {
         company: { name: "Values Co" },
       });
       const account = await createFinancialAccount(ctx.company.id, { name: "Cloud Hosting" });
-      const line = await createForecastLine(ctx.scenario.id, account.id);
+      const line = await createForecastLine(ctx.company.id, account.id);
       await createForecastValue(line.id, { amount: "5000.00", month: new Date("2026-03-01") });
       await createForecastValue(line.id, { amount: "5500.00", month: new Date("2026-04-01") });
       await createFundingRound(ctx.company.id, { name: "Seed Round", amount: "2000000.00" });

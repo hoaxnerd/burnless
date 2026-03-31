@@ -10,6 +10,7 @@ import {
   companies,
   companyMembers,
   scenarios,
+  scenarioOverrides,
   financialAccounts,
   forecastLines,
   forecastValues,
@@ -156,7 +157,7 @@ export async function createFinancialAccount(
 // ── Forecast Lines ─────────────────────────────────────────────────────────────
 
 export async function createForecastLine(
-  scenarioId: string,
+  companyId: string,
   accountId: string,
   overrides: Partial<typeof forecastLines.$inferInsert> = {},
 ) {
@@ -166,7 +167,7 @@ export async function createForecastLine(
     .insert(forecastLines)
     .values({
       id,
-      scenarioId,
+      companyId,
       accountId,
       startDate: new Date("2026-01-01"),
       ...overrides,
@@ -199,7 +200,7 @@ export async function createForecastValue(
 // ── Revenue Streams ────────────────────────────────────────────────────────────
 
 export async function createRevenueStream(
-  scenarioId: string,
+  companyId: string,
   overrides: Partial<typeof revenueStreams.$inferInsert> = {},
 ) {
   const db = getTestDb();
@@ -208,7 +209,7 @@ export async function createRevenueStream(
     .insert(revenueStreams)
     .values({
       id,
-      scenarioId,
+      companyId,
       name: `Revenue Stream ${id.slice(-4)}`,
       ...overrides,
     })
@@ -219,7 +220,7 @@ export async function createRevenueStream(
 // ── Headcount Plans ────────────────────────────────────────────────────────────
 
 export async function createHeadcountPlan(
-  scenarioId: string,
+  companyId: string,
   departmentId: string,
   overrides: Partial<typeof headcountPlans.$inferInsert> = {},
 ) {
@@ -229,7 +230,7 @@ export async function createHeadcountPlan(
     .insert(headcountPlans)
     .values({
       id,
-      scenarioId,
+      companyId,
       departmentId,
       title: `Role ${id.slice(-4)}`,
       salary: "80000.00",
@@ -287,10 +288,35 @@ export async function createTransaction(
   return row!;
 }
 
+// ── Scenario Overrides ────────────────────────────────────────────────────────
+
+export async function createScenarioOverride(
+  scenarioId: string,
+  entityType: string,
+  entityId: string,
+  action: "create" | "modify" | "delete",
+  data?: Record<string, unknown>,
+  originalData?: Record<string, unknown>,
+) {
+  const db = getTestDb();
+  const [row] = await db
+    .insert(scenarioOverrides)
+    .values({
+      scenarioId,
+      entityType,
+      entityId,
+      action,
+      data,
+      originalData,
+    })
+    .returning();
+  return row!;
+}
+
 // ── Composite helpers ──────────────────────────────────────────────────────────
 
 /**
- * Create a complete company context: user → company → membership → default scenario.
+ * Create a complete company context: user → company → membership → scenario.
  * Returns all created entities for use in tests.
  */
 export async function createCompanyContext(overrides?: {
@@ -302,8 +328,8 @@ export async function createCompanyContext(overrides?: {
   const company = await createCompany(user.id, overrides?.company);
   const member = await createMember(company.id, user.id);
   const scenario = await createScenario(company.id, {
-    isDefault: true,
-    type: "base",
+    source: "blank",
+    status: "active",
     ...overrides?.scenario,
   });
   return { user, company, member, scenario };
