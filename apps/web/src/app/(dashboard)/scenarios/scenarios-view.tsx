@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 import { ScenarioInsightsWrapper } from "./scenario-insights-wrapper";
 import { ScenarioCards } from "./scenario-cards";
@@ -18,8 +18,6 @@ interface ScenarioItem {
 }
 
 export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
-  const pageLayout = usePageLayout({ pageId: "scenarios" });
-
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "insights", x: 0, w: 12, h: 4, minH: 3 },
     { i: "scenario-cards", x: 0, w: 12, h: 16, minH: 8 },
@@ -36,13 +34,43 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   }), [scenarios]);
 
   return (
-    <PageProvider pageId="scenarios">
-      <PageGrid
-        widgets={widgets}
-        defaultLayoutLG={defaultLayoutLG}
-        defaultLayoutSM={defaultLayoutSM}
-        {...pageLayout}
-      />
-    </PageProvider>
+    <PageLayoutProvider pageId="scenarios">
+      <PageProvider pageId="scenarios">
+        <ScenariosPageGrid
+          widgets={widgets}
+          defaultLayoutLG={defaultLayoutLG}
+          defaultLayoutSM={defaultLayoutSM}
+        />
+      </PageProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function ScenariosPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }
