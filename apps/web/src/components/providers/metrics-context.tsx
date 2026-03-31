@@ -21,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import { METRIC_REGISTRY, type MetricDefinition } from "@burnless/engine";
+import type { CardContent } from "@burnless/engine";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,10 @@ export interface MetricsContextState {
   setCardMode: (pageId: string, slug: string, mode: CardMode | null) => void;
   /** Check if a card has a per-card override */
   hasOverride: (pageId: string, slug: string) => boolean;
+  /** Get the typed content override for a slot (null = use page default) */
+  getSlotOverride: (pageId: string, slotId: string) => CardContent | null;
+  /** Set a typed content override for a slot (null = clear override) */
+  setSlotOverride: (pageId: string, slotId: string, content: CardContent | null) => void;
   /** Get per-card scenario override */
   getCardScenario: (pageId: string, slug: string) => string | null;
   /** Set per-card scenario override */
@@ -155,6 +160,8 @@ interface MetricsProviderProps {
   initialMode?: CardMode;
   /** Initial per-card scenario overrides */
   initialScenarioOverrides?: Record<string, string> | null;
+  /** Initial typed slot content overrides */
+  initialSlotOverrides?: Record<string, CardContent> | null;
 }
 
 export function MetricsProvider({
@@ -162,6 +169,7 @@ export function MetricsProvider({
   initialOverrides,
   initialMode = "dynamic",
   initialScenarioOverrides,
+  initialSlotOverrides,
 }: MetricsProviderProps) {
   const [isLoading, setIsLoading] = useState(!initialOverrides);
   const [isSaving, setIsSaving] = useState(false);
@@ -182,6 +190,11 @@ export function MetricsProvider({
     () => initialScenarioOverrides ?? {}
   );
 
+  // Typed slot content overrides: card slot → CardContent
+  const [slotOverrides, setSlotOverridesState] = useState<Record<string, CardContent>>(
+    () => (initialSlotOverrides ?? {}) as Record<string, CardContent>
+  );
+
   // Load from API if no initial overrides provided
   const loadedRef = useRef(false);
   useEffect(() => {
@@ -195,6 +208,12 @@ export function MetricsProvider({
         if (data.mode) setModeState(data.mode as CardMode);
         if (data.cardScenarioOverrides) {
           setScenarioOverrides((prev) => ({ ...data.cardScenarioOverrides, ...prev }));
+        }
+        if (data.customSlugOverrides) {
+          setSlotOverridesState((prev) => ({ ...data.customSlugOverrides, ...prev }));
+        }
+        if (data.slotOverrides) {
+          setSlotOverridesState((prev) => ({ ...data.slotOverrides, ...prev }));
         }
         setIsLoading(false);
       })
@@ -303,6 +322,30 @@ export function MetricsProvider({
     [makeKey, save]
   );
 
+  const getSlotOverride = useCallback(
+    (pageId: string, slotId: string): CardContent | null => {
+      return slotOverrides[makeKey(pageId, slotId)] ?? null;
+    },
+    [slotOverrides, makeKey]
+  );
+
+  const setSlotOverride = useCallback(
+    (pageId: string, slotId: string, content: CardContent | null) => {
+      setSlotOverridesState((prev) => {
+        const key = makeKey(pageId, slotId);
+        const next = { ...prev };
+        if (content === null) {
+          delete next[key];
+        } else {
+          next[key] = content;
+        }
+        save({ slotOverrides: next });
+        return next;
+      });
+    },
+    [makeKey, save]
+  );
+
   const value = useMemo<MetricsContextState>(
     () => ({
       mode,
@@ -311,6 +354,8 @@ export function MetricsProvider({
       getCardMode,
       setCardMode,
       hasOverride,
+      getSlotOverride,
+      setSlotOverride,
       getCardScenario,
       setCardScenario,
       catalogOpen,
@@ -331,6 +376,8 @@ export function MetricsProvider({
       getCardMode,
       setCardMode,
       hasOverride,
+      getSlotOverride,
+      setSlotOverride,
       getCardScenario,
       setCardScenario,
       catalogOpen,
