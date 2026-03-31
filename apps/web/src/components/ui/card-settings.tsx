@@ -99,6 +99,8 @@ export interface CardSettingsProps {
   aiEnabled?: boolean;
   /** When provided, settings opens as modal with inline catalog. */
   catalogProps?: CatalogProps;
+  /** Called when user saves a metric selection for this specific card. */
+  onSaveForCard?: (selectedSlug: string) => void;
 }
 
 export function CardSettings({
@@ -107,6 +109,7 @@ export function CardSettings({
   isOverride = false,
   aiEnabled = false,
   catalogProps,
+  onSaveForCard,
 }: CardSettingsProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -154,6 +157,7 @@ export function CardSettings({
         isOverride={isOverride}
         aiEnabled={aiEnabled}
         catalogProps={catalogProps}
+        onSaveForCard={onSaveForCard}
       />
     </div>
   );
@@ -169,6 +173,7 @@ function SettingsModal({
   isOverride,
   aiEnabled,
   catalogProps,
+  onSaveForCard,
 }: {
   open: boolean;
   onClose: () => void;
@@ -177,6 +182,7 @@ function SettingsModal({
   isOverride: boolean;
   aiEnabled: boolean;
   catalogProps?: CatalogProps;
+  onSaveForCard?: (selectedSlug: string) => void;
 }) {
   const [stagedSlug, setStagedSlug] = useState<string | null>(null);
 
@@ -241,8 +247,8 @@ function SettingsModal({
           )}
           <button
             onClick={() => {
-              if (stagedSlug && catalogProps) {
-                catalogProps.onSelect(stagedSlug);
+              if (stagedSlug) {
+                onSaveForCard?.(stagedSlug);
               }
               setStagedSlug(null);
               onClose();

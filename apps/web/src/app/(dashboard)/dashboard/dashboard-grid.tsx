@@ -116,6 +116,7 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     secondaryMetrics,
     addSecondaryMetric,
     removeSecondaryMetric,
+    swapHeroCard,
     isEditMode,
     setIsEditMode,
     widgetReadiness,
@@ -142,7 +143,13 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     getMetricDef: getMetricDef as CardCatalogValue["getMetricDef"],
     swapMode: false,
     cardType: "metric" as const,
-  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer]);
+    onSaveForCard: (cardSlug: string, selectedSlug: string) => {
+      const heroIndex = heroCards.indexOf(cardSlug);
+      if (heroIndex >= 0) {
+        swapHeroCard(heroIndex, selectedSlug);
+      }
+    },
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, swapHeroCard]);
 
   const heroCount = heroCards.length || 4;
 

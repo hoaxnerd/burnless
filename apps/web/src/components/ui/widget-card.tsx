@@ -155,6 +155,9 @@ export function WidgetCard({
             isOverride={isOverride}
             aiEnabled={aiEnabled}
             catalogProps={catalog ?? undefined}
+            onSaveForCard={slug && catalog?.onSaveForCard
+              ? (selectedSlug: string) => catalog.onSaveForCard!(slug, selectedSlug)
+              : undefined}
           />
         </div>
       )}

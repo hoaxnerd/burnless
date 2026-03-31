@@ -26,6 +26,8 @@ export interface CardCatalogValue {
   getMetricDef: (slug: string) => MetricDef | undefined;
   swapMode: boolean;
   cardType: "metric" | "chart";
+  /** Called when a user saves a metric selection for a specific card (cardSlug → selectedSlug). */
+  onSaveForCard?: (cardSlug: string, selectedSlug: string) => void;
 }
 
 const CardCatalogCtx = createContext<CardCatalogValue | null>(null);
