@@ -9,6 +9,7 @@
  */
 
 import { type ReactNode, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { PageGrid, type DefaultLayoutItem, type PageWidgetLayout } from "@/components/ui/page-grid";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
@@ -107,6 +108,7 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
+  const router = useRouter();
   const { registry, openFormulaViewer } = useMetrics();
   const {
     layout: savedLayout,
@@ -146,10 +148,10 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     onSaveForCard: (cardSlug: string, selectedSlug: string) => {
       const heroIndex = heroCards.indexOf(cardSlug);
       if (heroIndex >= 0) {
-        swapHeroCard(heroIndex, selectedSlug);
+        swapHeroCard(heroIndex, selectedSlug).then(() => router.refresh());
       }
     },
-  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, swapHeroCard]);
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, swapHeroCard, router]);
 
   const heroCount = heroCards.length || 4;
 
