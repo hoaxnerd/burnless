@@ -383,7 +383,7 @@ export function PageGrid({
   }
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="w-full">
       {/* Layout controls */}
       <div className="flex items-center justify-end gap-2 mb-4">
         <button

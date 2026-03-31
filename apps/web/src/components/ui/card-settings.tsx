@@ -215,12 +215,9 @@ function SettingsModal({
         {catalogProps && (currentMode === "custom" || catalogProps.swapMode) && (
           <InlineCatalog
             {...catalogProps}
-            onSelect={
-              catalogProps.swapMode
-                ? (slug) => setStagedSlug(slug)
-                : catalogProps.onSelect
-            }
-            stagedSlug={catalogProps.swapMode ? stagedSlug : null}
+            swapMode
+            onSelect={(slug) => setStagedSlug(slug)}
+            stagedSlug={stagedSlug}
           />
         )}
 
@@ -244,7 +241,7 @@ function SettingsModal({
           )}
           <button
             onClick={() => {
-              if (stagedSlug && catalogProps?.swapMode) {
+              if (stagedSlug && catalogProps) {
                 catalogProps.onSelect(stagedSlug);
               }
               setStagedSlug(null);
@@ -252,7 +249,7 @@ function SettingsModal({
             }}
             className="px-4 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 transition-colors"
           >
-            Done
+            {stagedSlug ? "Save" : "Done"}
           </button>
         </div>
       </div>
