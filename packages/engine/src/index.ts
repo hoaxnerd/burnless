@@ -179,6 +179,9 @@ export {
   type MerchantMapping,
 } from "./categorization";
 
+// Slot types — universal slot-based card system
+export * from "./slot-types";
+
 // Payment providers — import directly from "@burnless/engine/payments" when needed.
 // Not re-exported here to avoid bundling optional plaid/razorpay/stripe SDKs.
 export type {
