@@ -2,7 +2,10 @@ import { Suspense } from "react";
 import { getCompany, getActiveScenario, getBudgetScenario, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
-import { seriesToArray, monthKey } from "@burnless/engine";
+import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import type { ResolvedSlotData } from "@burnless/engine";
+import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency } from "@burnless/types";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -96,6 +99,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
   }
 
   // Summary metrics
+  const { anomalyCount, recurringCount } = expenseDetails;
   const summaryMetrics = {
     totalMonthly: totalExpenseAmount,
     changePercent: changePercent ? Number(changePercent) : null,
@@ -103,9 +107,58 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
     personnelPercent: totalExpenseAmount > 0 ? (personnelCost / totalExpenseAmount * 100) : 0,
     opexAmount: Math.max(0, opexAmount - personnelCost),
     cogsAmount,
-    anomalyCount: expenseDetails.anomalyCount,
-    recurringCount: expenseDetails.recurringCount,
+    anomalyCount,
+    recurringCount,
   };
+
+  // Build resolved slot data for ALL engine metrics (swap targets)
+  const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
+    buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
+  );
+
+  // Build page-specific default cards as ResolvedSlotData
+  const pageDefaultSlots: ResolvedSlotData[] = [
+    {
+      slotId: "metric-0",
+      content: { type: "metric", slug: "totalMonthly" },
+      label: "Total Monthly",
+      value: formatCurrency(totalExpenseAmount, "USD", undefined, { compact: true }),
+      change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
+      changeLabel: changePercent !== null ? "vs last month" : undefined,
+      hasData: totalExpenseAmount > 0,
+      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/expenses" },
+    },
+    {
+      slotId: "metric-1",
+      content: { type: "metric", slug: "personnelCost" },
+      label: "People",
+      value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
+      description: `${summaryMetrics.personnelPercent.toFixed(0)}% of total`,
+      hasData: personnelCost > 0,
+      metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/team" },
+    },
+    {
+      slotId: "metric-2",
+      content: { type: "metric", slug: "anomalies" },
+      label: "Anomalies",
+      value: String(anomalyCount),
+      description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
+      hasData: true,
+      metricStyle: { icon: "AlertTriangle", color: "text-warning-500", href: "/expenses" },
+    },
+    {
+      slotId: "metric-3",
+      content: { type: "metric", slug: "recurring" },
+      label: "Recurring",
+      value: String(recurringCount),
+      description: `of ${expenseDetails.lineItems.length} expenses`,
+      hasData: true,
+      metricStyle: { icon: "RotateCw", color: "text-surface-500", href: "/expenses" },
+    },
+  ];
+
+  // Merge: page defaults + all engine metrics
+  const resolvedSlotData = [...pageDefaultSlots, ...allEngineSlots];
 
   // Timeline data
   const timeline = seriesToArray(totalExpenses);
@@ -129,6 +182,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
 
       <ExpensesView
         summaryMetrics={summaryMetrics}
+        resolvedSlotData={resolvedSlotData}
         expenseDetails={expenseDetails}
         timeline={timeline}
         opexTimeline={opexTimeline}

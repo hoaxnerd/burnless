@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { AlertTriangle, RotateCw, DollarSign, TrendingUp } from "lucide-react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { usePageLayout } from "@/components/ui/use-page-layout";
+import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { BarChartWidget, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { ExpenseCategoryChart } from "./expense-category-chart";
@@ -14,7 +15,7 @@ import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
-import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, type ResolvedSlotData } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { ExpenseDetails } from "@/lib/compute-expenses";
 
@@ -36,6 +37,7 @@ interface SummaryMetrics {
 
 interface ExpensesViewProps {
   summaryMetrics: SummaryMetrics;
+  resolvedSlotData: ResolvedSlotData[];
   expenseDetails: ExpenseDetails;
   timeline: MetricPoint[];
   opexTimeline: MetricPoint[];
@@ -46,6 +48,7 @@ interface ExpensesViewProps {
 
 export function ExpensesView({
   summaryMetrics,
+  resolvedSlotData,
   expenseDetails,
   timeline,
   opexTimeline: _opexTimeline,
@@ -91,7 +94,6 @@ export function ExpensesView({
     : null;
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
-  const pageLayout = usePageLayout({ pageId: "expenses" });
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "metric-cards", x: 0, w: 12, h: 5, minH: 4 },
@@ -276,16 +278,48 @@ export function ExpensesView({
   }), [metricCards, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
-    <PageProvider pageId="expenses">
-      <CardCatalogProvider value={catalogValue}>
-        <PageGrid
-          widgets={widgets}
-          defaultLayoutLG={defaultLayoutLG}
-          defaultLayoutSM={defaultLayoutSM}
-          {...pageLayout}
-        />
-      </CardCatalogProvider>
-    </PageProvider>
+    <PageLayoutProvider pageId="expenses">
+      <ComputedMetricsProvider slotData={resolvedSlotData}>
+        <PageProvider pageId="expenses">
+          <CardCatalogProvider value={catalogValue}>
+            <ExpensesPageGrid
+              widgets={widgets}
+              defaultLayoutLG={defaultLayoutLG}
+              defaultLayoutSM={defaultLayoutSM}
+            />
+          </CardCatalogProvider>
+        </PageProvider>
+      </ComputedMetricsProvider>
+    </PageLayoutProvider>
+  );
+}
+
+function ExpensesPageGrid({
+  widgets,
+  defaultLayoutLG,
+  defaultLayoutSM,
+}: {
+  widgets: Record<string, ReactNode>;
+  defaultLayoutLG: DefaultLayoutItem[];
+  defaultLayoutSM: DefaultLayoutItem[];
+}) {
+  const layout = usePageLayoutContext();
+  return (
+    <PageGrid
+      widgets={widgets}
+      defaultLayoutLG={defaultLayoutLG}
+      defaultLayoutSM={defaultLayoutSM}
+      savedLayout={layout.savedLayout}
+      onLayoutChange={layout.onLayoutChange}
+      closedWidgets={layout.closedWidgets}
+      onCloseWidget={layout.onCloseWidget}
+      onOpenWidget={layout.onOpenWidget}
+      onReset={layout.onReset}
+      widgetReadiness={layout.widgetReadiness}
+      isLoading={layout.isLoading}
+      isEditMode={layout.isEditMode}
+      setIsEditMode={layout.setIsEditMode}
+    />
   );
 }
 
