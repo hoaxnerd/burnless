@@ -40,8 +40,9 @@ describe("metrics", () => {
     // ARPA = MRR / customers
     expect(m.arpa[0]?.value).toBe(100); // 10000/100
 
-    // Churn rate
-    expect(m.customerChurnRate[0]?.value).toBeCloseTo(4.76, 0); // 5/(100+5) * 100
+    // Churn rate (month 2: uses beginning-of-period = prev month's ending = 100)
+    // 5 / 100 * 100 = 5%
+    expect(m.customerChurnRate[1]?.value).toBe(5);
 
     // Net burn rate
     expect(m.netBurnRate[0]?.value).toBe(5000); // expenses - revenue

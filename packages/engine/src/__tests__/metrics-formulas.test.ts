@@ -42,9 +42,9 @@ describe("Magic Number — hand-calculated", () => {
   it("quarterly: Net New ARR (QoQ) / Prior Quarter S&M", () => {
     // MRR: 10k, 11k, 12k, 14k (4 months)
     // At index 3: currMrr = 14000, qtrAgoMrr (index 0) = 10000
-    // Net New ARR = (14000 - 10000) * 4 = 16000  (annualize quarterly change)
+    // Net New ARR = (14000 - 10000) * 12 = 48000  (annualize quarterly MRR change to ARR)
     // Prior quarter S&M (months 0..2): 5000 + 5000 + 5000 = 15000
-    // Magic Number = 16000 / 15000 ≈ 1.07
+    // Magic Number = 48000 / 15000 = 3.2
     const details: SubscriptionDetail[] = [
       sub({ month: "2026-01", mrr: 10000 }),
       sub({ month: "2026-02", mrr: 11000 }),
@@ -64,7 +64,7 @@ describe("Magic Number — hand-calculated", () => {
     };
 
     const m = computeAllMetrics(input);
-    expect(m.magicNumber[3]?.value).toBeCloseTo(1.07, 1);
+    expect(m.magicNumber[3]?.value).toBeCloseTo(3.2, 1);
   });
 
   it("monthly fallback for months < 3", () => {
@@ -137,7 +137,7 @@ describe("Burn Multiple — hand-calculated", () => {
     expect(m.burnMultiple[0]?.value).toBeCloseTo(5.33, 1);
   });
 
-  it("returns 0 when Net New MRR ≤ 0", () => {
+  it("returns 999 sentinel when Net New MRR ≤ 0 and burning cash", () => {
     const details: SubscriptionDetail[] = [
       sub({ month: "2026-01", mrr: 10000, netNewMrr: -500 }),
     ];
@@ -152,7 +152,7 @@ describe("Burn Multiple — hand-calculated", () => {
       headcount: s({ "2026-01": 5 }),
     };
     const m = computeAllMetrics(input);
-    expect(m.burnMultiple[0]?.value).toBe(0);
+    expect(m.burnMultiple[0]?.value).toBe(999);
   });
 
   it("returns 0 when profitable (no burn)", () => {
@@ -179,15 +179,27 @@ describe("Burn Multiple — hand-calculated", () => {
 
 describe("LTV:CAC Ratio — hand-calculated", () => {
   it("LTV:CAC = LTV / CAC", () => {
+    // Month 2 (index 1):
     // ARPA = 20000 / 200 = 100
     // Gross Margin = (20000 - 4000) / 20000 = 80%
-    // Revenue Churn Rate = 1000 / (20000 + 1000) * 100 ≈ 4.76%
-    // LTV = (100 * 0.80) / 0.0476 ≈ 1680.67
+    // Revenue Churn Rate = churnedMrr / prevMRR * 100 = 1000 / 18000 * 100 ≈ 5.56%
+    // LTV = (100 * 0.80) / 0.0556 ≈ 1440
     // CAC = 8000 / 20 = 400
-    // LTV:CAC = 1680.67 / 400 ≈ 4.20
+    // LTV:CAC = 1440 / 400 ≈ 3.60
     const details: SubscriptionDetail[] = [
       sub({
         month: "2026-01",
+        customers: 190,
+        newCustomers: 15,
+        churnedCustomers: 5,
+        mrr: 18000,
+        newMrr: 1500,
+        expansionMrr: 300,
+        churnedMrr: 500,
+        netNewMrr: 1300,
+      }),
+      sub({
+        month: "2026-02",
         customers: 200,
         newCustomers: 20,
         churnedCustomers: 10,
@@ -199,21 +211,24 @@ describe("LTV:CAC Ratio — hand-calculated", () => {
       }),
     ];
     const input: MetricsInput = {
-      revenue: s({ "2026-01": 20000 }),
+      revenue: s({ "2026-01": 18000, "2026-02": 20000 }),
       subscriptionDetails: details,
-      totalExpenses: s({ "2026-01": 25000 }),
-      cogs: s({ "2026-01": 4000 }),
-      operatingExpenses: s({ "2026-01": 21000 }),
-      cashPosition: s({ "2026-01": 500000 }),
-      netIncome: s({ "2026-01": -5000 }),
-      headcount: s({ "2026-01": 15 }),
-      acquisitionSpend: s({ "2026-01": 8000 }),
+      totalExpenses: s({ "2026-01": 23000, "2026-02": 25000 }),
+      cogs: s({ "2026-01": 3600, "2026-02": 4000 }),
+      operatingExpenses: s({ "2026-01": 19400, "2026-02": 21000 }),
+      cashPosition: s({ "2026-01": 500000, "2026-02": 495000 }),
+      netIncome: s({ "2026-01": -5000, "2026-02": -5000 }),
+      headcount: s({ "2026-01": 15, "2026-02": 15 }),
+      acquisitionSpend: s({ "2026-01": 8000, "2026-02": 8000 }),
     };
 
     const m = computeAllMetrics(input);
-    expect(m.ltv[0]?.value).toBeCloseTo(1680.67, 0);
-    expect(m.cac[0]?.value).toBe(400);
-    expect(m.ltvCacRatio[0]?.value).toBeCloseTo(4.2, 1);
+    // Revenue churn = 1000 / 18000 * 100 ≈ 5.56%
+    // ARPA = 20000/200 = 100, GM = 80%
+    // LTV = (100 * 0.80) / 0.0556 ≈ 1440
+    expect(m.ltv[1]?.value).toBeCloseTo(1440, -1);
+    expect(m.cac[1]?.value).toBe(400);
+    expect(m.ltvCacRatio[1]?.value).toBeCloseTo(3.6, 0);
   });
 
   it("returns 0 when CAC is 0 (no acquisition spend)", () => {
@@ -290,12 +305,22 @@ describe("EBITDA — hand-calculated", () => {
 // ── Revenue Churn Rate ───────────────────────────────────────────────────────
 
 describe("Revenue Churn Rate — hand-calculated", () => {
-  it("Revenue Churn = churnedMRR / (MRR + churnedMRR) × 100", () => {
-    // churnedMrr = 800, mrr = 15200
-    // Rate = 800 / (15200 + 800) × 100 = 800 / 16000 × 100 = 5%
+  it("Revenue Churn = churnedMRR / previous MRR × 100", () => {
+    // Month 1 MRR = 16000 (beginning of period for month 2)
+    // Month 2: churnedMrr = 800, prevMRR = 16000
+    // Rate = 800 / 16000 × 100 = 5%
     const details: SubscriptionDetail[] = [
       sub({
         month: "2026-01",
+        customers: 140,
+        mrr: 16000,
+        churnedMrr: 500,
+        newMrr: 800,
+        expansionMrr: 0,
+        netNewMrr: 300,
+      }),
+      sub({
+        month: "2026-02",
         customers: 150,
         mrr: 15200,
         churnedMrr: 800,
@@ -305,17 +330,17 @@ describe("Revenue Churn Rate — hand-calculated", () => {
       }),
     ];
     const input: MetricsInput = {
-      revenue: s({ "2026-01": 15200 }),
+      revenue: s({ "2026-01": 16000, "2026-02": 15200 }),
       subscriptionDetails: details,
-      totalExpenses: s({ "2026-01": 20000 }),
-      cogs: s({ "2026-01": 3000 }),
-      operatingExpenses: s({ "2026-01": 17000 }),
-      cashPosition: s({ "2026-01": 400000 }),
-      netIncome: s({ "2026-01": -4800 }),
-      headcount: s({ "2026-01": 12 }),
+      totalExpenses: s({ "2026-01": 20000, "2026-02": 20000 }),
+      cogs: s({ "2026-01": 3000, "2026-02": 3000 }),
+      operatingExpenses: s({ "2026-01": 17000, "2026-02": 17000 }),
+      cashPosition: s({ "2026-01": 400000, "2026-02": 395200 }),
+      netIncome: s({ "2026-01": -4000, "2026-02": -4800 }),
+      headcount: s({ "2026-01": 12, "2026-02": 12 }),
     };
     const m = computeAllMetrics(input);
-    expect(m.revenueChurnRate[0]?.value).toBe(5);
+    expect(m.revenueChurnRate[1]?.value).toBe(5);
   });
 });
 
@@ -376,11 +401,13 @@ describe("Customer Growth Rate — hand-calculated", () => {
 // ── Rule of 40 ───────────────────────────────────────────────────────────────
 
 describe("Rule of 40 — hand-calculated", () => {
-  it("Rule of 40 = Revenue Growth Rate + Gross Margin", () => {
+  it("Rule of 40 = Revenue Growth Rate + EBITDA Margin", () => {
     // Month 1: revenue=40000, month 2: revenue=50000
     // Growth = (50000-40000)/40000*100 = 25%
-    // COGS month 2 = 10000 → GP = 40000 → Margin = 40000/50000*100 = 80%
-    // Rule of 40 = 25 + 80 = 105
+    // Month 2: GP = 50000-10000 = 40000, OpInc = 40000-25000 = 15000
+    // EBITDA = OpInc + D&A = 15000 (no D&A)
+    // EBITDA Margin = 15000/50000*100 = 30%
+    // Rule of 40 = 25 + 30 = 55
     const input: MetricsInput = {
       revenue: s({ "2026-01": 40000, "2026-02": 50000 }),
       totalExpenses: s({ "2026-01": 30000, "2026-02": 35000 }),
@@ -391,7 +418,7 @@ describe("Rule of 40 — hand-calculated", () => {
       headcount: s({ "2026-01": 20, "2026-02": 22 }),
     };
     const m = computeAllMetrics(input);
-    expect(m.ruleOf40[1]?.value).toBe(105);
+    expect(m.ruleOf40[1]?.value).toBe(55);
   });
 });
 

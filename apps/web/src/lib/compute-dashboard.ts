@@ -31,10 +31,13 @@ import {
   addSeries,
   subtractSeries,
   monthKey,
+  D,
+  dRound2,
 } from "@burnless/engine";
 import {
   getAccounts,
   getForecastLines,
+  getForecastValues,
   getRevenueStreams,
   getHeadcountPlans,
   getFundingRounds,
@@ -84,6 +87,20 @@ export const computeDashboardData = cache(async function computeDashboardData(
     getFundingRounds(companyId),
   ]);
 
+  // Fetch forecast value overrides
+  const lineIds = fLines.map((l) => l.id);
+  const allValues = await getForecastValues(lineIds);
+  const overridesByLine = new Map<string, Map<string, number>>();
+  for (const fv of allValues) {
+    if (!fv.isOverride) continue;
+    let lineOverrides = overridesByLine.get(fv.forecastLineId);
+    if (!lineOverrides) {
+      lineOverrides = new Map();
+      overridesByLine.set(fv.forecastLineId, lineOverrides);
+    }
+    lineOverrides.set(monthKey(new Date(fv.month)), Number(fv.amount));
+  }
+
   // Compute forecasts
   const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
     id: fl.id,
@@ -92,6 +109,7 @@ export const computeDashboardData = cache(async function computeDashboardData(
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
     startDate: new Date(fl.startDate),
     endDate: fl.endDate ? new Date(fl.endDate) : null,
+    overrides: overridesByLine.get(fl.id),
   }));
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
   const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
@@ -133,6 +151,8 @@ export const computeDashboardData = cache(async function computeDashboardData(
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();
+  let totalOtherIncome: MonthlySeries = new Map();
+  let totalOtherExpense: MonthlySeries = new Map();
 
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
@@ -140,18 +160,31 @@ export const computeDashboardData = cache(async function computeDashboardData(
     if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, values);
     else if (account.category === "cogs") totalCogs = addSeries(totalCogs, values);
     else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
+    else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, values);
+    else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, values);
   }
   totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
-  const totalExpenses = addSeries(totalCogs, totalOpex);
-  const netIncome = subtractSeries(totalRevenue, totalExpenses);
+  const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
+  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
-  // Cash position
-  const startingCash = funding.reduce((sum, r) => sum + Number(r.amount), 0);
+  // Cash position — only include funding received on or before period start;
+  // future/projected rounds are added when their month arrives
+  const startingCash = funding
+    .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+  const futureFunding: MonthlySeries = new Map();
+  for (const r of funding) {
+    const rDate = new Date(r.date);
+    if (r.isProjected || rDate >= periodStart) {
+      const key = monthKey(rDate);
+      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
+    }
+  }
   const cashPosition: MonthlySeries = new Map();
-  let runningCash = startingCash;
+  let runningCash = D(startingCash);
   for (const m of Array.from(netIncome.keys()).sort()) {
-    runningCash += netIncome.get(m) ?? 0;
-    cashPosition.set(m, runningCash);
+    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
+    cashPosition.set(m, dRound2(runningCash));
   }
 
   // Metrics

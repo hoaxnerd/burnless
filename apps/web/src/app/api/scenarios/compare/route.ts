@@ -16,6 +16,9 @@ import {
   type MonthlySeries,
   addSeries,
   subtractSeries,
+  monthKey,
+  D,
+  dRound2,
 } from "@burnless/engine";
 
 /**
@@ -116,6 +119,8 @@ async function buildScenarioData(
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();
+  let totalOtherIncome: MonthlySeries = new Map();
+  let totalOtherExpense: MonthlySeries = new Map();
 
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
@@ -123,17 +128,29 @@ async function buildScenarioData(
     if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, values);
     else if (account.category === "cogs") totalCogs = addSeries(totalCogs, values);
     else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
+    else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, values);
+    else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, values);
   }
   totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
-  const totalExpenses = addSeries(totalCogs, totalOpex);
-  const netIncome = subtractSeries(totalRevenue, totalExpenses);
+  const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
+  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
-  const startingCash = funding.reduce((sum, r) => sum + Number(r.amount), 0);
+  const startingCash = funding
+    .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+  const futureFunding: MonthlySeries = new Map();
+  for (const r of funding) {
+    const rDate = new Date(r.date);
+    if (r.isProjected || rDate >= periodStart) {
+      const key = monthKey(rDate);
+      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
+    }
+  }
   const cashPosition: MonthlySeries = new Map();
-  let runningCash = startingCash;
+  let runningCash = D(startingCash);
   for (const m of Array.from(netIncome.keys()).sort()) {
-    runningCash += netIncome.get(m) ?? 0;
-    cashPosition.set(m, runningCash);
+    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
+    cashPosition.set(m, dRound2(runningCash));
   }
 
   return {

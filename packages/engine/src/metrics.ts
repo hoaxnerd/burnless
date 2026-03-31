@@ -215,21 +215,28 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // SaaS metrics — all using Decimal
-  const customerChurnRate = months.map((m) => {
+  const customerChurnRate = months.map((m, i) => {
     const d = subDetails.get(m);
-    if (!d || d.customers === 0) return { month: m, value: 0 };
+    if (!d || i === 0) return { month: m, value: 0 };
+    // Beginning-of-period customers = previous month's ending count
+    const prevD = subDetails.get(months[i - 1]!);
+    const beginningCustomers = D(prevD?.customers ?? 0);
+    if (beginningCustomers.isZero()) return { month: m, value: 0 };
     return {
       month: m,
-      value: dRound2(dDiv(d.churnedCustomers, D(d.customers).plus(d.churnedCustomers)).mul(100)),
+      value: dRound2(dDiv(d.churnedCustomers, beginningCustomers).mul(100)),
     };
   });
 
-  const revenueChurnRate = months.map((m) => {
+  const revenueChurnRate = months.map((m, i) => {
     const d = subDetails.get(m);
-    if (!d || d.mrr === 0) return { month: m, value: 0 };
+    if (!d || i === 0) return { month: m, value: 0 };
+    // Beginning-of-period MRR = previous month's ending MRR
+    const prevMrrVal = D(mrr[i - 1]?.value ?? 0);
+    if (prevMrrVal.isZero()) return { month: m, value: 0 };
     return {
       month: m,
-      value: dRound2(dDiv(d.churnedMrr, D(d.mrr).plus(d.churnedMrr)).mul(100)),
+      value: dRound2(dDiv(d.churnedMrr, prevMrrVal).mul(100)),
     };
   });
 
@@ -305,7 +312,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     // Quarterly: net new ARR over 3 months / prior quarter S&M spend
     const currMrr = D(mrr[i]?.value ?? 0);
     const qtrAgoMrr = D(mrr[i - 3]?.value ?? 0);
-    const netNewArr = currMrr.minus(qtrAgoMrr).mul(4); // annualize quarterly change
+    const netNewArr = currMrr.minus(qtrAgoMrr).mul(12); // annualize quarterly MRR change to ARR
     let priorQtrSpend = D(0);
     for (let j = Math.max(0, i - 3); j < i; j++) {
       priorQtrSpend = priorQtrSpend.plus(input.acquisitionSpend?.get(months[j]!) ?? 0);
@@ -367,17 +374,20 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // Efficiency
+  const BURN_MULTIPLE_CAP = 999;
   const burnMultiple = months.map((m, i) => {
     const burn = D(netBurnRate[i]?.value ?? 0);
     const netNew = D(netNewMrr[i]?.value ?? 0);
-    if (netNew.lte(0)) return { month: m, value: 0 };
+    if (netNew.lte(0)) return { month: m, value: burn.gt(0) ? BURN_MULTIPLE_CAP : 0 };
     return { month: m, value: dRound2(burn.div(netNew)) };
   });
 
+  // Rule of 40 = Revenue Growth % + EBITDA Margin %
   const ruleOf40 = months.map((m, i) => {
     const growthRate = D(revenueGrowthRate[i]?.value ?? 0);
-    const margin = D(grossMarginPercent[i]?.value ?? 0);
-    return { month: m, value: dRound2(growthRate.plus(margin)) };
+    const rev = D(input.revenue.get(m) ?? 0);
+    const ebitdaMargin = rev.isZero() ? D(0) : D(ebitda[i]?.value ?? 0).div(rev).mul(100);
+    return { month: m, value: dRound2(growthRate.plus(ebitdaMargin)) };
   });
 
   // ── Tier-1: MRR Decomposition ──────────────────────────────────────────────

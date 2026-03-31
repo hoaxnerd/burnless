@@ -212,8 +212,16 @@ export function computeSubscriptionDetail(
     });
 
     // Update for next month — keep in Decimal for precision across iterations
-    customers = customers.minus(churnedCustomers).plus(newCustomers);
-    pricePerCustomer = pricePerCustomer.mul(D(1).plus(params.priceGrowthRate ?? 0));
+    const endingCustomers = retainedCustomers.plus(newCustomers);
+    customers = endingCustomers;
+    // Embed expansion into effective ARPA: totalMrr / endingCustomers gives
+    // the new per-customer price that includes upsells/expansion from this period.
+    // Then apply explicit priceGrowthRate on top.
+    if (endingCustomers.gt(0)) {
+      pricePerCustomer = totalMrr.div(endingCustomers).mul(D(1).plus(params.priceGrowthRate ?? 0));
+    } else {
+      pricePerCustomer = pricePerCustomer.mul(D(1).plus(params.priceGrowthRate ?? 0));
+    }
   }
 
   return details;

@@ -63,6 +63,14 @@ export function computeHeadcountPlanCost(
 
   const monthlySalary = D(plan.salary).div(12);
 
+  // Use cumulative rounding to prevent penny drift over the year.
+  // Each month gets the difference between cumulative rounded targets,
+  // ensuring the annual total is exact.
+  let cumulativeExactSalary = D(0);
+  let cumulativeRoundedSalary = D(0);
+  let cumulativeExactBenefits = D(0);
+  let cumulativeRoundedBenefits = D(0);
+
   for (const month of months) {
     const key = monthKey(month);
 
@@ -74,8 +82,16 @@ export function computeHeadcountPlanCost(
     }
 
     const proration = proratedFraction(month, plan.startDate, plan.endDate);
-    const salaryAmount = dRound2(monthlySalary.mul(plan.count).mul(proration));
-    const benefitsAmount = dRound2(D(salaryAmount).mul(plan.benefitsRate));
+
+    cumulativeExactSalary = cumulativeExactSalary.plus(monthlySalary.mul(plan.count).mul(proration));
+    const newRoundedSalary = dRound2(cumulativeExactSalary);
+    const salaryAmount = dRound2(D(newRoundedSalary).minus(cumulativeRoundedSalary));
+    cumulativeRoundedSalary = D(newRoundedSalary);
+
+    cumulativeExactBenefits = cumulativeExactBenefits.plus(monthlySalary.mul(plan.count).mul(proration).mul(plan.benefitsRate));
+    const newRoundedBenefits = dRound2(cumulativeExactBenefits);
+    const benefitsAmount = dRound2(D(newRoundedBenefits).minus(cumulativeRoundedBenefits));
+    cumulativeRoundedBenefits = D(newRoundedBenefits);
 
     salary.set(key, salaryAmount);
     benefits.set(key, benefitsAmount);

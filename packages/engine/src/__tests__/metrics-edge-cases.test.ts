@@ -155,6 +155,17 @@ describe("metrics — edge cases", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
+          customers: 100,
+          newCustomers: 5,
+          churnedCustomers: 3,
+          mrr: 10000,
+          newMrr: 500,
+          expansionMrr: 0,
+          churnedMrr: 300,
+          netNewMrr: 200,
+        },
+        {
+          month: "2026-02",
           customers: 95,
           newCustomers: 5,
           churnedCustomers: 10,
@@ -166,12 +177,12 @@ describe("metrics — edge cases", () => {
         },
       ];
       const input = makeBasicInput({
-        revenue: new Map([["2026-01", 9500]]),
+        revenue: new Map([["2026-01", 10000], ["2026-02", 9500]]),
         subscriptionDetails: subDetails,
       });
       const metrics = computeAllMetrics(input);
-      // Churn rate = churned / (customers + churned) * 100 = 10 / (95+10) * 100 ≈ 9.52%
-      expect(metrics.customerChurnRate[0]?.value).toBeCloseTo(9.52, 1);
+      // Churn rate = churned / beginning-of-period customers * 100 = 10 / 100 * 100 = 10%
+      expect(metrics.customerChurnRate[1]?.value).toBe(10);
     });
 
     it("computes ARPA correctly", () => {
@@ -295,6 +306,17 @@ describe("metrics — edge cases", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
+          customers: 95,
+          newCustomers: 8,
+          churnedCustomers: 3,
+          mrr: 9500,
+          newMrr: 800,
+          expansionMrr: 100,
+          churnedMrr: 300,
+          netNewMrr: 600,
+        },
+        {
+          month: "2026-02",
           customers: 100,
           newCustomers: 10,
           churnedCustomers: 5,
@@ -306,22 +328,33 @@ describe("metrics — edge cases", () => {
         },
       ];
       const input = makeBasicInput({
-        revenue: new Map([["2026-01", 10000]]),
-        cogs: new Map([["2026-01", 2000]]),
+        revenue: new Map([["2026-01", 9500], ["2026-02", 10000]]),
+        cogs: new Map([["2026-01", 1900], ["2026-02", 2000]]),
         subscriptionDetails: subDetails,
       });
       const metrics = computeAllMetrics(input);
-      // ARPA = 10000/100 = 100
+      // Month 2: ARPA = 10000/100 = 100
       // Gross Margin = (10000 - 2000)/10000 = 80%
-      // Revenue Churn Rate = 500/(10000+500)*100 ≈ 4.76%
-      // LTV = (100 * 0.80) / 0.0476 ≈ 1680.67
-      expect(metrics.ltv[0]?.value).toBeCloseTo(1680.67, 0);
+      // Revenue Churn Rate = 500 / 9500 * 100 ≈ 5.26%
+      // LTV = (100 * 0.80) / 0.0526 ≈ 1520
+      expect(metrics.ltv[1]?.value).toBeCloseTo(1520, -2);
     });
 
     it("returns capped LTV when no revenue churn (100% retention)", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
+          customers: 90,
+          newCustomers: 5,
+          churnedCustomers: 0,
+          mrr: 9000,
+          newMrr: 500,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 500,
+        },
+        {
+          month: "2026-02",
           customers: 100,
           newCustomers: 10,
           churnedCustomers: 0,
@@ -333,18 +366,29 @@ describe("metrics — edge cases", () => {
         },
       ];
       const input = makeBasicInput({
-        revenue: new Map([["2026-01", 10000]]),
+        revenue: new Map([["2026-01", 9000], ["2026-02", 10000]]),
         subscriptionDetails: subDetails,
       });
       const metrics = computeAllMetrics(input);
       // No revenue churn → LTV is infinite, capped at sentinel
-      expect(metrics.ltv[0]?.value).toBe(999999);
+      expect(metrics.ltv[1]?.value).toBe(999999);
     });
 
     it("computes normal LTV when churn is positive (even with expansion)", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
+          customers: 95,
+          newCustomers: 8,
+          churnedCustomers: 3,
+          mrr: 9500,
+          newMrr: 800,
+          expansionMrr: 500,
+          churnedMrr: 300,
+          netNewMrr: 1000,
+        },
+        {
+          month: "2026-02",
           customers: 100,
           newCustomers: 10,
           churnedCustomers: 2,
@@ -356,17 +400,16 @@ describe("metrics — edge cases", () => {
         },
       ];
       const input = makeBasicInput({
-        revenue: new Map([["2026-01", 10000]]),
-        cogs: new Map([["2026-01", 2000]]), // 80% gross margin
+        revenue: new Map([["2026-01", 9500], ["2026-02", 10000]]),
+        cogs: new Map([["2026-01", 1900], ["2026-02", 2000]]), // 80% gross margin
         subscriptionDetails: subDetails,
       });
       const metrics = computeAllMetrics(input);
-      // Revenue churn rate = churnedMrr / (mrr + churnedMrr) * 100
-      // = 200 / (10000 + 200) * 100 ≈ 1.96%
+      // Revenue churn rate = churnedMrr / prevMRR * 100 = 200 / 9500 * 100 ≈ 2.11%
       // ARPA = 10000/100 = 100, GM = 80%
-      // LTV = (100 * 0.80) / 0.0196 ≈ 4081.63
-      expect(metrics.ltv[0]?.value).toBeGreaterThan(4000);
-      expect(metrics.ltv[0]?.value).toBeLessThan(999999);
+      // LTV = (100 * 0.80) / 0.0211 ≈ 3800
+      expect(metrics.ltv[1]?.value).toBeGreaterThan(3500);
+      expect(metrics.ltv[1]?.value).toBeLessThan(999999);
     });
 
     it("returns 0 LTV when no revenue (even with zero churn)", () => {
@@ -448,13 +491,17 @@ describe("metrics — edge cases", () => {
   });
 
   it("computes Rule of 40", () => {
+    // Uses default makeBasicInput operatingExpenses: 30000 (month 1), 31000 (month 2)
     const input = makeBasicInput({
       revenue: new Map([["2026-01", 50000], ["2026-02", 60000]]),
       cogs: new Map([["2026-01", 10000], ["2026-02", 12000]]),
+      operatingExpenses: new Map([["2026-01", 30000], ["2026-02", 31000]]),
     });
     const metrics = computeAllMetrics(input);
-    // Month 2: growth = (60000-50000)/50000*100 = 20%, margin = (60000-12000)/60000*100 = 80%
-    // Rule of 40 = 20 + 80 = 100
-    expect(metrics.ruleOf40[1]?.value).toBe(100);
+    // Month 2: growth = (60000-50000)/50000*100 = 20%
+    // GP = 60000-12000 = 48000, OpInc = 48000-31000 = 17000, EBITDA = 17000
+    // EBITDA Margin = 17000/60000*100 ≈ 28.33%
+    // Rule of 40 = 20 + 28.33 = 48.33
+    expect(metrics.ruleOf40[1]?.value).toBeCloseTo(48.33, 1);
   });
 });

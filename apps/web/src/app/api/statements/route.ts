@@ -17,8 +17,8 @@ import {
   type HeadcountPlanInput,
   type AccountData,
   type MonthlySeries,
-  monthKey,
   addSeries,
+  monthKey,
 } from "@burnless/engine";
 
 /**
@@ -60,11 +60,23 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   // Fetch forecast values for all lines
   const lineIds = fLines.map((l) => l.id);
-  const _allValues = lineIds.length > 0
+  const allValues = lineIds.length > 0
     ? await db.select().from(forecastValues).where(
         inArray(forecastValues.forecastLineId, lineIds)
       )
     : [];
+
+  // Group override values by forecast line ID
+  const overridesByLine = new Map<string, Map<string, number>>();
+  for (const fv of allValues) {
+    if (!fv.isOverride) continue;
+    let lineOverrides = overridesByLine.get(fv.forecastLineId);
+    if (!lineOverrides) {
+      lineOverrides = new Map();
+      overridesByLine.set(fv.forecastLineId, lineOverrides);
+    }
+    lineOverrides.set(monthKey(fv.month), Number(fv.amount));
+  }
 
   // Build forecast line inputs
   const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
@@ -74,6 +86,7 @@ export const GET = withErrorHandler(async (request: Request) => {
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
     startDate: fl.startDate,
     endDate: fl.endDate,
+    overrides: overridesByLine.get(fl.id),
   }));
 
   // Compute forecast values

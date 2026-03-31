@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getScenarioForCompany, getScenarioData } from "@burnless/db";
+import { getScenarioForCompany, getScenarioData, db, fundingRounds } from "@burnless/db";
+import { eq } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { parseDateRange } from "@/lib/date-validation";
@@ -18,6 +19,9 @@ import {
   type MonthlySeries,
   addSeries,
   subtractSeries,
+  monthKey,
+  D,
+  dRound2,
 } from "@burnless/engine";
 
 /**
@@ -97,6 +101,8 @@ export const GET = withErrorHandler(async (request: Request) => {
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();
+  let totalOtherIncome: MonthlySeries = new Map();
+  let totalOtherExpense: MonthlySeries = new Map();
 
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
@@ -111,22 +117,40 @@ export const GET = withErrorHandler(async (request: Request) => {
       case "operating_expense":
         totalOpex = addSeries(totalOpex, values);
         break;
+      case "other_income":
+        totalOtherIncome = addSeries(totalOtherIncome, values);
+        break;
+      case "other_expense":
+        totalOtherExpense = addSeries(totalOtherExpense, values);
+        break;
     }
   }
 
   // Add headcount to opex
   totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
 
-  const totalExpenses = addSeries(totalCogs, totalOpex);
-  const netIncome = subtractSeries(totalRevenue, totalExpenses);
+  const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
+  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
-  // Cash position (simplified: cumulative net income)
+  // Fetch funding rounds for cash position
+  const funding = await db.select().from(fundingRounds).where(eq(fundingRounds.companyId, ctx.companyId));
+  const startingCash = funding
+    .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+  const futureFunding: MonthlySeries = new Map();
+  for (const r of funding) {
+    const rDate = new Date(r.date);
+    if (r.isProjected || rDate >= periodStart) {
+      const key = monthKey(rDate);
+      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
+    }
+  }
   const cashPosition: MonthlySeries = new Map();
-  let runningCash = 0;
+  let runningCash = D(startingCash);
   const sortedMonths = Array.from(netIncome.keys()).sort();
   for (const m of sortedMonths) {
-    runningCash += netIncome.get(m) ?? 0;
-    cashPosition.set(m, runningCash);
+    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
+    cashPosition.set(m, dRound2(runningCash));
   }
 
   const metricsInput: MetricsInput = {

@@ -1,8 +1,13 @@
 /**
  * Server-side data access layer. Used by server components to fetch data.
  *
- * DB queries are wrapped with unstable_cache for cross-request caching.
- * Cache tags allow targeted invalidation when data is mutated via API routes.
+ * DB queries are wrapped with cachedQuery (a wrapper around unstable_cache)
+ * for cross-request caching. Cache tags allow targeted invalidation when
+ * data is mutated via API routes.
+ *
+ * IMPORTANT: unstable_cache serializes results as JSON, which converts Date
+ * objects to strings. cachedQuery automatically revives ISO date strings
+ * back to Date objects so consumers get correct types.
  */
 
 import { cache } from "react";
@@ -11,6 +16,7 @@ import {
   companies,
   scenarios,
   forecastLines,
+  forecastValues,
   financialAccounts,
   revenueStreams,
   headcountPlans,
@@ -19,9 +25,50 @@ import {
   fundingRounds,
   dashboardPreferences,
 } from "@burnless/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { auth } from "./auth";
+
+// ── Date revival for unstable_cache ─────────────────────────────────────────
+// unstable_cache serializes via JSON, turning Date objects into ISO strings.
+// This reviver walks the deserialized result and converts them back.
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+function reviveDates<T>(value: T): T {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string" && ISO_DATE_RE.test(value)) {
+    return new Date(value) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map(reviveDates) as unknown as T;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const revived: Record<string, unknown> = {};
+    for (const key in obj) {
+      revived[key] = reviveDates(obj[key]);
+    }
+    return revived as T;
+  }
+  return value;
+}
+
+/**
+ * Wrapper around unstable_cache that revives Date objects after deserialization.
+ * Drop-in replacement — same signature as unstable_cache.
+ */
+function cachedQuery<T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  keyParts: string[],
+  options: { revalidate?: number | false; tags?: string[] }
+): T {
+  const cached = unstable_cache(fn, keyParts, options);
+  return (async (...args: Parameters<T>) => {
+    const result = await cached(...args);
+    return reviveDates(result);
+  }) as unknown as T;
+}
 
 /** Get the company for a specific user via their membership. */
 export async function getCompanyForAuthUser(userId: string) {
@@ -47,7 +94,7 @@ export const getCompany = cache(async function getCompany() {
 });
 
 /** Get all scenarios for a company (excludes soft-deleted). */
-export const getScenarios = unstable_cache(
+export const getScenarios = cachedQuery(
   async (companyId: string) => {
     return db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).orderBy(scenarios.createdAt);
   },
@@ -56,7 +103,7 @@ export const getScenarios = unstable_cache(
 );
 
 /** Get the default (or first) scenario for a company. */
-export const getDefaultScenario = unstable_cache(
+export const getDefaultScenario = cachedQuery(
   async (companyId: string) => {
     const rows = await db
       .select()
@@ -73,7 +120,7 @@ export const getDefaultScenario = unstable_cache(
 );
 
 /** Get all financial accounts for a company. */
-export const getAccounts = unstable_cache(
+export const getAccounts = cachedQuery(
   async (companyId: string) => {
     return db.select().from(financialAccounts).where(eq(financialAccounts.companyId, companyId));
   },
@@ -82,7 +129,7 @@ export const getAccounts = unstable_cache(
 );
 
 /** Get all forecast lines for a scenario. */
-export const getForecastLines = unstable_cache(
+export const getForecastLines = cachedQuery(
   async (scenarioId: string) => {
     return db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId));
   },
@@ -90,8 +137,14 @@ export const getForecastLines = unstable_cache(
   { revalidate: 30, tags: ["forecast-lines"] }
 );
 
+/** Get forecast values (overrides) for a set of forecast lines. */
+export async function getForecastValues(lineIds: string[]) {
+  if (lineIds.length === 0) return [];
+  return db.select().from(forecastValues).where(inArray(forecastValues.forecastLineId, lineIds));
+}
+
 /** Get revenue streams for a scenario. */
-export const getRevenueStreams = unstable_cache(
+export const getRevenueStreams = cachedQuery(
   async (scenarioId: string) => {
     return db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId));
   },
@@ -100,7 +153,7 @@ export const getRevenueStreams = unstable_cache(
 );
 
 /** Get headcount plans for a scenario. */
-export const getHeadcountPlans = unstable_cache(
+export const getHeadcountPlans = cachedQuery(
   async (scenarioId: string) => {
     return db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId));
   },
@@ -109,7 +162,7 @@ export const getHeadcountPlans = unstable_cache(
 );
 
 /** Get departments for a company. */
-export const getDepartments = unstable_cache(
+export const getDepartments = cachedQuery(
   async (companyId: string) => {
     return db.select().from(departments).where(eq(departments.companyId, companyId));
   },
@@ -118,7 +171,7 @@ export const getDepartments = unstable_cache(
 );
 
 /** Get funding rounds for a company. */
-export const getFundingRounds = unstable_cache(
+export const getFundingRounds = cachedQuery(
   async (companyId: string) => {
     return db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId));
   },
@@ -127,7 +180,7 @@ export const getFundingRounds = unstable_cache(
 );
 
 /** Get a scenario by ID. */
-export const getScenarioById = unstable_cache(
+export const getScenarioById = cachedQuery(
   async (scenarioId: string) => {
     const [scenario] = await db.select().from(scenarios).where(and(eq(scenarios.id, scenarioId), isNull(scenarios.deletedAt)));
     return scenario ?? null;
@@ -152,7 +205,7 @@ export async function getActiveScenario(
 }
 
 /** Get the budget scenario (isBudget=true) for a company. */
-export const getBudgetScenario = unstable_cache(
+export const getBudgetScenario = cachedQuery(
   async (companyId: string) => {
     const [scenario] = await db
       .select()

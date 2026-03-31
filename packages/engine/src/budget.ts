@@ -18,7 +18,7 @@ export interface BudgetLineItem {
   budget: { month: string; value: number }[];
   actual: { month: string; value: number }[];
   variance: { month: string; value: number }[];
-  variancePercent: { month: string; value: number }[];
+  variancePercent: { month: string; value: number | null }[];
   /** positive = favorable (under budget for expenses, over budget for revenue) */
   favorable: { month: string; value: boolean }[];
 }
@@ -59,7 +59,7 @@ export function computeBudgetVsActuals(
     const budget: { month: string; value: number }[] = [];
     const actual: { month: string; value: number }[] = [];
     const variance: { month: string; value: number }[] = [];
-    const variancePercent: { month: string; value: number }[] = [];
+    const variancePercent: { month: string; value: number | null }[] = [];
     const favorable: { month: string; value: boolean }[] = [];
 
     for (const month of allMonths) {
@@ -77,7 +77,7 @@ export function computeBudgetVsActuals(
       variance.push({ month, value: diffRounded });
       variancePercent.push({
         month,
-        value: !bVal.isZero() ? dRound2(diff.div(dAbs(bVal)).mul(100)) : 0,
+        value: !bVal.isZero() ? dRound2(diff.div(dAbs(bVal)).mul(100)) : (aVal.isZero() ? 0 : null),
       });
       favorable.push({ month, value: isFavorable });
 

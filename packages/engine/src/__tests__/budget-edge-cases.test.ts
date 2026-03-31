@@ -16,7 +16,7 @@ describe("budget vs actuals — edge cases", () => {
     const result = computeBudgetVsActuals(accounts);
     const line = result.lineItems[0]!;
     expect(line.variance[0]?.value).toBe(5000);
-    expect(line.variancePercent[0]?.value).toBe(0); // 0 when budget is 0
+    expect(line.variancePercent[0]?.value).toBeNull(); // null when budget is 0 but actual is non-zero
   });
 
   it("handles negative actual values (refunds)", () => {
