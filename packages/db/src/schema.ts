@@ -830,6 +830,16 @@ export const dashboardPreferences = pgTable(
       .$type<Record<string, string>>()
       .notNull()
       .default({}),
+    /** Custom slug overrides: { "pageId:originalSlug": "newSlug" } — card slot → displayed metric */
+    customSlugOverrides: jsonb("custom_slug_overrides")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    /** Typed slot content overrides: { "pageId:slotId": { type, slug?, ... } } */
+    slotOverrides: jsonb("slot_overrides")
+      .$type<Record<string, { type: string; slug?: string; chartId?: string; config?: Record<string, unknown> }>>()
+      .notNull()
+      .default({}),
     /** Dashboard widget layout: ordered list of { widgetId, w, h } */
     layout: jsonb("layout")
       .$type<

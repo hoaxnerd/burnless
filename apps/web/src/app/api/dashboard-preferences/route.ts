@@ -34,6 +34,8 @@ export const GET = withErrorHandler(async () => {
     secondaryMetrics: DEFAULT_SECONDARY_METRICS,
     cardModeOverrides: {} as Record<string, string>,
     cardScenarioOverrides: {},
+    customSlugOverrides: {},
+    slotOverrides: {},
     customMetrics: [],
     layout: [],
     closedWidgets: [],
@@ -60,6 +62,14 @@ const patchSchema = z.object({
   secondaryMetrics: z.array(z.string()).max(20).optional(),
   cardModeOverrides: z.record(z.string(), z.enum(["intelligence", "dynamic", "custom"])).optional(),
   cardScenarioOverrides: z.record(z.string(), z.string()).optional(),
+  customSlugOverrides: z.record(z.string(), z.string()).optional(),
+  slotOverrides: z.record(
+    z.string(),
+    z.object({
+      type: z.enum(["metric"]),
+      slug: z.string().optional(),
+    })
+  ).optional(),
   layout: z
     .array(
       z.object({

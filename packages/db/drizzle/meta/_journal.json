@@ -176,6 +176,20 @@
       "when": 1775260800000,
       "tag": "0024_add_companion_name",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1775347200000,
+      "tag": "0025_add_custom_slug_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1775433600000,
+      "tag": "0026_add_slot_overrides",
+      "breakpoints": true
     }
   ]
 }
