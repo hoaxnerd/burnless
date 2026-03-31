@@ -7,7 +7,8 @@ import { ComputedMetricsProvider } from "@/components/providers/computed-metrics
 import { TeamDetails } from "./team-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
-import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
+import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -85,14 +86,20 @@ export function TeamView({
   }), [registry, usedSlugs, openFormulaViewer]);
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-cards", x: 0, w: 12, h: 5, minH: 4 },
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
+  ], []);
 
   const metricCards: MetricCardConfig[] = useMemo(() => [
     {
@@ -122,7 +129,22 @@ export function TeamView({
   ], [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount]);
 
   const widgets = useMemo(() => ({
-    "metric-cards": <MetricCardsGrid cards={metricCards} gap={6} />,
+    ...Object.fromEntries(
+      metricCards.map((card, i) => [
+        `metric-${i}`,
+        <SwappableMetricCard
+          key={`metric-${i}`}
+          slug={card.slug}
+          label={card.label}
+          value={card.value}
+          change={card.change}
+          description={card.description}
+          icon={card.icon}
+          trend={card.trend}
+          variant={card.variant}
+        />,
+      ])
+    ),
     "details": (
       <TeamDetails
         departmentBreakdown={departmentBreakdown}

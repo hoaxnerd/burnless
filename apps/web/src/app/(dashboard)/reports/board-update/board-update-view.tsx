@@ -190,56 +190,69 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "kpis", x: 0, w: 12, h: 5, minH: 4 },
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "revenue-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "pnl-table", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "revenue-section", x: 0, w: 6, h: 14, minH: 8 },
+    { i: "expenses-section", x: 0, w: 6, h: 14, minH: 8 },
+    { i: "cash-runway-section", x: 0, w: 6, h: 14, minH: 8 },
+    { i: "pnl-table", x: 0, w: 6, h: 16, minH: 8 },
+  ], []);
 
   const widgets = useMemo(() => ({
-    "kpis": (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-3">
-        <SwappableMetricCard
-          slug="revenue"
-          pageId="reports/board-update"
-          label="Revenue"
-          value={formatCompactCurrency(d.revenue.current)}
-          change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
-          description="MoM"
-          trend={d.revenue.growthPercent > 1 ? "up" : d.revenue.growthPercent < -1 ? "down" : "flat"}
-          variant={d.revenue.growthPercent > 5 ? "success" : d.revenue.growthPercent < 0 ? "danger" : "default"}
-        />
-        <SwappableMetricCard
-          slug="netBurn"
-          pageId="reports/board-update"
-          label="Net Burn"
-          value={formatCompactCurrency(d.cash.burnRate)}
-          description="/month"
-          variant={d.cash.burnRate > 0 ? "warning" : "success"}
-        />
-        <SwappableMetricCard
-          slug="cash"
-          pageId="reports/board-update"
-          label="Cash"
-          value={formatCompactCurrency(d.cash.position)}
-          description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
-          variant={d.cash.runway < 6 ? "danger" : d.cash.runway < 12 ? "warning" : "success"}
-        />
-        <SwappableMetricCard
-          slug="grossMargin"
-          pageId="reports/board-update"
-          label="Gross Margin"
-          value={`${d.profitability.grossMargin.toFixed(1)}%`}
-          description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}
-          variant={d.profitability.grossMargin >= 60 ? "success" : d.profitability.grossMargin >= 40 ? "default" : "danger"}
-        />
-      </div>
+    "metric-0": (
+      <SwappableMetricCard
+        slug="revenue"
+        pageId="reports/board-update"
+        label="Revenue"
+        value={formatCompactCurrency(d.revenue.current)}
+        change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
+        description="MoM"
+        trend={d.revenue.growthPercent > 1 ? "up" : d.revenue.growthPercent < -1 ? "down" : "flat"}
+        variant={d.revenue.growthPercent > 5 ? "success" : d.revenue.growthPercent < 0 ? "danger" : "default"}
+      />
+    ),
+    "metric-1": (
+      <SwappableMetricCard
+        slug="netBurn"
+        pageId="reports/board-update"
+        label="Net Burn"
+        value={formatCompactCurrency(d.cash.burnRate)}
+        description="/month"
+        variant={d.cash.burnRate > 0 ? "warning" : "success"}
+      />
+    ),
+    "metric-2": (
+      <SwappableMetricCard
+        slug="cash"
+        pageId="reports/board-update"
+        label="Cash"
+        value={formatCompactCurrency(d.cash.position)}
+        description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
+        variant={d.cash.runway < 6 ? "danger" : d.cash.runway < 12 ? "warning" : "success"}
+      />
+    ),
+    "metric-3": (
+      <SwappableMetricCard
+        slug="grossMargin"
+        pageId="reports/board-update"
+        label="Gross Margin"
+        value={`${d.profitability.grossMargin.toFixed(1)}%`}
+        description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}
+        variant={d.profitability.grossMargin >= 60 ? "success" : d.profitability.grossMargin >= 40 ? "default" : "danger"}
+      />
     ),
     "revenue-section": (
       <ReportSection

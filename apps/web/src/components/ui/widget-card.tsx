@@ -134,7 +134,7 @@ export function WidgetCard({
         hover:border-surface-300 hover-lift
         ${stagger != null ? `animate-slide-up stagger-${stagger}` : ""}
         ${onClick ? "cursor-pointer" : ""}
-        ${isFloating ? "overflow-visible" : ""}
+        ${""}
         ${className}
       `
       }
@@ -144,7 +144,7 @@ export function WidgetCard({
         <div
           className={
             isFloating
-              ? "absolute -top-3 right-3 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200"
+              ? "absolute -top-1 right-2 z-20 rounded-full bg-surface-0 ring-1 ring-surface-200 shadow-sm"
               : "absolute top-3 right-3 z-10"
           }
           onMouseDown={() => {

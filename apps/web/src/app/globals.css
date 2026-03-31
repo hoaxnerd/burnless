@@ -625,6 +625,8 @@ a,
   border-color: rgb(252 165 165 / 0.8) !important;
 }
 
+/* ── Grid Layout: settings button is now inside card boundary (no overflow needed) ── */
+
 /* ── Print Styles ──────────────────────────────────────────────────────────── */
 @media print {
   body {

@@ -13,7 +13,8 @@ import { RevenueInsights } from "./revenue-insights";
 import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
-import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
+import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
@@ -63,7 +64,10 @@ export function RevenueView({
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-cards",  x: 0, w: 12, h: 5, minH: 4 },
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",   x: 0, w: 12, h: 4, minH: 3 },
     { i: "insights",      x: 0, w: 12, h: 4, minH: 3 },
     { i: "trend-charts",  x: 0, w: 12, h: 12, minH: 8 },
@@ -71,10 +75,17 @@ export function RevenueView({
     { i: "stream-breakdown", x: 0, w: 12, h: 14, minH: 8 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "ai-insights",   x: 0, w: 6, h: 4, minH: 3 },
+    { i: "insights",      x: 0, w: 6, h: 4, minH: 3 },
+    { i: "trend-charts",  x: 0, w: 6, h: 12, minH: 8 },
+    { i: "waterfall",     x: 0, w: 6, h: 10, minH: 6 },
+    { i: "stream-breakdown", x: 0, w: 6, h: 14, minH: 8 },
+  ], []);
 
   const metricCards: MetricCardConfig[] = useMemo(() => {
     const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
@@ -149,7 +160,22 @@ export function RevenueView({
   }, [g, hasSaaS, revenueDetails.streamCount]);
 
   const widgets = useMemo(() => ({
-    "metric-cards": <MetricCardsGrid cards={metricCards} />,
+    ...Object.fromEntries(
+      metricCards.map((card, i) => [
+        `metric-${i}`,
+        <SwappableMetricCard
+          key={`metric-${i}`}
+          slug={card.slug}
+          label={card.label}
+          value={card.value}
+          change={card.change}
+          description={card.description}
+          icon={card.icon}
+          trend={card.trend}
+          variant={card.variant}
+        />,
+      ])
+    ),
     "ai-insights": (
       <AiPageInsights
         page="revenue"

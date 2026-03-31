@@ -9,7 +9,8 @@ import { ComputedMetricsProvider } from "@/components/providers/computed-metrics
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
-import { MetricCardsGrid, type MetricCardConfig } from "@/components/ui/metric-cards-grid";
+import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
+import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
@@ -104,16 +105,25 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "export",        x: 0,  w: 12, h: 2, minH: 2 },
-    { i: "metric-cards",  x: 0,  w: 12, h: 5, minH: 4 },
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "cash-charts",   x: 0,  w: 12, h: 12, minH: 8 },
     { i: "burn-chart",    x: 0,  w: 12, h: 12, minH: 8 },
     { i: "warning",       x: 0,  w: 12, h: 3, minH: 2 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "export",        x: 0,  w: 6, h: 2, minH: 2 },
+    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "cash-charts",   x: 0,  w: 6, h: 12, minH: 8 },
+    { i: "burn-chart",    x: 0,  w: 6, h: 12, minH: 8 },
+    { i: "warning",       x: 0,  w: 6, h: 3, minH: 2 },
+  ], []);
 
   const metricCards: MetricCardConfig[] = useMemo(() => [
     {
@@ -147,7 +157,22 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
       </div>
     ),
-    "metric-cards": <MetricCardsGrid cards={metricCards} />,
+    ...Object.fromEntries(
+      metricCards.map((card, i) => [
+        `metric-${i}`,
+        <SwappableMetricCard
+          key={`metric-${i}`}
+          slug={card.slug}
+          label={card.label}
+          value={card.value}
+          change={card.change}
+          description={card.description}
+          icon={card.icon}
+          trend={card.trend}
+          variant={card.variant}
+        />,
+      ])
+    ),
     "cash-charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard title="Cash Position Over Time" subtitle="Projected ending cash balance">
