@@ -6,16 +6,21 @@
  * Bridges the DashboardIntelligenceProvider context with the
  * props-driven PageGrid component. Generates hero card layout items
  * and appends the standard non-hero widget layouts.
+ *
+ * Layout state (savedLayout, closedWidgets, widgetReadiness, isEditMode)
+ * comes from PageLayoutProvider via usePageLayoutContext().
+ * Card state (heroCards, secondaryMetrics) comes from DashboardLayoutContext.
  */
 
 import { type ReactNode, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageGrid, type DefaultLayoutItem, type PageWidgetLayout } from "@/components/ui/page-grid";
 import { PageProvider } from "@/components/providers/page-context";
+import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
-import { useDashboardLayout, type WidgetLayout } from "./dashboard-layout-context";
+import { useDashboardLayout } from "./dashboard-layout-context";
 
 // ── Widget ID type ──────────────────────────────────────────────────────────
 
@@ -77,29 +82,6 @@ function generateHeroItems(heroCount: number, cols: number): DefaultLayoutItem[]
   return items;
 }
 
-/** Convert WidgetLayout (dashboard context type) ↔ PageWidgetLayout */
-function toPageLayout(wl: WidgetLayout[]): PageWidgetLayout[] {
-  return wl.map((item) => ({
-    widgetId: item.widgetId,
-    x: item.x,
-    y: item.y,
-    w: item.w,
-    h: item.h,
-    autoH: item.autoH,
-  }));
-}
-
-function toWidgetLayout(pl: PageWidgetLayout[]): WidgetLayout[] {
-  return pl.map((item) => ({
-    widgetId: item.widgetId,
-    x: item.x,
-    y: item.y,
-    w: item.w,
-    h: item.h,
-    autoH: item.autoH,
-  }));
-}
-
 // ── Main Component ──────────────────────────────────────────────────────────
 
 interface DashboardGridProps {
@@ -110,21 +92,17 @@ interface DashboardGridProps {
 export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProps) {
   const router = useRouter();
   const { registry, openFormulaViewer } = useMetrics();
+
+  // Layout state from PageLayoutProvider
+  const pageLayout = usePageLayoutContext();
+
+  // Card state from DashboardLayoutContext
   const {
-    layout: savedLayout,
-    reorderLayout,
-    isLoading,
     heroCards,
     secondaryMetrics,
     addSecondaryMetric,
     removeSecondaryMetric,
     swapHeroCard,
-    isEditMode,
-    setIsEditMode,
-    widgetReadiness,
-    closedWidgets,
-    closeWidget,
-    openWidget,
   } = useDashboardLayout();
 
   const allUsedSlugs = useMemo(
@@ -164,8 +142,6 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     [heroCount]
   );
 
-  const pageLayout = useMemo(() => toPageLayout(savedLayout), [savedLayout]);
-
   return (
     <PageProvider pageId="dashboard">
       <CardCatalogProvider value={catalogValue}>
@@ -173,17 +149,17 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
           widgets={widgets as Record<string, ReactNode>}
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
-          savedLayout={pageLayout}
-          onLayoutChange={(layout) => reorderLayout(toWidgetLayout(layout))}
-          closedWidgets={closedWidgets}
-          onCloseWidget={closeWidget}
-          onOpenWidget={openWidget}
-          onReset={() => { reorderLayout([]); setIsEditMode(false); }}
-          widgetReadiness={widgetReadiness}
-          isLoading={isLoading}
+          savedLayout={pageLayout.savedLayout}
+          onLayoutChange={pageLayout.onLayoutChange}
+          closedWidgets={pageLayout.closedWidgets}
+          onCloseWidget={pageLayout.onCloseWidget}
+          onOpenWidget={pageLayout.onOpenWidget}
+          onReset={pageLayout.onReset}
+          widgetReadiness={pageLayout.widgetReadiness}
+          isLoading={pageLayout.isLoading}
           staticHiddenWidgets={hiddenWidgets}
-          isEditMode={isEditMode}
-          setIsEditMode={setIsEditMode}
+          isEditMode={pageLayout.isEditMode}
+          setIsEditMode={pageLayout.setIsEditMode}
         />
       </CardCatalogProvider>
     </PageProvider>

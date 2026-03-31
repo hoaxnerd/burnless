@@ -32,6 +32,7 @@ import { QuickActions } from "./quick-actions";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
 import { DashboardLayoutProvider } from "./dashboard-layout-context";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { DashboardHeader } from "./dashboard-header";
 import { CustomizableMetrics } from "./customizable-metrics";
 import { StatsCatalog } from "./stats-catalog";
@@ -40,6 +41,7 @@ import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
 import { ScenariosWidget } from "./scenarios-widget";
+import type { PageWidgetLayout } from "@/components/ui/page-grid";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
@@ -138,37 +140,54 @@ export default async function DashboardPage({
     headcountDelta: currentHeadcount - prevHeadcount,
   };
 
-  return (
-    <DashboardLayoutProvider
-      initialPreferences={dashPrefs ? {
-        heroCards: (dashPrefs.heroCards as string[]) ?? [],
-        secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
-        layout: (dashPrefs.layout as Array<{ widgetId: string; x: number; y: number; w: number; h: number; autoH?: boolean }>) ?? [],
-        customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
-        closedWidgets: (dashPrefs.closedWidgets as string[]) ?? [],
-      } : null}
-    >
-      <div>
-        {/* Header with Mode Switcher — always above the grid */}
-        <DashboardHeader
-          companyName={company.name}
-          hasData={hasData}
-          boardData={boardData}
-        />
+  // Resolve initial layout for PageLayoutProvider — check pageLayouts.dashboard
+  // first, then fall back to legacy root-level layout for backward compat.
+  const pageLayoutData = (dashPrefs?.pageLayouts as Record<string, { layout?: unknown[]; closedWidgets?: string[] }> | undefined)?.dashboard;
+  const initialLayout: PageWidgetLayout[] | undefined = pageLayoutData?.layout
+    ? (pageLayoutData.layout as PageWidgetLayout[])
+    : dashPrefs?.layout
+      ? (dashPrefs.layout as PageWidgetLayout[])
+      : undefined;
+  const initialClosedWidgets: string[] | undefined = pageLayoutData?.closedWidgets
+    ? pageLayoutData.closedWidgets
+    : dashPrefs?.closedWidgets
+      ? (dashPrefs.closedWidgets as string[])
+      : undefined;
 
-        {!hasData ? (
-          <>
-            {/* Hero KPI Cards — ghost state when no data, auto-swap in Dynamic mode */}
-            <HeroCardGrid cards={heroCards} swaps={heroSwapCards} allPopulated={false} />
-            <DashboardEmptyState
-              companyName={company.name}
-              hasExpenses={hasExpenses}
-              hasRevenue={hasRevenue}
-              hasFunding={hasFunding}
-            />
-          </>
-        ) : (
-          <DashboardGrid
+  return (
+    <PageLayoutProvider
+      pageId="dashboard"
+      initialLayout={initialLayout}
+      initialClosedWidgets={initialClosedWidgets}
+    >
+      <DashboardLayoutProvider
+        initialPreferences={dashPrefs ? {
+          heroCards: (dashPrefs.heroCards as string[]) ?? [],
+          secondaryMetrics: (dashPrefs.secondaryMetrics as string[]) ?? [],
+          customMetrics: (dashPrefs.customMetrics as Array<{ id: string; name: string; formula: string; dependsOn: string[] }>) ?? [],
+        } : null}
+      >
+        <div>
+          {/* Header with Mode Switcher — always above the grid */}
+          <DashboardHeader
+            companyName={company.name}
+            hasData={hasData}
+            boardData={boardData}
+          />
+
+          {!hasData ? (
+            <>
+              {/* Hero KPI Cards — ghost state when no data, auto-swap in Dynamic mode */}
+              <HeroCardGrid cards={heroCards} swaps={heroSwapCards} allPopulated={false} />
+              <DashboardEmptyState
+                companyName={company.name}
+                hasExpenses={hasExpenses}
+                hasRevenue={hasRevenue}
+                hasFunding={hasFunding}
+              />
+            </>
+          ) : (
+            <DashboardGrid
             widgets={{
               /* ── Individual Hero KPI Cards ─────────────────────────── */
               ...Object.fromEntries(
@@ -317,12 +336,13 @@ export default async function DashboardPage({
           />
         )}
 
-        {/* Stats Catalog Slide-over */}
-        <StatsCatalog />
+          {/* Stats Catalog Slide-over */}
+          <StatsCatalog />
 
-        {/* Formula Dependency Viewer */}
-        <FormulaViewer />
-      </div>
-    </DashboardLayoutProvider>
+          {/* Formula Dependency Viewer */}
+          <FormulaViewer />
+        </div>
+      </DashboardLayoutProvider>
+    </PageLayoutProvider>
   );
 }

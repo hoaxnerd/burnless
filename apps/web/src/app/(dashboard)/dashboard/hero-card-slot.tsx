@@ -8,7 +8,7 @@
 
 import { useEffect } from "react";
 import { useMetrics } from "@/components/providers/metrics-context";
-import { useDashboardLayout } from "./dashboard-layout-context";
+import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { HeroKpiCard, type HeroKpiCardProps, type KpiVariant } from "./hero-kpi-card";
 
 export interface HeroCardSlotProps {
@@ -35,7 +35,7 @@ export function HeroCardSlot({
   swapProps,
 }: HeroCardSlotProps) {
   const { mode } = useMetrics();
-  const { reportWidgetReady, reportWidgetNotReady } = useDashboardLayout();
+  const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
 
   // Report readiness based on data availability
   const isReady = !(mode === "dynamic" && !hasData && !swapProps);

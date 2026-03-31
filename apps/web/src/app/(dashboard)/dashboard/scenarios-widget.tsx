@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { useDashboardLayout } from "./dashboard-layout-context";
+import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 
 interface Scenario {
   id: string;
@@ -15,7 +15,7 @@ interface ScenariosWidgetProps {
 }
 
 export function ScenariosWidget({ scenarios }: ScenariosWidgetProps) {
-  const { reportWidgetReady, reportWidgetNotReady } = useDashboardLayout();
+  const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
 
   const isEmpty = scenarios.length === 0;
   useEffect(() => {

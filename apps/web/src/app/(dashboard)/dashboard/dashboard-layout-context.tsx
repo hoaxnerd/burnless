@@ -1,12 +1,15 @@
 "use client";
 
 /**
- * DashboardLayoutContext — dashboard-page-only context for hero cards,
- * secondary metrics, widget layout, edit mode, and widget lifecycle.
+ * DashboardLayoutContext — dashboard-page-only context for hero cards
+ * and secondary metrics management.
+ *
+ * Layout concerns (savedLayout, closedWidgets, widgetReadiness, isEditMode)
+ * are managed by PageLayoutProvider. This context handles only
+ * dashboard card configuration.
  *
  * Card mode, catalog state, and formula viewer live in MetricsContext
- * (the app-wide single source of truth). This context handles only
- * dashboard layout/card management.
+ * (the app-wide single source of truth).
  */
 
 import {
@@ -23,32 +26,19 @@ import {
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
 } from "@burnless/engine";
-import { useMetrics, type CardMode } from "@/components/providers/metrics-context";
+import { useMetrics } from "@/components/providers/metrics-context";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface WidgetLayout {
-  widgetId: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** true (default) = content-driven height; false = user-locked via resize */
-  autoH?: boolean;
-}
-
-export interface DashboardLayoutPreferences {
+export interface DashboardCardPreferences {
   heroCards: string[];
   secondaryMetrics: string[];
-  layout: WidgetLayout[];
   customMetrics: Array<{
     id: string;
     name: string;
     formula: string;
     dependsOn: string[];
   }>;
-  /** Widget IDs the user has explicitly closed/hidden */
-  closedWidgets: string[];
 }
 
 export interface DashboardLayoutState {
@@ -72,34 +62,12 @@ export interface DashboardLayoutState {
   swapSecondaryMetric: (oldSlug: string, newSlug: string) => void;
   /** Reorder secondary metrics */
   reorderSecondaryMetrics: (metrics: string[]) => void;
-  /** Dashboard widget layout order */
-  layout: WidgetLayout[];
-  /** Reorder widgets by providing new ordered list */
-  reorderLayout: (layout: WidgetLayout[]) => void;
   /** Whether any card uses Intelligence mode (global or per-card override) */
   hasIntelligenceCards: boolean;
-  /** Whether preferences are being saved */
+  /** Whether card preferences are being saved */
   isSaving: boolean;
-  /** Whether the dashboard is in edit/drag mode (transient, not persisted) */
-  isEditMode: boolean;
-  /** Toggle edit/drag mode */
-  setIsEditMode: (editing: boolean) => void;
-  /** Widget readiness — false means no data yet (transient, widget-reported) */
-  widgetReadiness: Record<string, boolean>;
-  /** Widget reports it has data and is ready to display */
-  reportWidgetReady: (id: string) => void;
-  /** Widget reports it has no data / is not ready */
-  reportWidgetNotReady: (id: string) => void;
-  /** Widget IDs the user has explicitly closed (persistent) */
-  closedWidgets: string[];
-  /** Close/hide a widget (user action, persisted) */
-  closeWidget: (id: string) => void;
-  /** Reopen a closed widget */
-  openWidget: (id: string) => void;
-  /** Reset to defaults */
+  /** Reset card configuration to defaults */
   resetToDefaults: () => void;
-  /** Whether layout data is loading */
-  isLoading: boolean;
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -119,7 +87,7 @@ export function useDashboardLayout(): DashboardLayoutState {
 interface ProviderProps {
   children: ReactNode;
   /** Server-side initial preferences (avoids loading flash) */
-  initialPreferences?: DashboardLayoutPreferences | null;
+  initialPreferences?: DashboardCardPreferences | null;
 }
 
 export function DashboardLayoutProvider({
@@ -128,26 +96,9 @@ export function DashboardLayoutProvider({
 }: ProviderProps) {
   const { mode } = useMetrics();
 
-  const [isLoading, setIsLoading] = useState(!initialPreferences);
   const [isSaving, setIsSaving] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Widget readiness — transient, widget self-reports
-  const [widgetReadiness, setWidgetReadiness] = useState<Record<string, boolean>>({});
-  const reportWidgetReady = useCallback((id: string) => {
-    setWidgetReadiness((prev) => {
-      if (prev[id] === true) return prev;
-      return { ...prev, [id]: true };
-    });
-  }, []);
-  const reportWidgetNotReady = useCallback((id: string) => {
-    setWidgetReadiness((prev) => {
-      if (prev[id] === false) return prev;
-      return { ...prev, [id]: false };
-    });
-  }, []);
-
-  const [prefs, setPrefs] = useState<DashboardLayoutPreferences>(() => ({
+  const [prefs, setPrefs] = useState<DashboardCardPreferences>(() => ({
     heroCards:
       initialPreferences?.heroCards?.length
         ? initialPreferences.heroCards
@@ -156,9 +107,7 @@ export function DashboardLayoutProvider({
       initialPreferences?.secondaryMetrics?.length
         ? initialPreferences.secondaryMetrics
         : DEFAULT_SECONDARY_METRICS,
-    layout: initialPreferences?.layout ?? [],
     customMetrics: initialPreferences?.customMetrics ?? [],
-    closedWidgets: initialPreferences?.closedWidgets ?? [],
   }));
 
   // Load preferences from API if not provided server-side
@@ -174,13 +123,10 @@ export function DashboardLayoutProvider({
           secondaryMetrics: data.secondaryMetrics?.length
             ? data.secondaryMetrics
             : DEFAULT_SECONDARY_METRICS,
-          layout: data.layout ?? [],
           customMetrics: data.customMetrics ?? [],
-          closedWidgets: data.closedWidgets ?? [],
         });
-        setIsLoading(false);
       })
-      .catch(() => setIsLoading(false));
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [initialPreferences]);
 
@@ -195,11 +141,16 @@ export function DashboardLayoutProvider({
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  // Save preferences to API with retry
+  // Save card preferences to API with retry
   const savePrefs = useCallback(
-    (updated: DashboardLayoutPreferences): Promise<void> => {
+    (updated: DashboardCardPreferences): Promise<void> => {
       setIsSaving(true);
-      const body = JSON.stringify(updated);
+      // Only save card-related fields — layout is managed by PageLayoutProvider
+      const body = JSON.stringify({
+        heroCards: updated.heroCards,
+        secondaryMetrics: updated.secondaryMetrics,
+        customMetrics: updated.customMetrics,
+      });
 
       const attempt = (retries: number, delay: number): Promise<void> =>
         fetch("/api/dashboard-preferences", {
@@ -219,7 +170,7 @@ export function DashboardLayoutProvider({
               setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
             );
           }
-          console.error("Failed to save dashboard layout:", err);
+          console.error("Failed to save dashboard card preferences:", err);
         });
 
       isSavePendingRef.current = true;
@@ -240,8 +191,8 @@ export function DashboardLayoutProvider({
   );
 
   const updatePrefs = useCallback(
-    (updater: (prev: DashboardLayoutPreferences) => DashboardLayoutPreferences): Promise<void> => {
-      let next: DashboardLayoutPreferences | undefined;
+    (updater: (prev: DashboardCardPreferences) => DashboardCardPreferences): Promise<void> => {
+      let next: DashboardCardPreferences | undefined;
       setPrefs((prev) => {
         next = updater(prev);
         return next;
@@ -320,37 +271,12 @@ export function DashboardLayoutProvider({
     [updatePrefs]
   );
 
-  const reorderLayout = useCallback(
-    (layout: WidgetLayout[]) => updatePrefs((p) => ({ ...p, layout })),
-    [updatePrefs]
-  );
-
-  const closeWidget = useCallback(
-    (id: string) =>
-      updatePrefs((p) => ({
-        ...p,
-        closedWidgets: p.closedWidgets.includes(id) ? p.closedWidgets : [...p.closedWidgets, id],
-      })),
-    [updatePrefs]
-  );
-
-  const openWidget = useCallback(
-    (id: string) =>
-      updatePrefs((p) => ({
-        ...p,
-        closedWidgets: p.closedWidgets.filter((w) => w !== id),
-      })),
-    [updatePrefs]
-  );
-
   const resetToDefaults = useCallback(
     () =>
       updatePrefs(() => ({
         heroCards: DEFAULT_HERO_CARDS,
         secondaryMetrics: DEFAULT_SECONDARY_METRICS,
-        layout: [],
         customMetrics: [],
-        closedWidgets: [],
       })),
     [updatePrefs]
   );
@@ -373,26 +299,13 @@ export function DashboardLayoutProvider({
       swapSecondaryMetric,
       removeSecondaryMetric,
       reorderSecondaryMetrics,
-      layout: prefs.layout,
-      reorderLayout,
       hasIntelligenceCards,
       isSaving,
-      isEditMode,
-      setIsEditMode,
-      widgetReadiness,
-      reportWidgetReady,
-      reportWidgetNotReady,
-      closedWidgets: prefs.closedWidgets,
-      closeWidget,
-      openWidget,
       resetToDefaults,
-      isLoading,
     }),
     [
       prefs.heroCards,
       prefs.secondaryMetrics,
-      prefs.layout,
-      prefs.closedWidgets,
       hasIntelligenceCards,
       swapHeroCard,
       addHeroCard,
@@ -402,17 +315,8 @@ export function DashboardLayoutProvider({
       swapSecondaryMetric,
       removeSecondaryMetric,
       reorderSecondaryMetrics,
-      reorderLayout,
-      closeWidget,
-      openWidget,
       isSaving,
-      isEditMode,
-      setIsEditMode,
-      widgetReadiness,
-      reportWidgetReady,
-      reportWidgetNotReady,
       resetToDefaults,
-      isLoading,
     ]
   );
 

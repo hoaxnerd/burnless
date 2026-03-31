@@ -42,6 +42,21 @@ export const GET = withErrorHandler(async () => {
     pageLayouts: {},
   };
 
+  // Backward compat: if root-level layout exists but pageLayouts.dashboard doesn't,
+  // copy it over so PageLayoutProvider can read it
+  if (
+    (data.layout as unknown[])?.length &&
+    !(data.pageLayouts as Record<string, unknown>)?.dashboard
+  ) {
+    (data as Record<string, unknown>).pageLayouts = {
+      ...((data.pageLayouts as Record<string, unknown>) ?? {}),
+      dashboard: {
+        layout: data.layout,
+        closedWidgets: (data.closedWidgets as string[]) ?? [],
+      },
+    };
+  }
+
   // Compute whether any card uses Intelligence mode — server-side equivalent
   // of the client-side hasIntelligenceCards in dashboard-intelligence-context.tsx.
   // Used to gate AI card processing: when false, no Intelligence pipeline runs.
