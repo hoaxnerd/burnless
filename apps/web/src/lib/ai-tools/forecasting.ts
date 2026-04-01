@@ -2,9 +2,9 @@
  * Forecast line creation, revenue forecasting, and financial statement generation.
  */
 
-import { db } from "@burnless/db";
-import { forecastLines, scenarios } from "@burnless/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { forecastLines } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
@@ -35,7 +35,6 @@ export const deleteForecastLineSchema = z.object({
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 export const createForecastLineSchema = z.object({
-  scenarioId: optionalId,
   accountId: idString,
   method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]),
   parameters: z.record(z.unknown()).default({}),
@@ -61,19 +60,15 @@ async function createForecastLine(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof createForecastLineSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
 
-  const [row] = await db
-    .insert(forecastLines)
-    .values({
-      scenarioId,
-      accountId: data.accountId,
-      method: data.method,
-      parameters: data.parameters,
-      startDate: new Date(data.startDate),
-      endDate: data.endDate ? new Date(data.endDate) : null,
-    })
-    .returning();
+  const row = await scenarioInsert("forecast_line", forecastLines, {
+    companyId: context.companyId,
+    accountId: data.accountId,
+    method: data.method,
+    parameters: data.parameters,
+    startDate: new Date(data.startDate),
+    endDate: data.endDate ? new Date(data.endDate) : null,
+  }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -236,11 +231,11 @@ async function updateForecastLine(
 ): Promise<string> {
   const data = input as z.infer<typeof updateForecastLineSchema>;
 
+  // Verify ownership
   const [existing] = await db
-    .select({ id: forecastLines.id, accountId: forecastLines.accountId })
+    .select({ id: forecastLines.id, accountId: forecastLines.accountId, companyId: forecastLines.companyId })
     .from(forecastLines)
-    .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
-    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
@@ -255,7 +250,7 @@ async function updateForecastLine(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(forecastLines).set(updates).where(eq(forecastLines.id, data.id));
+  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -269,16 +264,16 @@ async function deleteForecastLine(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteForecastLineSchema>;
 
+  // Verify ownership
   const [existing] = await db
-    .select({ id: forecastLines.id, accountId: forecastLines.accountId })
+    .select({ id: forecastLines.id, accountId: forecastLines.accountId, companyId: forecastLines.companyId })
     .from(forecastLines)
-    .innerJoin(scenarios, eq(forecastLines.scenarioId, scenarios.id))
-    .where(and(eq(forecastLines.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
 
-  await db.delete(forecastLines).where(eq(forecastLines.id, data.id));
+  await scenarioDelete("forecast_line", forecastLines, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,

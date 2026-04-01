@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db } from "@burnless/db";
+import { db, getOverrideCount } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc, gte, sql } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
@@ -139,11 +139,18 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   // Build financial context
-  const { contextText } = await buildAiContext(ctx.companyId, {
+  const { contextText: baseContextText } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
-    type: scenario.type,
+    type: scenario.source ?? "blank",
   });
+
+  // Inject scenario override context when a scenario is active
+  const overrideCount = await getOverrideCount(scenario.id);
+  const scenarioContext = overrideCount > 0
+    ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
+    : "";
+  const contextText = scenarioContext + baseContextText;
 
   // Load company's custom AI provider config (if any)
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);

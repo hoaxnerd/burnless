@@ -3,7 +3,7 @@
  * report narratives, cost analysis, and account management tools.
  */
 
-import { db } from "@burnless/db";
+import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { financialAccounts } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -145,15 +145,13 @@ async function createAccount(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof createAccountSchema>;
-  const [row] = await db
-    .insert(financialAccounts)
-    .values({
-      companyId: context.companyId,
-      name: data.name,
-      type: data.type,
-      category: data.category,
-    })
-    .returning();
+
+  const row = await scenarioInsert("financial_account", financialAccounts, {
+    companyId: context.companyId,
+    name: data.name,
+    type: data.type,
+    category: data.category,
+  }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -394,7 +392,7 @@ async function updateAccount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(financialAccounts).set(updates).where(eq(financialAccounts.id, data.id));
+  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -419,7 +417,7 @@ async function deleteAccount(
     return JSON.stringify({ success: false, error: "Cannot delete system accounts" });
   }
 
-  await db.delete(financialAccounts).where(eq(financialAccounts.id, data.id));
+  await scenarioDelete("financial_account", financialAccounts, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,

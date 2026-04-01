@@ -2,15 +2,14 @@
  * Revenue modeling, funding rounds, and dilution tools — full CRUD.
  */
 
-import { db } from "@burnless/db";
-import { revenueStreams, fundingRounds, scenarios } from "@burnless/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { revenueStreams, fundingRounds } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   nameString,
   idString,
-  optionalId,
   financialAmount,
   percentFraction,
   dateString,
@@ -19,7 +18,6 @@ import {
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 export const addRevenueStreamSchema = z.object({
-  scenarioId: optionalId,
   name: nameString,
   type: z.enum(["subscription", "one_time", "usage_based", "services"]),
   parameters: z.record(z.unknown()).default({}),
@@ -80,17 +78,13 @@ async function addRevenueStream(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addRevenueStreamSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
 
-  const [row] = await db
-    .insert(revenueStreams)
-    .values({
-      scenarioId,
-      name: data.name,
-      type: data.type,
-      parameters: data.parameters,
-    })
-    .returning();
+  const row = await scenarioInsert("revenue_stream", revenueStreams, {
+    companyId: context.companyId,
+    name: data.name,
+    type: data.type,
+    parameters: data.parameters,
+  }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -104,19 +98,17 @@ async function addFundingRound(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addFundingRoundSchema>;
-  const [row] = await db
-    .insert(fundingRounds)
-    .values({
-      companyId: context.companyId,
-      name: data.name,
-      type: data.type,
-      amount: String(data.amount),
-      date: new Date(data.date),
-      preMoneyValuation: data.preMoneyValuation ? String(data.preMoneyValuation) : null,
-      dilutionPercent: data.dilutionPercent ? String(data.dilutionPercent) : null,
-      isProjected: data.isProjected,
-    })
-    .returning();
+
+  const row = await scenarioInsert("funding_round", fundingRounds, {
+    companyId: context.companyId,
+    name: data.name,
+    type: data.type,
+    amount: String(data.amount),
+    date: new Date(data.date),
+    preMoneyValuation: data.preMoneyValuation ? String(data.preMoneyValuation) : null,
+    dilutionPercent: data.dilutionPercent ? String(data.dilutionPercent) : null,
+    isProjected: data.isProjected,
+  }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -183,11 +175,11 @@ async function updateRevenueStream(
 ): Promise<string> {
   const data = input as z.infer<typeof updateRevenueStreamSchema>;
 
+  // Verify ownership
   const [existing] = await db
-    .select({ id: revenueStreams.id, name: revenueStreams.name })
+    .select({ id: revenueStreams.id, name: revenueStreams.name, companyId: revenueStreams.companyId })
     .from(revenueStreams)
-    .innerJoin(scenarios, eq(revenueStreams.scenarioId, scenarios.id))
-    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
@@ -201,7 +193,7 @@ async function updateRevenueStream(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(revenueStreams).set(updates).where(eq(revenueStreams.id, data.id));
+  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -215,16 +207,16 @@ async function deleteRevenueStream(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteRevenueStreamSchema>;
 
+  // Verify ownership
   const [existing] = await db
-    .select({ id: revenueStreams.id, name: revenueStreams.name })
+    .select({ id: revenueStreams.id, name: revenueStreams.name, companyId: revenueStreams.companyId })
     .from(revenueStreams)
-    .innerJoin(scenarios, eq(revenueStreams.scenarioId, scenarios.id))
-    .where(and(eq(revenueStreams.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
 
-  await db.delete(revenueStreams).where(eq(revenueStreams.id, data.id));
+  await scenarioDelete("revenue_stream", revenueStreams, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -259,7 +251,7 @@ async function updateFundingRound(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(fundingRounds).set(updates).where(eq(fundingRounds.id, data.id));
+  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -281,7 +273,7 @@ async function deleteFundingRound(
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
 
-  await db.delete(fundingRounds).where(eq(fundingRounds.id, data.id));
+  await scenarioDelete("funding_round", fundingRounds, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,

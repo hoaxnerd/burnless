@@ -55,29 +55,31 @@ function isMutationTool(toolName: string): boolean {
   return MUTATION_TOOLS.has(toolName);
 }
 
-/** Maps mutation tool names to the cache tags they should invalidate. */
+/** Maps mutation tool names to the cache tags they should invalidate.
+ *  Scenario-override changes also invalidate "scenario-overrides" so the
+ *  banner / diff views refresh. */
 const MUTATION_CACHE_TAGS: Record<string, string[]> = {
   create_scenario: ["scenarios"],
   update_scenario: ["scenarios"],
   delete_scenario: ["scenarios"],
-  add_headcount: ["headcount-plans"],
-  update_headcount: ["headcount-plans"],
-  delete_headcount: ["headcount-plans"],
-  create_department: ["departments"],
-  update_department: ["departments"],
-  delete_department: ["departments", "headcount-plans"],
-  add_revenue_stream: ["revenue-streams"],
-  update_revenue_stream: ["revenue-streams"],
-  delete_revenue_stream: ["revenue-streams"],
-  add_funding_round: ["funding-rounds"],
-  update_funding_round: ["funding-rounds"],
-  delete_funding_round: ["funding-rounds"],
-  create_forecast_line: ["forecast-lines"],
-  update_forecast_line: ["forecast-lines"],
-  delete_forecast_line: ["forecast-lines"],
-  create_account: ["accounts"],
-  update_account: ["accounts"],
-  delete_account: ["accounts"],
+  add_headcount: ["headcount-plans", "scenario-overrides"],
+  update_headcount: ["headcount-plans", "scenario-overrides"],
+  delete_headcount: ["headcount-plans", "scenario-overrides"],
+  create_department: ["departments", "scenario-overrides"],
+  update_department: ["departments", "scenario-overrides"],
+  delete_department: ["departments", "headcount-plans", "scenario-overrides"],
+  add_revenue_stream: ["revenue-streams", "scenario-overrides"],
+  update_revenue_stream: ["revenue-streams", "scenario-overrides"],
+  delete_revenue_stream: ["revenue-streams", "scenario-overrides"],
+  add_funding_round: ["funding-rounds", "scenario-overrides"],
+  update_funding_round: ["funding-rounds", "scenario-overrides"],
+  delete_funding_round: ["funding-rounds", "scenario-overrides"],
+  create_forecast_line: ["forecast-lines", "scenario-overrides"],
+  update_forecast_line: ["forecast-lines", "scenario-overrides"],
+  delete_forecast_line: ["forecast-lines", "scenario-overrides"],
+  create_account: ["accounts", "scenario-overrides"],
+  update_account: ["accounts", "scenario-overrides"],
+  delete_account: ["accounts", "scenario-overrides"],
 };
 
 function invalidateCacheForTool(toolName: string): void {

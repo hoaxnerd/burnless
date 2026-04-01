@@ -2,14 +2,13 @@
  * Headcount planning and department tools — CRUD operations.
  */
 
-import { db } from "@burnless/db";
-import { headcountPlans, departments, scenarios } from "@burnless/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { headcountPlans, departments } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   nameString,
-  optionalId,
   idString,
   headcount,
   salaryAmount,
@@ -21,7 +20,6 @@ import {
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 export const addHeadcountSchema = z.object({
-  scenarioId: optionalId,
   departmentId: idString,
   title: nameString,
   count: headcount,
@@ -66,21 +64,17 @@ async function addHeadcount(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addHeadcountSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
 
-  const [row] = await db
-    .insert(headcountPlans)
-    .values({
-      scenarioId,
-      departmentId: data.departmentId,
-      title: data.title,
-      count: data.count,
-      salary: String(data.salary),
-      startDate: new Date(data.startDate),
-      endDate: data.endDate ? new Date(data.endDate) : null,
-      benefitsRate: String(data.benefitsRate),
-    })
-    .returning();
+  const row = await scenarioInsert("headcount_plan", headcountPlans, {
+    companyId: context.companyId,
+    departmentId: data.departmentId,
+    title: data.title,
+    count: data.count,
+    salary: String(data.salary),
+    startDate: new Date(data.startDate),
+    endDate: data.endDate ? new Date(data.endDate) : null,
+    benefitsRate: String(data.benefitsRate),
+  }, context.scenarioId);
 
   const totalCost = data.count * data.salary * (1 + data.benefitsRate);
 
@@ -96,13 +90,11 @@ async function createDepartment(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof createDepartmentSchema>;
-  const [row] = await db
-    .insert(departments)
-    .values({
-      companyId: context.companyId,
-      name: data.name,
-    })
-    .returning();
+
+  const row = await scenarioInsert("department", departments, {
+    companyId: context.companyId,
+    name: data.name,
+  }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -117,12 +109,11 @@ async function updateHeadcount(
 ): Promise<string> {
   const data = input as z.infer<typeof updateHeadcountSchema>;
 
-  // Verify ownership via scenario -> company chain
+  // Verify ownership
   const [existing] = await db
-    .select({ id: headcountPlans.id, scenarioId: headcountPlans.scenarioId, title: headcountPlans.title })
+    .select({ id: headcountPlans.id, title: headcountPlans.title, companyId: headcountPlans.companyId })
     .from(headcountPlans)
-    .innerJoin(scenarios, eq(headcountPlans.scenarioId, scenarios.id))
-    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
@@ -140,7 +131,7 @@ async function updateHeadcount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(headcountPlans).set(updates).where(eq(headcountPlans.id, data.id));
+  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -154,16 +145,16 @@ async function deleteHeadcount(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteHeadcountSchema>;
 
+  // Verify ownership
   const [existing] = await db
-    .select({ id: headcountPlans.id, title: headcountPlans.title })
+    .select({ id: headcountPlans.id, title: headcountPlans.title, companyId: headcountPlans.companyId })
     .from(headcountPlans)
-    .innerJoin(scenarios, eq(headcountPlans.scenarioId, scenarios.id))
-    .where(and(eq(headcountPlans.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, context.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
 
-  await db.delete(headcountPlans).where(eq(headcountPlans.id, data.id));
+  await scenarioDelete("headcount_plan", headcountPlans, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -189,7 +180,7 @@ async function updateDepartment(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await db.update(departments).set({ name: data.name }).where(eq(departments.id, data.id));
+  await scenarioUpdate("department", departments, data.id, { name: data.name }, context.scenarioId);
 
   return JSON.stringify({
     success: true,
@@ -211,7 +202,7 @@ async function deleteDepartment(
     return JSON.stringify({ success: false, error: "Department not found or access denied" });
   }
 
-  await db.delete(departments).where(eq(departments.id, data.id));
+  await scenarioDelete("department", departments, data.id, context.scenarioId);
 
   return JSON.stringify({
     success: true,

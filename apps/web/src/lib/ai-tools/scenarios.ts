@@ -14,14 +14,12 @@ import { nameString, descriptionString, idString, sumValues } from "./types";
 
 export const createScenarioSchema = z.object({
   name: nameString,
-  type: z.enum(["base", "best", "worst", "custom"]),
   description: descriptionString,
 });
 
 export const updateScenarioSchema = z.object({
   id: idString,
   name: nameString.optional(),
-  type: z.enum(["base", "best", "worst", "custom"]).optional(),
   description: descriptionString,
 });
 
@@ -46,15 +44,16 @@ async function createScenario(
     .values({
       companyId: context.companyId,
       name: data.name,
-      type: data.type,
       description: data.description ?? null,
+      source: "ai",
+      aiConversationId: context.conversationId ?? null,
     })
     .returning();
 
   return JSON.stringify({
     success: true,
     scenarioId: row!.id,
-    message: `Created scenario "${row!.name}" (${row!.type}). ID: ${row!.id}`,
+    message: `Created scenario "${row!.name}". ID: ${row!.id}`,
   });
 }
 
@@ -106,7 +105,6 @@ async function updateScenario(
 
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;
-  if (data.type !== undefined) updates.type = data.type;
   if (data.description !== undefined) updates.description = data.description;
 
   if (Object.keys(updates).length === 0) {
@@ -133,7 +131,6 @@ async function deleteScenario(
   const data = input as z.infer<typeof deleteScenarioSchema>;
 
   // Verify ownership
-  // TODO(Task 7): Revisit deletion guard — isDefault no longer exists in overlay model
   const [existing] = await db
     .select({ id: scenarios.id, name: scenarios.name })
     .from(scenarios)
