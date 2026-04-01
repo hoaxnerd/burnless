@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { type CompanyProfile, type ConnectedIntegration, tabs } from "./settings-data";
 import { GeneralTab } from "./general-tab";
@@ -41,7 +42,7 @@ export default function SettingsPage() {
 
   // Load company profile
   useEffect(() => {
-    fetch("/api/company")
+    apiFetch("/api/company")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
@@ -64,7 +65,7 @@ export default function SettingsPage() {
 
   // Load integrations
   const loadIntegrations = useCallback(() => {
-    fetch("/api/integrations")
+    apiFetch("/api/integrations")
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         setConnectedIntegrations(data);
@@ -82,7 +83,7 @@ export default function SettingsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/company", {
+      const res = await apiFetch("/api/company", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(company),
@@ -103,7 +104,7 @@ export default function SettingsPage() {
 
   // Disconnect integration
   const disconnectIntegration = async (id: string) => {
-    const res = await fetch(`/api/integrations/${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/integrations/${id}`, { method: "DELETE" });
     if (res.ok) loadIntegrations();
   };
 

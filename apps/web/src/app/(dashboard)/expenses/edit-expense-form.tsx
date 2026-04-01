@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { validateField, validateAll, expenseFormSchema } from "@/lib/form-validation";
@@ -103,7 +104,7 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
         params.growthRate = Number(growthRate) / 100;
       }
 
-      const res = await fetch(`/api/forecast-lines/${item.id}`, {
+      const res = await apiFetch(`/api/forecast-lines/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -124,7 +125,7 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
 
         // Update the account's category if parent changed (operating_expense <-> cogs)
         if (parentCategory !== item.accountCategory) {
-          await fetch(`/api/accounts/${item.accountId}`, {
+          await apiFetch(`/api/accounts/${item.accountId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ category: parentCategory }),
@@ -133,7 +134,7 @@ export function EditExpenseForm({ item, open, onClose }: EditExpenseFormProps) {
 
         // Save merchant mapping for future auto-categorization
         if (item.accountName.length >= 3) {
-          fetch("/api/merchant-mappings", {
+          apiFetch("/api/merchant-mappings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import {
@@ -49,7 +50,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
     setError(null);
     setSaving(true);
     try {
-      const acctRes = await fetch("/api/accounts", {
+      const acctRes = await apiFetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: expName, type: "expense", category: expCategory }),
@@ -61,7 +62,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
       const acct = await acctRes.json();
 
       const now = new Date();
-      const res = await fetch("/api/forecast-lines", {
+      const res = await apiFetch("/api/forecast-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -103,7 +104,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
             }
           : { unitPrice: Number(revPrice), monthlyUnits: Number(revCustomers || "1") };
 
-      const res = await fetch("/api/revenue-streams", {
+      const res = await apiFetch("/api/revenue-streams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenarioId, name: revName, type: revType, parameters: params }),

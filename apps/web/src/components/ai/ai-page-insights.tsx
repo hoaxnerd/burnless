@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import {
   Sparkles,
@@ -133,7 +134,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
     setError(false);
 
     try {
-      const res = await fetch(`/api/insights?page=${page}`);
+      const res = await apiFetch(`/api/insights?page=${page}`);
       if (res.ok) {
         const data = await res.json();
         if (data.insights?.length > 0) {
@@ -169,7 +170,7 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
     const abortTimer = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const res = await fetch("/api/insights", {
+      const res = await apiFetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ page, scenarioId, pageData, forceRefresh: true }),

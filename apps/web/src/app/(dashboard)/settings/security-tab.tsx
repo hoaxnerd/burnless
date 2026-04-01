@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   Shield,
   Lock,
@@ -37,7 +38,7 @@ export function SecurityTab() {
   // Load 2FA status on mount
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/two-factor/status");
+      const res = await apiFetch("/api/auth/two-factor/status");
       if (res.ok) {
         const data = await res.json();
         setTfa({ enabled: data.enabled, loaded: true });
@@ -58,7 +59,7 @@ export function SecurityTab() {
     setStep("loading");
     setError(null);
     try {
-      const res = await fetch("/api/auth/two-factor/setup");
+      const res = await apiFetch("/api/auth/two-factor/setup");
       if (!res.ok) {
         const data = await res.json();
         if (data.error?.includes("already enabled")) {
@@ -83,7 +84,7 @@ export function SecurityTab() {
     setConfirming(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/two-factor/setup", {
+      const res = await apiFetch("/api/auth/two-factor/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
@@ -108,7 +109,7 @@ export function SecurityTab() {
     if (disableCode.length < 6) return;
     setError(null);
     try {
-      const res = await fetch("/api/auth/two-factor/disable", {
+      const res = await apiFetch("/api/auth/two-factor/disable", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: disableCode }),

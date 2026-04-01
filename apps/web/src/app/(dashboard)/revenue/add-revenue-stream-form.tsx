@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus, Trash2 } from "lucide-react";
@@ -247,7 +248,7 @@ export function AddRevenueStreamForm({ scenarioId, editStream, open: controlledO
     setError(null);
 
     try {
-      const res = await fetch(`/api/revenue-streams/${editStream.id}`, {
+      const res = await apiFetch(`/api/revenue-streams/${editStream.id}`, {
         method: "DELETE",
       });
 
@@ -316,7 +317,7 @@ export function AddRevenueStreamForm({ scenarioId, editStream, open: controlledO
         ? { name, type, parameters: buildParams() }
         : { scenarioId, name, type, parameters: buildParams() };
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

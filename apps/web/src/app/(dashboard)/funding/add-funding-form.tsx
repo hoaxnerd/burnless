@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus, Trash2 } from "lucide-react";
@@ -176,7 +177,7 @@ export function AddFundingForm({ editRound, open: controlledOpen, onClose }: Add
         ? `/api/funding-rounds/${editRound.id}`
         : "/api/funding-rounds";
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -208,7 +209,7 @@ export function AddFundingForm({ editRound, open: controlledOpen, onClose }: Add
     setError(null);
 
     try {
-      const res = await fetch(`/api/funding-rounds/${editRound.id}`, {
+      const res = await apiFetch(`/api/funding-rounds/${editRound.id}`, {
         method: "DELETE",
       });
 

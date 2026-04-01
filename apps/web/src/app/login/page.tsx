@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -49,7 +50,7 @@ function LoginContent() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/check-email", {
+      const res = await apiFetch("/api/auth/check-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -88,7 +89,7 @@ function LoginContent() {
         // On first sign-in attempt, check if 2FA is required
         if (step !== "2fa") {
           try {
-            const tfaRes = await fetch("/api/auth/two-factor/verify", {
+            const tfaRes = await apiFetch("/api/auth/two-factor/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email }),
@@ -130,7 +131,7 @@ function LoginContent() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await apiFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

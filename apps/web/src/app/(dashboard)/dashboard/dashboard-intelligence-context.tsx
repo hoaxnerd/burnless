@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
@@ -206,7 +207,7 @@ export function DashboardIntelligenceProvider({
   useEffect(() => {
     if (initialPreferences) return;
     let cancelled = false;
-    fetch("/api/dashboard-preferences")
+    apiFetch("/api/dashboard-preferences")
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -249,7 +250,7 @@ export function DashboardIntelligenceProvider({
       const body = JSON.stringify(updated);
 
       const attempt = (retries: number, delay: number): Promise<void> =>
-        fetch("/api/dashboard-preferences", {
+        apiFetch("/api/dashboard-preferences", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body,

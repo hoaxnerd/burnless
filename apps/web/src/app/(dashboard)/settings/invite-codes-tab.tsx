@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   Loader2,
   Plus,
@@ -53,7 +54,7 @@ export function InviteCodesTab() {
 
   const loadCodes = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/invite-codes");
+      const res = await apiFetch("/api/admin/invite-codes");
       if (!res.ok) {
         if (res.status === 403) {
           setError("Admin access required");
@@ -92,7 +93,7 @@ export function InviteCodesTab() {
       if (form.expiresAt) body.expiresAt = new Date(form.expiresAt).toISOString();
       if (form.note) body.note = form.note;
 
-      const res = await fetch("/api/admin/invite-codes", {
+      const res = await apiFetch("/api/admin/invite-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -128,7 +129,7 @@ export function InviteCodesTab() {
         body.expiresAt = null;
       }
 
-      const res = await fetch(`/api/admin/invite-codes/${editCode.id}`, {
+      const res = await apiFetch(`/api/admin/invite-codes/${editCode.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -148,7 +149,7 @@ export function InviteCodesTab() {
   };
 
   const toggleActive = async (code: InviteCode) => {
-    await fetch(`/api/admin/invite-codes/${code.id}`, {
+    await apiFetch(`/api/admin/invite-codes/${code.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !code.isActive }),

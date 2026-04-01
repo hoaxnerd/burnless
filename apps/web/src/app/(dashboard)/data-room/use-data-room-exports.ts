@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useToast } from "@/components/ui/toast";
 import { usePlanLimit } from "@/hooks/use-plan-limit";
 import type { DataRoomViewProps } from "./data-room-config";
@@ -39,7 +40,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
 
     try {
       const format = id.endsWith("-csv") ? "csv" : "pdf";
-      const gateRes = await fetch("/api/exports", {
+      const gateRes = await apiFetch("/api/exports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exportType: id, format }),

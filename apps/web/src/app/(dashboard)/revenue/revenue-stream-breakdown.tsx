@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
@@ -61,7 +62,7 @@ export function RevenueStreamBreakdown({
 
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/revenue-streams/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/revenue-streams/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to delete");

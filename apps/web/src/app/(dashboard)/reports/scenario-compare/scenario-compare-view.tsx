@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
 
@@ -40,7 +41,7 @@ export function ScenarioCompareView({
     }
 
     setLoading(true);
-    fetch(`/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`)
+    apiFetch(`/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`)
       .then((r) => r.json())
       .then((data) => setComparison(data))
       .catch(() => setComparison(null))

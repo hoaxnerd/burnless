@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { classifyError, type ErrorVariant } from "@/components/ui/data-load-error";
 
@@ -76,7 +77,7 @@ export function useDataFetch<T = unknown>(
       }, abortTimeoutMs);
 
       try {
-        const res = await fetch(url, { signal: controller.signal });
+        const res = await apiFetch(url, { signal: controller.signal });
         clearTimeout(slowTimer);
         clearTimeout(abortTimer);
 

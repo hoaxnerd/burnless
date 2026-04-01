@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { validateField, scenarioNameSchema } from "@/lib/form-validation";
 import {
@@ -92,7 +93,7 @@ export function CreateScenarioDialog() {
     setError(null);
     clearLimit();
     try {
-      const res = await fetch("/api/scenarios/ai-generate", {
+      const res = await apiFetch("/api/scenarios/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "best_worst" }),
@@ -120,7 +121,7 @@ export function CreateScenarioDialog() {
     setError(null);
     clearLimit();
     try {
-      const res = await fetch("/api/scenarios", {
+      const res = await apiFetch("/api/scenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, type, description }),

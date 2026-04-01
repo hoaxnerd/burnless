@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
@@ -45,7 +46,7 @@ export default function OnboardingPage() {
     trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
 
     try {
-      const res = await fetch("/api/onboarding/enrich", {
+      const res = await apiFetch("/api/onboarding/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ websiteUrl: websiteUrl.trim() }),
@@ -141,7 +142,7 @@ export default function OnboardingPage() {
     setStep("creating");
 
     try {
-      const res = await fetch("/api/onboarding", {
+      const res = await apiFetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +194,7 @@ export default function OnboardingPage() {
     trackEvent("onboarding_company_create_started");
 
     try {
-      const res = await fetch("/api/onboarding", {
+      const res = await apiFetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

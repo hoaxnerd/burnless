@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { Cpu, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import type { AiProviderConfig } from "@/components/ai/ai-feature-context";
 
@@ -67,7 +68,7 @@ export function ProviderSection({
     }
 
     try {
-      const res = await fetch("/api/ai-features/test-connection", {
+      const res = await apiFetch("/api/ai-features/test-connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

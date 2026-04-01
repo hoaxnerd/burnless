@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   Sparkles,
   History,
@@ -123,7 +124,7 @@ export default function AiCompanionPage() {
 
   async function fetchInsights() {
     try {
-      const res = await fetch("/api/insights", { method: "POST" });
+      const res = await apiFetch("/api/insights", { method: "POST" });
       if (res.ok) setInsights((await res.json()).insights ?? []);
     } catch {
       /* non-critical */
@@ -132,7 +133,7 @@ export default function AiCompanionPage() {
 
   async function loadConversations() {
     try {
-      const res = await fetch("/api/chat/history");
+      const res = await apiFetch("/api/chat/history");
       if (res.ok) {
         const json = await res.json();
         setConversations(json.data ?? []);
@@ -144,7 +145,7 @@ export default function AiCompanionPage() {
 
   async function loadConversation(id: string) {
     try {
-      const res = await fetch(`/api/chat/history?conversationId=${id}`);
+      const res = await apiFetch(`/api/chat/history?conversationId=${id}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(
@@ -215,7 +216,7 @@ export default function AiCompanionPage() {
     ]);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

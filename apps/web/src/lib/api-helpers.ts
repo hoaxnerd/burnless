@@ -5,6 +5,7 @@ import { db, companies, getCompanyForUser } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { canPerformAction, type GatedAction, type Plan } from "./feature-gate";
+import { ScenarioSafetyError } from "./scenario-middleware";
 
 /** Standard JSON error response. */
 export function errorResponse(message: string, status: number) {
@@ -107,6 +108,14 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
         return NextResponse.json(
           { error: error.errors[0]?.message ?? "Invalid request body" },
           { status: 400 }
+        );
+      }
+
+      // Return 409 when scenario safety check fails
+      if (error instanceof ScenarioSafetyError) {
+        return NextResponse.json(
+          { error: error.message, code: "SCENARIO_SAFETY" },
+          { status: 409 }
         );
       }
 

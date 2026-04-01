@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import Link from "next/link";
 import {
   Sparkles,
@@ -48,7 +49,7 @@ export function AiCommandCenter({
   // Fetch anomaly alerts
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/alerts", { signal: controller.signal })
+    apiFetch("/api/alerts", { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.alerts) {
@@ -78,7 +79,7 @@ export function AiCommandCenter({
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   type CurrencyCode,
   type LocaleSettings,
@@ -51,7 +52,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/company")
+    apiFetch("/api/company")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {

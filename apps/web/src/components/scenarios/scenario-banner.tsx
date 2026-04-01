@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useScenario } from "./scenario-context";
 import { useEffect, useState } from "react";
 
@@ -11,7 +12,7 @@ export function ScenarioBanner() {
   // If we have an ID but no name (e.g., direct URL navigation), fetch it
   useEffect(() => {
     if (activeScenarioId && !activeScenarioName) {
-      fetch(`/api/scenarios/${activeScenarioId}`)
+      apiFetch(`/api/scenarios/${activeScenarioId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data?.name) setResolvedName(data.name);

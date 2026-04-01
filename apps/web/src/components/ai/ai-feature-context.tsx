@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   resolveFeatureStatus,
   DEFAULT_AI_FLAGS,
@@ -74,7 +75,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/ai-features")
+    apiFetch("/api/ai-features")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
@@ -125,7 +126,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const res = await fetch("/api/ai-features", {
+        const res = await apiFetch("/api/ai-features", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),

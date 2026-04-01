@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui";
@@ -45,7 +46,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
 
   const loadAccounts = useCallback(async () => {
     try {
-      const res = await fetch("/api/accounts");
+      const res = await apiFetch("/api/accounts");
       if (res.ok) {
         const data = await res.json();
         setAccounts(data);
@@ -57,7 +58,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch("/api/imports");
+      const res = await apiFetch("/api/imports");
       if (res.ok) {
         const json = await res.json();
         setHistory(json.data ?? json);
@@ -137,7 +138,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
           return { date: date.toISOString(), amount, description: desc, accountId: targetAccountId };
         })
         .filter(Boolean);
-      const res = await fetch("/api/import", {
+      const res = await apiFetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactions: mapped, dryRun: true, fileName, columnMapping: mapping }),
@@ -169,7 +170,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
       const mapped = toImport.map((t) => ({
         date: t.date, amount: t.amount, description: t.description, accountId: t.accountId,
       }));
-      const res = await fetch("/api/import", {
+      const res = await apiFetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transactions: mapped, dryRun: false, fileName, columnMapping: mapping }),
@@ -191,7 +192,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
 
   const rollbackBatch = async (batchId: string) => {
     try {
-      const res = await fetch(`/api/imports/${batchId}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/imports/${batchId}`, { method: "DELETE" });
       if (res.ok) { loadHistory(); }
       else {
         const data = await res.json();

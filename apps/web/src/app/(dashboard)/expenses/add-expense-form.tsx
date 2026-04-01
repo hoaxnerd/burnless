@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus, Sparkles, Check } from "lucide-react";
@@ -135,7 +136,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
     try {
       let targetAccountId = accountId;
       if (!targetAccountId) {
-        const acctRes = await fetch("/api/accounts", {
+        const acctRes = await apiFetch("/api/accounts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -157,7 +158,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
         params.growthRate = Number(growthRate) / 100;
       }
 
-      const res = await fetch("/api/forecast-lines", {
+      const res = await apiFetch("/api/forecast-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -176,7 +177,7 @@ export function AddExpenseForm({ scenarioId, accounts }: AddExpenseFormProps) {
 
       // Learn: save merchant→category mapping when user manually categorizes
       if (name.length >= 3 && targetAccountId) {
-        fetch("/api/merchant-mappings", {
+        apiFetch("/api/merchant-mappings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

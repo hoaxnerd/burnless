@@ -28,6 +28,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import type { PageWidgetLayout } from "@/components/ui/page-grid";
 import { useInitialLayouts } from "./initial-layouts-context";
 
@@ -121,7 +122,7 @@ export function PageLayoutProvider({
     if (hasInitialData || loadedRef.current) return;
     loadedRef.current = true;
     let cancelled = false;
-    fetch("/api/dashboard-preferences")
+    apiFetch("/api/dashboard-preferences")
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -165,7 +166,7 @@ export function PageLayoutProvider({
       });
 
       const attempt = (retries: number, delay: number): Promise<void> =>
-        fetch("/api/dashboard-preferences", {
+        apiFetch("/api/dashboard-preferences", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body,

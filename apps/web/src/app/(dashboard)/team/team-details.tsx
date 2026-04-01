@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@burnless/types";
@@ -136,7 +137,7 @@ export function TeamDetails({
 
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/headcount/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/headcount/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "Failed to delete");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
@@ -33,7 +34,7 @@ function ResetPasswordContent() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/forgot-password", {
+      const res = await apiFetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -65,7 +66,7 @@ function ResetPasswordContent() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/reset-password", {
+      const res = await apiFetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, token: tokenParam, password }),

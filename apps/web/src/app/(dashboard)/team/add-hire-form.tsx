@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { Plus, Trash2 } from "lucide-react";
@@ -139,7 +140,7 @@ export function AddHireForm({ scenarioId, departments, editHire, open: controlle
     setError(null);
 
     try {
-      const res = await fetch(`/api/headcount/${editHire.id}`, {
+      const res = await apiFetch(`/api/headcount/${editHire.id}`, {
         method: "DELETE",
       });
 
@@ -175,7 +176,7 @@ export function AddHireForm({ scenarioId, departments, editHire, open: controlle
       // Create department if needed
       let deptId = departmentId;
       if (deptId === "__new__" && newDeptName.trim()) {
-        const deptRes = await fetch("/api/departments", {
+        const deptRes = await apiFetch("/api/departments", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: newDeptName.trim() }),
@@ -191,7 +192,7 @@ export function AddHireForm({ scenarioId, departments, editHire, open: controlle
 
       if (isEditMode) {
         // PATCH existing hire
-        const res = await fetch(`/api/headcount/${editHire.id}`, {
+        const res = await apiFetch(`/api/headcount/${editHire.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -211,7 +212,7 @@ export function AddHireForm({ scenarioId, departments, editHire, open: controlle
         }
       } else {
         // POST new hire
-        const res = await fetch("/api/headcount", {
+        const res = await apiFetch("/api/headcount", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

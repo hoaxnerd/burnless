@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { formatCompactCurrency } from "@/components/charts";
@@ -106,7 +107,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     setDeleteError(null);
 
     try {
-      const res = await fetch(`/api/forecast-lines/${deletingItem.id}`, {
+      const res = await apiFetch(`/api/forecast-lines/${deletingItem.id}`, {
         method: "DELETE",
       });
 
@@ -330,7 +331,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               setEditingCategoryId(null);
                               onCategoryOverride?.(item.id, newCat);
                               // Learn: save merchant->category mapping
-                              fetch("/api/merchant-mappings", {
+                              apiFetch("/api/merchant-mappings", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { validateField, validateAll, fundingFormSchema } from "@/lib/form-validation";
@@ -90,7 +91,7 @@ export function EditFundingForm({ round, open, onClose }: EditFundingFormProps) 
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/funding-rounds/${round.id}`, {
+      const res = await apiFetch(`/api/funding-rounds/${round.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

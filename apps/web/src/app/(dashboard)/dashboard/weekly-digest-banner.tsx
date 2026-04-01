@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +25,7 @@ export function WeeklyDigestBanner() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
 
-    fetch("/api/digest", { signal: controller.signal })
+    apiFetch("/api/digest", { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (data.digest) setDigest(data.digest);
@@ -75,7 +76,7 @@ export function WeeklyDigestBanner() {
   async function handleDismiss() {
     setDismissed(true);
     try {
-      await fetch("/api/digest", {
+      await apiFetch("/api/digest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "dismiss", digestId: digest!.id }),

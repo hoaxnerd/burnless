@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { apiFetch } from "@/lib/api-fetch";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
@@ -161,7 +162,7 @@ function DashboardContent({
 
   // Load preferences from API on mount
   useEffect(() => {
-    fetch("/api/user-preferences")
+    apiFetch("/api/user-preferences")
       .then((r) => r.ok ? r.json() : null)
       .then((prefs) => {
         if (prefs?.sidebarOrder?.length) setNavOrder(prefs.sidebarOrder);
@@ -175,7 +176,7 @@ function DashboardContent({
 
   // Persist preferences on change
   const persistPreferences = useCallback((updates: Record<string, unknown>) => {
-    fetch("/api/user-preferences", {
+    apiFetch("/api/user-preferences", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),

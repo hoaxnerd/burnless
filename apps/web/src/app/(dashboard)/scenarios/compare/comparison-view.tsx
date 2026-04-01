@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 
@@ -32,7 +33,7 @@ export function ComparisonView({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`
       );
       if (!res.ok) {

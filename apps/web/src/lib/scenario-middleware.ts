@@ -4,13 +4,20 @@
  *
  * For mutating requests (POST/PATCH/PUT/DELETE):
  *   If the `active-scenario-id` cookie is present but the
- *   `X-Scenario-Id` header is missing, a warning is logged.
- *   This will become a hard 409 rejection after Task 8 migrates
- *   all frontend fetch calls to use apiFetch.
+ *   `X-Scenario-Id` header is missing, a ScenarioSafetyError is thrown.
+ *   API route error handlers should catch this and return 409 Conflict.
  *
  * Returns the scenario ID from the header, or null when no
  * scenario is active.
  */
+
+export class ScenarioSafetyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ScenarioSafetyError";
+  }
+}
+
 export function getActiveScenario(request: Request): string | null {
   const header = request.headers.get("X-Scenario-Id");
   const cookieHeader = request.headers.get("Cookie") ?? "";
@@ -21,11 +28,8 @@ export function getActiveScenario(request: Request): string | null {
   );
 
   if (cookie && !header && isMutation) {
-    // Log-only for now — will become hard 409 after Task 8 apiFetch migration
-    console.warn(
-      "[scenario-safety] Scenario active (cookie) but X-Scenario-Id header missing on",
-      request.method,
-      request.url
+    throw new ScenarioSafetyError(
+      `Scenario active (cookie=${cookie}) but X-Scenario-Id header missing on ${request.method} ${request.url}`
     );
   }
 

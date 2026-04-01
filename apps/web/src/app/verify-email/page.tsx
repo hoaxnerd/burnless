@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useSearchParams } from "next/navigation";
 import { useSession, SessionProvider } from "next-auth/react";
 import Link from "next/link";
@@ -24,7 +25,7 @@ function VerifyEmailContent() {
 
     setStep("verifying");
     try {
-      const res = await fetch("/api/auth/verify-email", {
+      const res = await apiFetch("/api/auth/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailParam, token }),
@@ -63,7 +64,7 @@ function VerifyEmailContent() {
     if (!targetEmail || resendCooldown > 0) return;
 
     try {
-      await fetch("/api/auth/send-verification", {
+      await apiFetch("/api/auth/send-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: targetEmail }),

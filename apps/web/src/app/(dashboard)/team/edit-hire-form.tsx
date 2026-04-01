@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { validateField, validateAll, hireFormSchema } from "@/lib/form-validation";
@@ -72,7 +73,7 @@ export function EditHireForm({ hire, open, onClose }: EditHireFormProps) {
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/headcount/${hire.id}`, {
+      const res = await apiFetch(`/api/headcount/${hire.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

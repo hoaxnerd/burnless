@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui";
 import { z } from "zod";
@@ -159,7 +160,7 @@ export function EditRevenueStreamForm({ stream, open, onClose }: EditRevenueStre
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/revenue-streams/${stream.id}`, {
+      const res = await apiFetch(`/api/revenue-streams/${stream.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, type, parameters: buildParams() }),

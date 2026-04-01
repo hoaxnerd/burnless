@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { useToast } from "@/components/ui/toast";
 import type { FinancialAlert, AlertSeverity } from "@/lib/alerts";
@@ -54,7 +55,7 @@ export function useProactiveAlerts() {
 
     (async () => {
       try {
-        const res = await fetch("/api/alerts", { signal: controller.signal });
+        const res = await apiFetch("/api/alerts", { signal: controller.signal });
         if (!res.ok) return;
 
         const { alerts }: { alerts: FinancialAlert[] } = await res.json();

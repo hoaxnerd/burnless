@@ -5,6 +5,8 @@
  * so SWR can expose it via the `error` return value.
  */
 
+import { apiFetch } from "@/lib/api-fetch";
+
 export class FetchError extends Error {
   status: number;
   info: Record<string, unknown>;
@@ -18,7 +20,7 @@ export class FetchError extends Error {
 }
 
 export async function fetcher<T = unknown>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

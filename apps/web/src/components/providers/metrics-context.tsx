@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 import { METRIC_REGISTRY, type MetricDefinition } from "@burnless/engine";
 import type { CardContent } from "@burnless/engine";
 
@@ -127,7 +128,7 @@ function syncToApi(
   retries = 2,
   delay = 500
 ): Promise<void> {
-  return fetch("/api/dashboard-preferences", {
+  return apiFetch("/api/dashboard-preferences", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -200,7 +201,7 @@ export function MetricsProvider({
   useEffect(() => {
     if (initialOverrides || loadedRef.current) return;
     loadedRef.current = true;
-    fetch("/api/dashboard-preferences")
+    apiFetch("/api/dashboard-preferences")
       .then((r) => r.json())
       .then((data) => {
         const apiOverrides = (data.cardModeOverrides ?? {}) as Record<string, CardMode>;
