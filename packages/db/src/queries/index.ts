@@ -25,3 +25,10 @@ export {
   deleteOverrideByEntity,
   getOverrideCount,
 } from "./scenario-overrides";
+
+export {
+  resolveEntities,
+  getResolvedData,
+} from "./scenario-resolver";
+
+export type { OverrideTag, ResolvedEntity } from "./scenario-resolver";
