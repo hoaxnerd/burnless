@@ -1,7 +1,7 @@
 export interface ScenarioOption {
   id: string;
   name: string;
-  type: string;
+  source: string;
 }
 
 export interface ComparisonLine {

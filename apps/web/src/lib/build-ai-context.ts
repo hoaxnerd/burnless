@@ -21,7 +21,7 @@ import {
 interface ScenarioRef {
   id: string;
   name: string;
-  type: string;
+  source: string;
 }
 
 export async function buildAiContext(
@@ -51,13 +51,13 @@ export async function buildAiContext(
     scenario: {
       id: scenario.id,
       name: scenario.name,
-      type: scenario.type,
+      source: scenario.source,
     },
     scenarios: allScenarios.map((s) => ({
       id: s.id,
       name: s.name,
-      type: s.type,
-      isDefault: s.isDefault,
+      source: s.source,
+      status: s.status,
     })),
     accounts: accounts.map((a) => ({
       id: a.id,

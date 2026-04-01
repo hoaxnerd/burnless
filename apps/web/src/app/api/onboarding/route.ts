@@ -46,8 +46,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   // Idempotency: if user already has a company, return it instead of creating a duplicate
   const existingMembership = await getUserCompany(userId);
   if (existingMembership) {
-    // Find their first scenario
-    // TODO(Task 7): Revisit — isDefault no longer exists in overlay model
+    // Find their first scenario (overlay model has no "default" flag — just return the first)
     const [defaultScenario] = await db
       .select({ id: scenarios.id })
       .from(scenarios)
@@ -95,14 +94,13 @@ export const POST = withErrorHandler(async (request: Request) => {
         role: "owner",
       });
 
-      // Create base scenario
+      // Create initial scenario
       const [scenario] = await tx
         .insert(scenarios)
         .values({
           companyId: company.id,
           name: "Base Plan",
-          type: "base",
-          isDefault: true,
+          source: "blank",
           description: `Initial financial model for ${body.company_name}`,
         })
         .returning();
@@ -158,7 +156,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         }
 
         await tx.insert(revenueStreams).values({
-          scenarioId: scenario.id,
+          companyId: company.id,
           name: `${body.company_name} Revenue`,
           type: revenueType,
           parameters: revenueParams,

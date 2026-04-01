@@ -103,9 +103,8 @@ export const getScenarios = cachedQuery(
 );
 
 /**
- * Get the default (or first) scenario for a company.
- * TODO(Task 7): Remove — the overlay model no longer has a "default" scenario.
- * Temporarily returns the first non-deleted scenario.
+ * Get the first active scenario for a company.
+ * The overlay model has no "default" scenario — this returns the first non-deleted one.
  */
 export const getDefaultScenario = cachedQuery(
   async (companyId: string) => {
@@ -222,9 +221,7 @@ export async function getActiveScenario(
 }
 
 /**
- * Get the budget scenario for a company.
- * TODO(Task 7): Remove — isBudget column no longer exists in the overlay model.
- * Temporarily returns null.
+ * @deprecated The overlay model has no "budget" concept. Remove callers.
  */
 export const getBudgetScenario = cachedQuery(
   async (_companyId: string) => {

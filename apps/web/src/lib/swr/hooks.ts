@@ -20,9 +20,9 @@ export interface Scenario {
   companyId: string;
   name: string;
   description: string | null;
-  isDefault: boolean;
-  isArchived: boolean;
-  isBudget: boolean;
+  source: string;
+  status: string;
+  color: string | null;
   createdAt: string;
   updatedAt: string;
 }

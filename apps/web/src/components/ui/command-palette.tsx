@@ -72,7 +72,7 @@ function buildCommands(onToggleAI?: () => void, companionName = "Companion"): Co
     { id: "nav-settings", label: "Settings", description: "App preferences", icon: Settings, href: "/settings", keywords: ["config", "preferences", "account"], section: "Pages", category: "page" },
 
     // Actions
-    { id: "act-new-scenario", label: "New Scenario", description: "Create a what-if scenario", icon: GitBranch, href: "/scenarios/new", keywords: ["create", "new", "what if"], section: "Actions", category: "action" },
+    { id: "act-new-scenario", label: "New Scenario", description: "Create a scenario overlay", icon: GitBranch, href: "/scenarios", keywords: ["create", "new", "scenario", "overlay"], section: "Actions", category: "action" },
     { id: "act-import-csv", label: "Import CSV", description: "Upload expense data", icon: Upload, href: "/import", keywords: ["upload", "csv"], section: "Actions", category: "action" },
     { id: "act-generate-report", label: "Generate Report", description: "Create financial report", icon: FileBarChart, href: "/reports", keywords: ["report", "export", "pdf"], section: "Actions", category: "action" },
 

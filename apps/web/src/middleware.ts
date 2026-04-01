@@ -158,7 +158,6 @@ function resolveRateLimitTier(pathname: string, method: string) {
   // AI endpoints — cost-controlled tier (LLM calls are expensive)
   if (pathname.startsWith("/api/chat")) return RATE_LIMITS.chat!;
   if (pathname.startsWith("/api/insights")) return RATE_LIMITS.ai!;
-  if (pathname.startsWith("/api/scenarios/ai-generate")) return RATE_LIMITS.ai!;
   if (pathname.startsWith("/api/onboarding/enrich")) return RATE_LIMITS.ai!;
 
   // Import — heavy processing tier
@@ -173,7 +172,6 @@ function resolveTierKey(pathname: string, method: string): string {
   if (pathname.startsWith("/api/auth/")) return "auth";
   if (pathname.startsWith("/api/chat")) return "chat";
   if (pathname.startsWith("/api/insights")) return "ai";
-  if (pathname.startsWith("/api/scenarios/ai-generate")) return "ai";
   if (pathname.startsWith("/api/onboarding/enrich")) return "ai";
   if (pathname.startsWith("/api/import")) return "import";
   if (MUTATION_METHODS.has(method)) return "mutation";

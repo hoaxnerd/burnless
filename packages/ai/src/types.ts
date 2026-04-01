@@ -20,7 +20,7 @@ export interface FinancialSnapshot {
   scenario: {
     id: string;
     name: string;
-    type: string;
+    source: string;
   };
   period: {
     start: string;
@@ -63,8 +63,8 @@ export interface FinancialSnapshot {
   scenarios: Array<{
     id: string;
     name: string;
-    type: string;
-    isDefault: boolean;
+    source: string;
+    status: string;
   }>;
   accounts: Array<{
     id: string;

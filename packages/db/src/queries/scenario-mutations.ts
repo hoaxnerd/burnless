@@ -94,15 +94,16 @@ export async function scenarioUpdate(
     .select()
     .from(table)
     .where(eq(table.id, entityId));
+  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
   validateOverridable(entityType, baseEntity);
-  const overrideData = { ...baseEntity, ...changes };
+  const overrideData = { ...baseEntity, ...changes } as Record<string, unknown>;
   await upsertOverride(
     scenarioId,
     entityType,
     entityId,
     "modify",
     overrideData,
-    baseEntity,
+    baseEntity as Record<string, unknown>,
   );
   return overrideData;
 }
@@ -153,6 +154,7 @@ export async function scenarioDelete(
     .select()
     .from(table)
     .where(eq(table.id, entityId));
+  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
   validateOverridable(entityType, baseEntity);
   await upsertOverride(
     scenarioId,
@@ -160,7 +162,7 @@ export async function scenarioDelete(
     entityId,
     "delete",
     null,
-    baseEntity,
+    baseEntity as Record<string, unknown>,
   );
 
   // Cascade: if deleting a department, create delete overrides for children

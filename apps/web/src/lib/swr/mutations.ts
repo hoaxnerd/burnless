@@ -46,7 +46,7 @@ export async function createScenario(data: { name: string; description?: string 
 
 export async function updateScenario(
   id: string,
-  data: Partial<{ name: string; description: string; isDefault: boolean; isArchived: boolean; isBudget: boolean }>,
+  data: Partial<{ name: string; description: string; color: string | null; status: string }>,
 ) {
   const result = await apiCall(KEYS.scenario(id), "PATCH", data);
   // Revalidate both the single scenario and the list

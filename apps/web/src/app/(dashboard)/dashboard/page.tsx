@@ -122,7 +122,7 @@ export default async function DashboardPage({
   const heroSwapCards = buildHeroSwapCards(heroSlugs, heroCards, metrics, currentMonth, prevMonth);
 
   /* ── Pinned secondary metrics ───────────────────────────────────── */
-  const pinnedScenarios = allScenarios.filter((s) => !s.isDefault).slice(0, 4);
+  const pinnedScenarios = allScenarios.filter((s) => s.status === "active").slice(0, 4);
 
   /* ── Board Meeting Mode data ──────────────────────────────────── */
   const mrrGrowthPct = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
@@ -320,7 +320,7 @@ export default async function DashboardPage({
 
               /* ── Scenarios Panel ────────────────────────────────────── */
               "scenarios": (
-                <ScenariosWidget scenarios={pinnedScenarios.map((s) => ({ id: s.id, name: s.name, type: s.type }))} />
+                <ScenariosWidget scenarios={pinnedScenarios.map((s) => ({ id: s.id, name: s.name, source: s.source }))} />
               ),
 
               /* ── Customizable Metrics ───────────────────────────────── */

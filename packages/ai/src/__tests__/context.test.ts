@@ -17,8 +17,8 @@ function makeInput(overrides: Record<string, unknown> = {}) {
       currency: "USD",
       locale: "en-US",
     },
-    scenario: { id: "s1", name: "Base Case", type: "base" },
-    scenarios: [{ id: "s1", name: "Base Case", type: "base", isDefault: true }],
+    scenario: { id: "s1", name: "Base Case", source: "blank" },
+    scenarios: [{ id: "s1", name: "Base Case", source: "blank", status: "active" }],
     accounts: [{ id: "a1", name: "Engineering", type: "expense", category: "opex" }],
     departments: [{ id: "d1", name: "Engineering" }],
     period: { start: "2026-01", end: "2026-12", currentMonth: "2026-03" },
@@ -212,7 +212,7 @@ describe("formatContextForPrompt", () => {
   it("skips sections when data is empty", () => {
     const input = makeInput({
       fundingRounds: [],
-      scenarios: [{ id: "s1", name: "Base", type: "base", isDefault: true }],
+      scenarios: [{ id: "s1", name: "Base", source: "blank", status: "active" }],
       accounts: [],
       departments: [],
     });

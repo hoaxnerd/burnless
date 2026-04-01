@@ -83,5 +83,5 @@ export async function getOverrideCount(scenarioId: string) {
     .select({ count: sql<number>`count(*)::int` })
     .from(scenarioOverrides)
     .where(eq(scenarioOverrides.scenarioId, scenarioId));
-  return result.count;
+  return result?.count ?? 0;
 }

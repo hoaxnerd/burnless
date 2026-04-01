@@ -304,17 +304,22 @@ export interface Transaction {
 
 // ── Scenarios ─────────────────────────────────────────────────────────────────
 
-export type ScenarioType = "base" | "best" | "worst" | "custom";
+export type ScenarioSource = "blank" | "ai" | "template" | "clone" | "backup";
+export type ScenarioStatus = "active" | "promoted" | "archived";
 
 export interface Scenario {
   id: string;
   companyId: string;
   name: string;
-  type: ScenarioType;
-  isDefault: boolean;
-  isBudget: boolean;
-  budgetLockedAt: Date | null;
   description: string | null;
+  source: ScenarioSource;
+  status: ScenarioStatus;
+  color: string | null;
+  sourceScenarioId: string | null;
+  aiConversationId: string | null;
+  promotedAt: Date | null;
+  autoDeleteAt: Date | null;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

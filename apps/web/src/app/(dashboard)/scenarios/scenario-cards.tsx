@@ -8,10 +8,10 @@ import { useScenario } from "@/components/scenarios/scenario-context";
 interface ScenarioItem {
   id: string;
   name: string;
-  type: string;
-  isDefault: boolean;
-  isBudget: boolean;
   description: string | null;
+  source: string;
+  status: string;
+  color: string | null;
   createdAt: string;
 }
 
@@ -95,16 +95,16 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
                   </h3>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="inline-block rounded-full bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-600">
-                      {scenario.type}
+                      {scenario.source}
                     </span>
-                    {scenario.isDefault && (
-                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-                        Default
+                    {scenario.status === "promoted" && (
+                      <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                        Promoted
                       </span>
                     )}
-                    {scenario.isBudget && (
-                      <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                        Budget
+                    {scenario.status === "archived" && (
+                      <span className="rounded-full bg-surface-100 px-2 py-0.5 text-xs font-medium text-surface-500">
+                        Archived
                       </span>
                     )}
                   </div>

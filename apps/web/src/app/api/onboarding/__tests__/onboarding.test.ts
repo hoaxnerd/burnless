@@ -51,7 +51,7 @@ vi.mock("@burnless/db", () => ({
   },
   companies: { id: "id", name: "name" },
   companyMembers: {},
-  scenarios: { id: "id", companyId: "companyId", isDefault: "isDefault" },
+  scenarios: { id: "id", companyId: "companyId", deletedAt: "deletedAt" },
   financialAccounts: {},
   departments: {},
   forecastLines: {},

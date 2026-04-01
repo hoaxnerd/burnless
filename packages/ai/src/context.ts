@@ -25,9 +25,9 @@ interface ContextInput {
   scenario: {
     id: string;
     name: string;
-    type: string;
+    source: string;
   };
-  scenarios: Array<{ id: string; name: string; type: string; isDefault: boolean }>;
+  scenarios: Array<{ id: string; name: string; source: string; status: string }>;
   accounts: Array<{ id: string; name: string; type: string; category: string }>;
   departments: Array<{ id: string; name: string }>;
   period: {
@@ -126,7 +126,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     `# Financial Context for ${company.name}`,
     ``,
     `**Company:** ${company.name} | Stage: ${company.stage} | Model: ${company.businessModel}${company.industry ? ` | Industry: ${company.industry}` : ""}`,
-    `**Scenario:** ${snapshot.scenario.name} (${snapshot.scenario.type})`,
+    `**Scenario:** ${snapshot.scenario.name} (${snapshot.scenario.source})`,
     `**Period:** ${period.start} to ${period.end} | Current month: ${period.currentMonth}`,
     `**Currency:** ${currency}`,
     ``,
@@ -186,7 +186,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(``);
     lines.push(`## Available Scenarios`);
     for (const s of snapshot.scenarios) {
-      lines.push(`- ${s.name} (${s.type})${s.isDefault ? " [default]" : ""} — ID: ${s.id}`);
+      lines.push(`- ${s.name} (${s.source})${s.status !== "active" ? ` [${s.status}]` : ""} — ID: ${s.id}`);
     }
   }
 

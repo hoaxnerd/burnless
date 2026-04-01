@@ -356,14 +356,6 @@ describe("middleware", () => {
       );
     });
 
-    it("uses ai tier for /api/scenarios/ai-generate", () => {
-      middleware(createRequest("/api/scenarios/ai-generate"));
-      expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        expect.any(String),
-        { maxRequests: 10, windowMs: 60_000 },
-      );
-    });
-
     it("uses ai tier for /api/onboarding/enrich", () => {
       middleware(createRequest("/api/onboarding/enrich"));
       expect(mockCheckRateLimit).toHaveBeenCalledWith(

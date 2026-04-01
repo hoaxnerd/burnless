@@ -8,7 +8,7 @@ import { ChartCard, SwappableMetricCard } from "@/components/ui";
 interface ScenarioOption {
   id: string;
   name: string;
-  type: string;
+  source: string;
 }
 
 interface ComparisonData {
@@ -63,7 +63,7 @@ export function ScenarioCompareView({
             className="rounded-lg border border-surface-200 px-3 py-1.5 text-sm bg-surface-0"
           >
             {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
+              <option key={s.id} value={s.id}>{s.name} ({s.source})</option>
             ))}
           </select>
         </div>
@@ -76,7 +76,7 @@ export function ScenarioCompareView({
             className="rounded-lg border border-surface-200 px-3 py-1.5 text-sm bg-surface-0"
           >
             {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
+              <option key={s.id} value={s.id}>{s.name} ({s.source})</option>
             ))}
           </select>
         </div>

@@ -133,8 +133,7 @@ export const GET = withErrorHandler(async () => {
         .where(inArray(aiInsightCache.companyId, companyIds)),
     ]);
 
-    // Batch 2: Fetch scenario-level and conversation-level nested data
-    const scenarioIds = scenariosData.map((s) => s.id);
+    // Batch 2: Fetch company-scoped entity data and conversation-level nested data
     const conversationIds = aiConversationsData.map((c) => c.id);
 
     const [
@@ -143,23 +142,23 @@ export const GET = withErrorHandler(async () => {
       revenueStreamsData,
       aiMessagesData,
     ] = await Promise.all([
-      scenarioIds.length > 0
+      companyIds.length > 0
         ? db
             .select()
             .from(forecastLines)
-            .where(inArray(forecastLines.scenarioId, scenarioIds))
+            .where(inArray(forecastLines.companyId, companyIds))
         : Promise.resolve([]),
-      scenarioIds.length > 0
+      companyIds.length > 0
         ? db
             .select()
             .from(headcountPlans)
-            .where(inArray(headcountPlans.scenarioId, scenarioIds))
+            .where(inArray(headcountPlans.companyId, companyIds))
         : Promise.resolve([]),
-      scenarioIds.length > 0
+      companyIds.length > 0
         ? db
             .select()
             .from(revenueStreams)
-            .where(inArray(revenueStreams.scenarioId, scenarioIds))
+            .where(inArray(revenueStreams.companyId, companyIds))
         : Promise.resolve([]),
       conversationIds.length > 0
         ? db
@@ -188,25 +187,21 @@ export const GET = withErrorHandler(async () => {
       transactions: transactionsData.filter(
         (t) => t.companyId === company.id
       ),
-      scenarios: scenariosData
-        .filter((s) => s.companyId === company.id)
-        .map((scenario) => ({
-          ...scenario,
-          forecastLines: forecastLinesData
-            .filter((fl) => fl.scenarioId === scenario.id)
-            .map((fl) => ({
-              ...fl,
-              values: forecastValuesData.filter(
-                (fv) => fv.forecastLineId === fl.id
-              ),
-            })),
-          headcountPlans: headcountPlansData.filter(
-            (hp) => hp.scenarioId === scenario.id
-          ),
-          revenueStreams: revenueStreamsData.filter(
-            (rs) => rs.scenarioId === scenario.id
+      scenarios: scenariosData.filter((s) => s.companyId === company.id),
+      forecastLines: forecastLinesData
+        .filter((fl) => fl.companyId === company.id)
+        .map((fl) => ({
+          ...fl,
+          values: forecastValuesData.filter(
+            (fv) => fv.forecastLineId === fl.id
           ),
         })),
+      headcountPlans: headcountPlansData.filter(
+        (hp) => hp.companyId === company.id
+      ),
+      revenueStreams: revenueStreamsData.filter(
+        (rs) => rs.companyId === company.id
+      ),
       departments: departmentsData.filter(
         (d) => d.companyId === company.id
       ),

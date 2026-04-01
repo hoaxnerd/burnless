@@ -142,7 +142,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const { contextText: baseContextText } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
-    type: scenario.source ?? "blank",
+    source: scenario.source ?? "blank",
   });
 
   // Inject scenario override context when a scenario is active

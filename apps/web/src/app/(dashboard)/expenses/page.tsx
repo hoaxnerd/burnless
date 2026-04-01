@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getBudgetScenario, getAccounts } from "@/lib/data";
+import { getCompany, getActiveScenario, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
@@ -48,19 +48,11 @@ export default async function ExpensesPage({
 }
 
 async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
-  // Step 1: fetch budget scenario ID alongside main data (cheap cached lookup)
-  const [data, accounts, expenseDetails, budgetScenario] = await Promise.all([
+  const [data, accounts, expenseDetails] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),
     computeExpenseDetails(companyId, scenarioId),
-    getBudgetScenario(companyId),
   ]);
-
-  // Step 2: if budget scenario exists, compute its data (may already be cached via unstable_cache)
-  const budgetDataPromise =
-    budgetScenario && budgetScenario.id !== scenarioId
-      ? computeDashboardData(companyId, budgetScenario.id)
-      : null;
 
   // Show empty state if no expense data exists
   if (expenseDetails.lineItems.length === 0) {
@@ -94,12 +86,8 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
-  // Budget vs actuals data (computation started above, await here)
-  let budgetTimeline: { month: string; value: number }[] | null = null;
-  if (budgetDataPromise) {
-    const budgetData = await budgetDataPromise;
-    budgetTimeline = seriesToArray(budgetData.totalExpenses);
-  }
+  // Budget vs actuals — the overlay model has no separate "budget" scenario
+  const budgetTimeline: { month: string; value: number }[] | null = null;
 
   // Summary metrics
   const { anomalyCount, recurringCount } = expenseDetails;

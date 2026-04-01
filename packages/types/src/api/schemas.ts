@@ -8,6 +8,7 @@ export const accountCategoryEnum = z.enum([
   "revenue", "cogs", "operating_expense", "other_income",
   "other_expense", "asset", "liability", "equity",
 ]);
+/** @deprecated Use scenarioSourceEnum/scenarioStatusEnumZ instead */
 export const scenarioTypeEnum = z.enum(["base", "best", "worst", "custom"]);
 export const forecastMethodEnum = z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]);
 export const revenueStreamTypeEnum = z.enum(["subscription", "one_time", "usage_based", "services"]);

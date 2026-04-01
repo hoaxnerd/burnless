@@ -96,7 +96,7 @@ export function ComparisonView({
             <option value="">Select scenario...</option>
             {scenarios.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.type})
+                {s.name} ({s.source})
               </option>
             ))}
           </select>
@@ -118,7 +118,7 @@ export function ComparisonView({
               .filter((s) => s.id !== baseId)
               .map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} ({s.type})
+                  {s.name} ({s.source})
                 </option>
               ))}
           </select>

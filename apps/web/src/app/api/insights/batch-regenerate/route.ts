@@ -144,7 +144,7 @@ export const POST = withErrorHandler(async function POST(request: Request) {
       const ctx = await buildAiContext(companyId, {
         id: scenario.id,
         name: scenario.name,
-        type: scenario.type,
+        source: scenario.source,
       });
       snapshot = ctx.snapshot;
     } catch (err) {

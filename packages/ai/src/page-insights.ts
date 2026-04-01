@@ -155,7 +155,7 @@ function buildScenariosPrompt(snapshot: FinancialSnapshot): string {
   const currency = company.currency;
 
   const scenarioLines = scenarios
-    .map((s) => `  ${s.name} (${s.type})${s.isDefault ? " [default]" : ""}`)
+    .map((s) => `  ${s.name} (${s.source})${s.status !== "active" ? ` [${s.status}]` : ""}`)
     .join("\n");
 
   return `You are a senior financial advisor analyzing a startup's financial scenarios. Be direct and data-driven.

@@ -24,7 +24,7 @@ const { mockGetDefaultScenario } = vi.hoisted(() => ({
   mockGetDefaultScenario: vi.fn().mockResolvedValue({
     id: "scenario-1",
     name: "Base Case",
-    type: "base",
+    source: "blank",
   }),
 }));
 
@@ -132,7 +132,7 @@ describe("POST /api/insights/batch-regenerate", () => {
     mockGetDefaultScenario.mockResolvedValue({
       id: "scenario-1",
       name: "Base Case",
-      type: "base",
+      source: "blank",
     });
     mockBuildAiContext.mockResolvedValue({
       snapshot: { company: { name: "Test Corp" } },

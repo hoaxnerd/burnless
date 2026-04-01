@@ -7,7 +7,7 @@ import { usePageLayoutContext } from "@/components/providers/page-layout-context
 interface Scenario {
   id: string;
   name: string;
-  type: string;
+  source: string;
 }
 
 interface ScenariosWidgetProps {
@@ -47,7 +47,7 @@ export function ScenariosWidget({ scenarios }: ScenariosWidgetProps) {
           >
             <div>
               <p className="text-sm font-medium text-surface-900">{s.name}</p>
-              <span className="text-xs text-surface-400 capitalize">{s.type}</span>
+              <span className="text-xs text-surface-400 capitalize">{s.source}</span>
             </div>
             <Link
               href="/scenarios"

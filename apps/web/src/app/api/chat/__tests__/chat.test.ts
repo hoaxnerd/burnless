@@ -216,7 +216,7 @@ describe("POST /api/chat", () => {
     mockGetDefaultScenario.mockResolvedValue({
       id: "s1",
       name: "Base Case",
-      type: "base",
+      source: "blank",
     });
 
     // Default: AI context built
@@ -417,7 +417,7 @@ describe("POST /api/chat", () => {
       .mockResolvedValueOnce([]) // #1 monthly messages
       .mockReturnValueOnce({ orderBy: mockOrderBy }) // #2 history → chain to orderBy
       .mockResolvedValueOnce([
-        { id: "custom-scenario-id", name: "Custom", type: "custom", companyId: "c1" },
+        { id: "custom-scenario-id", name: "Custom", source: "ai", companyId: "c1" },
       ]); // #3 scenario found
     mockOrderBy.mockResolvedValueOnce([]); // history messages empty
 

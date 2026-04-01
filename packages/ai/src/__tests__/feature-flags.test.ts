@@ -14,6 +14,7 @@ describe("resolveFeatureStatus", () => {
     masterEnabled: true,
     dataMode: "full",
     writeMode: "full",
+    companionName: "Assistant",
     features: {
       onboarding: true,
       chat: true,
@@ -61,6 +62,7 @@ describe("resolveFeatureStatus", () => {
       masterEnabled: false,
       dataMode: "full",
       writeMode: "full",
+      companionName: "Assistant",
       features: { ...allOn.features, chat: true },
     };
     const status = resolveFeatureStatus(flags, "chat");
@@ -82,19 +84,19 @@ describe("resolveFeatureStatus", () => {
 
 describe("canMakeLlmCall", () => {
   it("returns true when master on and full mode", () => {
-    expect(canMakeLlmCall({ masterEnabled: true, dataMode: "full", writeMode: "full", features: DEFAULT_AI_FLAGS.features })).toBe(true);
+    expect(canMakeLlmCall({ ...DEFAULT_AI_FLAGS, masterEnabled: true, dataMode: "full" })).toBe(true);
   });
 
   it("returns false when master off", () => {
-    expect(canMakeLlmCall({ masterEnabled: false, dataMode: "full", writeMode: "full", features: DEFAULT_AI_FLAGS.features })).toBe(false);
+    expect(canMakeLlmCall({ ...DEFAULT_AI_FLAGS, masterEnabled: false, dataMode: "full" })).toBe(false);
   });
 
   it("returns false in show_cached mode", () => {
-    expect(canMakeLlmCall({ masterEnabled: true, dataMode: "show_cached", writeMode: "full", features: DEFAULT_AI_FLAGS.features })).toBe(false);
+    expect(canMakeLlmCall({ ...DEFAULT_AI_FLAGS, masterEnabled: true, dataMode: "show_cached" })).toBe(false);
   });
 
   it("returns false in hide_all mode", () => {
-    expect(canMakeLlmCall({ masterEnabled: true, dataMode: "hide_all", writeMode: "full", features: DEFAULT_AI_FLAGS.features })).toBe(false);
+    expect(canMakeLlmCall({ ...DEFAULT_AI_FLAGS, masterEnabled: true, dataMode: "hide_all" })).toBe(false);
   });
 });
 

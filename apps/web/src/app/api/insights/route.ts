@@ -189,7 +189,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const { snapshot } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
-    type: scenario.type,
+    source: scenario.source,
   });
 
   // Route to appropriate insight generator

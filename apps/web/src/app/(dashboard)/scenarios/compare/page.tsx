@@ -18,7 +18,7 @@ async function CompareContent({
   const scenarioOptions = allScenarios.map((s) => ({
     id: s.id,
     name: s.name,
-    type: s.type,
+    source: s.source,
   }));
 
   return (

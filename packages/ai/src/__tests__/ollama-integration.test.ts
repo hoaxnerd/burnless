@@ -46,7 +46,7 @@ function makeTestSnapshot(): FinancialSnapshot {
     scenario: {
       id: "s1",
       name: "Base Case",
-      type: "base",
+      source: "blank",
     },
     period: {
       start: "2025-10",
@@ -97,7 +97,7 @@ function makeTestSnapshot(): FinancialSnapshot {
     },
     fundingRounds: [],
     scenarios: [
-      { id: "s1", name: "Base Case", type: "base", isDefault: true },
+      { id: "s1", name: "Base Case", source: "blank", status: "active" },
     ],
     accounts: [],
     departments: [],

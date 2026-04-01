@@ -10,10 +10,10 @@ import { ScenarioCards } from "./scenario-cards";
 interface ScenarioItem {
   id: string;
   name: string;
-  type: string;
-  isDefault: boolean;
-  isBudget: boolean;
   description: string | null;
+  source: string;
+  status: string;
+  color: string | null;
   createdAt: string;
 }
 

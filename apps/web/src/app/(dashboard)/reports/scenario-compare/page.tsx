@@ -32,7 +32,7 @@ export default async function ScenarioComparePage() {
     );
   }
 
-  const scenarioList = allScenarios.map((s) => ({ id: s.id, name: s.name, type: s.type }));
+  const scenarioList = allScenarios.map((s) => ({ id: s.id, name: s.name, source: s.source }));
 
   return (
     <div>

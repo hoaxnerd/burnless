@@ -270,7 +270,7 @@ describe("POST /api/insights", () => {
   it("generates dashboard insights (deterministic)", async () => {
     mockRequireCompanyAccess.mockResolvedValue(CTX);
     mockCheckAiFeatureAllowed.mockResolvedValue({ allowed: true });
-    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", type: "base" });
+    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", source: "blank" });
     mockBuildAiContext.mockResolvedValue({
       snapshot: { keyMetrics: { runway: 8, burnRate: 50000 } },
       contextText: "",
@@ -297,7 +297,7 @@ describe("POST /api/insights", () => {
   it("generates LLM page insights for expenses", async () => {
     mockRequireCompanyAccess.mockResolvedValue(CTX);
     mockCheckAiFeatureAllowed.mockResolvedValue({ allowed: true });
-    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", type: "base" });
+    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", source: "blank" });
     mockBuildAiContext.mockResolvedValue({
       snapshot: { keyMetrics: {} },
       contextText: "",
@@ -324,7 +324,7 @@ describe("POST /api/insights", () => {
   it("gracefully handles LLM failure", async () => {
     mockRequireCompanyAccess.mockResolvedValue(CTX);
     mockCheckAiFeatureAllowed.mockResolvedValue({ allowed: true });
-    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", type: "base" });
+    mockGetDefaultScenario.mockResolvedValue({ id: "s1", name: "Base", source: "blank" });
     mockBuildAiContext.mockResolvedValue({
       snapshot: { keyMetrics: {} },
       contextText: "",

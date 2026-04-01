@@ -84,8 +84,6 @@ const IDS = {
   flPaymentPctOf: "00000000-0000-4000-a000-000000000303",
   flSoftwareFixed: "00000000-0000-4000-a000-000000000304",
   // Best/worst scenario lines
-  flBestRevGrowth: "00000000-0000-4000-a000-000000000310",
-  flWorstRevGrowth: "00000000-0000-4000-a000-000000000320",
 
   // Revenue Streams (base scenario)
   rsSubscription: "00000000-0000-4000-a000-000000000400",
@@ -376,22 +374,19 @@ async function seed() {
     {
       id: IDS.scenarioBase,
       name: "Base Case",
-      type: "base" as const,
-      isDefault: true,
+      source: "blank" as const,
       description: "Realistic growth trajectory based on current metrics",
     },
     {
       id: IDS.scenarioBest,
       name: "Best Case",
-      type: "best" as const,
-      isDefault: false,
+      source: "clone" as const,
       description: "Aggressive growth with product-market fit acceleration",
     },
     {
       id: IDS.scenarioWorst,
       name: "Worst Case",
-      type: "worst" as const,
-      isDefault: false,
+      source: "clone" as const,
       description: "Conservative with extended sales cycles and higher churn",
     },
   ];
@@ -413,7 +408,7 @@ async function seed() {
     // fixed — Office rent $4,500/mo
     {
       id: IDS.flOfficeRent,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       accountId: IDS.acctOffice,
       method: "fixed" as const,
       parameters: { amount: 4500 },
@@ -423,7 +418,7 @@ async function seed() {
     // growth_rate — Marketing spend starting $8,000/mo, +5% MoM
     {
       id: IDS.flMarketingGrowth,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       accountId: IDS.acctMarketing,
       method: "growth_rate" as const,
       parameters: { baseAmount: 8000, monthlyGrowthRate: 0.05 },
@@ -433,7 +428,7 @@ async function seed() {
     // per_unit — Cloud infra: 500 units @ $12/unit, 8% unit growth
     {
       id: IDS.flCloudPerUnit,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       accountId: IDS.acctCloudInfra,
       method: "per_unit" as const,
       parameters: {
@@ -448,7 +443,7 @@ async function seed() {
     // percentage_of — Payment processing = 2.9% of SaaS Revenue forecast
     {
       id: IDS.flPaymentPctOf,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       accountId: IDS.acctPaymentProcessing,
       method: "percentage_of" as const,
       parameters: {
@@ -461,30 +456,10 @@ async function seed() {
     // fixed — Software tools $2,800/mo
     {
       id: IDS.flSoftwareFixed,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       accountId: IDS.acctSoftwareTools,
       method: "fixed" as const,
       parameters: { amount: 2800 },
-      startDate: forecastStart,
-      endDate: forecastEnd,
-    },
-    // Best scenario: aggressive marketing growth +10% MoM
-    {
-      id: IDS.flBestRevGrowth,
-      scenarioId: IDS.scenarioBest,
-      accountId: IDS.acctMarketing,
-      method: "growth_rate" as const,
-      parameters: { baseAmount: 12000, monthlyGrowthRate: 0.1 },
-      startDate: forecastStart,
-      endDate: forecastEnd,
-    },
-    // Worst scenario: flat marketing
-    {
-      id: IDS.flWorstRevGrowth,
-      scenarioId: IDS.scenarioWorst,
-      accountId: IDS.acctMarketing,
-      method: "fixed" as const,
-      parameters: { amount: 5000 },
       startDate: forecastStart,
       endDate: forecastEnd,
     },
@@ -500,7 +475,7 @@ async function seed() {
   const revenueStreamData = [
     {
       id: IDS.rsSubscription,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       name: "Core Platform",
       type: "subscription" as const,
       parameters: {
@@ -514,7 +489,7 @@ async function seed() {
     },
     {
       id: IDS.rsOneTime,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       name: "Setup & Onboarding Fees",
       type: "one_time" as const,
       parameters: {
@@ -525,7 +500,7 @@ async function seed() {
     },
     {
       id: IDS.rsUsageBased,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       name: "API Usage",
       type: "usage_based" as const,
       parameters: {
@@ -538,7 +513,7 @@ async function seed() {
     },
     {
       id: IDS.rsServices,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       name: "Consulting & Implementation",
       type: "services" as const,
       parameters: {
@@ -560,7 +535,7 @@ async function seed() {
   const headcountData = [
     {
       id: IDS.hcEngineers,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptEngineering,
       title: "Software Engineer",
       count: 4,
@@ -570,7 +545,7 @@ async function seed() {
     },
     {
       id: IDS.hcVpEng,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptEngineering,
       title: "VP of Engineering",
       count: 1,
@@ -580,7 +555,7 @@ async function seed() {
     },
     {
       id: IDS.hcSdrs,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptSales,
       title: "Sales Development Rep",
       count: 2,
@@ -590,7 +565,7 @@ async function seed() {
     },
     {
       id: IDS.hcAe,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptSales,
       title: "Account Executive",
       count: 1,
@@ -600,7 +575,7 @@ async function seed() {
     },
     {
       id: IDS.hcPm,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptProduct,
       title: "Product Manager",
       count: 1,
@@ -610,7 +585,7 @@ async function seed() {
     },
     {
       id: IDS.hcDesigner,
-      scenarioId: IDS.scenarioBase,
+      companyId: IDS.company,
       departmentId: IDS.deptProduct,
       title: "Product Designer",
       count: 1,

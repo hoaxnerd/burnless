@@ -3,7 +3,6 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import { getCompany, getScenarios } from "@/lib/data";
-import { CreateScenarioDialog } from "./create-scenario-dialog";
 import { ScenariosView } from "./scenarios-view";
 
 async function ScenariosContent() {
@@ -13,10 +12,10 @@ async function ScenariosContent() {
   const scenarioData = scenarioList.map((s) => ({
     id: s.id,
     name: s.name,
-    type: s.type,
-    isDefault: s.isDefault,
-    isBudget: s.isBudget,
     description: s.description,
+    source: s.source,
+    status: s.status,
+    color: s.color,
     createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
   }));
 
@@ -33,7 +32,7 @@ export default function ScenariosPage() {
             Model different futures for your business
           </p>
         </div>
-        <CreateScenarioDialog />
+        {/* TODO(Task 13): Add CreateScenarioModal here */}
       </div>
 
       <Suspense fallback={<ScenariosListSkeleton />}>

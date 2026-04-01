@@ -259,8 +259,7 @@ async function seedTestAccounts() {
     id: FREE.scenario,
     companyId: FREE.company,
     name: "Base Plan",
-    type: "base",
-    isDefault: true,
+    source: "blank",
     description: "Default scenario from onboarding",
   }).onConflictDoNothing();
 
@@ -330,9 +329,9 @@ async function seedTestAccounts() {
 
   console.log("    → 3 scenarios (base/best/worst)");
   for (const s of [
-    { id: PRO.scenarioBase, name: "Base Case", type: "base" as const, isDefault: true, description: "Realistic growth trajectory" },
-    { id: PRO.scenarioBest, name: "Best Case", type: "best" as const, isDefault: false, description: "Accelerated growth scenario" },
-    { id: PRO.scenarioWorst, name: "Worst Case", type: "worst" as const, isDefault: false, description: "Conservative downside scenario" },
+    { id: PRO.scenarioBase, name: "Base Case", source: "blank" as const, description: "Realistic growth trajectory" },
+    { id: PRO.scenarioBest, name: "Best Case", source: "clone" as const, description: "Accelerated growth scenario" },
+    { id: PRO.scenarioWorst, name: "Worst Case", source: "clone" as const, description: "Conservative downside scenario" },
   ]) {
     await db.insert(schema.scenarios).values({ ...s, companyId: PRO.company }).onConflictDoNothing();
   }
@@ -340,7 +339,7 @@ async function seedTestAccounts() {
   console.log("    → Revenue stream + forecast lines");
   await db.insert(schema.revenueStreams).values({
     id: PRO.rsSubscription,
-    scenarioId: PRO.scenarioBase,
+    companyId: PRO.company,
     name: "Platform Subscriptions",
     type: "subscription",
     parameters: {
@@ -356,8 +355,8 @@ async function seedTestAccounts() {
   const forecastStart = monthDate(2026, 1);
   const forecastEnd = monthDate(2026, 12);
   for (const fl of [
-    { id: PRO.flMarketing, scenarioId: PRO.scenarioBase, accountId: PRO.acctMarketing, method: "growth_rate" as const, parameters: { baseAmount: 5000, monthlyGrowthRate: 0.04 }, startDate: forecastStart, endDate: forecastEnd },
-    { id: PRO.flCloud, scenarioId: PRO.scenarioBase, accountId: PRO.acctCloud, method: "fixed" as const, parameters: { amount: 2200 }, startDate: forecastStart, endDate: forecastEnd },
+    { id: PRO.flMarketing, companyId: PRO.company, accountId: PRO.acctMarketing, method: "growth_rate" as const, parameters: { baseAmount: 5000, monthlyGrowthRate: 0.04 }, startDate: forecastStart, endDate: forecastEnd },
+    { id: PRO.flCloud, companyId: PRO.company, accountId: PRO.acctCloud, method: "fixed" as const, parameters: { amount: 2200 }, startDate: forecastStart, endDate: forecastEnd },
   ]) {
     await db.insert(schema.forecastLines).values(fl).onConflictDoNothing();
   }
@@ -378,7 +377,7 @@ async function seedTestAccounts() {
   console.log("    → Headcount plan");
   await db.insert(schema.headcountPlans).values({
     id: PRO.hcEngineers,
-    scenarioId: PRO.scenarioBase,
+    companyId: PRO.company,
     departmentId: PRO.deptEngineering,
     title: "Software Engineer",
     count: 3,
@@ -544,10 +543,10 @@ async function seedTestAccounts() {
 
   console.log("    → 4 scenarios (base/best/worst/custom)");
   for (const s of [
-    { id: TEAM.scenarioBase, name: "Base Case", type: "base" as const, isDefault: true, description: "Conservative growth with Series A runway" },
-    { id: TEAM.scenarioBest, name: "Best Case", type: "best" as const, isDefault: false, description: "Product-market fit acceleration" },
-    { id: TEAM.scenarioWorst, name: "Worst Case", type: "worst" as const, isDefault: false, description: "Extended sales cycles, higher churn" },
-    { id: TEAM.scenarioCustom, name: "Board Presentation", type: "custom" as const, isDefault: false, description: "Tailored for Q2 board meeting" },
+    { id: TEAM.scenarioBase, name: "Base Case", source: "blank" as const, description: "Conservative growth with Series A runway" },
+    { id: TEAM.scenarioBest, name: "Best Case", source: "clone" as const, description: "Product-market fit acceleration" },
+    { id: TEAM.scenarioWorst, name: "Worst Case", source: "clone" as const, description: "Extended sales cycles, higher churn" },
+    { id: TEAM.scenarioCustom, name: "Board Presentation", source: "ai" as const, description: "Tailored for Q2 board meeting" },
   ]) {
     await db.insert(schema.scenarios).values({ ...s, companyId: TEAM.company }).onConflictDoNothing();
   }
@@ -555,7 +554,7 @@ async function seedTestAccounts() {
   console.log("    → Revenue streams");
   await db.insert(schema.revenueStreams).values({
     id: TEAM.rsSubscription,
-    scenarioId: TEAM.scenarioBase,
+    companyId: TEAM.company,
     name: "Enterprise SaaS",
     type: "subscription",
     parameters: {
@@ -570,7 +569,7 @@ async function seedTestAccounts() {
 
   await db.insert(schema.revenueStreams).values({
     id: TEAM.rsServices,
-    scenarioId: TEAM.scenarioBase,
+    companyId: TEAM.company,
     name: "Implementation Services",
     type: "services",
     parameters: {
@@ -585,8 +584,8 @@ async function seedTestAccounts() {
   const teamForecastStart = monthDate(2026, 1);
   const teamForecastEnd = monthDate(2026, 12);
   for (const fl of [
-    { id: TEAM.flSalaries, scenarioId: TEAM.scenarioBase, accountId: TEAM.acctSalaries, method: "growth_rate" as const, parameters: { baseAmount: 95000, monthlyGrowthRate: 0.02 }, startDate: teamForecastStart, endDate: teamForecastEnd },
-    { id: TEAM.flCloud, scenarioId: TEAM.scenarioBase, accountId: TEAM.acctCloud, method: "per_unit" as const, parameters: { units: 200, pricePerUnit: 25, unitGrowthRate: 0.06, priceGrowthRate: 0 }, startDate: teamForecastStart, endDate: teamForecastEnd },
+    { id: TEAM.flSalaries, companyId: TEAM.company, accountId: TEAM.acctSalaries, method: "growth_rate" as const, parameters: { baseAmount: 95000, monthlyGrowthRate: 0.02 }, startDate: teamForecastStart, endDate: teamForecastEnd },
+    { id: TEAM.flCloud, companyId: TEAM.company, accountId: TEAM.acctCloud, method: "per_unit" as const, parameters: { units: 200, pricePerUnit: 25, unitGrowthRate: 0.06, priceGrowthRate: 0 }, startDate: teamForecastStart, endDate: teamForecastEnd },
   ]) {
     await db.insert(schema.forecastLines).values(fl).onConflictDoNothing();
   }
@@ -601,8 +600,8 @@ async function seedTestAccounts() {
 
   console.log("    → Headcount plans");
   for (const hc of [
-    { id: TEAM.hcEngineers, scenarioId: TEAM.scenarioBase, departmentId: TEAM.deptEngineering, title: "Software Engineer", count: 8, salary: "140000.00", startDate: monthDate(2025, 1), benefitsRate: "0.2200" },
-    { id: TEAM.hcSales, scenarioId: TEAM.scenarioBase, departmentId: TEAM.deptSales, title: "Account Executive", count: 3, salary: "100000.00", startDate: monthDate(2025, 6), benefitsRate: "0.2000" },
+    { id: TEAM.hcEngineers, companyId: TEAM.company, departmentId: TEAM.deptEngineering, title: "Software Engineer", count: 8, salary: "140000.00", startDate: monthDate(2025, 1), benefitsRate: "0.2200" },
+    { id: TEAM.hcSales, companyId: TEAM.company, departmentId: TEAM.deptSales, title: "Account Executive", count: 3, salary: "100000.00", startDate: monthDate(2025, 6), benefitsRate: "0.2000" },
   ]) {
     await db.insert(schema.headcountPlans).values(hc).onConflictDoNothing();
   }
