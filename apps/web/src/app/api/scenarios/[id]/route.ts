@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, scenarios, updateForCompany } from "@burnless/db";
+import { db, scenarios, getOverrideCount } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { updateScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -27,7 +27,9 @@ export const GET = withErrorHandler(async (
 
   const row = await findScenario(id, ctx.companyId);
   if (!row) return errorResponse("Scenario not found", 404);
-  return NextResponse.json(row);
+
+  const overrideCount = await getOverrideCount(id);
+  return NextResponse.json({ ...row, overrideCount });
 });
 
 export const PATCH = withErrorHandler(async (
@@ -47,15 +49,12 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateScenarioSchema);
   if ("error" in parsed) return parsed.error;
 
-  // If locking as budget, set budgetLockedAt
-  const updates: Record<string, unknown> = { ...parsed.data };
-  if (parsed.data.isBudget === true) {
-    updates.budgetLockedAt = new Date();
-  } else if (parsed.data.isBudget === false) {
-    updates.budgetLockedAt = null;
-  }
+  const [row] = await db
+    .update(scenarios)
+    .set(parsed.data)
+    .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId)))
+    .returning();
 
-  const row = await updateForCompany(scenarios, id, ctx.companyId, updates);
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "scenarios");

@@ -1,38 +1,33 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, forecastLines, getScenarioForCompany } from "@burnless/db";
+import { db, forecastLines, resolveEntities, scenarioInsert } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
 import { createForecastLineSchema } from "@burnless/types";
-import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
   const url = new URL(request.url);
-  const scenarioId = url.searchParams.get("scenarioId");
-  if (!scenarioId) return errorResponse("scenarioId required", 400);
+  const scenarioId = getActiveScenario(request) ?? url.searchParams.get("scenarioId");
 
-  const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
-  if (!scenario) return errorResponse("Scenario not found", 404);
-
-  const { limit, cursor } = parsePaginationParams(request);
-
-  const conditions = [eq(forecastLines.scenarioId, scenarioId)];
-  if (cursor) {
-    conditions.push(lt(forecastLines.id, cursor));
-  }
-
-  const rows = await db
+  // Fetch base forecast lines for the company
+  const base = await db
     .select()
     .from(forecastLines)
-    .where(and(...conditions))
-    .limit(limit + 1);
+    .where(eq(forecastLines.companyId, ctx.companyId));
 
-  return NextResponse.json(paginatedResponse(rows, limit));
+  // Resolve with scenario overrides
+  const resolved = await resolveEntities("forecast_line", base, scenarioId);
+
+  const { limit, cursor } = parsePaginationParams(request);
+  const filtered = cursor ? resolved.filter((r) => r.id < cursor) : resolved;
+  return NextResponse.json(paginatedResponse(filtered.slice(0, limit + 1), limit));
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -41,16 +36,13 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
+  const scenarioId = getActiveScenario(request);
+
   const parsed = await parseBody(request, createForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
-  const scenario = await getScenarioForCompany(parsed.data.scenarioId, ctx.companyId);
-  if (!scenario) return errorResponse("Scenario not found", 404);
-
-  const [row] = await db
-    .insert(forecastLines)
-    .values(parsed.data)
-    .returning();
+  const data = { ...parsed.data, companyId: ctx.companyId };
+  const row = await scenarioInsert("forecast_line", forecastLines, data, scenarioId);
 
   if (row) await logAudit(ctx, "forecast_line", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");

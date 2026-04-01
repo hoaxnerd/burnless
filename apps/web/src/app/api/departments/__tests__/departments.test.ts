@@ -1,3 +1,7 @@
+/**
+ * Tests for GET /api/departments and POST /api/departments.
+ * Updated for overlay scenario system.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
@@ -6,200 +10,110 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
-const {
-  mockSelect,
-  mockFrom,
-  mockWhere,
-  mockInsert,
-  mockValues,
-  mockReturning,
-} = vi.hoisted(() => ({
+const { mockSelect, mockFrom, mockWhere, mockResolveEntities, mockScenarioInsert } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
-  mockInsert: vi.fn(),
-  mockValues: vi.fn(),
-  mockReturning: vi.fn(),
+  mockResolveEntities: vi.fn(),
+  mockScenarioInsert: vi.fn(),
+}));
+
+const { mockGetActiveScenario } = vi.hoisted(() => ({
+  mockGetActiveScenario: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
-  parseBody: async (
-    req: Request,
-    schema: { parse: (d: unknown) => unknown }
-  ) => {
-    try {
-      const body = await req.json();
-      return { data: schema.parse(body) };
-    } catch {
-      return {
-        error: NextResponse.json(
-          { error: "Validation failed" },
-          { status: 400 }
-        ),
-      };
-    }
+  parseBody: async (req: Request, schema: { parse: (d: unknown) => unknown }) => {
+    try { return { data: schema.parse(await req.json()) }; }
+    catch { return { error: NextResponse.json({ error: "Validation failed" }, { status: 400 }) }; }
   },
-  errorResponse: (msg: string, status: number) =>
-    NextResponse.json({ error: msg }, { status }),
+  errorResponse: (msg: string, status: number) => NextResponse.json({ error: msg }, { status }),
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: {
-    select: mockSelect,
-    insert: mockInsert,
-  },
-  departments: {
-    companyId: "companyId",
-    id: "id",
-    name: "name",
-    parentId: "parentId",
-  },
+  db: { select: mockSelect },
+  departments: { companyId: "companyId", id: "id" },
+  resolveEntities: mockResolveEntities,
+  scenarioInsert: mockScenarioInsert,
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-}));
-
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), gt: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
+vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
 
 import { GET, POST } from "../route";
 
 function jsonRequest(url: string, method: string, body?: unknown): Request {
-  const opts: RequestInit = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
+  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   return new Request(url, opts);
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "comp-1", role: "owner" });
+  mockRequireRole.mockReturnValue(null);
+  mockGetActiveScenario.mockReturnValue(null);
+  mockSelect.mockReturnValue({ from: mockFrom });
+  mockFrom.mockReturnValue({ where: mockWhere });
+});
+
 describe("GET /api/departments", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
-  });
-
   it("returns 401 when unauthenticated", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     });
-
-    const req = jsonRequest("http://localhost/api/departments", "GET");
-    const res = await GET(req);
-    const body = await res.json();
-
+    const res = await GET(jsonRequest("http://localhost/api/departments", "GET"));
     expect(res.status).toBe(401);
-    expect(body.error).toBe("Unauthorized");
   });
 
-  it("returns departments list", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-
-    const mockDepts = [
+  it("returns resolved departments list", async () => {
+    const base = [
       { id: "dept-1", companyId: "comp-1", name: "Engineering", parentId: null },
       { id: "dept-2", companyId: "comp-1", name: "Marketing", parentId: null },
     ];
-    mockWhere.mockResolvedValue(mockDepts);
+    mockWhere.mockResolvedValue(base);
+    mockResolveEntities.mockResolvedValue(base.map((e) => ({ ...e, _override: null })));
 
-    const req = jsonRequest("http://localhost/api/departments", "GET");
-    const res = await GET(req);
-    const body = await res.json();
-
+    const res = await GET(jsonRequest("http://localhost/api/departments", "GET"));
     expect(res.status).toBe(200);
+    const body = await res.json();
     expect(body).toHaveLength(2);
     expect(body[0].name).toBe("Engineering");
-    expect(body[1].name).toBe("Marketing");
-    expect(mockSelect).toHaveBeenCalled();
+    expect(mockResolveEntities).toHaveBeenCalledWith("department", base, null);
   });
 });
 
 describe("POST /api/departments", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("creates department via scenarioInsert (201)", async () => {
+    const created = { id: "dept-new", companyId: "comp-1", name: "Design", parentId: null };
+    mockScenarioInsert.mockResolvedValue(created);
 
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
-  });
-
-  it("creates department (201)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(null);
-
-    const createdDept = {
-      id: "dept-new",
-      companyId: "comp-1",
-      name: "Design",
-      parentId: null,
-    };
-    mockReturning.mockResolvedValue([createdDept]);
-
-    const req = jsonRequest("http://localhost/api/departments", "POST", {
-      name: "Design",
-    });
-    const res = await POST(req);
-    const body = await res.json();
-
+    const res = await POST(jsonRequest("http://localhost/api/departments", "POST", { name: "Design" }));
     expect(res.status).toBe(201);
+    const body = await res.json();
     expect(body.id).toBe("dept-new");
-    expect(body.name).toBe("Design");
-    expect(mockInsert).toHaveBeenCalled();
-    expect(mockValues).toHaveBeenCalled();
-    expect(mockReturning).toHaveBeenCalled();
+    expect(mockScenarioInsert).toHaveBeenCalledWith(
+      "department", expect.anything(),
+      expect.objectContaining({ name: "Design", companyId: "comp-1" }),
+      null,
+    );
   });
 
   it("returns 403 for viewer role", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/departments", "POST", {
-      name: "Should Not Create",
-    });
-    const res = await POST(req);
-    const body = await res.json();
-
+    mockRequireRole.mockReturnValue(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+    const res = await POST(jsonRequest("http://localhost/api/departments", "POST", { name: "X" }));
     expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockScenarioInsert).not.toHaveBeenCalled();
   });
 
   it("returns 400 for missing name", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(null);
-
-    const req = jsonRequest("http://localhost/api/departments", "POST", {});
-    const res = await POST(req);
-    const body = await res.json();
-
+    const res = await POST(jsonRequest("http://localhost/api/departments", "POST", {}));
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Validation failed");
   });
 });

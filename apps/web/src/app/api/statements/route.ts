@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { db, scenarios, forecastLines, forecastValues, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { db, forecastValues, getResolvedData } from "@burnless/db";
+import { inArray } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { parseDateRange } from "@/lib/date-validation";
+import { getActiveScenario } from "@/lib/scenario-middleware";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -22,9 +23,10 @@ import {
 } from "@burnless/engine";
 
 /**
- * GET /api/statements?scenarioId=xxx&startDate=2026-01&endDate=2026-12
+ * GET /api/statements?startDate=2026-01&endDate=2026-12
  *
- * Returns computed P&L, Cash Flow, and Balance Sheet for a scenario.
+ * Returns computed P&L, Cash Flow, and Balance Sheet.
+ * Scenario ID comes from the X-Scenario-Id header or ?scenarioId query param.
  */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "heavy");
@@ -34,32 +36,19 @@ export const GET = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const url = new URL(request.url);
-  const scenarioId = url.searchParams.get("scenarioId");
+  const scenarioId = getActiveScenario(request) ?? url.searchParams.get("scenarioId");
   const startDateStr = url.searchParams.get("startDate") ?? "2026-01";
   const endDateStr = url.searchParams.get("endDate") ?? "2026-12";
-
-  if (!scenarioId) return errorResponse("scenarioId required", 400);
-
-  // Verify scenario ownership
-  const [scenario] = await db.select().from(scenarios)
-    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
-  if (!scenario) return errorResponse("Scenario not found", 404);
 
   const dateRange = parseDateRange(startDateStr, endDateStr);
   if ("error" in dateRange) return errorResponse(dateRange.error, 400);
   const { periodStart, periodEnd } = dateRange;
 
-  // Fetch all data in parallel
-  const [fLines, accounts, revStreams, hcPlans, funding] = await Promise.all([
-    db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId)),
-    db.select().from(financialAccounts).where(eq(financialAccounts.companyId, ctx.companyId)),
-    db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId)),
-    db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId)),
-    db.select().from(fundingRounds).where(eq(fundingRounds.companyId, ctx.companyId)),
-  ]);
+  // Resolve all entity types (base + scenario overrides)
+  const data = await getResolvedData(ctx.companyId, scenarioId);
 
-  // Fetch forecast values for all lines
-  const lineIds = fLines.map((l) => l.id);
+  // Fetch forecast values for all forecast lines
+  const lineIds = data.forecastLines.map((l) => l.id);
   const allValues = lineIds.length > 0
     ? await db.select().from(forecastValues).where(
         inArray(forecastValues.forecastLineId, lineIds)
@@ -79,7 +68,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   }
 
   // Build forecast line inputs
-  const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
+  const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
     id: fl.id,
     accountId: fl.accountId,
     method: fl.method,
@@ -94,7 +83,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
 
   // Compute revenue from revenue streams
-  const revInputs: RevenueStreamInput[] = revStreams.map((rs) => ({
+  const revInputs: RevenueStreamInput[] = data.revenueStreams.map((rs) => ({
     id: rs.id,
     name: rs.name,
     type: rs.type,
@@ -103,7 +92,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
 
   // Compute headcount costs
-  const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({
+  const hcInputs: HeadcountPlanInput[] = data.headcountPlans.map((hp) => ({
     id: hp.id,
     departmentId: hp.departmentId,
     title: hp.title,
@@ -116,6 +105,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
   // Build account data for statement generation
+  const accounts = data.financialAccounts;
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
   const accountDataList: AccountData[] = [];
 
@@ -160,7 +150,8 @@ export const GET = withErrorHandler(async (request: Request) => {
     });
   }
 
-  // Compute funding inflows
+  // Compute funding inflows (resolved through scenario overlay)
+  const funding = data.fundingRounds;
   const fundingInflows: MonthlySeries = new Map();
   for (const round of funding) {
     if (round.isProjected || round.date >= periodStart) {
@@ -175,7 +166,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const balanceSheet = generateBalanceSheet(accountDataList);
 
   return NextResponse.json({
-    scenario: { id: scenario.id, name: scenario.name, type: scenario.type },
+    scenarioId: scenarioId ?? null,
     period: { start: startDateStr, end: endDateStr },
     profitAndLoss: pnl,
     cashFlow,

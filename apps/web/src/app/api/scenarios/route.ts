@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, scenarios } from "@burnless/db";
+import { db, scenarios, getOverrideCount } from "@burnless/db";
 import { eq, and, gt, sql, isNull } from "drizzle-orm";
 import { createScenarioSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, requirePlanFeature, withErrorHandler } from "@/lib/api-helpers";
@@ -21,7 +21,15 @@ export const GET = withErrorHandler(async (request: Request) => {
       ? and(eq(scenarios.companyId, ctx.companyId), gt(scenarios.id, cursor), isNull(scenarios.deletedAt))
       : and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt));
     const rows = await db.select().from(scenarios).where(where).orderBy(scenarios.createdAt).limit(limit + 1);
-    return NextResponse.json(paginatedResponse(rows, limit));
+
+    // Attach override counts
+    const withCounts = await Promise.all(
+      rows.map(async (s) => ({
+        ...s,
+        overrideCount: await getOverrideCount(s.id),
+      }))
+    );
+    return NextResponse.json(paginatedResponse(withCounts, limit));
   }
 
   const rows = await db
@@ -30,7 +38,15 @@ export const GET = withErrorHandler(async (request: Request) => {
     .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)))
     .orderBy(scenarios.createdAt);
 
-  return NextResponse.json(rows);
+  // Attach override counts
+  const withCounts = await Promise.all(
+    rows.map(async (s) => ({
+      ...s,
+      overrideCount: await getOverrideCount(s.id),
+    }))
+  );
+
+  return NextResponse.json(withCounts);
 });
 
 export const POST = withErrorHandler(async (request: Request) => {

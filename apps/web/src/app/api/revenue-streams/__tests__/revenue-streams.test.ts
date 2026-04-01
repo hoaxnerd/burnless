@@ -1,15 +1,13 @@
 /**
- * Integration tests for /api/revenue-streams and /api/revenue-streams/[id] routes.
+ * Tests for GET /api/revenue-streams and POST /api/revenue-streams.
  *
- * Covers GET (list with scenarioId validation), POST (create),
- * PATCH (update), and DELETE with auth, RBAC, and validation checks.
+ * Updated for the overlay scenario system:
+ * - GET fetches base entities by companyId, then resolves via resolveEntities
+ * - POST uses scenarioInsert to route to base or override
+ * - scenarioId comes from header via getActiveScenario (or query param fallback)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
-
-/* ------------------------------------------------------------------ */
-/* Hoisted mocks                                                      */
-/* ------------------------------------------------------------------ */
 
 const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
@@ -20,31 +18,19 @@ const {
   mockSelect,
   mockFrom,
   mockWhere,
-  mockLimit,
-  mockInsert,
-  mockValues,
-  mockReturning,
-  mockUpdate,
-  mockSet,
-  mockDelete,
-  mockOrderBy,
+  mockResolveEntities,
+  mockScenarioInsert,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
-  mockLimit: vi.fn(),
-  mockOrderBy: vi.fn(),
-  mockInsert: vi.fn(),
-  mockValues: vi.fn(),
-  mockReturning: vi.fn(),
-  mockUpdate: vi.fn(),
-  mockSet: vi.fn(),
-  mockDelete: vi.fn(),
+  mockResolveEntities: vi.fn(),
+  mockScenarioInsert: vi.fn(),
 }));
 
-/* ------------------------------------------------------------------ */
-/* Module mocks                                                       */
-/* ------------------------------------------------------------------ */
+const { mockGetActiveScenario } = vi.hoisted(() => ({
+  mockGetActiveScenario: vi.fn(),
+}));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
@@ -63,36 +49,21 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: {
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-    delete: mockDelete,
-  },
-  revenueStreams: { scenarioId: "scenarioId", id: "id" },
-  scenarios: { id: "id", companyId: "companyId" },
+  db: { select: mockSelect },
+  revenueStreams: { companyId: "companyId", id: "id" },
+  resolveEntities: mockResolveEntities,
+  scenarioInsert: mockScenarioInsert,
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  inArray: vi.fn(),
-  isNull: vi.fn(),
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), gt: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
+vi.mock("@/lib/scenario-middleware", () => ({
+  getActiveScenario: mockGetActiveScenario,
 }));
-
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
-
-/* ------------------------------------------------------------------ */
-/* Route imports (AFTER mocks are registered)                         */
-/* ------------------------------------------------------------------ */
 
 import { GET, POST } from "../route";
-import { PATCH, DELETE } from "../[id]/route";
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
 
 function jsonRequest(url: string, method: string, body?: unknown): Request {
   const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
@@ -100,240 +71,120 @@ function jsonRequest(url: string, method: string, body?: unknown): Request {
   return new Request(url, opts);
 }
 
-function makeParams(id: string) {
-  return { params: Promise.resolve({ id }) };
-}
-
-const VALID_REVENUE_STREAM = {
-  scenarioId: "scen-1",
-  name: "SaaS Subscriptions",
-  type: "subscription" as const,
-  parameters: { price: 49, growthRate: 0.1 },
-};
-
-/* ------------------------------------------------------------------ */
-/* Setup                                                              */
-/* ------------------------------------------------------------------ */
-
 beforeEach(() => {
   vi.clearAllMocks();
-
-  // Default: authenticated owner
   mockRequireCompanyAccess.mockResolvedValue({
-    userId: "user-1",
-    companyId: "comp-1",
-    role: "owner",
+    userId: "user-1", companyId: "comp-1", role: "owner",
   });
   mockRequireRole.mockReturnValue(null);
+  mockGetActiveScenario.mockReturnValue(null);
 
-  // Re-chain DB mocks
   mockSelect.mockReturnValue({ from: mockFrom });
   mockFrom.mockReturnValue({ where: mockWhere });
-  mockWhere.mockReturnValue({ limit: mockLimit, orderBy: mockOrderBy, returning: mockReturning });
-  mockOrderBy.mockReturnValue({ limit: mockLimit });
-  mockInsert.mockReturnValue({ values: mockValues });
-  mockValues.mockReturnValue({ returning: mockReturning });
-  mockUpdate.mockReturnValue({ set: mockSet });
-  mockSet.mockReturnValue({ where: mockWhere });
-  mockDelete.mockReturnValue({ where: mockWhere });
 });
-
-/* ================================================================== */
-/* GET /api/revenue-streams                                           */
-/* ================================================================== */
 
 describe("GET /api/revenue-streams", () => {
   it("returns 401 when unauthenticated", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     });
-
-    const res = await GET(
-      jsonRequest("http://localhost/api/revenue-streams?scenarioId=scen-1", "GET"),
-    );
-
+    const res = await GET(jsonRequest("http://localhost/api/revenue-streams", "GET"));
     expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.error).toBe("Unauthorized");
   });
 
-  it("returns 400 when scenarioId is missing", async () => {
-    const res = await GET(
-      jsonRequest("http://localhost/api/revenue-streams", "GET"),
-    );
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe("scenarioId required");
-  });
-
-  it("returns 404 when scenario not found", async () => {
-    // Scenario lookup returns empty
-    mockWhere.mockResolvedValueOnce([]);
-
-    const res = await GET(
-      jsonRequest("http://localhost/api/revenue-streams?scenarioId=scen-missing", "GET"),
-    );
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toBe("Scenario not found");
-  });
-
-  it("returns revenue streams for valid scenario", async () => {
-    const streams = [
+  it("returns resolved revenue streams (no scenario)", async () => {
+    const base = [
       { id: "rs-1", name: "SaaS", type: "subscription" },
       { id: "rs-2", name: "Consulting", type: "services" },
     ];
-
-    // First call: scenario lookup succeeds
-    mockWhere.mockResolvedValueOnce([{ id: "scen-1" }]);
-    // Second call: revenue streams list
-    mockWhere.mockResolvedValueOnce(streams);
-
-    const res = await GET(
-      jsonRequest("http://localhost/api/revenue-streams?scenarioId=scen-1", "GET"),
+    mockWhere.mockResolvedValue(base);
+    mockResolveEntities.mockResolvedValue(
+      base.map((e) => ({ ...e, _override: null }))
     );
 
+    const res = await GET(jsonRequest("http://localhost/api/revenue-streams", "GET"));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual(streams);
     expect(body).toHaveLength(2);
-    expect(mockSelect).toHaveBeenCalledTimes(2);
+    expect(mockResolveEntities).toHaveBeenCalledWith("revenue_stream", base, null);
+  });
+
+  it("passes scenarioId from header to resolveEntities", async () => {
+    mockGetActiveScenario.mockReturnValue("scen-1");
+    const base = [{ id: "rs-1", name: "SaaS", type: "subscription" }];
+    mockWhere.mockResolvedValue(base);
+    mockResolveEntities.mockResolvedValue(
+      base.map((e) => ({ ...e, _override: null }))
+    );
+
+    await GET(jsonRequest("http://localhost/api/revenue-streams", "GET"));
+    expect(mockResolveEntities).toHaveBeenCalledWith("revenue_stream", base, "scen-1");
+  });
+
+  it("falls back to scenarioId query param", async () => {
+    mockGetActiveScenario.mockReturnValue(null);
+    const base = [{ id: "rs-1", name: "SaaS", type: "subscription" }];
+    mockWhere.mockResolvedValue(base);
+    mockResolveEntities.mockResolvedValue(
+      base.map((e) => ({ ...e, _override: null }))
+    );
+
+    await GET(jsonRequest("http://localhost/api/revenue-streams?scenarioId=scen-2", "GET"));
+    expect(mockResolveEntities).toHaveBeenCalledWith("revenue_stream", base, "scen-2");
   });
 });
 
-/* ================================================================== */
-/* POST /api/revenue-streams                                          */
-/* ================================================================== */
-
 describe("POST /api/revenue-streams", () => {
-  it("creates a revenue stream (201)", async () => {
-    const created = { id: "rs-new", ...VALID_REVENUE_STREAM };
-
-    // Scenario lookup succeeds
-    mockWhere.mockResolvedValueOnce([{ id: "scen-1" }]);
-    // Insert returns the new row
-    mockReturning.mockResolvedValue([created]);
+  it("creates a revenue stream via scenarioInsert (201)", async () => {
+    const created = { id: "rs-new", name: "SaaS Subscriptions", type: "subscription", companyId: "comp-1" };
+    mockScenarioInsert.mockResolvedValue(created);
 
     const res = await POST(
-      jsonRequest("http://localhost/api/revenue-streams", "POST", VALID_REVENUE_STREAM),
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "SaaS Subscriptions",
+        type: "subscription",
+        parameters: { price: 49 },
+      }),
     );
 
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toBe("rs-new");
-    expect(body.name).toBe("SaaS Subscriptions");
-    expect(mockInsert).toHaveBeenCalled();
+    expect(mockScenarioInsert).toHaveBeenCalledWith(
+      "revenue_stream",
+      expect.anything(),
+      expect.objectContaining({ name: "SaaS Subscriptions", companyId: "comp-1" }),
+      null,
+    );
+  });
+
+  it("passes scenarioId from header to scenarioInsert", async () => {
+    mockGetActiveScenario.mockReturnValue("scen-1");
+    mockScenarioInsert.mockResolvedValue({ id: "rs-new" });
+
+    await POST(
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "Test",
+        type: "subscription",
+      }),
+    );
+    expect(mockScenarioInsert).toHaveBeenCalledWith(
+      "revenue_stream",
+      expect.anything(),
+      expect.anything(),
+      "scen-1",
+    );
   });
 
   it("returns 403 for viewer role", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
     mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden: requires editor role or higher" }, { status: 403 }),
+      NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     );
-
     const res = await POST(
-      jsonRequest("http://localhost/api/revenue-streams", "POST", VALID_REVENUE_STREAM),
-    );
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toContain("Forbidden");
-  });
-
-  it("returns 404 when scenario not found", async () => {
-    // Scenario lookup returns empty
-    mockWhere.mockResolvedValueOnce([]);
-
-    const res = await POST(
-      jsonRequest("http://localhost/api/revenue-streams", "POST", VALID_REVENUE_STREAM),
-    );
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toBe("Scenario not found");
-  });
-});
-
-/* ================================================================== */
-/* PATCH /api/revenue-streams/[id]                                    */
-/* ================================================================== */
-
-describe("PATCH /api/revenue-streams/[id]", () => {
-  it("updates a revenue stream", async () => {
-    const updated = { id: "rs-1", name: "Enterprise SaaS", type: "subscription" };
-    mockReturning.mockResolvedValue([updated]);
-
-    const res = await PATCH(
-      jsonRequest("http://localhost/api/revenue-streams/rs-1", "PATCH", {
-        name: "Enterprise SaaS",
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "Test", type: "subscription",
       }),
-      makeParams("rs-1"),
     );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.name).toBe("Enterprise SaaS");
-    expect(mockUpdate).toHaveBeenCalled();
-  });
-
-  it("returns 404 when revenue stream not found", async () => {
-    mockReturning.mockResolvedValue([undefined]);
-
-    const res = await PATCH(
-      jsonRequest("http://localhost/api/revenue-streams/rs-missing", "PATCH", {
-        name: "Nope",
-      }),
-      makeParams("rs-missing"),
-    );
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toBe("Revenue stream not found");
-  });
-});
-
-/* ================================================================== */
-/* DELETE /api/revenue-streams/[id]                                   */
-/* ================================================================== */
-
-describe("DELETE /api/revenue-streams/[id]", () => {
-  it("deletes a revenue stream", async () => {
-    mockReturning.mockResolvedValue([{ id: "rs-1" }]);
-
-    const res = await DELETE(
-      jsonRequest("http://localhost/api/revenue-streams/rs-1", "DELETE"),
-      makeParams("rs-1"),
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.deleted).toBe(true);
-    expect(mockDelete).toHaveBeenCalled();
-  });
-
-  it("returns 403 for editor role (requires admin)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden: requires admin role or higher" }, { status: 403 }),
-    );
-
-    const res = await DELETE(
-      jsonRequest("http://localhost/api/revenue-streams/rs-1", "DELETE"),
-      makeParams("rs-1"),
-    );
-
     expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toContain("Forbidden");
   });
 });

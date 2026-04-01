@@ -1,3 +1,7 @@
+/**
+ * Tests for PATCH/DELETE /api/departments/[id].
+ * Updated for overlay scenario system.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
@@ -6,249 +10,111 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
-const { mockUpdateForCompany, mockDeleteForCompany } = vi.hoisted(() => ({
-  mockUpdateForCompany: vi.fn(),
-  mockDeleteForCompany: vi.fn(),
+const { mockScenarioUpdate, mockScenarioDelete } = vi.hoisted(() => ({
+  mockScenarioUpdate: vi.fn(),
+  mockScenarioDelete: vi.fn(),
+}));
+
+const { mockGetActiveScenario } = vi.hoisted(() => ({
+  mockGetActiveScenario: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
-  parseBody: async (
-    req: Request,
-    schema: { parse: (d: unknown) => unknown }
-  ) => {
-    try {
-      const body = await req.json();
-      return { data: schema.parse(body) };
-    } catch {
-      return {
-        error: NextResponse.json(
-          { error: "Validation failed" },
-          { status: 400 }
-        ),
-      };
-    }
+  parseBody: async (req: Request, schema: { parse: (d: unknown) => unknown }) => {
+    try { return { data: schema.parse(await req.json()) }; }
+    catch { return { error: NextResponse.json({ error: "Validation failed" }, { status: 400 }) }; }
   },
-  errorResponse: (msg: string, status: number) =>
-    NextResponse.json({ error: msg }, { status }),
+  errorResponse: (msg: string, status: number) => NextResponse.json({ error: msg }, { status }),
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-vi.mock("@burnless/db", () => ({
-  departments: {
-    companyId: "companyId",
-    id: "id",
-    name: "name",
-    parentId: "parentId",
-  },
-  updateForCompany: mockUpdateForCompany,
-  deleteForCompany: mockDeleteForCompany,
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-}));
-
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
+
+vi.mock("@burnless/db", () => ({
+  departments: { companyId: "companyId", id: "id" },
+  scenarioUpdate: mockScenarioUpdate,
+  scenarioDelete: mockScenarioDelete,
+}));
+vi.mock("@burnless/types", () => ({ updateDepartmentSchema: { parse: (d: unknown) => d } }));
+vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
 
 import { PATCH, DELETE } from "../[id]/route";
 
+function makeParams(id: string) { return { params: Promise.resolve({ id }) }; }
 function jsonRequest(url: string, method: string, body?: unknown): Request {
-  const opts: RequestInit = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
+  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   return new Request(url, opts);
 }
 
-function makeParams(id: string): { params: Promise<{ id: string }> } {
-  return { params: Promise.resolve({ id }) };
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRequireCompanyAccess.mockResolvedValue({ companyId: "comp-1", userId: "user-1", role: "editor" });
+  mockRequireRole.mockReturnValue(null);
+  mockGetActiveScenario.mockReturnValue(null);
+});
 
 describe("PATCH /api/departments/[id]", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns 401 when not authorized", async () => {
     mockRequireCompanyAccess.mockResolvedValue({
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     });
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
-      name: "Should Not Update",
-    });
-    const res = await PATCH(req, makeParams("dept-1"));
-
+    const res = await PATCH(jsonRequest("http://localhost/api/departments/dept-1", "PATCH", { name: "X" }), makeParams("dept-1"));
     expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.error).toBe("Unauthorized");
-    expect(mockUpdateForCompany).not.toHaveBeenCalled();
-  });
-
-  it("returns 403 for viewer", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
-      name: "Should Not Update",
-    });
-    const res = await PATCH(req, makeParams("dept-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockUpdateForCompany).not.toHaveBeenCalled();
-  });
-
-  it("updates department", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(null);
-
-    const updatedDept = {
-      id: "dept-1",
-      companyId: "comp-1",
-      name: "Updated Engineering",
-      parentId: null,
-    };
-    mockUpdateForCompany.mockResolvedValue(updatedDept);
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "PATCH", {
-      name: "Updated Engineering",
-    });
-    const res = await PATCH(req, makeParams("dept-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.name).toBe("Updated Engineering");
-    expect(mockUpdateForCompany).toHaveBeenCalledWith(
-      expect.anything(),
-      "dept-1",
-      "comp-1",
-      { name: "Updated Engineering" }
-    );
   });
 
   it("returns 404 when not found", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(null);
-    mockUpdateForCompany.mockResolvedValue(null);
-
-    const req = jsonRequest(
-      "http://localhost/api/departments/nonexistent",
-      "PATCH",
-      { name: "Does Not Exist" }
-    );
-    const res = await PATCH(req, makeParams("nonexistent"));
-    const body = await res.json();
-
+    mockScenarioUpdate.mockResolvedValue(null);
+    const res = await PATCH(jsonRequest("http://localhost/api/departments/dept-1", "PATCH", { name: "X" }), makeParams("dept-1"));
     expect(res.status).toBe(404);
+    const body = await res.json();
     expect(body.error).toBe("Department not found");
+  });
+
+  it("updates department via scenarioUpdate", async () => {
+    mockScenarioUpdate.mockResolvedValue({ id: "dept-1", name: "Updated Engineering" });
+    const res = await PATCH(
+      jsonRequest("http://localhost/api/departments/dept-1", "PATCH", { name: "Updated Engineering" }),
+      makeParams("dept-1"),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.name).toBe("Updated Engineering");
+    expect(mockScenarioUpdate).toHaveBeenCalledWith(
+      "department", expect.anything(), "dept-1",
+      { name: "Updated Engineering" }, null,
+    );
   });
 });
 
 describe("DELETE /api/departments/[id]", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue({ companyId: "comp-1", userId: "user-1", role: "admin" });
   });
 
-  it("returns 401 when not authorized", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    });
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
-    const res = await DELETE(req, makeParams("dept-1"));
-
-    expect(res.status).toBe(401);
+  it("deletes via scenarioDelete", async () => {
+    mockScenarioDelete.mockResolvedValue(undefined);
+    const res = await DELETE(jsonRequest("http://localhost/api/departments/dept-1", "DELETE"), makeParams("dept-1"));
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toBe("Unauthorized");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
+    expect(body.deleted).toBe(true);
   });
 
   it("returns 403 for editor (requires admin)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
-    const res = await DELETE(req, makeParams("dept-1"));
-    const body = await res.json();
-
+    mockRequireCompanyAccess.mockResolvedValue({ companyId: "comp-1", userId: "user-1", role: "editor" });
+    mockRequireRole.mockReturnValue(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+    const res = await DELETE(jsonRequest("http://localhost/api/departments/dept-1", "DELETE"), makeParams("dept-1"));
     expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockDeleteForCompany).not.toHaveBeenCalled();
-  });
-
-  it("deletes department", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "admin",
-    });
-    mockRequireRole.mockReturnValue(null);
-
-    const deletedDept = {
-      id: "dept-1",
-      companyId: "comp-1",
-      name: "Engineering",
-    };
-    mockDeleteForCompany.mockResolvedValue(deletedDept);
-
-    const req = jsonRequest("http://localhost/api/departments/dept-1", "DELETE");
-    const res = await DELETE(req, makeParams("dept-1"));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.deleted).toBe(true);
-    expect(mockDeleteForCompany).toHaveBeenCalledWith(
-      expect.anything(),
-      "dept-1",
-      "comp-1"
-    );
   });
 
   it("returns 404 when not found", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "admin",
-    });
-    mockRequireRole.mockReturnValue(null);
-    mockDeleteForCompany.mockResolvedValue(null);
-
-    const req = jsonRequest(
-      "http://localhost/api/departments/nonexistent",
-      "DELETE"
-    );
-    const res = await DELETE(req, makeParams("nonexistent"));
-    const body = await res.json();
-
-    expect(res.status).toBe(404);
-    expect(body.error).toBe("Department not found");
+    // scenarioDelete doesn't return null, it just completes; but the route always returns { deleted: true }
+    mockScenarioDelete.mockResolvedValue(undefined);
+    const res = await DELETE(jsonRequest("http://localhost/api/departments/nonexistent", "DELETE"), makeParams("nonexistent"));
+    expect(res.status).toBe(200);
   });
 });

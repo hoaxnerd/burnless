@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, fundingRounds } from "@burnless/db";
-import { eq, and } from "drizzle-orm";
+import { fundingRounds, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { updateFundingRoundSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -17,17 +17,19 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await context.params;
 
+  const scenarioId = getActiveScenario(request);
+
   const parsed = await parseBody(request, updateFundingRoundSchema);
   if ("error" in parsed) return parsed.error;
 
-  const updates: Record<string, unknown> = { ...parsed.data };
-  if (parsed.data.amount !== undefined) updates.amount = String(parsed.data.amount);
+  const changes: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.amount !== undefined) changes.amount = String(parsed.data.amount);
   if (parsed.data.preMoneyValuation !== undefined)
-    updates.preMoneyValuation = parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null;
+    changes.preMoneyValuation = parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null;
   if (parsed.data.dilutionPercent !== undefined)
-    updates.dilutionPercent = parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null;
+    changes.dilutionPercent = parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null;
 
-  const [row] = await db.update(fundingRounds).set(updates).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
+  const row = await scenarioUpdate("funding_round", fundingRounds, id, changes, scenarioId);
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
@@ -36,7 +38,7 @@ export const PATCH = withErrorHandler(async (
 });
 
 export const DELETE = withErrorHandler(async (
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) => {
   const ctx = await requireCompanyAccess();
@@ -45,9 +47,10 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await context.params;
 
-  const [row] = await db.delete(fundingRounds).where(and(eq(fundingRounds.id, id), eq(fundingRounds.companyId, ctx.companyId))).returning();
-  if (!row) return errorResponse("Funding round not found", 404);
-  await logAudit(ctx, "funding_round", id, "delete", { before: row });
+  const scenarioId = getActiveScenario(request);
+
+  await scenarioDelete("funding_round", fundingRounds, id, scenarioId);
+  await logAudit(ctx, "funding_round", id, "delete", {});
   await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
   return NextResponse.json({ deleted: true });

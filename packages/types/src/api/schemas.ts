@@ -56,19 +56,22 @@ export type UpdateDepartmentInput = z.infer<typeof updateDepartmentSchema>;
 
 // ── Scenarios ───────────────────────────────────────────────────────────────
 
+export const scenarioSourceEnum = z.enum(["blank", "ai", "template", "clone", "backup"]);
+export const scenarioStatusEnumZ = z.enum(["active", "promoted", "archived"]);
+
 export const createScenarioSchema = z.object({
   name: z.string().min(1),
-  type: scenarioTypeEnum.default("custom"),
-  isDefault: z.boolean().default(false),
   description: z.string().nullable().default(null),
+  source: scenarioSourceEnum.default("blank"),
+  color: z.string().nullable().default(null),
+  sourceScenarioId: z.string().nullable().default(null),
 });
 
 export const updateScenarioSchema = z.object({
   name: z.string().min(1).optional(),
-  type: scenarioTypeEnum.optional(),
-  isDefault: z.boolean().optional(),
-  isBudget: z.boolean().optional(),
   description: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  status: scenarioStatusEnumZ.optional(),
 });
 
 export type CreateScenarioInput = z.infer<typeof createScenarioSchema>;
@@ -77,7 +80,6 @@ export type UpdateScenarioInput = z.infer<typeof updateScenarioSchema>;
 // ── Headcount Plans ─────────────────────────────────────────────────────────
 
 export const createHeadcountSchema = z.object({
-  scenarioId: z.string(),
   departmentId: z.string(),
   title: z.string().min(1),
   count: z.number().int().min(1).default(1),
@@ -103,7 +105,6 @@ export type UpdateHeadcountInput = z.infer<typeof updateHeadcountSchema>;
 // ── Revenue Streams ─────────────────────────────────────────────────────────
 
 export const createRevenueStreamSchema = z.object({
-  scenarioId: z.string(),
   name: z.string().min(1),
   type: revenueStreamTypeEnum.default("subscription"),
   parameters: z.record(z.unknown()).default({}),
@@ -146,7 +147,6 @@ export type UpdateFundingRoundInput = z.infer<typeof updateFundingRoundSchema>;
 // ── Forecast Lines ──────────────────────────────────────────────────────────
 
 export const createForecastLineSchema = z.object({
-  scenarioId: z.string(),
   accountId: z.string(),
   method: forecastMethodEnum.default("fixed"),
   parameters: z.record(z.unknown()).default({}),

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, scenarios, forecastLines, financialAccounts, revenueStreams, headcountPlans, fundingRounds } from "@burnless/db";
+import { db, scenarios, getResolvedData } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
@@ -23,6 +23,8 @@ import {
 
 /**
  * GET /api/scenarios/compare?baseId=xxx&compareId=yyy
+ *
+ * Compares two scenarios by resolving base data + scenario overrides for each.
  */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "heavy");
@@ -55,7 +57,6 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   const result = compareScenarios(baseData, compareData);
 
-  // Convert to serializable format
   return NextResponse.json({
     baseScenario: result.baseScenario,
     compareScenario: result.compareScenario,
@@ -76,15 +77,10 @@ async function buildScenarioData(
   periodStart: Date,
   periodEnd: Date
 ): Promise<ScenarioData> {
-  const [fLines, accounts, revStreams, hcPlans, funding] = await Promise.all([
-    db.select().from(forecastLines).where(eq(forecastLines.scenarioId, scenarioId)),
-    db.select().from(financialAccounts).where(eq(financialAccounts.companyId, companyId)),
-    db.select().from(revenueStreams).where(eq(revenueStreams.scenarioId, scenarioId)),
-    db.select().from(headcountPlans).where(eq(headcountPlans.scenarioId, scenarioId)),
-    db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId)),
-  ]);
+  // Resolve all entity types with scenario overlay
+  const data = await getResolvedData(companyId, scenarioId);
 
-  const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
+  const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
     id: fl.id,
     accountId: fl.accountId,
     method: fl.method,
@@ -95,7 +91,7 @@ async function buildScenarioData(
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
   const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
 
-  const revInputs: RevenueStreamInput[] = revStreams.map((rs) => ({
+  const revInputs: RevenueStreamInput[] = data.revenueStreams.map((rs) => ({
     id: rs.id,
     name: rs.name,
     type: rs.type,
@@ -103,7 +99,7 @@ async function buildScenarioData(
   }));
   const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
 
-  const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({
+  const hcInputs: HeadcountPlanInput[] = data.headcountPlans.map((hp) => ({
     id: hp.id,
     departmentId: hp.departmentId,
     title: hp.title,
@@ -115,7 +111,7 @@ async function buildScenarioData(
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
-  const accountMap = new Map(accounts.map((a) => [a.id, a]));
+  const accountMap = new Map(data.financialAccounts.map((a) => [a.id, a]));
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();
@@ -135,6 +131,8 @@ async function buildScenarioData(
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
   const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
+  // Cash position from resolved funding rounds
+  const funding = data.fundingRounds;
   const startingCash = funding
     .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
     .reduce((sum, r) => sum + Number(r.amount), 0);

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { getScenarioForCompany, getScenarioData, db, fundingRounds } from "@burnless/db";
+import { db, fundingRounds, getResolvedData, resolveEntities } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { parseDateRange } from "@/lib/date-validation";
+import { getActiveScenario } from "@/lib/scenario-middleware";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -25,9 +26,10 @@ import {
 } from "@burnless/engine";
 
 /**
- * GET /api/metrics?scenarioId=xxx&startDate=2026-01&endDate=2026-12
+ * GET /api/metrics?startDate=2026-01&endDate=2026-12
  *
- * Returns all computed financial and SaaS metrics for a scenario.
+ * Returns all computed financial and SaaS metrics.
+ * Scenario ID comes from the X-Scenario-Id header or ?scenarioId query param.
  */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "heavy");
@@ -37,20 +39,16 @@ export const GET = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const url = new URL(request.url);
-  const scenarioId = url.searchParams.get("scenarioId");
+  const scenarioId = getActiveScenario(request) ?? url.searchParams.get("scenarioId");
   const startDateStr = url.searchParams.get("startDate") ?? "2026-01";
   const endDateStr = url.searchParams.get("endDate") ?? "2026-12";
-
-  if (!scenarioId) return errorResponse("scenarioId required", 400);
-
-  const scenario = await getScenarioForCompany(scenarioId, ctx.companyId);
-  if (!scenario) return errorResponse("Scenario not found", 404);
 
   const dateRange = parseDateRange(startDateStr, endDateStr);
   if ("error" in dateRange) return errorResponse(dateRange.error, 400);
   const { periodStart, periodEnd } = dateRange;
 
-  const data = await getScenarioData(scenarioId, ctx.companyId);
+  // Resolve all entity types (base + scenario overrides)
+  const data = await getResolvedData(ctx.companyId, scenarioId);
 
   // Compute forecasts
   const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
@@ -97,7 +95,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
   // Aggregate by category
-  const accountMap = new Map(data.accounts.map((a) => [a.id, a]));
+  const accountMap = new Map(data.financialAccounts.map((a) => [a.id, a]));
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
   let totalOpex: MonthlySeries = new Map();
@@ -132,13 +130,13 @@ export const GET = withErrorHandler(async (request: Request) => {
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
   const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
-  // Fetch funding rounds for cash position
-  const funding = await db.select().from(fundingRounds).where(eq(fundingRounds.companyId, ctx.companyId));
-  const startingCash = funding
+  // Funding rounds (resolved through scenario overlay)
+  const fundingResolved = data.fundingRounds;
+  const startingCash = fundingResolved
     .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
     .reduce((sum, r) => sum + Number(r.amount), 0);
   const futureFunding: MonthlySeries = new Map();
-  for (const r of funding) {
+  for (const r of fundingResolved) {
     const rDate = new Date(r.date);
     if (r.isProjected || rDate >= periodStart) {
       const key = monthKey(rDate);
@@ -167,7 +165,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   const metrics = computeAllMetrics(metricsInput);
 
   return NextResponse.json({
-    scenario: { id: scenario.id, name: scenario.name },
+    scenarioId: scenarioId ?? null,
     period: { start: startDateStr, end: endDateStr },
     metrics,
   });

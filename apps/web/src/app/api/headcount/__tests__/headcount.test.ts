@@ -1,3 +1,7 @@
+/**
+ * Tests for GET /api/headcount and POST /api/headcount.
+ * Updated for overlay scenario system.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
@@ -6,253 +10,116 @@ const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
-const {
-  mockSelect,
-  mockFrom,
-  mockWhere,
-  mockInsert,
-  mockValues,
-  mockReturning,
-} = vi.hoisted(() => ({
+const { mockSelect, mockFrom, mockWhere, mockResolveEntities, mockScenarioInsert } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
-  mockInsert: vi.fn(),
-  mockValues: vi.fn(),
-  mockReturning: vi.fn(),
+  mockResolveEntities: vi.fn(),
+  mockScenarioInsert: vi.fn(),
+}));
+
+const { mockGetActiveScenario } = vi.hoisted(() => ({
+  mockGetActiveScenario: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   requireRole: mockRequireRole,
-  parseBody: async (
-    req: Request,
-    schema: { parse: (d: unknown) => unknown }
-  ) => {
-    try {
-      const body = await req.json();
-      return { data: schema.parse(body) };
-    } catch {
-      return {
-        error: NextResponse.json(
-          { error: "Validation failed" },
-          { status: 400 }
-        ),
-      };
-    }
+  parseBody: async (req: Request, schema: { parse: (d: unknown) => unknown }) => {
+    try { return { data: schema.parse(await req.json()) }; }
+    catch { return { error: NextResponse.json({ error: "Validation failed" }, { status: 400 }) }; }
   },
-  errorResponse: (msg: string, status: number) =>
-    NextResponse.json({ error: msg }, { status }),
+  errorResponse: (msg: string, status: number) => NextResponse.json({ error: msg }, { status }),
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: {
-    select: mockSelect,
-    insert: mockInsert,
-  },
-  headcountPlans: {
-    id: "id",
-    scenarioId: "scenarioId",
-    departmentId: "departmentId",
-    title: "title",
-    count: "count",
-    salary: "salary",
-    startDate: "startDate",
-    endDate: "endDate",
-    benefitsRate: "benefitsRate",
-  },
-  scenarios: {
-    id: "id",
-    companyId: "companyId",
-  },
+  db: { select: mockSelect },
+  headcountPlans: { companyId: "companyId", id: "id" },
+  resolveEntities: mockResolveEntities,
+  scenarioInsert: mockScenarioInsert,
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  isNull: vi.fn(),
-}));
-
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ logAudit: vi.fn(), logAuditBatch: vi.fn() }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), gt: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
+vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
 
 import { GET, POST } from "../route";
 
 function jsonRequest(url: string, method: string, body?: unknown): Request {
-  const opts: RequestInit = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
+  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   return new Request(url, opts);
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "comp-1", role: "owner" });
+  mockRequireRole.mockReturnValue(null);
+  mockGetActiveScenario.mockReturnValue(null);
+  mockSelect.mockReturnValue({ from: mockFrom });
+  mockFrom.mockReturnValue({ where: mockWhere });
+});
+
 describe("GET /api/headcount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
-  });
-
-  it("returns 400 when scenarioId missing", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-
-    const req = jsonRequest("http://localhost/api/headcount", "GET");
-    const res = await GET(req);
-    const body = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(body.error).toBe("scenarioId required");
-  });
-
-  it("returns 404 when scenario not found", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-
-    // First where() call for scenario lookup returns empty
-    mockWhere.mockResolvedValueOnce([]);
-
-    const req = jsonRequest(
-      "http://localhost/api/headcount?scenarioId=scen-1",
-      "GET"
-    );
-    const res = await GET(req);
-    const body = await res.json();
-
-    expect(res.status).toBe(404);
-    expect(body.error).toBe("Scenario not found");
-  });
-
-  it("returns headcount plans for valid scenario", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-
-    const scenario = { id: "scen-1", companyId: "comp-1", name: "Base" };
-    const plans = [
-      {
-        id: "hc-1",
-        scenarioId: "scen-1",
-        departmentId: "dept-1",
-        title: "Senior Engineer",
-        count: 2,
-        salary: "120000",
-        benefitsRate: "0.20",
-      },
-      {
-        id: "hc-2",
-        scenarioId: "scen-1",
-        departmentId: "dept-2",
-        title: "Designer",
-        count: 1,
-        salary: "100000",
-        benefitsRate: "0.20",
-      },
+  it("returns resolved headcount plans (no scenario)", async () => {
+    const base = [
+      { id: "hc-1", departmentId: "dept-1", title: "Senior Engineer", count: 2, salary: "120000", benefitsRate: "0.20" },
+      { id: "hc-2", departmentId: "dept-2", title: "Designer", count: 1, salary: "100000", benefitsRate: "0.20" },
     ];
+    mockWhere.mockResolvedValue(base);
+    mockResolveEntities.mockResolvedValue(base.map((e) => ({ ...e, _override: null })));
 
-    // First where() for scenario lookup, second where() for headcount plans
-    mockWhere.mockResolvedValueOnce([scenario]).mockResolvedValueOnce(plans);
-
-    const req = jsonRequest(
-      "http://localhost/api/headcount?scenarioId=scen-1",
-      "GET"
-    );
-    const res = await GET(req);
-    const body = await res.json();
-
+    const res = await GET(jsonRequest("http://localhost/api/headcount", "GET"));
     expect(res.status).toBe(200);
+    const body = await res.json();
     expect(body).toHaveLength(2);
     expect(body[0].title).toBe("Senior Engineer");
-    expect(body[1].title).toBe("Designer");
+    expect(mockResolveEntities).toHaveBeenCalledWith("headcount_plan", base, null);
+  });
+
+  it("passes scenarioId from header", async () => {
+    mockGetActiveScenario.mockReturnValue("scen-1");
+    mockWhere.mockResolvedValue([]);
+    mockResolveEntities.mockResolvedValue([]);
+
+    await GET(jsonRequest("http://localhost/api/headcount", "GET"));
+    expect(mockResolveEntities).toHaveBeenCalledWith("headcount_plan", [], "scen-1");
   });
 });
 
 describe("POST /api/headcount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("creates headcount plan via scenarioInsert (201)", async () => {
+    const created = { id: "hc-new", departmentId: "dept-1", title: "Product Manager", companyId: "comp-1" };
+    mockScenarioInsert.mockResolvedValue(created);
 
-    mockSelect.mockReturnValue({ from: mockFrom });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
-  });
-
-  it("creates headcount plan (201)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "editor",
-    });
-    mockRequireRole.mockReturnValue(null);
-
-    const scenario = { id: "scen-1", companyId: "comp-1", name: "Base" };
-    mockWhere.mockResolvedValueOnce([scenario]);
-
-    const createdPlan = {
-      id: "hc-new",
-      scenarioId: "scen-1",
-      departmentId: "dept-1",
-      title: "Product Manager",
-      count: 1,
-      salary: "130000",
-      benefitsRate: "0.25",
-    };
-    mockReturning.mockResolvedValue([createdPlan]);
-
-    const req = jsonRequest("http://localhost/api/headcount", "POST", {
-      scenarioId: "scen-1",
+    const res = await POST(jsonRequest("http://localhost/api/headcount", "POST", {
       departmentId: "dept-1",
       title: "Product Manager",
       count: 1,
       salary: 130000,
       startDate: "2026-01-01",
       benefitsRate: 0.25,
-    });
-    const res = await POST(req);
-    const body = await res.json();
+    }));
 
     expect(res.status).toBe(201);
+    const body = await res.json();
     expect(body.id).toBe("hc-new");
-    expect(body.title).toBe("Product Manager");
-    expect(mockInsert).toHaveBeenCalled();
-    expect(mockReturning).toHaveBeenCalled();
+    expect(mockScenarioInsert).toHaveBeenCalledWith(
+      "headcount_plan", expect.anything(),
+      expect.objectContaining({ departmentId: "dept-1", companyId: "comp-1" }),
+      null,
+    );
   });
 
   it("returns 403 for viewer", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
-      userId: "user-1",
-      companyId: "comp-1",
-      role: "viewer",
-    });
-    mockRequireRole.mockReturnValue(
-      NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    );
-
-    const req = jsonRequest("http://localhost/api/headcount", "POST", {
-      scenarioId: "scen-1",
-      departmentId: "dept-1",
-      title: "Should Not Create",
-      salary: 100000,
-      startDate: "2026-01-01",
-    });
-    const res = await POST(req);
-    const body = await res.json();
-
+    mockRequireRole.mockReturnValue(NextResponse.json({ error: "Forbidden" }, { status: 403 }));
+    const res = await POST(jsonRequest("http://localhost/api/headcount", "POST", {
+      departmentId: "dept-1", title: "X", salary: 100000, startDate: "2026-01-01",
+    }));
     expect(res.status).toBe(403);
-    expect(body.error).toBe("Forbidden");
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockScenarioInsert).not.toHaveBeenCalled();
   });
 });

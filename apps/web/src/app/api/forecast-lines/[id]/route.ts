@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, forecastLines, scenarios } from "@burnless/db";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { forecastLines, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { updateForecastLineSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
-
-/** Subquery: scenario IDs belonging to the authenticated company */
-function companyScenarioIds(companyId: string) {
-  return db.select({ id: scenarios.id }).from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)));
-}
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -22,15 +17,12 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
+  const scenarioId = getActiveScenario(request);
+
   const parsed = await parseBody(request, updateForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
-  const [row] = await db
-    .update(forecastLines)
-    .set(parsed.data)
-    .where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId))))
-    .returning();
-
+  const row = await scenarioUpdate("forecast_line", forecastLines, id, parsed.data, scenarioId);
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");
@@ -39,7 +31,7 @@ export const PATCH = withErrorHandler(async (
 });
 
 export const DELETE = withErrorHandler(async (
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const ctx = await requireCompanyAccess();
@@ -48,9 +40,10 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(forecastLines).where(and(eq(forecastLines.id, id), inArray(forecastLines.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
-  if (!row) return errorResponse("Forecast line not found", 404);
-  await logAudit(ctx, "forecast_line", id, "delete", { before: row });
+  const scenarioId = getActiveScenario(request);
+
+  await scenarioDelete("forecast_line", forecastLines, id, scenarioId);
+  await logAudit(ctx, "forecast_line", id, "delete", {});
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   return NextResponse.json({ deleted: true });

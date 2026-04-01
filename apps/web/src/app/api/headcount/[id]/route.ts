@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, headcountPlans, scenarios } from "@burnless/db";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { headcountPlans, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { updateHeadcountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
-
-/** Subquery: scenario IDs belonging to the authenticated company */
-function companyScenarioIds(companyId: string) {
-  return db.select({ id: scenarios.id }).from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)));
-}
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -22,14 +17,16 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
+  const scenarioId = getActiveScenario(request);
+
   const parsed = await parseBody(request, updateHeadcountSchema);
   if ("error" in parsed) return parsed.error;
 
-  const updates: Record<string, unknown> = { ...parsed.data };
-  if (parsed.data.salary !== undefined) updates.salary = String(parsed.data.salary);
-  if (parsed.data.benefitsRate !== undefined) updates.benefitsRate = String(parsed.data.benefitsRate);
+  const changes: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.salary !== undefined) changes.salary = String(parsed.data.salary);
+  if (parsed.data.benefitsRate !== undefined) changes.benefitsRate = String(parsed.data.benefitsRate);
 
-  const [row] = await db.update(headcountPlans).set(updates).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
+  const row = await scenarioUpdate("headcount_plan", headcountPlans, id, changes, scenarioId);
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
@@ -38,7 +35,7 @@ export const PATCH = withErrorHandler(async (
 });
 
 export const DELETE = withErrorHandler(async (
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const ctx = await requireCompanyAccess();
@@ -47,9 +44,10 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(headcountPlans).where(and(eq(headcountPlans.id, id), inArray(headcountPlans.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
-  if (!row) return errorResponse("Headcount plan not found", 404);
-  await logAudit(ctx, "headcount_plan", id, "delete", { before: row });
+  const scenarioId = getActiveScenario(request);
+
+  await scenarioDelete("headcount_plan", headcountPlans, id, scenarioId);
+  await logAudit(ctx, "headcount_plan", id, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
   return NextResponse.json({ deleted: true });

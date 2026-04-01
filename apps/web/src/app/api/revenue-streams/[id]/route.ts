@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, revenueStreams, scenarios } from "@burnless/db";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { revenueStreams, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { updateRevenueStreamSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
-
-/** Subquery: scenario IDs belonging to the authenticated company */
-function companyScenarioIds(companyId: string) {
-  return db.select({ id: scenarios.id }).from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)));
-}
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -22,10 +17,12 @@ export const PATCH = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
+  const scenarioId = getActiveScenario(request);
+
   const parsed = await parseBody(request, updateRevenueStreamSchema);
   if ("error" in parsed) return parsed.error;
 
-  const [row] = await db.update(revenueStreams).set(parsed.data).where(and(eq(revenueStreams.id, id), inArray(revenueStreams.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
+  const row = await scenarioUpdate("revenue_stream", revenueStreams, id, parsed.data, scenarioId);
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");
@@ -34,7 +31,7 @@ export const PATCH = withErrorHandler(async (
 });
 
 export const DELETE = withErrorHandler(async (
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) => {
   const ctx = await requireCompanyAccess();
@@ -43,9 +40,10 @@ export const DELETE = withErrorHandler(async (
   if (roleErr) return roleErr;
   const { id } = await params;
 
-  const [row] = await db.delete(revenueStreams).where(and(eq(revenueStreams.id, id), inArray(revenueStreams.scenarioId, companyScenarioIds(ctx.companyId)))).returning();
-  if (!row) return errorResponse("Revenue stream not found", 404);
-  await logAudit(ctx, "revenue_stream", id, "delete", { before: row });
+  const scenarioId = getActiveScenario(request);
+
+  await scenarioDelete("revenue_stream", revenueStreams, id, scenarioId);
+  await logAudit(ctx, "revenue_stream", id, "delete", {});
   await trackDataMutation(ctx.companyId, "revenue");
   revalidateTag("revenue-streams");
   return NextResponse.json({ deleted: true });
