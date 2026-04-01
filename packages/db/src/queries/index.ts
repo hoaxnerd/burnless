@@ -38,3 +38,5 @@ export {
   scenarioUpdate,
   scenarioDelete,
 } from "./scenario-mutations";
+
+export { promoteScenario } from "./scenario-promotion";
