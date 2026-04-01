@@ -4,6 +4,7 @@ export const revalidate = 0;
 import { Suspense } from "react";
 import { getCompany, getScenarios } from "@/lib/data";
 import { ScenariosView } from "./scenarios-view";
+import { NewScenarioButton } from "./new-scenario-button";
 
 async function ScenariosContent() {
   const company = await getCompany();
@@ -32,7 +33,7 @@ export default function ScenariosPage() {
             Model different futures for your business
           </p>
         </div>
-        {/* TODO(Task 13): Add CreateScenarioModal here */}
+        <NewScenarioButton />
       </div>
 
       <Suspense fallback={<ScenariosListSkeleton />}>
