@@ -73,6 +73,7 @@ export const updateScenarioSchema = z.object({
   description: z.string().nullable().optional(),
   color: z.string().nullable().optional(),
   status: scenarioStatusEnumZ.optional(),
+  autoDeleteAt: z.string().datetime().nullable().optional(),
 });
 
 export type CreateScenarioInput = z.infer<typeof createScenarioSchema>;

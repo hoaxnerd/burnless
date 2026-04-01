@@ -49,9 +49,16 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateScenarioSchema);
   if ("error" in parsed) return parsed.error;
 
+  // Convert autoDeleteAt string to Date for Drizzle (schema field is timestamp)
+  const { autoDeleteAt, ...rest } = parsed.data;
+  const setData: Record<string, unknown> = { ...rest };
+  if (autoDeleteAt !== undefined) {
+    setData.autoDeleteAt = autoDeleteAt ? new Date(autoDeleteAt) : null;
+  }
+
   const [row] = await db
     .update(scenarios)
-    .set(parsed.data)
+    .set(setData)
     .where(and(eq(scenarios.id, id), eq(scenarios.companyId, ctx.companyId)))
     .returning();
 

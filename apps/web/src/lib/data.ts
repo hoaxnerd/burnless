@@ -11,7 +11,7 @@
  */
 
 import { cache } from "react";
-import { db, getCompanyForUser } from "@burnless/db";
+import { db, getCompanyForUser, getOverrideCount } from "@burnless/db";
 import {
   companies,
   scenarios,
@@ -93,10 +93,16 @@ export const getCompany = cache(async function getCompany() {
   return getCompanyForAuthUser(session.user.id);
 });
 
-/** Get all scenarios for a company (excludes soft-deleted). */
+/** Get all scenarios for a company (excludes soft-deleted), with override counts. */
 export const getScenarios = cachedQuery(
   async (companyId: string) => {
-    return db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).orderBy(scenarios.createdAt);
+    const rows = await db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).orderBy(scenarios.createdAt);
+    return Promise.all(
+      rows.map(async (s) => ({
+        ...s,
+        overrideCount: await getOverrideCount(s.id),
+      }))
+    );
   },
   ["scenarios"],
   { revalidate: 30, tags: ["scenarios"] }

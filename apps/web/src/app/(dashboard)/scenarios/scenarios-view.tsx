@@ -1,23 +1,58 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
 import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
+import { PromoteDialog } from "@/components/scenarios/promote-dialog";
 import { ScenarioInsightsWrapper } from "./scenario-insights-wrapper";
 import { ScenarioCards } from "./scenario-cards";
 
-interface ScenarioItem {
+export interface ScenarioItem {
   id: string;
   name: string;
   description: string | null;
   source: string;
   status: string;
   color: string | null;
+  overrideCount: number;
+  autoDeleteAt: string | null;
+  sourceScenarioId: string | null;
   createdAt: string;
 }
 
 export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const promoteId = searchParams.get("promote");
+
+  // Find the scenario to promote (if URL has ?promote=scenarioId)
+  const promoteScenario = promoteId
+    ? scenarios.find((s) => s.id === promoteId) ?? null
+    : null;
+  const [promoteOpen, setPromoteOpen] = useState(false);
+
+  // Auto-open promote dialog when URL param is present
+  useEffect(() => {
+    if (promoteScenario) {
+      setPromoteOpen(true);
+    }
+  }, [promoteScenario]);
+
+  const handlePromoteClose = () => {
+    setPromoteOpen(false);
+    // Remove the query param from the URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete("promote");
+    router.replace(url.pathname + url.search, { scroll: false });
+  };
+
+  const handlePromoted = () => {
+    handlePromoteClose();
+    router.refresh();
+  };
+
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "insights", x: 0, w: 12, h: 4, minH: 3 },
     { i: "scenario-cards", x: 0, w: 12, h: 16, minH: 8 },
@@ -41,6 +76,17 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
         />
+
+        {/* Promote dialog triggered by URL param */}
+        {promoteScenario && (
+          <PromoteDialog
+            open={promoteOpen}
+            onClose={handlePromoteClose}
+            scenarioId={promoteScenario.id}
+            scenarioName={promoteScenario.name}
+            onPromoted={handlePromoted}
+          />
+        )}
       </PageProvider>
     </PageLayoutProvider>
   );
