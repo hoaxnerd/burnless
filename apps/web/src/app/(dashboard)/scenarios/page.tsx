@@ -19,15 +19,14 @@ async function ScenariosContent() {
     color: s.color,
     overrideCount: s.overrideCount ?? 0,
     autoDeleteAt: s.autoDeleteAt
-      ? typeof s.autoDeleteAt === "string"
-        ? s.autoDeleteAt
-        : s.autoDeleteAt.toISOString()
+      ? s.autoDeleteAt instanceof Date
+        ? s.autoDeleteAt.toISOString()
+        : String(s.autoDeleteAt)
       : null,
     sourceScenarioId: s.sourceScenarioId ?? null,
-    createdAt:
-      typeof s.createdAt === "string"
-        ? s.createdAt
-        : s.createdAt.toISOString(),
+    createdAt: s.createdAt instanceof Date
+      ? s.createdAt.toISOString()
+      : String(s.createdAt ?? new Date().toISOString()),
   }));
 
   return <ScenariosView scenarios={scenarioData} />;
