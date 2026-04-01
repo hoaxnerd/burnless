@@ -8,6 +8,9 @@ import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components
 import { ChartCard } from "@/components/ui";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
 import { AddRevenueStreamForm, type EditRevenueStream } from "./add-revenue-stream-form";
+import { OverrideIndicator } from "@/components/scenarios/override-indicator";
+import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
+import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
 
 interface RevenueStreamBreakdownProps {
   streams: StreamBreakdown[];
@@ -41,8 +44,16 @@ export function RevenueStreamBreakdown({
   const router = useRouter();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const {
+    isInScenarioMode,
+    overrideMap,
+    deletedEntities,
+    handleRevert,
+    handleRemove,
+    handleRestore,
+  } = useScenarioOverrides("revenue_stream");
 
-  if (streams.length === 0) return null;
+  if (streams.length === 0 && deletedEntities.length === 0) return null;
 
   // Build stacked chart bars (max 6 streams, rest grouped)
   const topStreams = streamNames.slice(0, 6);
@@ -93,61 +104,71 @@ export function RevenueStreamBreakdown({
             const changeIcon = stream.changePercent > 0.01 ? "\u2191" : stream.changePercent < -0.01 ? "\u2193" : "\u2192";
             const changeColor = stream.changePercent > 0.01 ? "text-green-500" : stream.changePercent < -0.01 ? "text-red-500" : "text-surface-400";
             const isDeleting = deletingId === stream.id;
+            const override = isInScenarioMode ? overrideMap.get(stream.id) : undefined;
+            const overrideTag = override?.action === "modify" ? "modified" as const : override?.action === "create" ? "created" as const : null;
 
             return (
-              <div key={stream.id} className="group">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-xs font-medium text-surface-700 truncate">{stream.name}</span>
-                    <span className="text-[9px] text-surface-400 flex-shrink-0">{typeLabels[stream.type] ?? stream.type}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-semibold tabular-nums text-surface-900">
-                      {formatCompactCurrency(stream.currentRevenue)}
-                    </span>
-                    <span className={`text-[10px] font-medium ${changeColor}`}>
-                      {changeIcon}{Math.abs(stream.changePercent * 100).toFixed(0)}%
-                    </span>
-                    {/* Edit/delete actions — visible on hover */}
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() =>
-                          setEditingStream({
-                            id: stream.id,
-                            name: stream.name,
-                            type: stream.type,
-                            parameters: stream.parameters,
-                          })
-                        }
-                        className="rounded p-1 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                        aria-label={`Edit ${stream.name}`}
-                        title="Edit stream"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(stream.id)}
-                        disabled={isDeleting}
-                        className="rounded p-1 text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
-                        aria-label={`Delete ${stream.name}`}
-                        title="Delete stream"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+              <OverrideIndicator
+                key={stream.id}
+                override={overrideTag}
+                entityName={stream.name}
+                onRevert={() => handleRevert(stream.id)}
+                onRemove={() => handleRemove(stream.id)}
+              >
+                <div className="group">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                      <span className="text-xs font-medium text-surface-700 truncate">{stream.name}</span>
+                      <span className="text-[9px] text-surface-400 flex-shrink-0">{typeLabels[stream.type] ?? stream.type}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs font-semibold tabular-nums text-surface-900">
+                        {formatCompactCurrency(stream.currentRevenue)}
+                      </span>
+                      <span className={`text-[10px] font-medium ${changeColor}`}>
+                        {changeIcon}{Math.abs(stream.changePercent * 100).toFixed(0)}%
+                      </span>
+                      {/* Edit/delete actions — visible on hover */}
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() =>
+                            setEditingStream({
+                              id: stream.id,
+                              name: stream.name,
+                              type: stream.type,
+                              parameters: stream.parameters,
+                            })
+                          }
+                          className="rounded p-1 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          aria-label={`Edit ${stream.name}`}
+                          title="Edit stream"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(stream.id)}
+                          disabled={isDeleting}
+                          className="rounded p-1 text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+                          aria-label={`Delete ${stream.name}`}
+                          title="Delete stream"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(stream.percentage, 100)}%`,
+                        backgroundColor: color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(stream.percentage, 100)}%`,
-                      backgroundColor: color,
-                    }}
-                  />
-                </div>
-              </div>
+              </OverrideIndicator>
             );
           })}
         </div>
@@ -160,6 +181,14 @@ export function RevenueStreamBreakdown({
             </span>
           </div>
         </div>
+
+        {isInScenarioMode && (
+          <HiddenEntitiesSection
+            deletedEntities={deletedEntities}
+            entityLabel="revenue stream"
+            onRestore={handleRestore}
+          />
+        )}
       </div>
 
       {/* Edit modal (controlled) */}

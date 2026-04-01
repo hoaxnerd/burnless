@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency } from "@burnless/types";
 import { AddHireForm, type EditHire } from "./add-hire-form";
+import { OverrideIndicator } from "@/components/scenarios/override-indicator";
+import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
+import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
 
 interface Department {
   id: string;
@@ -71,6 +74,14 @@ export function TeamDetails({
   const [editingHire, setEditingHire] = useState<EditHire | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const {
+    isInScenarioMode,
+    overrideMap,
+    deletedEntities,
+    handleRevert,
+    handleRemove,
+    handleRestore,
+  } = useScenarioOverrides("headcount_plan");
 
   const maxDeptCost = useMemo(
     () => Math.max(...departmentBreakdown.map((d) => d.monthlyCost), 1),
@@ -244,50 +255,60 @@ export function TeamDetails({
                         {dept.members.map((member) => {
                           const monthlyCost =
                             (member.salary * member.count * (1 + member.benefitsRate)) / 12;
+                          const memberOverride = isInScenarioMode ? overrideMap.get(member.id) : undefined;
+                          const memberOverrideTag = memberOverride?.action === "modify" ? "modified" as const : memberOverride?.action === "create" ? "created" as const : null;
+
                           return (
-                            <div
+                            <OverrideIndicator
                               key={member.id}
-                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors group/row"
+                              override={memberOverrideTag}
+                              entityName={member.title}
+                              onRevert={() => handleRevert(member.id)}
+                              onRemove={() => handleRemove(member.id)}
                             >
-                              <div className="flex items-center gap-2.5">
-                                <div className={`h-2 w-2 rounded-full ${color.dot}`} />
-                                <span className="text-sm text-surface-700">{member.title}</span>
-                                {member.count > 1 && (
-                                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
-                                    ×{member.count}
+                              <div
+                                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors group/row"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`h-2 w-2 rounded-full ${color.dot}`} />
+                                  <span className="text-sm text-surface-700">{member.title}</span>
+                                  {member.count > 1 && (
+                                    <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+                                      ×{member.count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-right">
+                                  <span className="text-xs tabular-nums text-surface-400">
+                                    {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-4 text-right">
-                                <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
-                                </span>
-                                <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
-                                </span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
-                                    className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                                    title="Edit team member"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleInlineDelete(member.id); }}
-                                    disabled={deletingId === member.id}
-                                    className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
-                                      confirmDeleteId === member.id
-                                        ? "text-white bg-danger-600 hover:bg-danger-700"
-                                        : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
-                                    }`}
-                                    title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  <span className="text-sm tabular-nums font-medium text-surface-700">
+                                    {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
+                                  </span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
+                                      className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                      title="Edit team member"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(member.id); }}
+                                      disabled={deletingId === member.id}
+                                      className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                                        confirmDeleteId === member.id
+                                          ? "text-white bg-danger-600 hover:bg-danger-700"
+                                          : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
+                                      }`}
+                                      title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </OverrideIndicator>
                           );
                         })}
                       </div>
@@ -360,51 +381,61 @@ export function TeamDetails({
                         {q.hires.map((hire) => {
                           const impact =
                             (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+                          const hireOverride = isInScenarioMode ? overrideMap.get(hire.id) : undefined;
+                          const hireOverrideTag = hireOverride?.action === "modify" ? "modified" as const : hireOverride?.action === "create" ? "created" as const : null;
+
                           return (
-                            <div
+                            <OverrideIndicator
                               key={hire.id}
-                              className="flex items-center justify-between px-4 py-2.5 group/hire"
+                              override={hireOverrideTag}
+                              entityName={hire.title}
+                              onRevert={() => handleRevert(hire.id)}
+                              onRemove={() => handleRemove(hire.id)}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                                <span className="text-sm text-surface-700">{hire.title}</span>
-                                <span className="text-xs text-surface-400">{hire.department}</span>
-                                {hire.count > 1 && (
-                                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
-                                    ×{hire.count}
+                              <div
+                                className="flex items-center justify-between px-4 py-2.5 group/hire"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                  <span className="text-sm text-surface-700">{hire.title}</span>
+                                  <span className="text-xs text-surface-400">{hire.department}</span>
+                                  {hire.count > 1 && (
+                                    <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+                                      ×{hire.count}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-xs tabular-nums text-surface-400">
+                                    {formatCurrency(hire.salary, "USD", undefined, { compact: true })}/yr
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(hire.salary, "USD", undefined, { compact: true })}/yr
-                                </span>
-                                <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  +{formatCurrency(impact, "USD", undefined, { compact: true })}/mo
-                                </span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/hire:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openEditModalFromHire(hire); }}
-                                    className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                                    title="Edit planned hire"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleInlineDelete(hire.id); }}
-                                    disabled={deletingId === hire.id}
-                                    className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
-                                      confirmDeleteId === hire.id
-                                        ? "text-white bg-danger-600 hover:bg-danger-700"
-                                        : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
-                                    }`}
-                                    title={confirmDeleteId === hire.id ? "Click again to confirm" : "Delete planned hire"}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  <span className="text-sm tabular-nums font-medium text-surface-700">
+                                    +{formatCurrency(impact, "USD", undefined, { compact: true })}/mo
+                                  </span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/hire:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openEditModalFromHire(hire); }}
+                                      className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                      title="Edit planned hire"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(hire.id); }}
+                                      disabled={deletingId === hire.id}
+                                      className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                                        confirmDeleteId === hire.id
+                                          ? "text-white bg-danger-600 hover:bg-danger-700"
+                                          : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
+                                      }`}
+                                      title={confirmDeleteId === hire.id ? "Click again to confirm" : "Delete planned hire"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </OverrideIndicator>
                           );
                         })}
                       </div>
@@ -444,6 +475,15 @@ export function TeamDetails({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Hidden in scenario section */}
+      {isInScenarioMode && (
+        <HiddenEntitiesSection
+          deletedEntities={deletedEntities}
+          entityLabel="team member"
+          onRestore={handleRestore}
+        />
       )}
     </div>
   );

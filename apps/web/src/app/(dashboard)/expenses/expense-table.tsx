@@ -8,6 +8,9 @@ import { formatCompactCurrency } from "@/components/charts";
 import { Modal } from "@/components/ui";
 import { EditExpenseForm } from "./edit-expense-form";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
+import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
+import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
+import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
 
 interface ExpenseTableProps {
   lineItems: ExpenseLineItem[];
@@ -29,6 +32,14 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const {
+    isInScenarioMode,
+    overrideMap: scenarioOverrideMap,
+    deletedEntities,
+    handleRevert: handleScenarioRevert,
+    handleRemove: handleScenarioRemove,
+    handleRestore: handleScenarioRestore,
+  } = useScenarioOverrides("forecast_line");
 
   // Edit state
   const [editingItem, setEditingItem] = useState<ExpenseLineItem | null>(null);
@@ -298,11 +309,14 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                 const changeLabel = item.changePercent > 0.01 ? "Increasing" : item.changePercent < -0.01 ? "Decreasing" : "Stable";
                 const changeColor = item.changePercent > 0.01 ? "text-red-600" : item.changePercent < -0.01 ? "text-green-600" : "text-surface-500";
                 const synthetic = isSynthetic(item);
+                const scenarioOverride = isInScenarioMode ? scenarioOverrideMap.get(item.id) : undefined;
+                const overrideTag = scenarioOverride?.action === "modify" ? "modified" as const : scenarioOverride?.action === "create" ? "created" as const : null;
+                const rowBorderClass = overrideTag === "modified" ? "border-l-3 border-l-warning-500" : overrideTag === "created" ? "border-l-3 border-l-success-500" : "";
 
                 return (
                   <tr
                     key={item.id}
-                    className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""}`}
+                    className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""} ${rowBorderClass}`}
                   >
                     <td className="w-10 px-4 py-3">
                       <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${item.accountName}`} className="flex items-center justify-center">
@@ -314,9 +328,10 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <div>
+                      <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium text-surface-900">{item.accountName}</span>
-                        <span className="ml-2 text-[10px] text-surface-400 uppercase">{item.method}</span>
+                        <span className="ml-1 text-[10px] text-surface-400 uppercase">{item.method}</span>
+                        {overrideTag && <ScenarioBadge variant={overrideTag} />}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -407,29 +422,63 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {!synthetic && (
-                        <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1">
+                        {overrideTag === "modified" && (
                           <button
-                            onClick={() => setEditingItem(item)}
-                            className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                            title="Edit expense"
-                            aria-label={`Edit ${item.accountName}`}
+                            onClick={() => handleScenarioRevert(item.id)}
+                            className="rounded-md p-1.5 text-warning-500 hover:text-warning-700 hover:bg-warning-50 transition-colors"
+                            title="Revert to base"
+                            aria-label={`Revert ${item.accountName}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <RotateCw className="h-3.5 w-3.5" />
                           </button>
+                        )}
+                        {overrideTag === "created" && (
                           <button
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeletingItem(item);
-                            }}
-                            className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Delete expense"
-                            aria-label={`Delete ${item.accountName}`}
+                            onClick={() => handleScenarioRemove(item.id)}
+                            className="rounded-md p-1.5 text-danger-500 hover:text-danger-700 hover:bg-danger-50 transition-colors"
+                            title="Remove scenario entity"
+                            aria-label={`Remove ${item.accountName}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                        {!synthetic && !overrideTag && (
+                          <>
+                            <button
+                              onClick={() => setEditingItem(item)}
+                              className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                              title="Edit expense"
+                              aria-label={`Edit ${item.accountName}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteError(null);
+                                setDeletingItem(item);
+                              }}
+                              className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Delete expense"
+                              aria-label={`Delete ${item.accountName}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {!synthetic && overrideTag && (
+                          <>
+                            <button
+                              onClick={() => setEditingItem(item)}
+                              className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                              title="Edit expense"
+                              aria-label={`Edit ${item.accountName}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -485,6 +534,15 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
           </div>
         </div>
       </Modal>
+
+      {/* Hidden in scenario section */}
+      {isInScenarioMode && (
+        <HiddenEntitiesSection
+          deletedEntities={deletedEntities}
+          entityLabel="expense"
+          onRestore={handleScenarioRestore}
+        />
+      )}
     </div>
   );
 }
