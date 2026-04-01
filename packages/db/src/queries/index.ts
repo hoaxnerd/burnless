@@ -32,3 +32,9 @@ export {
 } from "./scenario-resolver";
 
 export type { OverrideTag, ResolvedEntity } from "./scenario-resolver";
+
+export {
+  scenarioInsert,
+  scenarioUpdate,
+  scenarioDelete,
+} from "./scenario-mutations";
