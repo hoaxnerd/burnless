@@ -12,10 +12,29 @@ export interface ComparisonLine {
   deltaPercent: { month: string; value: number }[];
 }
 
+export interface DataDiffItem {
+  id: string;
+  entityId: string;
+  action: "modify" | "create" | "delete";
+  data: Record<string, unknown>;
+  originalData?: Record<string, unknown>;
+}
+
+export interface DataDiffGroup {
+  entityType: string;
+  items: DataDiffItem[];
+}
+
+export interface DataDiff {
+  summary: { modified: number; created: number; deleted: number; total: number };
+  groups: DataDiffGroup[];
+}
+
 export interface ComparisonData {
   baseScenario: { id: string; name: string };
   compareScenario: { id: string; name: string };
   lines: ComparisonLine[];
+  dataDiff?: DataDiff;
 }
 
 import { formatCurrency } from "@burnless/types";
