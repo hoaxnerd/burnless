@@ -52,6 +52,8 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
     (id: string, name: string) => {
       setActiveScenarioId(id);
       setActiveScenarioName(name);
+      // Set cookie so apiFetch can read it and inject X-Scenario-Id header
+      document.cookie = `active-scenario-id=${encodeURIComponent(id)}; SameSite=Strict; Path=/api`;
       const params = new URLSearchParams(searchParams.toString());
       params.set("scenarioId", id);
       router.push(`${pathname}?${params.toString()}`);
@@ -61,6 +63,8 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
   );
 
   const exitScenario = useCallback(() => {
+    // Clear cookie synchronously before React state clear and navigation
+    document.cookie = "active-scenario-id=; Path=/api; Max-Age=0";
     setActiveScenarioId(null);
     setActiveScenarioName(null);
     const params = new URLSearchParams(searchParams.toString());
