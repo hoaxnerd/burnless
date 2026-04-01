@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
 import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
@@ -31,17 +31,12 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   const promoteScenario = promoteId
     ? scenarios.find((s) => s.id === promoteId) ?? null
     : null;
-  const [promoteOpen, setPromoteOpen] = useState(false);
-
-  // Auto-open promote dialog when URL param is present
-  useEffect(() => {
-    if (promoteScenario) {
-      setPromoteOpen(true);
-    }
-  }, [promoteScenario]);
+  // Dialog is open when a promote scenario is present via URL, or explicitly opened
+  const [dismissedPromote, setDismissedPromote] = useState(false);
+  const promoteOpen = !!promoteScenario && !dismissedPromote;
 
   const handlePromoteClose = () => {
-    setPromoteOpen(false);
+    setDismissedPromote(true);
     // Remove the query param from the URL
     const url = new URL(window.location.href);
     url.searchParams.delete("promote");

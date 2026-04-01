@@ -136,7 +136,7 @@ export const getAccounts = cachedQuery(
 
 /**
  * Get all forecast lines for a scenario's company.
- * TODO(Task 7): Refactor callers to pass companyId directly.
+ * Looks up the companyId from the scenario for backward compatibility.
  * In the overlay model, forecast lines are company-scoped base data.
  */
 export const getForecastLines = cachedQuery(
@@ -157,7 +157,7 @@ export async function getForecastValues(lineIds: string[]) {
 
 /**
  * Get revenue streams for a scenario's company.
- * TODO(Task 7): Refactor callers to pass companyId directly.
+ * Looks up the companyId from the scenario for backward compatibility.
  */
 export const getRevenueStreams = cachedQuery(
   async (scenarioId: string) => {
@@ -171,7 +171,7 @@ export const getRevenueStreams = cachedQuery(
 
 /**
  * Get headcount plans for a scenario's company.
- * TODO(Task 7): Refactor callers to pass companyId directly.
+ * Looks up the companyId from the scenario for backward compatibility.
  */
 export const getHeadcountPlans = cachedQuery(
   async (scenarioId: string) => {

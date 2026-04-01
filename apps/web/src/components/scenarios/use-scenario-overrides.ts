@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useScenario } from "./scenario-context";
 import { apiFetch } from "@/lib/api-fetch";
@@ -90,16 +90,18 @@ export function useScenarioOverrides(
     }
   }, [isInScenarioMode, fetchOverrides]);
 
-  const overrideMap = new Map<string, OverrideInfo>();
-  const deletedEntities: OverrideInfo[] = [];
-
-  for (const o of overrides) {
-    if (o.action === "delete") {
-      deletedEntities.push(o);
-    } else {
-      overrideMap.set(o.entityId, o);
+  const { overrideMap, deletedEntities } = useMemo(() => {
+    const map = new Map<string, OverrideInfo>();
+    const deleted: OverrideInfo[] = [];
+    for (const o of overrides) {
+      if (o.action === "delete") {
+        deleted.push(o);
+      } else {
+        map.set(o.entityId, o);
+      }
     }
-  }
+    return { overrideMap: map, deletedEntities: deleted };
+  }, [overrides]);
 
   const deleteOverrideById = useCallback(
     async (overrideId: string) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { ScenarioBadge } from "./scenario-badge";
 import { Skeleton } from "@/components/ui";
@@ -110,39 +110,51 @@ function getEntityName(item: OverrideItem): string {
   );
 }
 
+/* ── Fetch reducer ─────────────────────────────────────────────────────── */
+
+type FetchState = { data: OverridesResponse | null; loading: boolean; error: string | null };
+type FetchAction =
+  | { type: "FETCH" }
+  | { type: "SUCCESS"; data: OverridesResponse }
+  | { type: "ERROR"; error: string };
+
+function fetchReducer(_state: FetchState, action: FetchAction): FetchState {
+  switch (action.type) {
+    case "FETCH":
+      return { data: null, loading: true, error: null };
+    case "SUCCESS":
+      return { data: action.data, loading: false, error: null };
+    case "ERROR":
+      return { data: null, loading: false, error: action.error };
+  }
+}
+
+const initialFetchState: FetchState = { data: null, loading: true, error: null };
+
 /* ── Component ──────────────────────────────────────────────────────────── */
 
 export function DataDiffView({ scenarioId }: DataDiffViewProps) {
-  const [data, setData] = useState<OverridesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [{ data, loading, error }, dispatch] = useReducer(fetchReducer, initialFetchState);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const controller = new AbortController();
+    dispatch({ type: "FETCH" });
 
-    apiFetch(`/api/scenarios/overrides?scenarioId=${scenarioId}`)
+    apiFetch(`/api/scenarios/overrides?scenarioId=${scenarioId}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load overrides (${res.status})`);
         return res.json();
       })
       .then((json: OverridesResponse) => {
-        if (!cancelled) {
-          setData(json);
-          setLoading(false);
-        }
+        if (!controller.signal.aborted) dispatch({ type: "SUCCESS", data: json });
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load overrides");
-          setLoading(false);
-        }
+        if (controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        dispatch({ type: "ERROR", error: err instanceof Error ? err.message : "Failed to load overrides" });
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [scenarioId]);
 
   /* Loading state */

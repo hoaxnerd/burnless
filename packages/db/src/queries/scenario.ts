@@ -29,9 +29,10 @@ export async function getScenarioForCompany(
 }
 
 /**
- * Get the default scenario for a company.
- * TODO(Task 7): Remove — the overlay model no longer has a "default" scenario.
- * Temporarily returns the first non-deleted scenario for the company.
+ * Get the first active scenario for a company.
+ * In the overlay model there is no "default" scenario; this returns the first
+ * non-deleted one, which callers use as a fallback when no specific scenario
+ * is selected.
  */
 export async function getDefaultScenario(companyId: string) {
   const [row] = await db

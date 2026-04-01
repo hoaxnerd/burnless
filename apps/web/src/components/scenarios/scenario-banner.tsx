@@ -9,30 +9,32 @@ import { Button } from "@/components/ui";
 
 export function ScenarioBanner() {
   const { isInScenarioMode, activeScenarioId, activeScenarioName, exitScenario } = useScenario();
-  const [resolvedName, setResolvedName] = useState(activeScenarioName);
-  const [overrideCount, setOverrideCount] = useState<number | null>(null);
+  const [fetchedName, setFetchedName] = useState<string | undefined>(undefined);
+  const [fetchedCount, setFetchedCount] = useState<number | null>(null);
   const router = useRouter();
+
+  // Derive display name: prefer context name, fall back to fetched name
+  const resolvedName = activeScenarioName ?? fetchedName;
+
+  // Derive override count: only valid when there is an active scenario
+  const overrideCount = activeScenarioId ? fetchedCount : null;
 
   // If we have an ID but no name (e.g., direct URL navigation), fetch it
   useEffect(() => {
-    if (activeScenarioId && !activeScenarioName) {
-      apiFetch(`/api/scenarios/${activeScenarioId}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data?.name) setResolvedName(data.name);
-        })
-        .catch(() => {});
-    } else {
-      setResolvedName(activeScenarioName); // eslint-disable-line react-hooks/set-state-in-effect -- sync derived state from context
-    }
+    if (!activeScenarioId || activeScenarioName) return;
+    let cancelled = false;
+    apiFetch(`/api/scenarios/${activeScenarioId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.name) setFetchedName(data.name);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [activeScenarioId, activeScenarioName]);
 
-  // Fetch live override count (API created in Task 14; graceful fallback until then)
+  // Fetch live override count
   useEffect(() => {
-    if (!activeScenarioId) {
-      setOverrideCount(null);
-      return;
-    }
+    if (!activeScenarioId) return;
 
     let cancelled = false;
 
@@ -40,7 +42,7 @@ export function ScenarioBanner() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!cancelled && data && typeof data.count === "number") {
-          setOverrideCount(data.count);
+          setFetchedCount(data.count);
         }
       })
       .catch(() => {
