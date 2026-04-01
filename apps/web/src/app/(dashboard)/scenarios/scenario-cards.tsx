@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { GitBranch, Play, Square, BarChart3 } from "lucide-react";
+import { GitBranch, Play, Square, BarChart3, Copy } from "lucide-react";
 import { useScenario } from "@/components/scenarios/scenario-context";
+import { useToast } from "@/components/ui/toast";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface ScenarioItem {
   id: string;
@@ -18,6 +21,28 @@ interface ScenarioItem {
 export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const router = useRouter();
+  const toast = useToast();
+
+  const duplicateScenario = async (id: string) => {
+    setDuplicatingId(id);
+    try {
+      const res = await apiFetch(`/api/scenarios/${id}/duplicate`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to duplicate scenario");
+      }
+      toast.success("Scenario duplicated");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to duplicate scenario");
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
 
   const toggleCompare = (id: string) => {
     setCompareIds((prev) =>
@@ -156,6 +181,15 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
                 >
                   <BarChart3 className="h-3 w-3" />
                   {isComparing ? "Selected" : "Compare"}
+                </button>
+
+                <button
+                  onClick={() => duplicateScenario(scenario.id)}
+                  disabled={duplicatingId === scenario.id}
+                  className="flex items-center gap-1.5 rounded-lg bg-surface-100 px-3 py-1.5 text-xs font-medium text-surface-600 hover:bg-surface-200 transition-colors disabled:opacity-50"
+                >
+                  <Copy className="h-3 w-3" />
+                  {duplicatingId === scenario.id ? "Duplicating…" : "Duplicate"}
                 </button>
               </div>
             </div>
