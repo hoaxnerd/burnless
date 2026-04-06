@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AiGate } from "./ai-gate";
 import { useAiFeature } from "./ai-feature-context";
+import { useOptionalPageLayout } from "@/components/providers/page-layout-context";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 import { MarkdownRenderer } from "./markdown-renderer";
 
@@ -44,6 +45,8 @@ interface AiPageInsightsProps {
   scenarioId: string;
   /** Additional page-specific data to send to the API */
   pageData?: Record<string, unknown>;
+  /** Widget ID for grid readiness reporting (default: "ai-insights") */
+  widgetId?: string;
 }
 
 /** Human-readable labels for stale reasons. */
@@ -112,7 +115,7 @@ function formatGraceRemaining(ms: number): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsProps) {
+export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insights" }: AiPageInsightsProps) {
   const [insights, setInsights] = useState<PageInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -126,7 +129,8 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   const [staleReason, setStaleReason] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [slow, setSlow] = useState(false);
-  const _insightFeature = useAiFeature("insights");
+  const { enabled, loaded } = useAiFeature("insights");
+  const pageLayout = useOptionalPageLayout();
 
   /** Fetch cached insights only — never auto-triggers LLM generation. */
   const fetchCached = useCallback(async () => {
@@ -206,6 +210,19 @@ export function AiPageInsights({ page, scenarioId, pageData }: AiPageInsightsPro
   useEffect(() => {
     fetchCached();
   }, [fetchCached]);
+
+  // Report readiness to the grid: ready when AI is enabled AND we have insights to show
+  const isReady = loaded && enabled && !loading && insights.length > 0;
+  useEffect(() => {
+    if (!loaded || loading) return; // Don't report until we know the state
+    if (pageLayout) {
+      if (isReady) {
+        pageLayout.reportWidgetReady(widgetId);
+      } else {
+        pageLayout.reportWidgetNotReady(widgetId);
+      }
+    }
+  }, [isReady, loaded, loading, widgetId, pageLayout]);
 
   if (loading && insights.length === 0) {
     return (

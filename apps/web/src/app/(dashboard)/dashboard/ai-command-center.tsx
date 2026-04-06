@@ -12,8 +12,10 @@ import {
   X,
 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
+import { useAiFeature } from "@/components/ai/ai-feature-context";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { useScenario } from "@/components/scenarios/scenario-context";
+import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import {
   type AiCommandCenterProps,
   type AlertData,
@@ -35,6 +37,20 @@ export function AiCommandCenter({
   cash,
 }: AiCommandCenterProps) {
   const { activeScenarioId } = useScenario();
+  const { enabled, loaded } = useAiFeature("insights");
+  const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
+
+  // Report readiness: only ready when AI feature is loaded AND enabled
+  const isReady = loaded && enabled;
+  useEffect(() => {
+    if (!loaded) return; // Don't report until flags have loaded
+    if (isReady) {
+      reportWidgetReady("ai-command-center");
+    } else {
+      reportWidgetNotReady("ai-command-center");
+    }
+  }, [isReady, loaded, reportWidgetReady, reportWidgetNotReady]);
+
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [query, setQuery] = useState("");

@@ -68,9 +68,14 @@ const GRID_COLS = { lg: 12, md: 12, sm: 6, xs: 6, xxs: 6 };
 function assignYPositions(items: DefaultLayoutItem[]): LayoutItem[] {
   const result: LayoutItem[] = [];
   let yOffset = 0;
+  let currentRowH = 0;
   for (const item of items) {
+    if (item.x === 0 && result.length > 0) {
+      yOffset += currentRowH;
+      currentRowH = 0;
+    }
     result.push({ ...item, y: yOffset } as LayoutItem);
-    if (item.x === 0) yOffset += item.h;
+    currentRowH = Math.max(currentRowH, item.h);
   }
   return result;
 }
