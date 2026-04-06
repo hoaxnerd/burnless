@@ -36,7 +36,10 @@ export function RevenueView({
 }: RevenueViewProps) {
   const { growthMetrics: g, hasSaaS, streamBreakdown, waterfall, monthlyByStream, streamNames } = revenueDetails;
 
-  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+  const findSlot = (slug: string) => {
+    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
+    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
+  };
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();

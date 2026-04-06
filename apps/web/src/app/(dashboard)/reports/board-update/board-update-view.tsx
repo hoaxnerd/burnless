@@ -184,7 +184,10 @@ function ReportSection({
 
 export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; resolvedSlotData: ResolvedSlotData[] }) {
   const d = data;
-  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+  const findSlot = (slug: string) => {
+    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
+    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
+  };
 
   const handlePrint = () => window.print();
 

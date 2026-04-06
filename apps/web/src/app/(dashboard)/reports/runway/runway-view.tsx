@@ -26,7 +26,10 @@ interface RunwayViewProps {
 }
 
 export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, resolvedSlotData }: RunwayViewProps) {
-  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+  const findSlot = (slug: string) => {
+    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
+    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
+  };
   const latest = cashPosition[cashPosition.length - 1];
   const latestBurn = netBurnRate[netBurnRate.length - 1];
   const latestRunway = runway[runway.length - 1];

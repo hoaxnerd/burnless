@@ -66,7 +66,10 @@ export function TeamView({
   scenarioId,
   departments,
 }: TeamViewProps) {
-  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+  const findSlot = (slug: string) => {
+    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
+    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
+  };
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();

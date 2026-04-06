@@ -58,7 +58,11 @@ export function ExpensesView({
   const [view, setView] = useState<"overview" | "budget">("overview");
   const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount: _opexAmount, cogsAmount: _cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
 
-  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+  const findSlot = (slug: string) => {
+    // Prefer the engine-computed entry (has sparkData) over the page-default entry
+    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
+    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
+  };
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
