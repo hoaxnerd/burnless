@@ -66,6 +66,8 @@ export function TeamView({
   scenarioId,
   departments,
 }: TeamViewProps) {
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
   const usedSlugs = useMemo(() => new Set(["totalHeadcount", "monthlyPeopleCost", "revenuePerEmployee", "departments"]), []);
@@ -100,32 +102,44 @@ export function TeamView({
     { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string }> => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
     {
       slug: "totalHeadcount",
       label: "Total Headcount",
       value: String(totalHeadcount),
       description: plannedCount > 0 ? `+${plannedCount} planned` : undefined,
+      sparkData: findSlot("totalHeadcount")?.sparkData,
+      metricStyle: findSlot("totalHeadcount")?.metricStyle,
+      hasData: findSlot("totalHeadcount")?.hasData,
     },
     {
       slug: "monthlyPeopleCost",
       label: "Monthly People Cost",
       value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
       description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
+      sparkData: findSlot("monthlyPeopleCost")?.sparkData,
+      metricStyle: findSlot("monthlyPeopleCost")?.metricStyle,
+      hasData: findSlot("monthlyPeopleCost")?.hasData,
     },
     {
       slug: "revenuePerEmployee",
       label: "Revenue / Employee",
       value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
       description: "Efficiency metric",
+      sparkData: findSlot("revenuePerEmployee")?.sparkData,
+      metricStyle: findSlot("revenuePerEmployee")?.metricStyle,
+      hasData: findSlot("revenuePerEmployee")?.hasData,
     },
     {
       slug: "departments",
       label: "Departments",
       value: String(deptGroupCount),
       description: `${departmentsCount} total defined`,
+      sparkData: findSlot("departments")?.sparkData,
+      metricStyle: findSlot("departments")?.metricStyle,
+      hasData: findSlot("departments")?.hasData,
     },
-  ], [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount]);
+  ], [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount, resolvedSlotData]);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
@@ -138,6 +152,9 @@ export function TeamView({
           value={card.value}
           change={card.change}
           description={card.description}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
           stagger={i}
         />,
       ])

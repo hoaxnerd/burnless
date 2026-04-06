@@ -26,6 +26,7 @@ interface RunwayViewProps {
 }
 
 export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, resolvedSlotData }: RunwayViewProps) {
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
   const latest = cashPosition[cashPosition.length - 1];
   const latestBurn = netBurnRate[netBurnRate.length - 1];
   const latestRunway = runway[runway.length - 1];
@@ -124,16 +125,22 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "warning",       x: 0,  w: 6, h: 3, minH: 2 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; lowerIsBetter?: boolean }> => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; lowerIsBetter?: boolean; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
     {
       slug: "startingCash",
       label: "Starting Cash",
       value: fc(startingCash),
+      sparkData: findSlot("startingCash")?.sparkData,
+      metricStyle: findSlot("startingCash")?.metricStyle,
+      hasData: findSlot("startingCash")?.hasData,
     },
     {
       slug: "currentCash",
       label: "Current Cash",
       value: fc(latest?.value ?? 0),
+      sparkData: findSlot("currentCash")?.sparkData,
+      metricStyle: findSlot("currentCash")?.metricStyle,
+      hasData: findSlot("currentCash")?.hasData,
     },
     {
       slug: "netBurnRate",
@@ -141,14 +148,20 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       value: fc(latestBurn?.value ?? 0),
       description: "Latest month",
       lowerIsBetter: true,
+      sparkData: findSlot("netBurnRate")?.sparkData,
+      metricStyle: findSlot("netBurnRate")?.metricStyle,
+      hasData: findSlot("netBurnRate")?.hasData,
     },
     {
       slug: "runway",
       label: "Runway",
       value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e",
       description: zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway",
+      sparkData: findSlot("runway")?.sparkData,
+      metricStyle: findSlot("runway")?.metricStyle,
+      hasData: findSlot("runway")?.hasData,
     },
-  ], [startingCash, latest, latestBurn, latestRunway, zeroCashMonth]);
+  ], [startingCash, latest, latestBurn, latestRunway, zeroCashMonth, resolvedSlotData]);
 
   const widgets = useMemo(() => ({
     "export": (
@@ -168,6 +181,9 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
           change={card.change}
           description={card.description}
           lowerIsBetter={card.lowerIsBetter}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
           stagger={i}
         />,
       ])

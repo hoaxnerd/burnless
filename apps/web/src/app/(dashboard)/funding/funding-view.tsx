@@ -45,6 +45,8 @@ export function FundingView({
   rounds,
   resolvedSlotData,
 }: FundingViewProps) {
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
   const usedSlugs = useMemo(() => new Set(["totalRaised", "currentCash", "runway", "founderOwnership"]), []);
@@ -81,32 +83,44 @@ export function FundingView({
 
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string }> => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
     {
       slug: "totalRaised",
       label: "Total Raised",
       value: totalRaised > 0 ? fc(totalRaised) : "$---",
       description: totalRaised > 0 ? `${completedRoundsCount} round${completedRoundsCount !== 1 ? "s" : ""} completed` : "Add a funding round",
+      sparkData: findSlot("totalRaised")?.sparkData,
+      metricStyle: findSlot("totalRaised")?.metricStyle,
+      hasData: findSlot("totalRaised")?.hasData,
     },
     {
       slug: "currentCash",
       label: "Current Cash",
       value: currentCash > 0 ? fc(currentCash) : "$---",
       description: currentCash > 0 ? "Available capital" : "Add funding to see cash",
+      sparkData: findSlot("currentCash")?.sparkData,
+      metricStyle: findSlot("currentCash")?.metricStyle,
+      hasData: findSlot("currentCash")?.hasData,
     },
     {
       slug: "runway",
       label: "Runway",
       value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
       description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
+      sparkData: findSlot("runway")?.sparkData,
+      metricStyle: findSlot("runway")?.metricStyle,
+      hasData: findSlot("runway")?.hasData,
     },
     {
       slug: "founderOwnership",
       label: "Founder Ownership",
       value: completedRoundsCount > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%",
       description: completedRoundsCount > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round",
+      sparkData: findSlot("founderOwnership")?.sparkData,
+      metricStyle: findSlot("founderOwnership")?.metricStyle,
+      hasData: findSlot("founderOwnership")?.hasData,
     },
-  ], [totalRaised, completedRoundsCount, currentCash, currentBurn, currentRunway, foundersOwnership, totalDilution]);
+  ], [totalRaised, completedRoundsCount, currentCash, currentBurn, currentRunway, foundersOwnership, totalDilution, resolvedSlotData]);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
@@ -119,6 +133,9 @@ export function FundingView({
           value={card.value}
           change={card.change}
           description={card.description}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
           stagger={i}
         />,
       ])

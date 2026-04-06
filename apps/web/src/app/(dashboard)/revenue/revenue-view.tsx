@@ -36,6 +36,8 @@ export function RevenueView({
 }: RevenueViewProps) {
   const { growthMetrics: g, hasSaaS, streamBreakdown, waterfall, monthlyByStream, streamNames } = revenueDetails;
 
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
   const usedSlugs = useMemo(
@@ -85,7 +87,7 @@ export function RevenueView({
     { i: "stream-breakdown", x: 0, w: 6, h: 14, minH: 8 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; changeLabel?: string; description?: string; lowerIsBetter?: boolean }> => {
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; changeLabel?: string; description?: string; lowerIsBetter?: boolean; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => {
     const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
     const first = {
       slug: "monthlyRevenue",
@@ -94,6 +96,9 @@ export function RevenueView({
       change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
       changeLabel: "MoM growth",
       description: "MoM growth",
+      sparkData: findSlot("monthlyRevenue")?.sparkData,
+      metricStyle: findSlot("monthlyRevenue")?.metricStyle,
+      hasData: findSlot("monthlyRevenue")?.hasData,
     };
 
     if (hasSaaS) {
@@ -105,12 +110,18 @@ export function RevenueView({
           value: fc(g.currentMrr),
           change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
           description: `ARR: ${fc(g.arr)}`,
+          sparkData: findSlot("mrr")?.sparkData,
+          metricStyle: findSlot("mrr")?.metricStyle,
+          hasData: findSlot("mrr")?.hasData,
         },
         {
           slug: "customers",
           label: "Customers",
           value: String(Math.round(g.totalCustomers)),
           description: `ARPA: ${fc(g.arpa)}/mo`,
+          sparkData: findSlot("customers")?.sparkData,
+          metricStyle: findSlot("customers")?.metricStyle,
+          hasData: findSlot("customers")?.hasData,
         },
         {
           slug: "churnRate",
@@ -118,6 +129,9 @@ export function RevenueView({
           value: `${g.churnRate.toFixed(1)}%`,
           description: `LTV: ${fc(g.ltv)}`,
           lowerIsBetter: true,
+          sparkData: findSlot("churnRate")?.sparkData,
+          metricStyle: findSlot("churnRate")?.metricStyle,
+          hasData: findSlot("churnRate")?.hasData,
         },
       ];
     }
@@ -129,21 +143,30 @@ export function RevenueView({
         label: "Annual Run Rate",
         value: fc(g.currentRevenue * 12),
         description: "Based on current monthly",
+        sparkData: findSlot("annualRunRate")?.sparkData,
+        metricStyle: findSlot("annualRunRate")?.metricStyle,
+        hasData: findSlot("annualRunRate")?.hasData,
       },
       {
         slug: "revenueStreams",
         label: "Revenue Streams",
         value: String(revenueDetails.streamCount),
         description: "Active sources",
+        sparkData: findSlot("revenueStreams")?.sparkData,
+        metricStyle: findSlot("revenueStreams")?.metricStyle,
+        hasData: findSlot("revenueStreams")?.hasData,
       },
       {
         slug: "growth",
         label: "Growth",
         value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
         description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
+        sparkData: findSlot("growth")?.sparkData,
+        metricStyle: findSlot("growth")?.metricStyle,
+        hasData: findSlot("growth")?.hasData,
       },
     ];
-  }, [g, hasSaaS, revenueDetails.streamCount]);
+  }, [g, hasSaaS, revenueDetails.streamCount, resolvedSlotData]);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
@@ -158,6 +181,9 @@ export function RevenueView({
           changeLabel={card.changeLabel}
           description={card.description}
           lowerIsBetter={card.lowerIsBetter}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
           stagger={i}
         />,
       ])

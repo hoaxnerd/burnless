@@ -184,6 +184,7 @@ function ReportSection({
 
 export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; resolvedSlotData: ResolvedSlotData[] }) {
   const d = data;
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
 
   const handlePrint = () => window.print();
 
@@ -220,6 +221,9 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         value={formatCompactCurrency(d.revenue.current)}
         change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
         description="MoM"
+        sparkData={findSlot("revenue")?.sparkData}
+        metricStyle={findSlot("revenue")?.metricStyle}
+        hasData={findSlot("revenue")?.hasData}
         stagger={0}
       />
     ),
@@ -231,6 +235,9 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         value={formatCompactCurrency(d.cash.burnRate)}
         description="/month"
         lowerIsBetter
+        sparkData={findSlot("netBurn")?.sparkData}
+        metricStyle={findSlot("netBurn")?.metricStyle}
+        hasData={findSlot("netBurn")?.hasData}
         stagger={1}
       />
     ),
@@ -241,6 +248,9 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         label="Cash"
         value={formatCompactCurrency(d.cash.position)}
         description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
+        sparkData={findSlot("cash")?.sparkData}
+        metricStyle={findSlot("cash")?.metricStyle}
+        hasData={findSlot("cash")?.hasData}
         stagger={2}
       />
     ),
@@ -251,6 +261,9 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         label="Gross Margin"
         value={`${d.profitability.grossMargin.toFixed(1)}%`}
         description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}
+        sparkData={findSlot("grossMargin")?.sparkData}
+        metricStyle={findSlot("grossMargin")?.metricStyle}
+        hasData={findSlot("grossMargin")?.hasData}
         stagger={3}
       />
     ),

@@ -58,6 +58,8 @@ export function ExpensesView({
   const [view, setView] = useState<"overview" | "budget">("overview");
   const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount: _opexAmount, cogsAmount: _cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
 
+  const findSlot = (slug: string) => resolvedSlotData.find(s => s.content.slug === slug);
+
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
   const usedSlugs = useMemo(() => new Set(["totalMonthly", "personnelCost", "anomalies", "recurring"]), []);
@@ -125,26 +127,38 @@ export function ExpensesView({
       changeLabel: "vs last month",
       description: "vs last month",
       lowerIsBetter: true,
+      sparkData: findSlot("totalMonthly")?.sparkData,
+      metricStyle: findSlot("totalMonthly")?.metricStyle,
+      hasData: findSlot("totalMonthly")?.hasData,
     },
     {
       slug: "personnelCost",
       label: "People",
       value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
       description: `${personnelPercent.toFixed(0)}% of total`,
+      sparkData: findSlot("personnelCost")?.sparkData,
+      metricStyle: findSlot("personnelCost")?.metricStyle,
+      hasData: findSlot("personnelCost")?.hasData,
     },
     {
       slug: "anomalies",
       label: "Anomalies",
       value: String(anomalyCount),
       description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
+      sparkData: findSlot("anomalies")?.sparkData,
+      metricStyle: findSlot("anomalies")?.metricStyle,
+      hasData: findSlot("anomalies")?.hasData,
     },
     {
       slug: "recurring",
       label: "Recurring",
       value: String(recurringCount),
       description: `of ${expenseDetails.lineItems.length} expenses`,
+      sparkData: findSlot("recurring")?.sparkData,
+      metricStyle: findSlot("recurring")?.metricStyle,
+      hasData: findSlot("recurring")?.hasData,
     },
-  ], [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails.lineItems.length]);
+  ], [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails.lineItems.length, resolvedSlotData]);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
@@ -159,6 +173,9 @@ export function ExpensesView({
           changeLabel={card.changeLabel}
           description={card.description}
           lowerIsBetter={card.lowerIsBetter}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
           stagger={i}
         />,
       ])
