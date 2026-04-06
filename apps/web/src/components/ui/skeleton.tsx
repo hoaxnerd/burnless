@@ -10,7 +10,7 @@ export function Skeleton({ className = "" }: SkeletonProps) {
 /** Skeleton for a metric card (label + value + change). */
 export function MetricCardSkeleton() {
   return (
-    <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
       <Skeleton className="h-4 w-24 mb-3" />
       <Skeleton className="h-8 w-32 mb-2" />
       <Skeleton className="h-3 w-20" />

@@ -1,6 +1,5 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import { SwappableMetricCard } from "./swappable-metric-card";
 
 export interface MetricCardConfig {
@@ -8,10 +7,12 @@ export interface MetricCardConfig {
   label: string;
   value: string;
   change?: string;
+  changeLabel?: string;
   description?: string;
-  icon?: LucideIcon;
-  trend?: "up" | "down" | "flat";
-  variant?: "default" | "success" | "danger" | "warning" | "brand";
+  sparkData?: number[];
+  metricStyle?: { icon: string; color: string; href: string };
+  hasData?: boolean;
+  lowerIsBetter?: boolean;
   loading?: boolean;
 }
 
@@ -22,23 +23,25 @@ interface MetricCardsGridProps {
 }
 
 export function MetricCardsGrid({ cards, gap = 4 }: MetricCardsGridProps) {
-  // Static class lookup — dynamic template literals are purged by Tailwind
   const gapClass = gap === 6 ? "gap-6" : "gap-4";
-
   return (
     <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${gapClass} animate-fade-in`}>
       {cards.map((card, i) => (
-        <div key={card.slug} className={`stagger-${i + 1} animate-slide-up`}>
-          <SwappableMetricCard
-            slug={card.slug}
-            label={card.label}
-            value={card.value}
-            change={card.change}
-            description={card.description}
-            loading={card.loading}
-            stagger={i}
-          />
-        </div>
+        <SwappableMetricCard
+          key={card.slug}
+          slug={card.slug}
+          label={card.label}
+          value={card.value}
+          change={card.change}
+          changeLabel={card.changeLabel}
+          description={card.description}
+          sparkData={card.sparkData}
+          metricStyle={card.metricStyle}
+          hasData={card.hasData}
+          lowerIsBetter={card.lowerIsBetter}
+          loading={card.loading}
+          stagger={i}
+        />
       ))}
     </div>
   );

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use HeroKpiCard (via SwappableMetricCard) instead.
+ * Retained only for existing tests; will be removed in a future cleanup.
+ */
 import { TrendingUp, TrendingDown, Minus, type LucideIcon } from "lucide-react";
 
 type Trend = "up" | "down" | "flat";
