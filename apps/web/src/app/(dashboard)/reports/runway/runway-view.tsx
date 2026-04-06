@@ -12,7 +12,6 @@ import { CardCatalogProvider, type CardCatalogValue } from "@/components/provide
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
 
 interface RunwayViewProps {
   cashPosition: MetricValue[];
@@ -26,10 +25,13 @@ interface RunwayViewProps {
 }
 
 export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, resolvedSlotData }: RunwayViewProps) {
-  const findSlot = (slug: string) => {
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
+
   const latest = cashPosition[cashPosition.length - 1];
   const latestBurn = netBurnRate[netBurnRate.length - 1];
   const latestRunway = runway[runway.length - 1];
@@ -104,8 +106,6 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
-  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
-
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
     { i: "export",        x: 0,  w: 12, h: 2, minH: 2 },
     { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
@@ -128,43 +128,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "warning",       x: 0,  w: 6, h: 3, minH: 2 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; lowerIsBetter?: boolean; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
-    {
-      slug: "startingCash",
-      label: "Starting Cash",
-      value: fc(startingCash),
-      sparkData: findSlot("startingCash")?.sparkData,
-      metricStyle: findSlot("startingCash")?.metricStyle,
-      hasData: findSlot("startingCash")?.hasData,
-    },
-    {
-      slug: "currentCash",
-      label: "Current Cash",
-      value: fc(latest?.value ?? 0),
-      sparkData: findSlot("currentCash")?.sparkData,
-      metricStyle: findSlot("currentCash")?.metricStyle,
-      hasData: findSlot("currentCash")?.hasData,
-    },
-    {
-      slug: "netBurnRate",
-      label: "Net Burn Rate",
-      value: fc(latestBurn?.value ?? 0),
-      description: "Latest month",
-      lowerIsBetter: true,
-      sparkData: findSlot("netBurnRate")?.sparkData,
-      metricStyle: findSlot("netBurnRate")?.metricStyle,
-      hasData: findSlot("netBurnRate")?.hasData,
-    },
-    {
-      slug: "runway",
-      label: "Runway",
-      value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e",
-      description: zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway",
-      sparkData: findSlot("runway")?.sparkData,
-      metricStyle: findSlot("runway")?.metricStyle,
-      hasData: findSlot("runway")?.hasData,
-    },
-  ], [startingCash, latest, latestBurn, latestRunway, zeroCashMonth, resolvedSlotData]);
+  // Page-specific lowerIsBetter flags
+  const lowerIsBetterSlugs = useMemo(() => new Set(["netBurnRate"]), []);
 
   const widgets = useMemo(() => ({
     "export": (
@@ -174,22 +139,27 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       </div>
     ),
     ...Object.fromEntries(
-      metricCards.map((card, i) => [
-        `metric-${i}`,
-        <SwappableMetricCard
-          key={`metric-${i}`}
-          slug={card.slug}
-          label={card.label}
-          value={card.value}
-          change={card.change}
-          description={card.description}
-          lowerIsBetter={card.lowerIsBetter}
-          sparkData={card.sparkData}
-          metricStyle={card.metricStyle}
-          hasData={card.hasData}
-          stagger={i}
-        />,
-      ])
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            lowerIsBetter={lowerIsBetterSlugs.has(slot.content.slug)}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "cash-charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -223,7 +193,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         </p>
       </div>
     ) : <div />,
-  }), [handleExportCSV, handleExportPDF, metricCards, zeroCashMonth, cashPosition, runway, burnData]);
+  }), [handleExportCSV, handleExportPDF, slotById, lowerIsBetterSlugs, zeroCashMonth, cashPosition, runway, burnData]);
 
   const staticHiddenWidgets = useMemo(() => zeroCashMonth ? [] : ["warning"], [zeroCashMonth]);
 

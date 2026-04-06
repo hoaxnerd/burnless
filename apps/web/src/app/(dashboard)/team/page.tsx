@@ -119,7 +119,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
       value: String(totalHeadcount),
       description: plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + h.count, 0)} planned` : undefined,
       hasData: totalHeadcount > 0,
-      metricStyle: { icon: "Users", color: "text-surface-500", href: "/team" },
+      metricStyle: { icon: "Users", color: "blue", href: "/team" },
     },
     {
       slotId: "metric-1",
@@ -128,7 +128,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
       value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
       description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
       hasData: totalMonthlyCost > 0,
-      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/team" },
+      metricStyle: { icon: "DollarSign", color: "emerald", href: "/team" },
     },
     {
       slotId: "metric-2",
@@ -137,7 +137,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
       value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
       description: "Efficiency metric",
       hasData: revPerEmployee > 0,
-      metricStyle: { icon: "TrendingUp", color: "text-surface-500", href: "/team" },
+      metricStyle: { icon: "TrendingUp", color: "teal", href: "/team" },
     },
     {
       slotId: "metric-3",
@@ -146,7 +146,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
       value: String(deptGroups.size),
       description: `${departments.length} total defined`,
       hasData: true,
-      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/team" },
+      metricStyle: { icon: "BarChart3", color: "violet", href: "/team" },
     },
   ];
 

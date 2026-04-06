@@ -11,7 +11,6 @@ import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
 
 interface TeamViewProps {
   totalHeadcount: number;
@@ -66,10 +65,12 @@ export function TeamView({
   scenarioId,
   departments,
 }: TeamViewProps) {
-  const findSlot = (slug: string) => {
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
@@ -105,62 +106,28 @@ export function TeamView({
     { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
-    {
-      slug: "totalHeadcount",
-      label: "Total Headcount",
-      value: String(totalHeadcount),
-      description: plannedCount > 0 ? `+${plannedCount} planned` : undefined,
-      sparkData: findSlot("totalHeadcount")?.sparkData,
-      metricStyle: findSlot("totalHeadcount")?.metricStyle,
-      hasData: findSlot("totalHeadcount")?.hasData,
-    },
-    {
-      slug: "monthlyPeopleCost",
-      label: "Monthly People Cost",
-      value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
-      description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
-      sparkData: findSlot("monthlyPeopleCost")?.sparkData,
-      metricStyle: findSlot("monthlyPeopleCost")?.metricStyle,
-      hasData: findSlot("monthlyPeopleCost")?.hasData,
-    },
-    {
-      slug: "revenuePerEmployee",
-      label: "Revenue / Employee",
-      value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
-      description: "Efficiency metric",
-      sparkData: findSlot("revenuePerEmployee")?.sparkData,
-      metricStyle: findSlot("revenuePerEmployee")?.metricStyle,
-      hasData: findSlot("revenuePerEmployee")?.hasData,
-    },
-    {
-      slug: "departments",
-      label: "Departments",
-      value: String(deptGroupCount),
-      description: `${departmentsCount} total defined`,
-      sparkData: findSlot("departments")?.sparkData,
-      metricStyle: findSlot("departments")?.metricStyle,
-      hasData: findSlot("departments")?.hasData,
-    },
-  ], [totalHeadcount, plannedCount, totalMonthlyCost, costPercentOfBurn, revPerEmployee, deptGroupCount, departmentsCount, resolvedSlotData]);
-
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
-      metricCards.map((card, i) => [
-        `metric-${i}`,
-        <SwappableMetricCard
-          key={`metric-${i}`}
-          slug={card.slug}
-          label={card.label}
-          value={card.value}
-          change={card.change}
-          description={card.description}
-          sparkData={card.sparkData}
-          metricStyle={card.metricStyle}
-          hasData={card.hasData}
-          stagger={i}
-        />,
-      ])
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "details": (
       <TeamDetails
@@ -171,7 +138,7 @@ export function TeamView({
         departments={departments}
       />
     ),
-  }), [metricCards, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
+  }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
 
   return (
     <PageLayoutProvider pageId="team">

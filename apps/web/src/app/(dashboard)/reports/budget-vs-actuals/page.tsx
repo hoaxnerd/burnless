@@ -126,7 +126,7 @@ async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: st
       label: "Total Budget",
       value: fc(totalBudgetSum),
       hasData: totalBudgetSum !== 0,
-      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/reports/budget-vs-actuals" },
+      metricStyle: { icon: "DollarSign", color: "emerald", href: "/reports/budget-vs-actuals" },
     },
     {
       slotId: "metric-1",
@@ -134,7 +134,7 @@ async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: st
       label: "Total Actual",
       value: fc(totalActualSum),
       hasData: totalActualSum !== 0,
-      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/budget-vs-actuals" },
+      metricStyle: { icon: "DollarSign", color: "blue", href: "/reports/budget-vs-actuals" },
     },
     {
       slotId: "metric-2",
@@ -143,7 +143,7 @@ async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: st
       value: fc(totalVarianceSum),
       change: totalVarianceSum >= 0 ? "Favorable" : "Unfavorable",
       hasData: true,
-      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/reports/budget-vs-actuals" },
+      metricStyle: { icon: "BarChart3", color: "violet", href: "/reports/budget-vs-actuals" },
     },
   ];
 

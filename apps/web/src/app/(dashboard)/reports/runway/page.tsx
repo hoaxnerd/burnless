@@ -46,6 +46,11 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
+  const spark = (series: { month: string; value: number }[]) => {
+    const vals = series.slice(-8).map(t => t.value);
+    return vals.length >= 2 ? vals : undefined;
+  };
+
   const latest = data.metrics.cashPosition[data.metrics.cashPosition.length - 1];
   const latestBurn = data.metrics.netBurnRate[data.metrics.netBurnRate.length - 1];
   const latestRunway = data.metrics.cashRunwayMonths[data.metrics.cashRunwayMonths.length - 1];
@@ -64,7 +69,7 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
       label: "Starting Cash",
       value: fc(data.startingCash),
       hasData: data.startingCash > 0,
-      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/reports/runway" },
+      metricStyle: { icon: "DollarSign", color: "emerald", href: "/reports/runway" },
     },
     {
       slotId: "metric-1",
@@ -72,7 +77,8 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
       label: "Current Cash",
       value: fc(latest?.value ?? 0),
       hasData: (latest?.value ?? 0) > 0,
-      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/runway" },
+      sparkData: spark(data.metrics.cashPosition),
+      metricStyle: { icon: "DollarSign", color: "blue", href: "/reports/runway" },
     },
     {
       slotId: "metric-2",
@@ -81,7 +87,8 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
       value: fc(latestBurn?.value ?? 0),
       description: "Latest month",
       hasData: (latestBurn?.value ?? 0) > 0,
-      metricStyle: { icon: "TrendingDown", color: "text-warning-500", href: "/reports/runway" },
+      sparkData: spark(data.metrics.netBurnRate),
+      metricStyle: { icon: "TrendingDown", color: "orange", href: "/reports/runway" },
     },
     {
       slotId: "metric-3",
@@ -90,7 +97,8 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName 
       value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "\u221e",
       description: zeroCashMonth ? `Cash runs out ~${zeroCashMonth.month}` : "Sufficient runway",
       hasData: (latestRunway?.value ?? 0) > 0,
-      metricStyle: { icon: "Clock", color: "text-surface-500", href: "/reports/runway" },
+      sparkData: spark(data.metrics.cashRunwayMonths),
+      metricStyle: { icon: "Clock", color: "violet", href: "/reports/runway" },
     },
   ];
 

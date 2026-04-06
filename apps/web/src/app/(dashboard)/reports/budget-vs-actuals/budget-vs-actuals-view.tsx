@@ -13,10 +13,12 @@ import { PageProvider } from "@/components/providers/page-context";
 export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsActuals; resolvedSlotData: ResolvedSlotData[] }) {
   const { lineItems, totalBudget, totalActual, totalVariance } = bva;
 
-  // Summary metrics
-  const totalBudgetSum = totalBudget.reduce((s, v) => s + v.value, 0);
-  const totalActualSum = totalActual.reduce((s, v) => s + v.value, 0);
-  const totalVarianceSum = totalVariance.reduce((s, v) => s + v.value, 0);
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   // Chart data
   const summaryChartData = totalBudget.map((b, i) => ({
@@ -56,21 +58,27 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
   ], []);
 
   const widgets = useMemo(() => ({
-    "metric-0": (
-      <SwappableMetricCard slug="totalBudget" pageId="reports/bva" label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} stagger={0} />
-    ),
-    "metric-1": (
-      <SwappableMetricCard slug="totalActual" pageId="reports/bva" label="Total Actual" value={formatCompactCurrency(totalActualSum)} stagger={1} />
-    ),
-    "metric-2": (
-      <SwappableMetricCard
-        slug="totalVariance"
-        pageId="reports/bva"
-        label="Total Variance"
-        value={formatCompactCurrency(totalVarianceSum)}
-        change={totalVarianceSum >= 0 ? "Favorable" : "Unfavorable"}
-        stagger={2}
-      />
+    ...Object.fromEntries(
+      ["metric-0", "metric-1", "metric-2"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "charts": (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -135,7 +143,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
         </div>
       </div>
     ),
-  }), [totalBudgetSum, totalActualSum, totalVarianceSum, summaryChartData, totalVariance, lineItems, csvData, headers]);
+  }), [slotById, summaryChartData, totalVariance, lineItems, csvData, headers]);
 
   // Empty state: show before PageGrid
   if (lineItems.length === 0) {

@@ -114,6 +114,13 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
     buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
   );
 
+  const spark = (series: { month: string; value: number }[]) => {
+    const vals = series.slice(-8).map(t => t.value);
+    return vals.length >= 2 ? vals : undefined;
+  };
+  const revTimeline = seriesToArray(totalRevenue);
+  const cashTl = seriesToArray(cashPosition);
+
   // Build page-specific default KPI cards as ResolvedSlotData
   const pageDefaultSlots: ResolvedSlotData[] = [
     {
@@ -124,7 +131,8 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       change: `${revGrowth > 0 ? "+" : ""}${revGrowth.toFixed(1)}%`,
       changeLabel: "MoM",
       hasData: currentRev > 0,
-      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+      sparkData: spark(revTimeline),
+      metricStyle: { icon: "DollarSign", color: "emerald", href: "/revenue" },
     },
     {
       slotId: "metric-1",
@@ -133,7 +141,8 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       value: `$${burnRate >= 1_000_000 ? `${(burnRate / 1_000_000).toFixed(1)}M` : burnRate >= 1_000 ? `${(burnRate / 1_000).toFixed(0)}k` : burnRate.toFixed(0)}`,
       description: "/month",
       hasData: burnRate > 0,
-      metricStyle: { icon: "TrendingDown", color: "text-warning-500", href: "/reports/runway" },
+      sparkData: spark(metrics.netBurnRate),
+      metricStyle: { icon: "TrendingDown", color: "orange", href: "/reports/runway" },
     },
     {
       slotId: "metric-2",
@@ -142,7 +151,8 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       value: `$${currentCash >= 1_000_000 ? `${(currentCash / 1_000_000).toFixed(1)}M` : currentCash >= 1_000 ? `${(currentCash / 1_000).toFixed(0)}k` : currentCash.toFixed(0)}`,
       description: runway > 36 ? "36+ mo runway" : `${Math.round(runway)} mo runway`,
       hasData: currentCash > 0,
-      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/reports/runway" },
+      sparkData: spark(cashTl),
+      metricStyle: { icon: "DollarSign", color: "blue", href: "/reports/runway" },
     },
     {
       slotId: "metric-3",
@@ -151,7 +161,8 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       value: `${grossMargin.toFixed(1)}%`,
       description: grossMargin >= 60 ? "Healthy" : grossMargin >= 40 ? "Average" : "Below benchmark",
       hasData: true,
-      metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/reports/profit-loss" },
+      sparkData: spark(metrics.grossMarginPercent),
+      metricStyle: { icon: "BarChart3", color: "violet", href: "/reports/profit-loss" },
     },
   ];
 

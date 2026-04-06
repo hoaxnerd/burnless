@@ -68,6 +68,11 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
+  const spark = (series: { month: string; value: number }[]) => {
+    const vals = series.slice(-8).map(t => t.value);
+    return vals.length >= 2 ? vals : undefined;
+  };
+
   // Build resolved slot data for ALL engine metrics (swap targets)
   const allEngineSlots: ResolvedSlotData[] = data
     ? METRIC_REGISTRY.map((def) =>
@@ -84,7 +89,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
       value: totalRaised > 0 ? fc(totalRaised) : "$---",
       description: totalRaised > 0 ? `${completedRounds.length} round${completedRounds.length !== 1 ? "s" : ""} completed` : "Add a funding round",
       hasData: totalRaised > 0,
-      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/funding" },
+      metricStyle: { icon: "Banknote", color: "emerald", href: "/funding" },
     },
     {
       slotId: "metric-1",
@@ -93,7 +98,8 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
       value: currentCash > 0 ? fc(currentCash) : "$---",
       description: currentCash > 0 ? "Available capital" : "Add funding to see cash",
       hasData: currentCash > 0,
-      metricStyle: { icon: "DollarSign", color: "text-brand-500", href: "/funding" },
+      sparkData: data ? spark(data.metrics.cashPosition) : undefined,
+      metricStyle: { icon: "Wallet", color: "emerald", href: "/funding" },
     },
     {
       slotId: "metric-2",
@@ -102,7 +108,8 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
       value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
       description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
       hasData: currentBurn > 0 && currentCash > 0,
-      metricStyle: { icon: "Clock", color: "text-surface-500", href: "/reports/runway" },
+      sparkData: data ? spark(data.metrics.cashRunwayMonths) : undefined,
+      metricStyle: { icon: "Clock", color: "blue", href: "/reports/runway" },
     },
     {
       slotId: "metric-3",
@@ -111,7 +118,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
       value: completedRounds.length > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%",
       description: completedRounds.length > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round",
       hasData: completedRounds.length > 0,
-      metricStyle: { icon: "PieChart", color: "text-surface-500", href: "/funding" },
+      metricStyle: { icon: "PieChart", color: "violet", href: "/funding" },
     },
   ];
 

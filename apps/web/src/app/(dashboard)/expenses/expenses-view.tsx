@@ -15,7 +15,6 @@ import { CardCatalogProvider, type CardCatalogValue } from "@/components/provide
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, type ResolvedSlotData } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
 import type { ExpenseDetails } from "@/lib/compute-expenses";
 
 interface MetricPoint {
@@ -56,13 +55,14 @@ export function ExpensesView({
   scenarioId,
 }: ExpensesViewProps) {
   const [view, setView] = useState<"overview" | "budget">("overview");
-  const { totalMonthly, changePercent, personnelCost, personnelPercent, opexAmount: _opexAmount, cogsAmount: _cogsAmount, anomalyCount, recurringCount } = summaryMetrics;
+  const { anomalyCount, recurringCount } = summaryMetrics;
 
-  const findSlot = (slug: string) => {
-    // Prefer the engine-computed entry (has sparkData) over the page-default entry
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
@@ -122,67 +122,32 @@ export function ExpensesView({
     { i: "table",        x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const metricCards = useMemo(() => [
-    {
-      slug: "totalMonthly",
-      label: "Total Monthly",
-      value: formatCurrency(totalMonthly, "USD", undefined, { compact: true }),
-      change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
-      changeLabel: "vs last month",
-      description: "vs last month",
-      lowerIsBetter: true,
-      sparkData: findSlot("totalMonthly")?.sparkData,
-      metricStyle: findSlot("totalMonthly")?.metricStyle,
-      hasData: findSlot("totalMonthly")?.hasData,
-    },
-    {
-      slug: "personnelCost",
-      label: "People",
-      value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
-      description: `${personnelPercent.toFixed(0)}% of total`,
-      sparkData: findSlot("personnelCost")?.sparkData,
-      metricStyle: findSlot("personnelCost")?.metricStyle,
-      hasData: findSlot("personnelCost")?.hasData,
-    },
-    {
-      slug: "anomalies",
-      label: "Anomalies",
-      value: String(anomalyCount),
-      description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
-      sparkData: findSlot("anomalies")?.sparkData,
-      metricStyle: findSlot("anomalies")?.metricStyle,
-      hasData: findSlot("anomalies")?.hasData,
-    },
-    {
-      slug: "recurring",
-      label: "Recurring",
-      value: String(recurringCount),
-      description: `of ${expenseDetails.lineItems.length} expenses`,
-      sparkData: findSlot("recurring")?.sparkData,
-      metricStyle: findSlot("recurring")?.metricStyle,
-      hasData: findSlot("recurring")?.hasData,
-    },
-  ], [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails.lineItems.length, resolvedSlotData]);
+  // Page-specific lowerIsBetter flags (expenses going up = bad)
+  const lowerIsBetterSlugs = useMemo(() => new Set(["totalMonthly"]), []);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
-      metricCards.map((card, i) => [
-        `metric-${i}`,
-        <SwappableMetricCard
-          key={`metric-${i}`}
-          slug={card.slug}
-          label={card.label}
-          value={card.value}
-          change={card.change}
-          changeLabel={card.changeLabel}
-          description={card.description}
-          lowerIsBetter={card.lowerIsBetter}
-          sparkData={card.sparkData}
-          metricStyle={card.metricStyle}
-          hasData={card.hasData}
-          stagger={i}
-        />,
-      ])
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            lowerIsBetter={lowerIsBetterSlugs.has(slot.content.slug)}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "ai-insights": (
       <AiPageInsights
@@ -200,7 +165,7 @@ export function ExpensesView({
         <ExpenseInsights
           breakdown={expenseDetails.subcategoryBreakdown}
           lineItems={expenseDetails.lineItems}
-          totalMonthly={totalMonthly}
+          totalMonthly={summaryMetrics.totalMonthly}
           anomalyCount={anomalyCount}
           recurringCount={recurringCount}
         />
@@ -239,7 +204,7 @@ export function ExpensesView({
             breakdown={expenseDetails.subcategoryBreakdown}
             monthlyBySubcategory={expenseDetails.monthlyBySubcategory}
             subcategories={expenseDetails.subcategories}
-            totalMonthly={totalMonthly}
+            totalMonthly={summaryMetrics.totalMonthly}
           />
         ) : budgetCompareData && varianceData ? (
           <div className="space-y-6">
@@ -312,7 +277,7 @@ export function ExpensesView({
         subcategories={expenseDetails.subcategories}
       />
     ),
-  }), [metricCards, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
     <PageLayoutProvider pageId="expenses">

@@ -107,6 +107,13 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
     buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
   );
 
+  // Timeline data (needed for sparklines)
+  const expenseTimeline = seriesToArray(totalExpenses);
+  const spark = (series: { month: string; value: number }[]) => {
+    const vals = series.slice(-8).map(t => t.value);
+    return vals.length >= 2 ? vals : undefined;
+  };
+
   // Build page-specific default cards as ResolvedSlotData
   const pageDefaultSlots: ResolvedSlotData[] = [
     {
@@ -117,7 +124,8 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
       changeLabel: changePercent !== null ? "vs last month" : undefined,
       hasData: totalExpenseAmount > 0,
-      metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/expenses" },
+      sparkData: spark(expenseTimeline),
+      metricStyle: { icon: "DollarSign", color: "emerald", href: "/expenses" },
     },
     {
       slotId: "metric-1",
@@ -126,7 +134,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
       description: `${summaryMetrics.personnelPercent.toFixed(0)}% of total`,
       hasData: personnelCost > 0,
-      metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/team" },
+      metricStyle: { icon: "TrendingUp", color: "blue", href: "/team" },
     },
     {
       slotId: "metric-2",
@@ -135,7 +143,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       value: String(anomalyCount),
       description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
       hasData: true,
-      metricStyle: { icon: "AlertTriangle", color: "text-warning-500", href: "/expenses" },
+      metricStyle: { icon: "Zap", color: "amber", href: "/expenses" },
     },
     {
       slotId: "metric-3",
@@ -144,7 +152,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       value: String(recurringCount),
       description: `of ${expenseDetails.lineItems.length} expenses`,
       hasData: true,
-      metricStyle: { icon: "RotateCw", color: "text-surface-500", href: "/expenses" },
+      metricStyle: { icon: "BarChart3", color: "violet", href: "/expenses" },
     },
   ];
 

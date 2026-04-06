@@ -66,6 +66,11 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
   const g = revenueDetails.growthMetrics;
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
+  const spark = (series: { month: string; value: number }[]) => {
+    const vals = series.slice(-8).map(t => t.value);
+    return vals.length >= 2 ? vals : undefined;
+  };
+
   // Build resolved slot data for ALL engine metrics (swap targets)
   const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>
     buildSlotMetricCard(def.slug, data.metrics, currentMonth, prevMonth)
@@ -82,7 +87,8 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
           changeLabel: "MoM growth",
           hasData: g.currentRevenue > 0,
-          metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+          sparkData: spark(revenueTimeline),
+          metricStyle: { icon: "DollarSign", color: "emerald", href: "/revenue" },
         },
         {
           slotId: "metric-1",
@@ -92,7 +98,8 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
           description: `ARR: ${fc(g.arr)}`,
           hasData: g.currentMrr > 0,
-          metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/revenue" },
+          sparkData: spark(mrrTimeline),
+          metricStyle: { icon: "TrendingUp", color: "teal", href: "/revenue" },
         },
         {
           slotId: "metric-2",
@@ -101,7 +108,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           value: String(Math.round(g.totalCustomers)),
           description: `ARPA: ${fc(g.arpa)}/mo`,
           hasData: g.totalCustomers > 0,
-          metricStyle: { icon: "Users", color: "text-surface-500", href: "/revenue" },
+          metricStyle: { icon: "Users", color: "blue", href: "/revenue" },
         },
         {
           slotId: "metric-3",
@@ -110,7 +117,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           value: `${g.churnRate.toFixed(1)}%`,
           description: `LTV: ${fc(g.ltv)}`,
           hasData: true,
-          metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/revenue" },
+          metricStyle: { icon: "Flame", color: "orange", href: "/revenue" },
         },
       ]
     : [
@@ -122,7 +129,8 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
           changeLabel: "MoM growth",
           hasData: g.currentRevenue > 0,
-          metricStyle: { icon: "DollarSign", color: "text-surface-500", href: "/revenue" },
+          sparkData: spark(revenueTimeline),
+          metricStyle: { icon: "DollarSign", color: "emerald", href: "/revenue" },
         },
         {
           slotId: "metric-1",
@@ -131,7 +139,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           value: fc(g.currentRevenue * 12),
           description: "Based on current monthly",
           hasData: g.currentRevenue > 0,
-          metricStyle: { icon: "TrendingUp", color: "text-brand-500", href: "/revenue" },
+          metricStyle: { icon: "TrendingUp", color: "violet", href: "/revenue" },
         },
         {
           slotId: "metric-2",
@@ -140,7 +148,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           value: String(revenueDetails.streamCount),
           description: "Active sources",
           hasData: true,
-          metricStyle: { icon: "BarChart3", color: "text-surface-500", href: "/revenue" },
+          metricStyle: { icon: "BarChart3", color: "blue", href: "/revenue" },
         },
         {
           slotId: "metric-3",
@@ -149,7 +157,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
           value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
           description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
           hasData: true,
-          metricStyle: { icon: "TrendingUp", color: "text-surface-500", href: "/revenue" },
+          metricStyle: { icon: "TrendingUp", color: "teal", href: "/revenue" },
         },
       ];
 

@@ -15,7 +15,6 @@ import { CardCatalogProvider, type CardCatalogValue } from "@/components/provide
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
 import type { RevenueDetails } from "@/lib/compute-revenue";
 import type { MetricValue, ResolvedSlotData } from "@burnless/engine";
 
@@ -36,10 +35,12 @@ export function RevenueView({
 }: RevenueViewProps) {
   const { growthMetrics: g, hasSaaS, streamBreakdown, waterfall, monthlyByStream, streamNames } = revenueDetails;
 
-  const findSlot = (slug: string) => {
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
@@ -90,106 +91,32 @@ export function RevenueView({
     { i: "stream-breakdown", x: 0, w: 6, h: 14, minH: 8 },
   ], []);
 
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; changeLabel?: string; description?: string; lowerIsBetter?: boolean; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => {
-    const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
-    const first = {
-      slug: "monthlyRevenue",
-      label: "Monthly Revenue",
-      value: fc(g.currentRevenue),
-      change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
-      changeLabel: "MoM growth",
-      description: "MoM growth",
-      sparkData: findSlot("monthlyRevenue")?.sparkData,
-      metricStyle: findSlot("monthlyRevenue")?.metricStyle,
-      hasData: findSlot("monthlyRevenue")?.hasData,
-    };
-
-    if (hasSaaS) {
-      return [
-        first,
-        {
-          slug: "mrr",
-          label: "MRR",
-          value: fc(g.currentMrr),
-          change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
-          description: `ARR: ${fc(g.arr)}`,
-          sparkData: findSlot("mrr")?.sparkData,
-          metricStyle: findSlot("mrr")?.metricStyle,
-          hasData: findSlot("mrr")?.hasData,
-        },
-        {
-          slug: "customers",
-          label: "Customers",
-          value: String(Math.round(g.totalCustomers)),
-          description: `ARPA: ${fc(g.arpa)}/mo`,
-          sparkData: findSlot("customers")?.sparkData,
-          metricStyle: findSlot("customers")?.metricStyle,
-          hasData: findSlot("customers")?.hasData,
-        },
-        {
-          slug: "churnRate",
-          label: "Churn Rate",
-          value: `${g.churnRate.toFixed(1)}%`,
-          description: `LTV: ${fc(g.ltv)}`,
-          lowerIsBetter: true,
-          sparkData: findSlot("churnRate")?.sparkData,
-          metricStyle: findSlot("churnRate")?.metricStyle,
-          hasData: findSlot("churnRate")?.hasData,
-        },
-      ];
-    }
-
-    return [
-      first,
-      {
-        slug: "annualRunRate",
-        label: "Annual Run Rate",
-        value: fc(g.currentRevenue * 12),
-        description: "Based on current monthly",
-        sparkData: findSlot("annualRunRate")?.sparkData,
-        metricStyle: findSlot("annualRunRate")?.metricStyle,
-        hasData: findSlot("annualRunRate")?.hasData,
-      },
-      {
-        slug: "revenueStreams",
-        label: "Revenue Streams",
-        value: String(revenueDetails.streamCount),
-        description: "Active sources",
-        sparkData: findSlot("revenueStreams")?.sparkData,
-        metricStyle: findSlot("revenueStreams")?.metricStyle,
-        hasData: findSlot("revenueStreams")?.hasData,
-      },
-      {
-        slug: "growth",
-        label: "Growth",
-        value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
-        description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
-        sparkData: findSlot("growth")?.sparkData,
-        metricStyle: findSlot("growth")?.metricStyle,
-        hasData: findSlot("growth")?.hasData,
-      },
-    ];
-  }, [g, hasSaaS, revenueDetails.streamCount, resolvedSlotData]);
+  // Page-specific lowerIsBetter flags
+  const lowerIsBetterSlugs = useMemo(() => new Set(["churnRate"]), []);
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
-      metricCards.map((card, i) => [
-        `metric-${i}`,
-        <SwappableMetricCard
-          key={`metric-${i}`}
-          slug={card.slug}
-          label={card.label}
-          value={card.value}
-          change={card.change}
-          changeLabel={card.changeLabel}
-          description={card.description}
-          lowerIsBetter={card.lowerIsBetter}
-          sparkData={card.sparkData}
-          metricStyle={card.metricStyle}
-          hasData={card.hasData}
-          stagger={i}
-        />,
-      ])
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            lowerIsBetter={lowerIsBetterSlugs.has(slot.content.slug)}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "ai-insights": (
       <AiPageInsights
@@ -240,7 +167,7 @@ export function RevenueView({
         scenarioId={scenarioId}
       />
     ),
-  }), [metricCards, g, hasSaaS, revenueDetails, streamBreakdown, waterfall, monthlyByStream, streamNames, revenueTimeline, mrrTimeline, scenarioId]);
+  }), [slotById, lowerIsBetterSlugs, g, hasSaaS, revenueDetails, streamBreakdown, waterfall, monthlyByStream, streamNames, revenueTimeline, mrrTimeline, scenarioId]);
 
   const staticHiddenWidgets = useMemo(() => hasSaaS ? [] : ["waterfall"], [hasSaaS]);
 

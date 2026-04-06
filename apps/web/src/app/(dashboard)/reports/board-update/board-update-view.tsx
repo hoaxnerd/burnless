@@ -184,10 +184,13 @@ function ReportSection({
 
 export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; resolvedSlotData: ResolvedSlotData[] }) {
   const d = data;
-  const findSlot = (slug: string) => {
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   const handlePrint = () => window.print();
 
@@ -215,60 +218,32 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "pnl-table", x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
+  // Page-specific lowerIsBetter flags
+  const lowerIsBetterSlugs = useMemo(() => new Set(["netBurn"]), []);
+
   const widgets = useMemo(() => ({
-    "metric-0": (
-      <SwappableMetricCard
-        slug="revenue"
-        pageId="reports/board-update"
-        label="Revenue"
-        value={formatCompactCurrency(d.revenue.current)}
-        change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
-        description="MoM"
-        sparkData={findSlot("revenue")?.sparkData}
-        metricStyle={findSlot("revenue")?.metricStyle}
-        hasData={findSlot("revenue")?.hasData}
-        stagger={0}
-      />
-    ),
-    "metric-1": (
-      <SwappableMetricCard
-        slug="netBurn"
-        pageId="reports/board-update"
-        label="Net Burn"
-        value={formatCompactCurrency(d.cash.burnRate)}
-        description="/month"
-        lowerIsBetter
-        sparkData={findSlot("netBurn")?.sparkData}
-        metricStyle={findSlot("netBurn")?.metricStyle}
-        hasData={findSlot("netBurn")?.hasData}
-        stagger={1}
-      />
-    ),
-    "metric-2": (
-      <SwappableMetricCard
-        slug="cash"
-        pageId="reports/board-update"
-        label="Cash"
-        value={formatCompactCurrency(d.cash.position)}
-        description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
-        sparkData={findSlot("cash")?.sparkData}
-        metricStyle={findSlot("cash")?.metricStyle}
-        hasData={findSlot("cash")?.hasData}
-        stagger={2}
-      />
-    ),
-    "metric-3": (
-      <SwappableMetricCard
-        slug="grossMargin"
-        pageId="reports/board-update"
-        label="Gross Margin"
-        value={`${d.profitability.grossMargin.toFixed(1)}%`}
-        description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}
-        sparkData={findSlot("grossMargin")?.sparkData}
-        metricStyle={findSlot("grossMargin")?.metricStyle}
-        hasData={findSlot("grossMargin")?.hasData}
-        stagger={3}
-      />
+    ...Object.fromEntries(
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            lowerIsBetter={lowerIsBetterSlugs.has(slot.content.slug)}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "revenue-section": (
       <ReportSection

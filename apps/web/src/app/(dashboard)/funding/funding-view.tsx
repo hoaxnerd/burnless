@@ -11,7 +11,6 @@ import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
 
 interface FundingViewProps {
   totalRaised: number;
@@ -45,10 +44,12 @@ export function FundingView({
   rounds,
   resolvedSlotData,
 }: FundingViewProps) {
-  const findSlot = (slug: string) => {
-    const withSpark = resolvedSlotData.find(s => s.content.slug === slug && s.sparkData);
-    return withSpark ?? resolvedSlotData.find(s => s.content.slug === slug);
-  };
+  // Render metric cards directly from resolvedSlotData (keyed by slotId)
+  const slotById = useMemo(() => {
+    const map = new Map<string, ResolvedSlotData>();
+    for (const s of resolvedSlotData) map.set(s.slotId, s);
+    return map;
+  }, [resolvedSlotData]);
 
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
@@ -84,64 +85,28 @@ export function FundingView({
     { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
-
-  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; sparkData?: number[]; metricStyle?: { icon: string; color: string; href: string }; hasData?: boolean }> => [
-    {
-      slug: "totalRaised",
-      label: "Total Raised",
-      value: totalRaised > 0 ? fc(totalRaised) : "$---",
-      description: totalRaised > 0 ? `${completedRoundsCount} round${completedRoundsCount !== 1 ? "s" : ""} completed` : "Add a funding round",
-      sparkData: findSlot("totalRaised")?.sparkData,
-      metricStyle: findSlot("totalRaised")?.metricStyle,
-      hasData: findSlot("totalRaised")?.hasData,
-    },
-    {
-      slug: "currentCash",
-      label: "Current Cash",
-      value: currentCash > 0 ? fc(currentCash) : "$---",
-      description: currentCash > 0 ? "Available capital" : "Add funding to see cash",
-      sparkData: findSlot("currentCash")?.sparkData,
-      metricStyle: findSlot("currentCash")?.metricStyle,
-      hasData: findSlot("currentCash")?.hasData,
-    },
-    {
-      slug: "runway",
-      label: "Runway",
-      value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
-      description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
-      sparkData: findSlot("runway")?.sparkData,
-      metricStyle: findSlot("runway")?.metricStyle,
-      hasData: findSlot("runway")?.hasData,
-    },
-    {
-      slug: "founderOwnership",
-      label: "Founder Ownership",
-      value: completedRoundsCount > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%",
-      description: completedRoundsCount > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round",
-      sparkData: findSlot("founderOwnership")?.sparkData,
-      metricStyle: findSlot("founderOwnership")?.metricStyle,
-      hasData: findSlot("founderOwnership")?.hasData,
-    },
-  ], [totalRaised, completedRoundsCount, currentCash, currentBurn, currentRunway, foundersOwnership, totalDilution, resolvedSlotData]);
-
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
-      metricCards.map((card, i) => [
-        `metric-${i}`,
-        <SwappableMetricCard
-          key={`metric-${i}`}
-          slug={card.slug}
-          label={card.label}
-          value={card.value}
-          change={card.change}
-          description={card.description}
-          sparkData={card.sparkData}
-          metricStyle={card.metricStyle}
-          hasData={card.hasData}
-          stagger={i}
-        />,
-      ])
+      ["metric-0", "metric-1", "metric-2", "metric-3"].map((slotId, i) => {
+        const slot = slotById.get(slotId);
+        if (!slot) return [slotId, null];
+        return [
+          slotId,
+          <SwappableMetricCard
+            key={slotId}
+            slug={slot.content.slug}
+            label={slot.label}
+            value={slot.value}
+            change={slot.change}
+            changeLabel={slot.changeLabel}
+            description={slot.description}
+            sparkData={slot.sparkData}
+            metricStyle={slot.metricStyle}
+            hasData={slot.hasData}
+            stagger={i}
+          />,
+        ];
+      })
     ),
     "details": (
       <FundingDetails
@@ -152,7 +117,7 @@ export function FundingView({
         currentRunway={currentRunway}
       />
     ),
-  }), [metricCards, rounds, foundersOwnership, currentCash, currentBurn, currentRunway]);
+  }), [slotById, rounds, foundersOwnership, currentCash, currentBurn, currentRunway]);
 
   return (
     <PageLayoutProvider pageId="funding">
