@@ -10,13 +10,11 @@
  */
 
 import { useMetrics } from "@/components/providers/metrics-context";
-import { HeroKpiCard, type KpiVariant, type HeroKpiCardProps } from "./hero-kpi-card";
+import { HeroKpiCard, type HeroKpiCardProps } from "./hero-kpi-card";
 
 export interface HeroCardDatum {
-  /** Variant key for the 4 defaults */
-  variant: KpiVariant;
-  /** Card props as rendered in the default (non-swapped) state */
-  props: Omit<HeroKpiCardProps, "variant">;
+  /** Card props */
+  props: HeroKpiCardProps;
   /** Whether this card has actual data */
   hasData: boolean;
 }
@@ -30,10 +28,8 @@ export interface SwapCardDatum {
   originalSlug: string;
   /** Hint for restoring the original metric */
   restoreHint: string;
-  /** Variant fallback (use the same position variant for grid consistency) */
-  variant: KpiVariant;
   /** Card props for the replacement metric */
-  props: Omit<HeroKpiCardProps, "variant">;
+  props: HeroKpiCardProps;
 }
 
 interface HeroCardGridProps {
@@ -84,7 +80,6 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
           return (
             <HeroKpiCard
               key={`swap-${swap.props.slug}`}
-              variant={swap.variant}
               {...swap.props}
               stagger={index}
               heroCardIndex={index}
@@ -101,8 +96,7 @@ export function HeroCardGrid({ cards, swaps, allPopulated }: HeroCardGridProps) 
         // Default: render the original card
         return (
           <HeroKpiCard
-            key={card.variant}
-            variant={card.variant}
+            key={card.props.slug}
             {...card.props}
             stagger={index}
             heroCardIndex={index}

@@ -9,26 +9,23 @@
 import { useEffect } from "react";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
-import { HeroKpiCard, type HeroKpiCardProps, type KpiVariant } from "./hero-kpi-card";
+import { HeroKpiCard, type HeroKpiCardProps } from "./hero-kpi-card";
 
 export interface HeroCardSlotProps {
   index: number;
-  variant: KpiVariant;
   hasData: boolean;
   allPopulated: boolean;
-  cardProps: Omit<HeroKpiCardProps, "variant">;
+  cardProps: HeroKpiCardProps;
   swapProps?: {
     originalSlug: string;
     originalLabel: string;
     restoreHint: string;
-    variant: KpiVariant;
-    cardProps: Omit<HeroKpiCardProps, "variant">;
+    cardProps: HeroKpiCardProps;
   } | null;
 }
 
 export function HeroCardSlot({
   index,
-  variant,
   hasData,
   allPopulated,
   cardProps,
@@ -52,7 +49,6 @@ export function HeroCardSlot({
   if (mode === "dynamic" && !hasData && swapProps) {
     return (
       <HeroKpiCard
-        variant={swapProps.variant}
         {...swapProps.cardProps}
         stagger={index}
         heroCardIndex={index}
@@ -72,7 +68,6 @@ export function HeroCardSlot({
   // Default: render the original card (ghost state if no data in Custom mode)
   return (
     <HeroKpiCard
-      variant={variant}
       {...cardProps}
       stagger={index}
       heroCardIndex={index}

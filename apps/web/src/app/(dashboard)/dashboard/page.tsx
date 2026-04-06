@@ -198,7 +198,6 @@ export default async function DashboardPage({
                     <HeroCardSlot
                       key={`hero-${i}`}
                       index={i}
-                      variant={card.variant}
                       hasData={card.hasData}
                       allPopulated={allPopulated}
                       cardProps={card.props}
@@ -206,7 +205,6 @@ export default async function DashboardPage({
                         originalSlug: swap.originalSlug,
                         originalLabel: swap.originalLabel,
                         restoreHint: swap.restoreHint,
-                        variant: swap.variant,
                         cardProps: swap.props,
                       } : null}
                     />,

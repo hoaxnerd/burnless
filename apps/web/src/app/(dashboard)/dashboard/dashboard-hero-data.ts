@@ -8,17 +8,15 @@ import {
   isMetricDataAvailable,
   type ComputedMetrics,
 } from "@burnless/engine";
-import { type KpiVariant } from "./hero-kpi-card";
 import { type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
 import { formatCurrency, pctChange, sparkline } from "./dashboard-helpers";
 
-const SLUG_VARIANT: Record<string, KpiVariant> = {
-  cashPosition: "cash",
-  netBurnRate: "burn",
-  cashRunwayMonths: "runway",
-  mrr: "revenue",
+const DEFAULT_METRIC_STYLES: Record<string, { icon: string; color: string; href: string }> = {
+  cashPosition: { icon: "Wallet", color: "emerald", href: "/funding" },
+  netBurnRate: { icon: "Flame", color: "orange", href: "/expenses" },
+  cashRunwayMonths: { icon: "Clock", color: "blue", href: "/scenarios" },
+  mrr: { icon: "TrendingUp", color: "teal", href: "/revenue" },
 };
-const variantOrder: KpiVariant[] = ["cash", "burn", "runway", "revenue"];
 
 export function buildHeroCards(
   heroSlugs: string[],
@@ -29,7 +27,6 @@ export function buildHeroCards(
 ): HeroCardDatum[] {
   return heroSlugs.map((slug, i) => {
     const def = getMetricDef(slug);
-    const variant: KpiVariant = SLUG_VARIANT[slug] ?? variantOrder[i % variantOrder.length]!;
     const hasData: boolean = slug in slugHasData
       ? slugHasData[slug]!
       : isMetricDataAvailable(metrics, slug, currentMonth);
@@ -67,14 +64,11 @@ export function buildHeroCards(
     const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
     const sparkData = hasData && Array.isArray(series) ? sparkline(series) : undefined;
 
-    // For non-default metrics, use metricStyle from the registry
-    const isKnownDefault = slug in SLUG_VARIANT;
-    const metricStyle = !isKnownDefault && def
-      ? { icon: def.icon, color: def.color, href: def.href }
-      : undefined;
+    // Resolve metricStyle: use DEFAULT_METRIC_STYLES for defaults, registry for others
+    const metricStyle = DEFAULT_METRIC_STYLES[slug]
+      ?? (def ? { icon: def.icon, color: def.color, href: def.href } : undefined);
 
     return {
-      variant,
       hasData,
       props: {
         slug,
@@ -87,6 +81,8 @@ export function buildHeroCards(
           : undefined,
         sparkData,
         metricStyle,
+        lowerIsBetter: slug === "netBurnRate",
+        hasData,
       },
     };
   });
@@ -135,7 +131,6 @@ export function buildHeroSwapCards(
       originalLabel: heroCards[heroIndex]?.props.label ?? "",
       originalSlug: swap.replacedSlug,
       restoreHint: swap.restoreHint ?? getMetricMissingDataHint(swap.replacedSlug),
-      variant: variantOrder[heroIndex % variantOrder.length]!,
       props: {
         slug: swap.displaySlug,
         label: swap.displayDef.name,
