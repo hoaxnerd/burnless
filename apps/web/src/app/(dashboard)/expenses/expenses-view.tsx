@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
-import { AlertTriangle, RotateCw, DollarSign, TrendingUp } from "lucide-react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
@@ -14,7 +13,6 @@ import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
-import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, type ResolvedSlotData } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
@@ -118,40 +116,33 @@ export function ExpensesView({
     { i: "table",        x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const metricCards: MetricCardConfig[] = useMemo(() => [
+  const metricCards = useMemo(() => [
     {
       slug: "totalMonthly",
       label: "Total Monthly",
       value: formatCurrency(totalMonthly, "USD", undefined, { compact: true }),
       change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
+      changeLabel: "vs last month",
       description: "vs last month",
-      trend: changePercent !== null ? (changePercent > 1 ? "down" : changePercent < -1 ? "up" : "flat") : undefined,
-      icon: DollarSign,
-      variant: changePercent !== null && changePercent > 10 ? "danger" : "default",
+      lowerIsBetter: true,
     },
     {
       slug: "personnelCost",
       label: "People",
       value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
       description: `${personnelPercent.toFixed(0)}% of total`,
-      icon: TrendingUp,
-      variant: "brand" as const,
     },
     {
       slug: "anomalies",
       label: "Anomalies",
       value: String(anomalyCount),
       description: anomalyCount > 0 ? "Unusual spend detected" : "All spend normal",
-      icon: AlertTriangle,
-      variant: anomalyCount > 0 ? "warning" : "default",
     },
     {
       slug: "recurring",
       label: "Recurring",
       value: String(recurringCount),
       description: `of ${expenseDetails.lineItems.length} expenses`,
-      icon: RotateCw,
-      variant: "default" as const,
     },
   ], [totalMonthly, changePercent, personnelCost, personnelPercent, anomalyCount, recurringCount, expenseDetails.lineItems.length]);
 
@@ -165,10 +156,10 @@ export function ExpensesView({
           label={card.label}
           value={card.value}
           change={card.change}
+          changeLabel={card.changeLabel}
           description={card.description}
-          icon={card.icon}
-          trend={card.trend}
-          variant={card.variant}
+          lowerIsBetter={card.lowerIsBetter}
+          stagger={i}
         />,
       ])
     ),

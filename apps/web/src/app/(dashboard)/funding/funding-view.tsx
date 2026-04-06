@@ -8,7 +8,6 @@ import { FundingDetails } from "./funding-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
-import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -82,7 +81,7 @@ export function FundingView({
 
   const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
 
-  const metricCards: MetricCardConfig[] = useMemo(() => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string }> => [
     {
       slug: "totalRaised",
       label: "Total Raised",
@@ -100,7 +99,6 @@ export function FundingView({
       label: "Runway",
       value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
       description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
-      variant: currentRunway > 0 && currentRunway < 6 ? "danger" : currentRunway < 12 ? "warning" : "default",
     },
     {
       slug: "founderOwnership",
@@ -121,9 +119,7 @@ export function FundingView({
           value={card.value}
           change={card.change}
           description={card.description}
-          icon={card.icon}
-          trend={card.trend}
-          variant={card.variant}
+          stagger={i}
         />,
       ])
     ),

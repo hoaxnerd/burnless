@@ -108,14 +108,16 @@ export function ScenarioCompareView({
             return (
               <div key={line.name} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <SwappableMetricCard slug={`base-${line.name}`} pageId="reports/scenario-compare" label={`${baseName} — ${line.name}`} value={formatCompactCurrency(lastBase)} />
-                  <SwappableMetricCard slug={`compare-${line.name}`} pageId="reports/scenario-compare" label={`${compareName} — ${line.name}`} value={formatCompactCurrency(lastCompare)} />
+                  <SwappableMetricCard slug={`base-${line.name}`} pageId="reports/scenario-compare" label={`${baseName} — ${line.name}`} value={formatCompactCurrency(lastBase)} metricStyle={{ icon: "BarChart3", color: "blue", href: "#" }} stagger={0} />
+                  <SwappableMetricCard slug={`compare-${line.name}`} pageId="reports/scenario-compare" label={`${compareName} — ${line.name}`} value={formatCompactCurrency(lastCompare)} metricStyle={{ icon: "BarChart3", color: "amber", href: "#" }} stagger={1} />
                   <SwappableMetricCard
                     slug={`delta-${line.name}`}
                     pageId="reports/scenario-compare"
                     label={`Delta — ${line.name}`}
                     value={formatCompactCurrency(delta)}
                     change={lastBase !== 0 ? `${delta >= 0 ? "+" : ""}${((delta / Math.abs(lastBase)) * 100).toFixed(1)}%` : undefined}
+                    metricStyle={{ icon: "ArrowUpRight", color: "violet", href: "#" }}
+                    stagger={2}
                   />
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -10,7 +10,6 @@ import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
-import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
@@ -125,7 +124,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "warning",       x: 0,  w: 6, h: 3, minH: 2 },
   ], []);
 
-  const metricCards: MetricCardConfig[] = useMemo(() => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string; lowerIsBetter?: boolean }> => [
     {
       slug: "startingCash",
       label: "Starting Cash",
@@ -141,6 +140,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       label: "Net Burn Rate",
       value: fc(latestBurn?.value ?? 0),
       description: "Latest month",
+      lowerIsBetter: true,
     },
     {
       slug: "runway",
@@ -167,9 +167,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
           value={card.value}
           change={card.change}
           description={card.description}
-          icon={card.icon}
-          trend={card.trend}
-          variant={card.variant}
+          lowerIsBetter={card.lowerIsBetter}
+          stagger={i}
         />,
       ])
     ),

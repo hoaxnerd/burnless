@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { DollarSign, TrendingUp, Users, BarChart3 } from "lucide-react";
 import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
@@ -14,7 +13,6 @@ import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
-import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
@@ -87,17 +85,15 @@ export function RevenueView({
     { i: "stream-breakdown", x: 0, w: 6, h: 14, minH: 8 },
   ], []);
 
-  const metricCards: MetricCardConfig[] = useMemo(() => {
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; changeLabel?: string; description?: string; lowerIsBetter?: boolean }> => {
     const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
-    const first: MetricCardConfig = {
+    const first = {
       slug: "monthlyRevenue",
       label: "Monthly Revenue",
       value: fc(g.currentRevenue),
       change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
+      changeLabel: "MoM growth",
       description: "MoM growth",
-      trend: g.revenueGrowthPercent > 1 ? "up" : g.revenueGrowthPercent < -1 ? "down" : "flat",
-      icon: DollarSign,
-      variant: g.revenueGrowthPercent > 5 ? "success" : g.revenueGrowthPercent < 0 ? "danger" : "default",
     };
 
     if (hasSaaS) {
@@ -109,24 +105,19 @@ export function RevenueView({
           value: fc(g.currentMrr),
           change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
           description: `ARR: ${fc(g.arr)}`,
-          trend: g.mrrGrowthPercent > 1 ? "up" : g.mrrGrowthPercent < -1 ? "down" : "flat",
-          icon: TrendingUp,
-          variant: "brand" as const,
         },
         {
           slug: "customers",
           label: "Customers",
           value: String(Math.round(g.totalCustomers)),
           description: `ARPA: ${fc(g.arpa)}/mo`,
-          icon: Users,
         },
         {
           slug: "churnRate",
           label: "Churn Rate",
           value: `${g.churnRate.toFixed(1)}%`,
           description: `LTV: ${fc(g.ltv)}`,
-          icon: BarChart3,
-          variant: g.churnRate > 5 ? "danger" : g.churnRate > 3 ? "warning" : "success",
+          lowerIsBetter: true,
         },
       ];
     }
@@ -138,23 +129,18 @@ export function RevenueView({
         label: "Annual Run Rate",
         value: fc(g.currentRevenue * 12),
         description: "Based on current monthly",
-        icon: TrendingUp,
-        variant: "brand" as const,
       },
       {
         slug: "revenueStreams",
         label: "Revenue Streams",
         value: String(revenueDetails.streamCount),
         description: "Active sources",
-        icon: BarChart3,
       },
       {
         slug: "growth",
         label: "Growth",
         value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
         description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
-        icon: TrendingUp,
-        variant: g.revenueGrowthPercent > 5 ? "success" : g.revenueGrowthPercent < 0 ? "danger" : "default",
       },
     ];
   }, [g, hasSaaS, revenueDetails.streamCount]);
@@ -169,10 +155,10 @@ export function RevenueView({
           label={card.label}
           value={card.value}
           change={card.change}
+          changeLabel={card.changeLabel}
           description={card.description}
-          icon={card.icon}
-          trend={card.trend}
-          variant={card.variant}
+          lowerIsBetter={card.lowerIsBetter}
+          stagger={i}
         />,
       ])
     ),

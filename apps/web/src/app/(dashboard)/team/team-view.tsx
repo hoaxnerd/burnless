@@ -8,7 +8,6 @@ import { TeamDetails } from "./team-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
-import type { MetricCardConfig } from "@/components/ui/metric-cards-grid";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -101,7 +100,7 @@ export function TeamView({
     { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
-  const metricCards: MetricCardConfig[] = useMemo(() => [
+  const metricCards = useMemo((): Array<{ slug: string; label: string; value: string; change?: string; description?: string }> => [
     {
       slug: "totalHeadcount",
       label: "Total Headcount",
@@ -139,9 +138,7 @@ export function TeamView({
           value={card.value}
           change={card.change}
           description={card.description}
-          icon={card.icon}
-          trend={card.trend}
-          variant={card.variant}
+          stagger={i}
         />,
       ])
     ),

@@ -57,10 +57,10 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
 
   const widgets = useMemo(() => ({
     "metric-0": (
-      <SwappableMetricCard slug="totalBudget" pageId="reports/bva" label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} />
+      <SwappableMetricCard slug="totalBudget" pageId="reports/bva" label="Total Budget" value={formatCompactCurrency(totalBudgetSum)} stagger={0} />
     ),
     "metric-1": (
-      <SwappableMetricCard slug="totalActual" pageId="reports/bva" label="Total Actual" value={formatCompactCurrency(totalActualSum)} />
+      <SwappableMetricCard slug="totalActual" pageId="reports/bva" label="Total Actual" value={formatCompactCurrency(totalActualSum)} stagger={1} />
     ),
     "metric-2": (
       <SwappableMetricCard
@@ -69,6 +69,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
         label="Total Variance"
         value={formatCompactCurrency(totalVarianceSum)}
         change={totalVarianceSum >= 0 ? "Favorable" : "Unfavorable"}
+        stagger={2}
       />
     ),
     "charts": (

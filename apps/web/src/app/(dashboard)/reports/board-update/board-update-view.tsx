@@ -220,8 +220,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         value={formatCompactCurrency(d.revenue.current)}
         change={`${d.revenue.growthPercent > 0 ? "+" : ""}${d.revenue.growthPercent.toFixed(1)}%`}
         description="MoM"
-        trend={d.revenue.growthPercent > 1 ? "up" : d.revenue.growthPercent < -1 ? "down" : "flat"}
-        variant={d.revenue.growthPercent > 5 ? "success" : d.revenue.growthPercent < 0 ? "danger" : "default"}
+        stagger={0}
       />
     ),
     "metric-1": (
@@ -231,7 +230,8 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         label="Net Burn"
         value={formatCompactCurrency(d.cash.burnRate)}
         description="/month"
-        variant={d.cash.burnRate > 0 ? "warning" : "success"}
+        lowerIsBetter
+        stagger={1}
       />
     ),
     "metric-2": (
@@ -241,7 +241,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         label="Cash"
         value={formatCompactCurrency(d.cash.position)}
         description={d.cash.runway > 36 ? "36+ mo runway" : `${Math.round(d.cash.runway)} mo runway`}
-        variant={d.cash.runway < 6 ? "danger" : d.cash.runway < 12 ? "warning" : "success"}
+        stagger={2}
       />
     ),
     "metric-3": (
@@ -251,7 +251,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         label="Gross Margin"
         value={`${d.profitability.grossMargin.toFixed(1)}%`}
         description={d.profitability.grossMargin >= 60 ? "Healthy" : d.profitability.grossMargin >= 40 ? "Average" : "Below benchmark"}
-        variant={d.profitability.grossMargin >= 60 ? "success" : d.profitability.grossMargin >= 40 ? "default" : "danger"}
+        stagger={3}
       />
     ),
     "revenue-section": (

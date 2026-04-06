@@ -35,10 +35,8 @@ export function MetricCardsGrid({ cards, gap = 4 }: MetricCardsGridProps) {
             value={card.value}
             change={card.change}
             description={card.description}
-            icon={card.icon}
-            trend={card.trend}
-            variant={card.variant}
             loading={card.loading}
+            stagger={i}
           />
         </div>
       ))}
