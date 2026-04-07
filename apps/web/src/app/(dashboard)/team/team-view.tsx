@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useMemo } from "react";
+import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
-import { TeamDetails } from "./team-details";
+import { TeamRoster, PlannedHiresSection, HiringInsightTip } from "./team-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
@@ -91,20 +91,29 @@ export function TeamView({
   }), [registry, usedSlugs, openFormulaViewer]);
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
+    { i: "metric-0",       x: 0, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-1",       x: 3, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-2",       x: 6, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-3",       x: 9, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "team-roster",    x: 0, w: 12, h: 14, minH: 8 },
+    { i: "planned-hires",  x: 0, w: 12, h: 10, minH: 6 },
+    { i: "hiring-insight", x: 0, w: 12, h: 3,  minH: 2 },
   ], []);
 
   const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
+    { i: "metric-0",       x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-1",       x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-2",       x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-3",       x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "team-roster",    x: 0, w: 6, h: 14, minH: 8 },
+    { i: "planned-hires",  x: 0, w: 6, h: 10, minH: 6 },
+    { i: "hiring-insight", x: 0, w: 6, h: 3,  minH: 2 },
   ], []);
+
+  const staticHiddenWidgets = useMemo(
+    () => plannedHires.length === 0 ? ["hiring-insight"] : [],
+    [plannedHires.length],
+  );
 
   const widgets = useMemo(() => ({
     ...Object.fromEntries(
@@ -129,14 +138,23 @@ export function TeamView({
         ];
       })
     ),
-    "details": (
-      <TeamDetails
+    "team-roster": (
+      <TeamRoster
         departmentBreakdown={departmentBreakdown}
-        plannedHires={plannedHires}
         totalMonthlyCost={totalMonthlyCost}
         scenarioId={scenarioId}
         departments={departments}
       />
+    ),
+    "planned-hires": (
+      <PlannedHiresSection
+        plannedHires={plannedHires}
+        scenarioId={scenarioId}
+        departments={departments}
+      />
+    ),
+    "hiring-insight": (
+      <HiringInsightTip plannedHires={plannedHires} />
     ),
   }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
 
@@ -145,43 +163,15 @@ export function TeamView({
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="team">
           <CardCatalogProvider value={catalogValue}>
-            <TeamPageGrid
+            <ConnectedPageGrid
               widgets={widgets}
               defaultLayoutLG={defaultLayoutLG}
               defaultLayoutSM={defaultLayoutSM}
+              staticHiddenWidgets={staticHiddenWidgets}
             />
           </CardCatalogProvider>
         </PageProvider>
       </ComputedMetricsProvider>
     </PageLayoutProvider>
-  );
-}
-
-function TeamPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
   );
 }
