@@ -325,7 +325,7 @@ export function PageGrid({
 
         let h = item.h;
         if (isAuto && measuredH !== undefined) {
-          h = Math.max(measuredH, item.minH ?? 1);
+          h = measuredH;
         }
 
         return {

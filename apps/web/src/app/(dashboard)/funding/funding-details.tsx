@@ -48,46 +48,14 @@ const segmentColors = [
   "#ef4444", // red
 ];
 
-interface CapTableAndRoundsProps {
-  rounds: FundingRound[];
+// ── Ownership Donut ─────────────────────────────────────────────────────────
+
+interface OwnershipChartProps {
   foundersOwnership: number;
-  currentCash: number;
-  currentBurn: number;
-  currentRunway: number;
-  calcRaiseAmount: number;
-  setCalcRaiseAmount: (v: number) => void;
-  calcPreMoney: number;
-  setCalcPreMoney: (v: number) => void;
-  calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+  completedRounds: FundingRound[];
 }
 
-export function CapTableAndRounds({
-  rounds,
-  foundersOwnership,
-  currentCash: _currentCash,
-  currentBurn: _currentBurn,
-  currentRunway: _currentRunway,
-  calcRaiseAmount,
-  setCalcRaiseAmount,
-  calcPreMoney,
-  setCalcPreMoney,
-  calcDilution,
-}: CapTableAndRoundsProps) {
-  const completedRounds = rounds.filter((r) => !r.isProjected);
-  const projectedRounds = rounds.filter((r) => r.isProjected);
-
-  // Edit modal state
-  const [editingRound, setEditingRound] = useState<EditRound | null>(null);
-  const {
-    isInScenarioMode,
-    overrideMap,
-    deletedEntities,
-    handleRevert,
-    handleRemove,
-    handleRestore,
-  } = useScenarioOverrides("funding_round");
-
-  // Build cap table segments
+export function OwnershipChart({ foundersOwnership, completedRounds }: OwnershipChartProps) {
   const capTableSegments = useMemo(() => {
     const segments: Array<{ label: string; percent: number; color: string }> = [];
     segments.push({ label: "Founders", percent: foundersOwnership, color: segmentColors[0]! });
@@ -111,7 +79,6 @@ export function CapTableAndRounds({
     return segments;
   }, [foundersOwnership, completedRounds]);
 
-  // SVG Donut chart math
   const donutSize = 200;
   const donutCenter = donutSize / 2;
   const donutRadius = 75;
@@ -129,106 +96,125 @@ export function CapTableAndRounds({
     return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
   }
 
-  if (rounds.length === 0) {
-    return (
-      <div className="space-y-8">
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-16 text-center">
-          <div className="mx-auto max-w-md">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 border border-brand-100">
-              <DollarSign className="h-7 w-7 text-brand-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-surface-900 mb-2">No funding rounds yet</h3>
-            <p className="text-sm text-surface-500 mb-6 leading-relaxed">
-              Track your fundraising history — amounts, valuations, dilution, and investors.
-            </p>
-            <p className="text-xs text-surface-400">
-              Use the &quot;Add Funding Round&quot; button above or the companion to get started.
-            </p>
+  return (
+    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+      <h2 className="text-base font-semibold text-surface-900 mb-4">Ownership</h2>
+
+      <div className="flex justify-center mb-6">
+        <div className="relative">
+          <svg width={donutSize} height={donutSize} aria-hidden="true">
+            {(() => {
+              let cumAngle = 0;
+              return capTableSegments.map((seg, i) => {
+                const angle = (seg.percent / 100) * 360;
+                if (angle < 0.5) {
+                  cumAngle += angle;
+                  return null;
+                }
+                const startAngle = cumAngle;
+                cumAngle += angle;
+                const endAngle = cumAngle;
+                return (
+                  <path
+                    key={i}
+                    d={donutSegmentPath(startAngle, endAngle - 0.5)}
+                    fill="none"
+                    stroke={seg.color}
+                    strokeWidth={donutStroke}
+                    strokeLinecap="round"
+                  />
+                );
+              });
+            })()}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-bold tabular-nums text-surface-900">
+              {foundersOwnership.toFixed(0)}%
+            </span>
+            <span className="text-[10px] text-surface-400 uppercase tracking-wider">
+              Founders
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Still show dilution calculator even with no rounds */}
-        <DilutionCalculator
-          foundersOwnership={foundersOwnership}
-          calcRaiseAmount={calcRaiseAmount}
-          setCalcRaiseAmount={setCalcRaiseAmount}
-          calcPreMoney={calcPreMoney}
-          setCalcPreMoney={setCalcPreMoney}
-          calcDilution={calcDilution}
-        />
+      <div className="space-y-2">
+        {capTableSegments.map((seg, i) => (
+          <div key={i} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: seg.color }}
+              />
+              <span className="text-xs text-surface-600">{seg.label}</span>
+            </div>
+            <span className="text-xs tabular-nums font-medium text-surface-900">
+              {seg.percent.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Funding Rounds ──────────────────────────────────────────────────────────
+
+interface FundingRoundsListProps {
+  rounds: FundingRound[];
+  foundersOwnership: number;
+  calcRaiseAmount: number;
+  setCalcRaiseAmount: (v: number) => void;
+  calcPreMoney: number;
+  setCalcPreMoney: (v: number) => void;
+  calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+}
+
+export function FundingRoundsList({
+  rounds,
+  foundersOwnership,
+  calcRaiseAmount,
+  setCalcRaiseAmount,
+  calcPreMoney,
+  setCalcPreMoney,
+  calcDilution,
+}: FundingRoundsListProps) {
+  const completedRounds = rounds.filter((r) => !r.isProjected);
+  const projectedRounds = rounds.filter((r) => r.isProjected);
+
+  // Edit modal state
+  const [editingRound, setEditingRound] = useState<EditRound | null>(null);
+  const {
+    isInScenarioMode,
+    overrideMap,
+    deletedEntities,
+    handleRevert,
+    handleRemove,
+    handleRestore,
+  } = useScenarioOverrides("funding_round");
+
+  if (rounds.length === 0) {
+    return (
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-16 text-center">
+        <div className="mx-auto max-w-md">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 border border-brand-100">
+            <DollarSign className="h-7 w-7 text-brand-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-surface-900 mb-2">No funding rounds yet</h3>
+          <p className="text-sm text-surface-500 mb-6 leading-relaxed">
+            Track your fundraising history — amounts, valuations, dilution, and investors.
+          </p>
+          <p className="text-xs text-surface-400">
+            Use the &quot;Add Funding Round&quot; button above or the companion to get started.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Cap Table + Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Donut chart */}
-        <div className="lg:col-span-2 rounded-2xl bg-surface-0 border border-surface-200 p-6">
-          <h2 className="text-base font-semibold text-surface-900 mb-4">Ownership</h2>
-
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <svg width={donutSize} height={donutSize} aria-hidden="true">
-                {(() => {
-                  let cumAngle = 0;
-                  return capTableSegments.map((seg, i) => {
-                    const angle = (seg.percent / 100) * 360;
-                    // Avoid rendering a zero-width segment
-                    if (angle < 0.5) {
-                      cumAngle += angle;
-                      return null;
-                    }
-                    const startAngle = cumAngle;
-                    cumAngle += angle;
-                    const endAngle = cumAngle;
-                    return (
-                      <path
-                        key={i}
-                        d={donutSegmentPath(startAngle, endAngle - 0.5)}
-                        fill="none"
-                        stroke={seg.color}
-                        strokeWidth={donutStroke}
-                        strokeLinecap="round"
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-              {/* Center label */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold tabular-nums text-surface-900">
-                  {foundersOwnership.toFixed(0)}%
-                </span>
-                <span className="text-[10px] text-surface-400 uppercase tracking-wider">
-                  Founders
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="space-y-2">
-            {capTableSegments.map((seg, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: seg.color }}
-                  />
-                  <span className="text-xs text-surface-600">{seg.label}</span>
-                </div>
-                <span className="text-xs tabular-nums font-medium text-surface-900">
-                  {seg.percent.toFixed(1)}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Funding rounds */}
-        <div className="lg:col-span-3 rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+    <>
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
           <div className="px-6 py-5 border-b border-surface-100">
             <h2 className="text-base font-semibold text-surface-900">Funding Rounds</h2>
             <p className="text-xs text-surface-400 mt-0.5">
@@ -349,7 +335,6 @@ export function CapTableAndRounds({
             })}
           </div>
         </div>
-      </div>
 
       {/* Hidden in scenario section */}
       {isInScenarioMode && (
@@ -368,7 +353,7 @@ export function CapTableAndRounds({
           onClose={() => setEditingRound(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 

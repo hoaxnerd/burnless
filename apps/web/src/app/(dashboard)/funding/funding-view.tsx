@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
-import { CapTableAndRounds, DilutionCalculator, FundraisingReadinessTip } from "./funding-details";
+import { OwnershipChart, FundingRoundsList, DilutionCalculator, FundraisingReadinessTip } from "./funding-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
@@ -86,7 +86,8 @@ export function FundingView({
     { i: "metric-1",         x: 3, w: 3,  h: 5,  minW: 2, minH: 4 },
     { i: "metric-2",         x: 6, w: 3,  h: 5,  minW: 2, minH: 4 },
     { i: "metric-3",         x: 9, w: 3,  h: 5,  minW: 2, minH: 4 },
-    { i: "cap-table-rounds", x: 0, w: 12, h: 14, minH: 8 },
+    { i: "ownership",        x: 0, w: 4,  h: 12, minH: 8 },
+    { i: "funding-rounds",   x: 4, w: 8,  h: 12, minH: 6 },
     { i: "dilution-calc",    x: 0, w: 12, h: 8,  minH: 5 },
     { i: "fundraising-tip",  x: 0, w: 12, h: 3,  minH: 2 },
   ], []);
@@ -96,7 +97,8 @@ export function FundingView({
     { i: "metric-1",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
     { i: "metric-2",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
     { i: "metric-3",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
-    { i: "cap-table-rounds", x: 0, w: 6, h: 14, minH: 8 },
+    { i: "ownership",        x: 0, w: 6, h: 12, minH: 8 },
+    { i: "funding-rounds",   x: 0, w: 6, h: 12, minH: 6 },
     { i: "dilution-calc",    x: 0, w: 6, h: 8,  minH: 5 },
     { i: "fundraising-tip",  x: 0, w: 6, h: 3,  minH: 2 },
   ], []);
@@ -124,13 +126,16 @@ export function FundingView({
         ];
       })
     ),
-    "cap-table-rounds": (
-      <CapTableAndRounds
+    "ownership": (
+      <OwnershipChart
+        foundersOwnership={foundersOwnership}
+        completedRounds={rounds.filter((r) => !r.isProjected)}
+      />
+    ),
+    "funding-rounds": (
+      <FundingRoundsList
         rounds={rounds}
         foundersOwnership={foundersOwnership}
-        currentCash={currentCash}
-        currentBurn={currentBurn}
-        currentRunway={currentRunway}
         calcRaiseAmount={calcRaiseAmount}
         setCalcRaiseAmount={setCalcRaiseAmount}
         calcPreMoney={calcPreMoney}
@@ -151,7 +156,7 @@ export function FundingView({
     "fundraising-tip": (
       <FundraisingReadinessTip currentRunway={currentRunway} currentBurn={currentBurn} />
     ),
-  }), [slotById, rounds, foundersOwnership, currentCash, currentBurn, currentRunway, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney]);
+  }), [slotById, rounds, foundersOwnership, currentBurn, currentRunway, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney]);
 
   const staticHiddenWidgets = useMemo(
     () => (currentRunway > 0 && currentRunway < 18) ? [] : ["fundraising-tip"],
