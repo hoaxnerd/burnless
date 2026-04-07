@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { BalanceSheet } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { BarChartWidget, chartColors } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ChartCard, ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 
 export function BalanceSheetView({
@@ -107,7 +106,7 @@ export function BalanceSheetView({
   return (
     <PageLayoutProvider pageId="reports/balance-sheet">
       <PageProvider pageId="reports/balance-sheet">
-        <BalanceSheetPageGrid
+        <ConnectedPageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
@@ -117,31 +116,3 @@ export function BalanceSheetView({
   );
 }
 
-function BalanceSheetPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}

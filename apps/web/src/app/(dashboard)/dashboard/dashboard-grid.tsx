@@ -14,9 +14,8 @@
 
 import { type ReactNode, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { PageGrid, type DefaultLayoutItem, type PageWidgetLayout } from "@/components/ui/page-grid";
+import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageProvider } from "@/components/providers/page-context";
-import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
@@ -93,9 +92,6 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
   const router = useRouter();
   const { registry, openFormulaViewer } = useMetrics();
 
-  // Layout state from PageLayoutProvider
-  const pageLayout = usePageLayoutContext();
-
   // Card state from DashboardLayoutContext
   const {
     heroCards,
@@ -145,21 +141,11 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
   return (
     <PageProvider pageId="dashboard">
       <CardCatalogProvider value={catalogValue}>
-        <PageGrid
+        <ConnectedPageGrid
           widgets={widgets as Record<string, ReactNode>}
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
-          savedLayout={pageLayout.savedLayout}
-          onLayoutChange={pageLayout.onLayoutChange}
-          closedWidgets={pageLayout.closedWidgets}
-          onCloseWidget={pageLayout.onCloseWidget}
-          onOpenWidget={pageLayout.onOpenWidget}
-          onReset={pageLayout.onReset}
-          widgetReadiness={pageLayout.widgetReadiness}
-          isLoading={pageLayout.isLoading}
           staticHiddenWidgets={hiddenWidgets}
-          isEditMode={pageLayout.isEditMode}
-          setIsEditMode={pageLayout.setIsEditMode}
         />
       </CardCatalogProvider>
     </PageProvider>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, type ReactNode } from "react";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useState, useMemo } from "react";
+import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { BarChartWidget, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
@@ -284,7 +284,7 @@ export function ExpensesView({
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="expenses">
           <CardCatalogProvider value={catalogValue}>
-            <ExpensesPageGrid
+            <ConnectedPageGrid
               widgets={widgets}
               defaultLayoutLG={defaultLayoutLG}
               defaultLayoutSM={defaultLayoutSM}
@@ -293,35 +293,6 @@ export function ExpensesView({
         </PageProvider>
       </ComputedMetricsProvider>
     </PageLayoutProvider>
-  );
-}
-
-function ExpensesPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
   );
 }
 
