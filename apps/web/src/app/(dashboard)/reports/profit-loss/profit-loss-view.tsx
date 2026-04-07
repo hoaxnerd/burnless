@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { ProfitAndLoss } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { MultiLineChart, chartColors, formatPercent } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ChartCard, ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 
 export function ProfitLossView({
@@ -81,39 +80,41 @@ export function ProfitLossView({
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "pnl-chart",     x: 0, w: 6, h: 12, minW: 4, minH: 8 },
+    { i: "margins-chart", x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "pnl-chart",     x: 0, w: 6, h: 12, minH: 8 },
+    { i: "margins-chart", x: 0, w: 6, h: 12, minH: 8 },
+    { i: "statement", x: 0, w: 6, h: 16, minH: 8 },
+  ], []);
 
   const widgets = useMemo(() => ({
-    "charts": (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Revenue, Expenses & Net Income" subtitle="Monthly trend">
-          <MultiLineChart
-            data={chartData}
-            lines={[
-              { dataKey: "revenue", label: "Revenue", color: chartColors.brand },
-              { dataKey: "expenses", label: "Expenses", color: chartColors.danger },
-              { dataKey: "netIncome", label: "Net Income", color: chartColors.success },
-            ]}
-          />
-        </ChartCard>
-        <ChartCard title="Margins" subtitle="Gross and net margin %">
-          <MultiLineChart
-            data={marginData}
-            lines={[
-              { dataKey: "grossMargin", label: "Gross Margin", color: chartColors.brand },
-              { dataKey: "netMargin", label: "Net Margin", color: chartColors.success },
-            ]}
-            formatValue={formatPercent}
-          />
-        </ChartCard>
-      </div>
+    "pnl-chart": (
+      <ChartCard title="Revenue, Expenses & Net Income" subtitle="Monthly trend">
+        <MultiLineChart
+          data={chartData}
+          lines={[
+            { dataKey: "revenue", label: "Revenue", color: chartColors.brand },
+            { dataKey: "expenses", label: "Expenses", color: chartColors.danger },
+            { dataKey: "netIncome", label: "Net Income", color: chartColors.success },
+          ]}
+        />
+      </ChartCard>
+    ),
+    "margins-chart": (
+      <ChartCard title="Margins" subtitle="Gross and net margin %">
+        <MultiLineChart
+          data={marginData}
+          lines={[
+            { dataKey: "grossMargin", label: "Gross Margin", color: chartColors.brand },
+            { dataKey: "netMargin", label: "Net Margin", color: chartColors.success },
+          ]}
+          formatValue={formatPercent}
+        />
+      </ChartCard>
     ),
     "statement": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
@@ -141,7 +142,7 @@ export function ProfitLossView({
   return (
     <PageLayoutProvider pageId="reports/profit-loss">
       <PageProvider pageId="reports/profit-loss">
-        <ProfitLossPageGrid
+        <ConnectedPageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
@@ -151,31 +152,3 @@ export function ProfitLossView({
   );
 }
 
-function ProfitLossPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}

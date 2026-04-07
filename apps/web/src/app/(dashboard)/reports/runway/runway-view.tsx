@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { MetricValue, ResolvedSlotData } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors } from "@/components/charts";
-import { ChartCard, PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ChartCard, ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { PageProvider } from "@/components/providers/page-context";
@@ -112,7 +112,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "cash-charts",   x: 0,  w: 12, h: 12, minH: 8 },
+    { i: "cash-position-chart",     x: 0, w: 6, h: 12, minW: 4, minH: 8 },
+    { i: "runway-projection-chart", x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "burn-chart",    x: 0,  w: 12, h: 12, minH: 8 },
     { i: "warning",       x: 0,  w: 12, h: 3, minH: 2 },
   ], []);
@@ -123,7 +124,8 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "cash-charts",   x: 0,  w: 6, h: 12, minH: 8 },
+    { i: "cash-position-chart",     x: 0, w: 6, h: 12, minH: 8 },
+    { i: "runway-projection-chart", x: 0, w: 6, h: 12, minH: 8 },
     { i: "burn-chart",    x: 0,  w: 6, h: 12, minH: 8 },
     { i: "warning",       x: 0,  w: 6, h: 3, minH: 2 },
   ], []);
@@ -161,19 +163,19 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
         ];
       })
     ),
-    "cash-charts": (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Cash Position Over Time" subtitle="Projected ending cash balance">
-          <AreaChartWidget data={cashPosition} color={chartColors.success} />
-        </ChartCard>
-        <ChartCard title="Runway Projection" subtitle="Months of runway remaining">
-          <AreaChartWidget
-            data={runway.map((r) => ({ ...r, value: Math.min(r.value, 60) }))}
-            color={chartColors.info}
-            formatValue={(v) => `${Math.round(v)}mo`}
-          />
-        </ChartCard>
-      </div>
+    "cash-position-chart": (
+      <ChartCard title="Cash Position Over Time" subtitle="Projected ending cash balance">
+        <AreaChartWidget data={cashPosition} color={chartColors.success} />
+      </ChartCard>
+    ),
+    "runway-projection-chart": (
+      <ChartCard title="Runway Projection" subtitle="Months of runway remaining">
+        <AreaChartWidget
+          data={runway.map((r) => ({ ...r, value: Math.min(r.value, 60) }))}
+          color={chartColors.info}
+          formatValue={(v) => `${Math.round(v)}mo`}
+        />
+      </ChartCard>
     ),
     "burn-chart": (
       <ChartCard title="Gross vs Net Burn Rate" subtitle="Monthly expense comparison">
@@ -202,7 +204,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="reports/runway">
           <CardCatalogProvider value={catalogValue}>
-            <RunwayPageGrid
+            <ConnectedPageGrid
               widgets={widgets}
               defaultLayoutLG={defaultLayoutLG}
               defaultLayoutSM={defaultLayoutSM}
@@ -215,34 +217,3 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
   );
 }
 
-function RunwayPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-  staticHiddenWidgets,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-  staticHiddenWidgets: string[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      staticHiddenWidgets={staticHiddenWidgets}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}

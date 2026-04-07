@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useMemo } from "react";
+
+import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
@@ -74,7 +75,8 @@ export function RevenueView({
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",   x: 0, w: 12, h: 4, minH: 3 },
     { i: "insights",      x: 0, w: 12, h: 4, minH: 3 },
-    { i: "trend-charts",  x: 0, w: 12, h: 12, minH: 8 },
+    { i: "revenue-chart",  x: 0, w: 6, h: 12, minW: 4, minH: 8 },
+    { i: "mrr-chart",      x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "waterfall",     x: 0, w: 12, h: 10, minH: 6 },
     { i: "stream-breakdown", x: 0, w: 12, h: 14, minH: 8 },
   ], []);
@@ -86,7 +88,8 @@ export function RevenueView({
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",   x: 0, w: 6, h: 4, minH: 3 },
     { i: "insights",      x: 0, w: 6, h: 4, minH: 3 },
-    { i: "trend-charts",  x: 0, w: 6, h: 12, minH: 8 },
+    { i: "revenue-chart",  x: 0, w: 6, h: 12, minH: 8 },
+    { i: "mrr-chart",      x: 0, w: 6, h: 12, minH: 8 },
     { i: "waterfall",     x: 0, w: 6, h: 10, minH: 6 },
     { i: "stream-breakdown", x: 0, w: 6, h: 14, minH: 8 },
   ], []);
@@ -143,18 +146,16 @@ export function RevenueView({
         />
       </div>
     ),
-    "trend-charts": (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Revenue Over Time" subtitle="Total monthly revenue trend">
-          <AreaChartWidget data={revenueTimeline} color={chartColors.brand} />
-        </ChartCard>
-        {hasSaaS && (
-          <ChartCard title="MRR Trend" subtitle="Monthly recurring revenue">
-            <AreaChartWidget data={mrrTimeline} color="#14b8a6" />
-          </ChartCard>
-        )}
-      </div>
+    "revenue-chart": (
+      <ChartCard title="Revenue Over Time" subtitle="Total monthly revenue trend">
+        <AreaChartWidget data={revenueTimeline} color={chartColors.brand} />
+      </ChartCard>
     ),
+    "mrr-chart": hasSaaS ? (
+      <ChartCard title="MRR Trend" subtitle="Monthly recurring revenue">
+        <AreaChartWidget data={mrrTimeline} color="#14b8a6" />
+      </ChartCard>
+    ) : <div />,
     "waterfall": hasSaaS ? (
       <RevenueWaterfallChart waterfall={waterfall} />
     ) : <div />,
@@ -169,14 +170,14 @@ export function RevenueView({
     ),
   }), [slotById, lowerIsBetterSlugs, g, hasSaaS, revenueDetails, streamBreakdown, waterfall, monthlyByStream, streamNames, revenueTimeline, mrrTimeline, scenarioId]);
 
-  const staticHiddenWidgets = useMemo(() => hasSaaS ? [] : ["waterfall"], [hasSaaS]);
+  const staticHiddenWidgets = useMemo(() => hasSaaS ? [] : ["waterfall", "mrr-chart"], [hasSaaS]);
 
   return (
     <PageLayoutProvider pageId="revenue">
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="revenue">
           <CardCatalogProvider value={catalogValue}>
-            <RevenuePageGrid
+            <ConnectedPageGrid
               widgets={widgets}
               defaultLayoutLG={defaultLayoutLG}
               defaultLayoutSM={defaultLayoutSM}
@@ -189,34 +190,3 @@ export function RevenueView({
   );
 }
 
-function RevenuePageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-  staticHiddenWidgets,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-  staticHiddenWidgets: string[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      staticHiddenWidgets={staticHiddenWidgets}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}

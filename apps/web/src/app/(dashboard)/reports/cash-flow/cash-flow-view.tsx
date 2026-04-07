@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { CashFlowStatement } from "@burnless/engine";
 import { StatementTable } from "@/components/reports/statement-table";
 import { statementToCSVRows } from "@/components/reports/export-button";
 import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { AreaChartWidget, BarChartWidget, chartColors } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { ChartCard, ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 
 export function CashFlowView({
@@ -77,32 +76,34 @@ export function CashFlowView({
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "cf-components-chart", x: 0, w: 6, h: 12, minW: 4, minH: 8 },
+    { i: "ending-cash-chart",   x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "statement", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
-  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(
-    () => defaultLayoutLG.map((item) => ({ ...item, x: 0, w: 6 })),
-    [defaultLayoutLG]
-  );
+  const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
+    { i: "cf-components-chart", x: 0, w: 6, h: 12, minH: 8 },
+    { i: "ending-cash-chart",   x: 0, w: 6, h: 12, minH: 8 },
+    { i: "statement", x: 0, w: 6, h: 16, minH: 8 },
+  ], []);
 
   const widgets = useMemo(() => ({
-    "charts": (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Cash Flow Components" subtitle="Operating, investing, and financing">
-          <BarChartWidget
-            data={barData}
-            bars={[
-              { dataKey: "operating", label: "Operating", color: chartColors.brand, stackId: "cf" },
-              { dataKey: "investing", label: "Investing", color: chartColors.warning, stackId: "cf" },
-              { dataKey: "financing", label: "Financing", color: chartColors.info, stackId: "cf" },
-            ]}
-          />
-        </ChartCard>
-        <ChartCard title="Ending Cash Balance" subtitle="Cumulative cash position">
-          <AreaChartWidget data={cashData} color={chartColors.success} />
-        </ChartCard>
-      </div>
+    "cf-components-chart": (
+      <ChartCard title="Cash Flow Components" subtitle="Operating, investing, and financing">
+        <BarChartWidget
+          data={barData}
+          bars={[
+            { dataKey: "operating", label: "Operating", color: chartColors.brand, stackId: "cf" },
+            { dataKey: "investing", label: "Investing", color: chartColors.warning, stackId: "cf" },
+            { dataKey: "financing", label: "Financing", color: chartColors.info, stackId: "cf" },
+          ]}
+        />
+      </ChartCard>
+    ),
+    "ending-cash-chart": (
+      <ChartCard title="Ending Cash Balance" subtitle="Cumulative cash position">
+        <AreaChartWidget data={cashData} color={chartColors.success} />
+      </ChartCard>
     ),
     "statement": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
@@ -127,7 +128,7 @@ export function CashFlowView({
   return (
     <PageLayoutProvider pageId="reports/cash-flow">
       <PageProvider pageId="reports/cash-flow">
-        <CashFlowPageGrid
+        <ConnectedPageGrid
           widgets={widgets}
           defaultLayoutLG={defaultLayoutLG}
           defaultLayoutSM={defaultLayoutSM}
@@ -137,31 +138,3 @@ export function CashFlowView({
   );
 }
 
-function CashFlowPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}

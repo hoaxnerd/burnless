@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import type { BudgetVsActuals, ResolvedSlotData } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, SwappableMetricCard } from "@/components/ui";
+import { ChartCard, ConnectedPageGrid, SwappableMetricCard, type DefaultLayoutItem } from "@/components/ui";
 import { ExportCSVButton } from "@/components/reports/export-button";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui/page-grid";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
 
@@ -45,7 +44,8 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
     { i: "metric-0", x: 0, w: 4, h: 5, minW: 2, minH: 4 },
     { i: "metric-1", x: 4, w: 4, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 8, w: 4, h: 5, minW: 2, minH: 4 },
-    { i: "charts", x: 0, w: 12, h: 12, minH: 8 },
+    { i: "budget-actual-chart", x: 0, w: 6, h: 12, minW: 4, minH: 8 },
+    { i: "variance-chart",      x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "detail-table", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
@@ -53,7 +53,8 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
     { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 0, w: 6, h: 5, minW: 2, minH: 4 },
-    { i: "charts", x: 0, w: 6, h: 12, minH: 8 },
+    { i: "budget-actual-chart", x: 0, w: 6, h: 12, minH: 8 },
+    { i: "variance-chart",      x: 0, w: 6, h: 12, minH: 8 },
     { i: "detail-table", x: 0, w: 6, h: 16, minH: 8 },
   ], []);
 
@@ -80,21 +81,21 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
         ];
       })
     ),
-    "charts": (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Budget vs Actual" subtitle="Monthly net position">
-          <MultiLineChart
-            data={summaryChartData}
-            lines={[
-              { dataKey: "budget", label: "Budget", color: chartColors.brand },
-              { dataKey: "actual", label: "Actual", color: chartColors.success, dashed: true },
-            ]}
-          />
-        </ChartCard>
-        <ChartCard title="Monthly Variance" subtitle="Actual minus budget">
-          <VarianceBarChart data={totalVariance} />
-        </ChartCard>
-      </div>
+    "budget-actual-chart": (
+      <ChartCard title="Budget vs Actual" subtitle="Monthly net position">
+        <MultiLineChart
+          data={summaryChartData}
+          lines={[
+            { dataKey: "budget", label: "Budget", color: chartColors.brand },
+            { dataKey: "actual", label: "Actual", color: chartColors.success, dashed: true },
+          ]}
+        />
+      </ChartCard>
+    ),
+    "variance-chart": (
+      <ChartCard title="Monthly Variance" subtitle="Actual minus budget">
+        <VarianceBarChart data={totalVariance} />
+      </ChartCard>
     ),
     "detail-table": (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
@@ -160,7 +161,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
     <PageLayoutProvider pageId="reports/budget-vs-actuals">
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="reports/budget-vs-actuals">
-          <BudgetVsActualsPageGrid
+          <ConnectedPageGrid
             widgets={widgets}
             defaultLayoutLG={defaultLayoutLG}
             defaultLayoutSM={defaultLayoutSM}
@@ -171,31 +172,3 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
   );
 }
 
-function BudgetVsActualsPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
-  );
-}
