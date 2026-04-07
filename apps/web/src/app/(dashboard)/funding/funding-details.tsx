@@ -19,14 +19,6 @@ interface FundingRound {
   isProjected: boolean;
 }
 
-interface FundingDetailsProps {
-  rounds: FundingRound[];
-  foundersOwnership: number;
-  currentCash: number;
-  currentBurn: number;
-  currentRunway: number;
-}
-
 const roundTypeLabels: Record<string, string> = {
   pre_seed: "Pre-Seed",
   seed: "Seed",
@@ -56,13 +48,31 @@ const segmentColors = [
   "#ef4444", // red
 ];
 
-export function FundingDetails({
+interface CapTableAndRoundsProps {
+  rounds: FundingRound[];
+  foundersOwnership: number;
+  currentCash: number;
+  currentBurn: number;
+  currentRunway: number;
+  calcRaiseAmount: number;
+  setCalcRaiseAmount: (v: number) => void;
+  calcPreMoney: number;
+  setCalcPreMoney: (v: number) => void;
+  calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+}
+
+export function CapTableAndRounds({
   rounds,
   foundersOwnership,
   currentCash: _currentCash,
-  currentBurn,
-  currentRunway,
-}: FundingDetailsProps) {
+  currentBurn: _currentBurn,
+  currentRunway: _currentRunway,
+  calcRaiseAmount,
+  setCalcRaiseAmount,
+  calcPreMoney,
+  setCalcPreMoney,
+  calcDilution,
+}: CapTableAndRoundsProps) {
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
@@ -76,18 +86,6 @@ export function FundingDetails({
     handleRemove,
     handleRestore,
   } = useScenarioOverrides("funding_round");
-
-  // Dilution calculator state
-  const [calcRaiseAmount, setCalcRaiseAmount] = useState(2_000_000);
-  const [calcPreMoney, setCalcPreMoney] = useState(8_000_000);
-
-  const calcDilution = useMemo(() => {
-    const postMoney = calcPreMoney + calcRaiseAmount;
-    if (postMoney <= 0) return { dilution: 0, postMoney: 0, newOwnership: foundersOwnership };
-    const dilution = (calcRaiseAmount / postMoney) * 100;
-    const newOwnership = foundersOwnership * (1 - dilution / 100);
-    return { dilution, postMoney, newOwnership };
-  }, [calcRaiseAmount, calcPreMoney, foundersOwnership]);
 
   // Build cap table segments
   const capTableSegments = useMemo(() => {
@@ -151,12 +149,12 @@ export function FundingDetails({
 
         {/* Still show dilution calculator even with no rounds */}
         <DilutionCalculator
-          foundersOwnership={100}
+          foundersOwnership={foundersOwnership}
           calcRaiseAmount={calcRaiseAmount}
           setCalcRaiseAmount={setCalcRaiseAmount}
           calcPreMoney={calcPreMoney}
           setCalcPreMoney={setCalcPreMoney}
-          calcDilution={{ dilution: (calcRaiseAmount / (calcPreMoney + calcRaiseAmount)) * 100, postMoney: calcPreMoney + calcRaiseAmount, newOwnership: 100 * (1 - calcRaiseAmount / (calcPreMoney + calcRaiseAmount)) }}
+          calcDilution={calcDilution}
         />
       </div>
     );
@@ -353,40 +351,6 @@ export function FundingDetails({
         </div>
       </div>
 
-      {/* Dilution Calculator */}
-      <DilutionCalculator
-        foundersOwnership={foundersOwnership}
-        calcRaiseAmount={calcRaiseAmount}
-        setCalcRaiseAmount={setCalcRaiseAmount}
-        calcPreMoney={calcPreMoney}
-        setCalcPreMoney={setCalcPreMoney}
-        calcDilution={calcDilution}
-      />
-
-      {/* AI Fundraising Insight */}
-      {currentRunway > 0 && currentRunway < 18 && (
-        <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
-              <TrendingUp className="h-4 w-4 text-brand-600" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-surface-900">Fundraising Readiness</p>
-              <p className="text-xs text-surface-600 mt-1 leading-relaxed">
-                With <span className="font-semibold">{Math.round(currentRunway)} months</span> of runway at{" "}
-                <span className="font-semibold tabular-nums">{formatCurrency(currentBurn, "USD", undefined, { compact: true })}/mo</span> burn,
-                {currentRunway <= 6
-                  ? " you should be actively fundraising now. Most rounds take 3-6 months."
-                  : currentRunway <= 12
-                  ? " consider starting fundraising conversations in the next few months."
-                  : " you have time to focus on growth before your next raise."}
-                {" "}Ask the companion for a detailed fundraising readiness assessment.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Hidden in scenario section */}
       {isInScenarioMode && (
         <HiddenEntitiesSection
@@ -409,7 +373,7 @@ export function FundingDetails({
 }
 
 /** Interactive dilution calculator */
-function DilutionCalculator({
+export function DilutionCalculator({
   foundersOwnership,
   calcRaiseAmount,
   setCalcRaiseAmount,
@@ -532,6 +496,38 @@ function DilutionCalculator({
               was {foundersOwnership.toFixed(1)}%
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** AI Fundraising Insight banner. Visibility is controlled externally via staticHiddenWidgets. */
+export function FundraisingReadinessTip({
+  currentRunway,
+  currentBurn,
+}: {
+  currentRunway: number;
+  currentBurn: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
+          <TrendingUp className="h-4 w-4 text-brand-600" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-surface-900">Fundraising Readiness</p>
+          <p className="text-xs text-surface-600 mt-1 leading-relaxed">
+            With <span className="font-semibold">{Math.round(currentRunway)} months</span> of runway at{" "}
+            <span className="font-semibold tabular-nums">{formatCurrency(currentBurn, "USD", undefined, { compact: true })}/mo</span> burn,
+            {currentRunway <= 6
+              ? " you should be actively fundraising now. Most rounds take 3-6 months."
+              : currentRunway <= 12
+              ? " consider starting fundraising conversations in the next few months."
+              : " you have time to focus on growth before your next raise."}
+            {" "}Ask the companion for a detailed fundraising readiness assessment.
+          </p>
         </div>
       </div>
     </div>

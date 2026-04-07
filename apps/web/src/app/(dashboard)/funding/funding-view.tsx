@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
-import { PageGrid, type DefaultLayoutItem } from "@/components/ui";
-import { PageLayoutProvider, usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useState, useMemo } from "react";
+import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
+import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
-import { FundingDetails } from "./funding-details";
+import { CapTableAndRounds, DilutionCalculator, FundraisingReadinessTip } from "./funding-details";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
@@ -51,6 +51,18 @@ export function FundingView({
     return map;
   }, [resolvedSlotData]);
 
+  // Dilution calculator state (lifted so it can be shared across widgets)
+  const [calcRaiseAmount, setCalcRaiseAmount] = useState(2_000_000);
+  const [calcPreMoney, setCalcPreMoney] = useState(8_000_000);
+
+  const calcDilution = useMemo(() => {
+    const postMoney = calcPreMoney + calcRaiseAmount;
+    if (postMoney <= 0) return { dilution: 0, postMoney: 0, newOwnership: foundersOwnership };
+    const dilution = (calcRaiseAmount / postMoney) * 100;
+    const newOwnership = foundersOwnership * (1 - dilution / 100);
+    return { dilution, postMoney, newOwnership };
+  }, [calcRaiseAmount, calcPreMoney, foundersOwnership]);
+
   // ── Context wiring ──────────────────────────────────────────────────────
   const { registry, openFormulaViewer } = useMetrics();
   const usedSlugs = useMemo(() => new Set(["totalRaised", "currentCash", "runway", "founderOwnership"]), []);
@@ -70,19 +82,23 @@ export function FundingView({
   }), [registry, usedSlugs, openFormulaViewer]);
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "details",      x: 0, w: 12, h: 16, minH: 8 },
+    { i: "metric-0",         x: 0, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-1",         x: 3, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-2",         x: 6, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "metric-3",         x: 9, w: 3,  h: 5,  minW: 2, minH: 4 },
+    { i: "cap-table-rounds", x: 0, w: 12, h: 14, minH: 8 },
+    { i: "dilution-calc",    x: 0, w: 12, h: 8,  minH: 5 },
+    { i: "fundraising-tip",  x: 0, w: 12, h: 3,  minH: 2 },
   ], []);
 
   const defaultLayoutSM: DefaultLayoutItem[] = useMemo(() => [
-    { i: "metric-0", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "details",      x: 0, w: 6, h: 16, minH: 8 },
+    { i: "metric-0",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-1",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-2",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "metric-3",         x: 0, w: 6, h: 5,  minW: 2, minH: 4 },
+    { i: "cap-table-rounds", x: 0, w: 6, h: 14, minH: 8 },
+    { i: "dilution-calc",    x: 0, w: 6, h: 8,  minH: 5 },
+    { i: "fundraising-tip",  x: 0, w: 6, h: 3,  minH: 2 },
   ], []);
 
   const widgets = useMemo(() => ({
@@ -108,59 +124,59 @@ export function FundingView({
         ];
       })
     ),
-    "details": (
-      <FundingDetails
+    "cap-table-rounds": (
+      <CapTableAndRounds
         rounds={rounds}
         foundersOwnership={foundersOwnership}
         currentCash={currentCash}
         currentBurn={currentBurn}
         currentRunway={currentRunway}
+        calcRaiseAmount={calcRaiseAmount}
+        setCalcRaiseAmount={setCalcRaiseAmount}
+        calcPreMoney={calcPreMoney}
+        setCalcPreMoney={setCalcPreMoney}
+        calcDilution={calcDilution}
       />
     ),
-  }), [slotById, rounds, foundersOwnership, currentCash, currentBurn, currentRunway]);
+    "dilution-calc": (
+      <DilutionCalculator
+        foundersOwnership={foundersOwnership}
+        calcRaiseAmount={calcRaiseAmount}
+        setCalcRaiseAmount={setCalcRaiseAmount}
+        calcPreMoney={calcPreMoney}
+        setCalcPreMoney={setCalcPreMoney}
+        calcDilution={calcDilution}
+      />
+    ),
+    "fundraising-tip": (
+      <FundraisingReadinessTip currentRunway={currentRunway} currentBurn={currentBurn} />
+    ),
+  }), [slotById, rounds, foundersOwnership, currentCash, currentBurn, currentRunway, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney]);
+
+  const staticHiddenWidgets = useMemo(
+    () => (currentRunway > 0 && currentRunway < 18) ? [] : ["fundraising-tip"],
+    [currentRunway]
+  );
+
+  // Suppress unused variable warnings for props that are part of the interface
+  void totalRaised;
+  void completedRoundsCount;
+  void totalDilution;
 
   return (
     <PageLayoutProvider pageId="funding">
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="funding">
           <CardCatalogProvider value={catalogValue}>
-            <FundingPageGrid
+            <ConnectedPageGrid
               widgets={widgets}
               defaultLayoutLG={defaultLayoutLG}
               defaultLayoutSM={defaultLayoutSM}
+              staticHiddenWidgets={staticHiddenWidgets}
             />
           </CardCatalogProvider>
         </PageProvider>
       </ComputedMetricsProvider>
     </PageLayoutProvider>
-  );
-}
-
-function FundingPageGrid({
-  widgets,
-  defaultLayoutLG,
-  defaultLayoutSM,
-}: {
-  widgets: Record<string, ReactNode>;
-  defaultLayoutLG: DefaultLayoutItem[];
-  defaultLayoutSM: DefaultLayoutItem[];
-}) {
-  const layout = usePageLayoutContext();
-  return (
-    <PageGrid
-      widgets={widgets}
-      defaultLayoutLG={defaultLayoutLG}
-      defaultLayoutSM={defaultLayoutSM}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
-      closedWidgets={layout.closedWidgets}
-      onCloseWidget={layout.onCloseWidget}
-      onOpenWidget={layout.onOpenWidget}
-      onReset={layout.onReset}
-      widgetReadiness={layout.widgetReadiness}
-      isLoading={layout.isLoading}
-      isEditMode={layout.isEditMode}
-      setIsEditMode={layout.setIsEditMode}
-    />
   );
 }
