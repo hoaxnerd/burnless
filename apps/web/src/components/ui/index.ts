@@ -14,3 +14,4 @@ export { ThemeProvider, ThemeToggle, useTheme } from "./theme-toggle";
 export { KeyboardShortcutsProvider } from "./keyboard-shortcuts";
 export { PageGrid, type PageGridProps, type PageWidgetLayout, type DefaultLayoutItem } from "./page-grid";
 export { HeroKpiCard, type HeroKpiCardProps } from "./hero-kpi-card";
+export { ConnectedPageGrid } from "./connected-page-grid";
