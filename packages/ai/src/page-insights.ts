@@ -12,7 +12,7 @@ import { createProvider, type CreateProviderOptions } from "./providers";
 
 // ── Page types ──────────────────────────────────────────────────────────────
 
-export type InsightPage = "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
+export type InsightPage = "dashboard" | "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
 
 export interface PageInsightContext {
   page: InsightPage;
@@ -28,6 +28,8 @@ export interface PageInsight {
   title: string;
   summary: string;
   severity: "info" | "warning" | "critical";
+  /** Pre-built prompt to continue exploring this insight in AI chat */
+  continuationPrompt?: string;
 }
 
 // ── Feature key for model routing (maps to "fast" tier) ─────────────────────
@@ -76,7 +78,7 @@ ${subcatLines}
 Anomalies detected: ${anomalyCount}
 Recurring charges: ${recurringCount}
 
-Generate exactly 3 insights as JSON array. Each insight must have: type (one of "variance_analysis", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "variance_analysis", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
 
 Focus on:
 1. Biggest spend anomaly or notable MoM change (explain what drove it)
@@ -139,7 +141,7 @@ ${revLines}
 Revenue Streams:
 ${streamLines}
 
-Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
 
 Focus on:
 1. Growth narrative — what's driving revenue and at what rate
@@ -171,7 +173,7 @@ Headcount: ${keyMetrics.headcount ?? "N/A"}
 Available Scenarios:
 ${scenarioLines || "  No scenarios created yet"}
 
-Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "financial_narrative", "benchmark"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "financial_narrative", "benchmark"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
 
 Focus on:
 1. Comparison insight — if multiple scenarios exist, note the most impactful trade-off. If only one, suggest what scenarios to create.
@@ -211,7 +213,7 @@ Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
 Funding History:
 ${roundLines}
 
-Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "financial_narrative", "benchmark"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "financial_narrative", "benchmark"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
 
 Focus on:
 1. Fundraising readiness — based on runway, growth rate, and stage, assess timing urgency
@@ -279,12 +281,39 @@ Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
 Gross Margin: ${keyMetrics.grossMargin?.toFixed(1) ?? "N/A"}%
 Headcount: ${keyMetrics.headcount ?? "N/A"}
 
-Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
 
 Focus on:
 1. Overall health — one-sentence verdict on the company's financial trajectory
 2. Key risk — the single biggest financial risk right now (runway, churn, concentration, margin compression)
 3. Board-ready highlight — one metric or trend that tells the strongest story for investors
+
+Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an insight, skip it.
+Return ONLY the JSON array, no markdown fences.`;
+}
+
+function buildDashboardPrompt(snapshot: FinancialSnapshot): string {
+  const { keyMetrics, company } = snapshot;
+  const currency = company.currency;
+
+  return `You are a senior financial advisor giving a startup founder a quick daily briefing. Be direct and data-driven.
+
+Company: ${company.name} (${company.stage}, ${company.businessModel})
+Currency: ${currency}
+MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
+ARR: ${currency} ${keyMetrics.arr?.toLocaleString() ?? "N/A"}
+Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
+Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
+Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
+Headcount: ${keyMetrics.headcount ?? "N/A"}
+
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).
+
+Focus on:
+1. The single most important financial signal right now (runway risk, growth inflection, or milestone proximity)
+2. A quick benchmark or comparison relevant to the company's stage
+3. One actionable recommendation for this week
 
 Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an insight, skip it.
 Return ONLY the JSON array, no markdown fences.`;
@@ -310,6 +339,9 @@ export async function generatePageInsights(
 
   let prompt: string;
   switch (context.page) {
+    case "dashboard":
+      prompt = buildDashboardPrompt(context.snapshot);
+      break;
     case "expenses":
       prompt = buildExpensesPrompt(context.snapshot, context.pageData);
       break;
@@ -356,6 +388,7 @@ export async function generatePageInsights(
         title: String(item.title).slice(0, 80),
         summary: String(item.summary).slice(0, 300),
         severity: validateSeverity(item.severity) ? item.severity : "info",
+        ...(item.continuationPrompt ? { continuationPrompt: String(item.continuationPrompt).slice(0, 150) } : {}),
       }));
   } catch (err) {
     console.error(

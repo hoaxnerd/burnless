@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Power, Database, Sparkles, Shield, Pencil } from "lucide-react";
+import { Power, Database, Sparkles, Shield, Pencil, Key } from "lucide-react";
 import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
 import type { BudgetStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
 import { ProviderSection } from "./ai-provider-section";
@@ -77,12 +77,52 @@ export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, 
         />
       )}
 
-      {/* AI Provider Selector */}
+      {/* BYOK Toggle + AI Provider Selector */}
       {flags.masterEnabled && (
-        <ProviderSection
-          providerConfig={providerConfig}
-          updateFlags={updateFlags}
-        />
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
+                <Key className="h-[18px] w-[18px] text-surface-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-surface-900">
+                  Bring Your Own Key
+                </h2>
+                <p className="text-sm text-surface-500 mt-0.5">
+                  {providerConfig.byokEnabled
+                    ? "Using your own AI provider credentials"
+                    : "Using platform-provided AI — no setup needed"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() =>
+                updateFlags({ byokEnabled: !providerConfig.byokEnabled })
+              }
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                providerConfig.byokEnabled
+                  ? "bg-brand-600"
+                  : "bg-surface-300"
+              }`}
+              role="switch"
+              aria-checked={providerConfig.byokEnabled}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  providerConfig.byokEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {providerConfig.byokEnabled && (
+            <ProviderSection
+              providerConfig={providerConfig}
+              updateFlags={updateFlags}
+            />
+          )}
+        </div>
       )}
 
       {/* Level 3: Data Retention Mode */}

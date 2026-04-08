@@ -92,7 +92,7 @@ export function ProviderSection({
   };
 
   return (
-    <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+    <div className="border-t border-surface-200 pt-6">
       <div className="flex items-center gap-4 mb-5">
         <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
           <Cpu className="h-[18px] w-[18px] text-surface-600" />

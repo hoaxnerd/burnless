@@ -192,6 +192,7 @@ export const updateAiFeaturesSchema = z.object({
     })
     .optional(),
   companionName: z.string().min(1).max(50).optional(),
+  byokEnabled: z.boolean().optional(),
   aiProvider: aiProviderEnum.nullable().optional(),
   aiApiKey: z.string().max(256).nullable().optional(),
   aiModel: z.string().max(128).nullable().optional(),

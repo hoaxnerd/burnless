@@ -6,7 +6,6 @@ import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 import { PromoteDialog } from "@/components/scenarios/promote-dialog";
-import { ScenarioInsightsWrapper } from "./scenario-insights-wrapper";
 import { ScenarioCards } from "./scenario-cards";
 
 export interface ScenarioItem {
@@ -49,7 +48,6 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   };
 
   const defaultLayoutLG: DefaultLayoutItem[] = useMemo(() => [
-    { i: "insights", x: 0, w: 12, h: 4, minH: 3 },
     { i: "scenario-cards", x: 0, w: 12, h: 16, minH: 8 },
   ], []);
 
@@ -59,7 +57,6 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   );
 
   const widgets = useMemo(() => ({
-    "insights": <ScenarioInsightsWrapper scenarios={scenarios} />,
     "scenario-cards": <ScenarioCards scenarios={scenarios} />,
   }), [scenarios]);
 

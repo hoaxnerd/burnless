@@ -146,6 +146,7 @@ export async function getCompanyProviderConfig(
 ): Promise<CompanyProviderConfig | undefined> {
   const [row] = await db
     .select({
+      byokEnabled: aiFeatureFlags.byokEnabled,
       aiProvider: aiFeatureFlags.aiProvider,
       aiApiKey: aiFeatureFlags.aiApiKey,
       aiModel: aiFeatureFlags.aiModel,
@@ -155,8 +156,8 @@ export async function getCompanyProviderConfig(
     .where(eq(aiFeatureFlags.companyId, companyId))
     .limit(1);
 
-  // No custom config — use env var defaults
-  if (!row?.aiApiKey) return undefined;
+  // BYOK disabled or no custom key — use platform defaults
+  if (!row?.byokEnabled || !row?.aiApiKey) return undefined;
 
   return {
     provider: row.aiProvider ?? undefined,

@@ -29,6 +29,7 @@ export interface BudgetStatus {
 }
 
 export interface AiProviderConfig {
+  byokEnabled: boolean;
   aiProvider: string | null;
   aiApiKey: string | null; // masked
   aiModel: string | null;
@@ -67,6 +68,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(5000);
   const [budget, setBudget] = useState<BudgetStatus | null>(null);
   const [providerConfig, setProviderConfig] = useState<AiProviderConfig>({
+    byokEnabled: false,
     aiProvider: null,
     aiApiKey: null,
     aiModel: null,
@@ -89,6 +91,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
           if (data.budget) setBudget(data.budget);
           setProviderConfig({
+            byokEnabled: data.byokEnabled ?? false,
             aiProvider: data.aiProvider ?? null,
             aiApiKey: data.aiApiKey ?? null,
             aiModel: data.aiModel ?? null,
@@ -143,6 +146,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
           if (updated.budget) setBudget(updated.budget);
           setProviderConfig({
+            byokEnabled: updated.byokEnabled ?? false,
             aiProvider: updated.aiProvider ?? null,
             aiApiKey: updated.aiApiKey ?? null,
             aiModel: updated.aiModel ?? null,

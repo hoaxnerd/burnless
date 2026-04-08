@@ -169,7 +169,7 @@ describe("promoteScenario", () => {
       "revenue_stream",
       stream.id,
       "delete",
-      null,
+      undefined,
       stream as any,
     );
 

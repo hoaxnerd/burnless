@@ -20,7 +20,6 @@ import {
 } from "@burnless/db";
 import { eq, isNull, lte, and } from "drizzle-orm";
 import {
-  generateInsights,
   generatePageInsights,
   type InsightPage,
 } from "@burnless/ai";
@@ -186,15 +185,11 @@ export const POST = withErrorHandler(async function POST(request: Request) {
       try {
         let insights: unknown[];
 
-        if (page === "dashboard") {
-          insights = generateInsights(snapshot);
-        } else {
-          insights = await generatePageInsights({
-            page: page as InsightPage,
-            snapshot,
-            providerConfig: companyProviderConfig,
-          });
-        }
+        insights = await generatePageInsights({
+          page: page as InsightPage,
+          snapshot,
+          providerConfig: companyProviderConfig,
+        });
 
         // Update cache
         const cacheKey = `scenario:${scenario.id}`;

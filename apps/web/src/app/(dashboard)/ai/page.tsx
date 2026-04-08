@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   Sparkles,
@@ -90,6 +91,7 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
 /* ─── Page Component ───────────────────────────────────────────────── */
 
 export default function AiCompanionPage() {
+  const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,9 +106,28 @@ export default function AiCompanionPage() {
   const { companionName } = useAiFlags();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const handledParamRef = useRef<string | null>(null);
   const { success } = useToast();
 
   const isEmptyState = messages.length === 0;
+
+  // ?prompt= pre-fills input without sending; ?send= pre-fills and auto-submits
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    const send = searchParams.get("send");
+    const paramValue = send || prompt || null;
+    // Guard against double-execution (React strict mode / searchParams ref change)
+    if (!paramValue || handledParamRef.current === paramValue) return;
+    handledParamRef.current = paramValue;
+
+    if (send) {
+      handleSend(null, send);
+    } else if (prompt) {
+      setInput(prompt);
+      inputRef.current?.focus();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 30_000);
@@ -361,12 +382,13 @@ export default function AiCompanionPage() {
   }
 
   function handleTemplateClick(prompt: string) {
-    handleSend(null, prompt);
+    setInput(prompt);
+    inputRef.current?.focus();
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-7rem)] lg:h-[calc(100vh-4rem)] gap-4">
-      <div className="flex flex-1 flex-col min-w-0">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-7rem)] lg:h-[calc(100vh-4rem)]">
+      <div className="flex flex-1 flex-col min-w-0 lg:mr-4">
         {/* ─── Page Header ─────────────────────────────────────── */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>

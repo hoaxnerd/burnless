@@ -160,8 +160,9 @@ export const REGION_OPTIONS = (Object.entries(DATA_REGIONS) as [DataRegion, { na
 export const tabs = [
   { key: "general" as const, label: "General" },
   { key: "security" as const, label: "Security" },
-  { key: "ai" as const, label: "AI Features" },
-  { key: "ai-dashboard" as const, label: "AI Dashboard" },
+  // TODO: Re-enable AI Features and AI Dashboard tabs in a later release
+  // { key: "ai" as const, label: "AI Features" },
+  // { key: "ai-dashboard" as const, label: "AI Dashboard" },
   { key: "integrations" as const, label: "Integrations" },
   { key: "invite-codes" as const, label: "Invite Codes" },
   { key: "billing" as const, label: "Billing" },

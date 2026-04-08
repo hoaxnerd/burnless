@@ -163,13 +163,12 @@ export default function SettingsPage() {
       {/* Security Tab */}
       {activeTab === "security" && <SecurityTab />}
 
-      {/* AI Features Tab */}
-      {activeTab === "ai" && aiLoaded && (
+      {/* TODO: Re-enable AI Features and AI Dashboard tabs in a later release */}
+      {/* {activeTab === "ai" && aiLoaded && (
         <AiFeaturesTab flags={flags} updateFlags={updateFlags} monthlyBudgetCents={monthlyBudgetCents} budget={budget} providerConfig={providerConfig} />
-      )}
+      )} */}
 
-      {/* AI Dashboard Tab */}
-      {activeTab === "ai-dashboard" && <AiDashboardTab />}
+      {/* {activeTab === "ai-dashboard" && <AiDashboardTab />} */}
 
       {/* Integrations Tab */}
       {activeTab === "integrations" && (

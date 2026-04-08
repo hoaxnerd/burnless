@@ -36,6 +36,8 @@ export interface InsightCacheState<T = unknown> {
   slow: boolean;
   /** Whether the hook is still working on getting initial data (fetch + auto-generate) */
   settling: boolean;
+  /** Whether the AI budget has been exceeded */
+  budgetExceeded: boolean;
   /** Fetch cached data only — never triggers LLM generation */
   fetchCached: () => Promise<void>;
   /** Force-refresh: triggers LLM generation, bypasses grace period */
@@ -53,6 +55,8 @@ interface UseInsightCacheOptions {
   autoRefreshDelayMs?: number;
   /** Whether AI insights feature is enabled (used for auto-generation on first visit) */
   aiEnabled?: boolean;
+  /** Whether the AI budget has been exceeded — blocks all LLM calls */
+  budgetExceeded?: boolean;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -63,6 +67,7 @@ export function useInsightCache<T = unknown>({
   pageData,
   autoRefreshDelayMs = 30_000,
   aiEnabled = false,
+  budgetExceeded = false,
 }: UseInsightCacheOptions): InsightCacheState<T> {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true); // Start loading — mount effect fetches immediately
@@ -116,6 +121,15 @@ export function useInsightCache<T = unknown>({
   }, [page]);
 
   const refresh = useCallback(async () => {
+    if (budgetExceeded) {
+      if (previousDataRef.current.length > 0) {
+        setRefreshError(true);
+      } else {
+        setError(true);
+      }
+      setErrorVariant("generic");
+      return;
+    }
     setLoading(true);
     setError(false);
     setRefreshError(false);
@@ -164,7 +178,7 @@ export function useInsightCache<T = unknown>({
       clearTimeout(slowTimer);
       clearTimeout(abortTimer);
     }
-  }, [page, scenarioId, pageData]);
+  }, [page, scenarioId, pageData, budgetExceeded]);
 
   // Auto-refresh: when grace period just expired, schedule a re-fetch
   useEffect(() => {
@@ -191,11 +205,11 @@ export function useInsightCache<T = unknown>({
     if (hasAttemptedGenerate.current) return;
     if (loading) return; // Wait for initial fetch to complete
     if (data.length > 0) return; // Already have data
-    if (!aiEnabled) return; // AI not enabled
+    if (!aiEnabled || budgetExceeded) return; // AI not enabled or budget exceeded
     hasAttemptedGenerate.current = true;
     setGenerating(true);
     refresh().finally(() => setGenerating(false));
-  }, [loading, data.length, aiEnabled, refresh]);
+  }, [loading, data.length, aiEnabled, budgetExceeded, refresh]);
 
   // Whether the hook is still working on getting data (initial fetch, or auto-generating)
   const settling = loading || generating;
@@ -215,6 +229,7 @@ export function useInsightCache<T = unknown>({
     staleReason,
     slow,
     settling,
+    budgetExceeded,
     fetchCached,
     refresh,
   };

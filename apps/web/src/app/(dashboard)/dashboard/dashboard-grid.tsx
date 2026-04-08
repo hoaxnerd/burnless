@@ -25,10 +25,9 @@ import { useDashboardLayout } from "./dashboard-layout-context";
 
 export type WidgetId =
   | `hero-${number}`
-  | "ai-command-center"
+  | "ai-insights"
   | "weekly-digest"
   | "pinned-insights"
-  | "quick-actions"
   | "chart-cash"
   | "chart-rev-exp"
   | "chart-burn-runway"
@@ -40,8 +39,7 @@ export type WidgetId =
 
 const NON_HERO_LAYOUT_LG: DefaultLayoutItem[] = [
   { i: "weekly-digest",     x: 0,  w: 12, h: 3, minW: 6, minH: 2 },
-  { i: "ai-command-center", x: 0,  w: 12, h: 12, minW: 6, minH: 5 },
-  { i: "quick-actions",     x: 0,  w: 12, h: 2, minW: 6, minH: 2 },
+  { i: "ai-insights",       x: 0,  w: 12, h: 8, minW: 6, minH: 4 },
   { i: "chart-cash",        x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
   { i: "chart-rev-exp",     x: 6,  w: 6,  h: 10, minW: 4, minH: 7 },
   { i: "chart-burn-runway", x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
@@ -52,8 +50,7 @@ const NON_HERO_LAYOUT_LG: DefaultLayoutItem[] = [
 
 const NON_HERO_LAYOUT_SM: DefaultLayoutItem[] = [
   { i: "weekly-digest",     x: 0, w: 6, h: 3, minW: 6, minH: 2 },
-  { i: "ai-command-center", x: 0, w: 6, h: 12, minW: 6, minH: 5 },
-  { i: "quick-actions",     x: 0, w: 6, h: 2, minW: 6, minH: 2 },
+  { i: "ai-insights",       x: 0, w: 6, h: 8, minW: 6, minH: 4 },
   { i: "chart-cash",        x: 0, w: 6, h: 10, minW: 6, minH: 7 },
   { i: "chart-rev-exp",     x: 0, w: 6, h: 10, minW: 6, minH: 7 },
   { i: "chart-burn-runway", x: 0, w: 6, h: 10, minW: 6, minH: 7 },

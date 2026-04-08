@@ -67,6 +67,8 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (body.companionName !== undefined) {
     updates.companionName = body.companionName;
   }
+  // BYOK toggle
+  if (body.byokEnabled !== undefined) updates.byokEnabled = body.byokEnabled;
   // Provider config — null clears to env-var fallback
   if (body.aiProvider !== undefined) updates.aiProvider = body.aiProvider;
   if (body.aiApiKey !== undefined) updates.aiApiKey = body.aiApiKey;
@@ -96,6 +98,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     features: updated.features,
     companionName: updated.companionName ?? DEFAULT_AI_FLAGS.companionName,
     monthlyBudgetCents: updated.monthlyBudgetCents,
+    byokEnabled: updated.byokEnabled,
     aiProvider: updated.aiProvider,
     aiApiKey: maskApiKey(updated.aiApiKey),
     aiModel: updated.aiModel,
@@ -121,6 +124,7 @@ async function getOrCreateFlags(companyId: string) {
       features: existing.features as AiFeatureConfig,
       companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
       monthlyBudgetCents: existing.monthlyBudgetCents,
+      byokEnabled: existing.byokEnabled,
       aiProvider: existing.aiProvider,
       aiApiKey: maskApiKey(existing.aiApiKey),
       aiModel: existing.aiModel,
@@ -146,6 +150,7 @@ async function getOrCreateFlags(companyId: string) {
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
     companionName: created?.companionName ?? DEFAULT_AI_FLAGS.companionName,
     monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
+    byokEnabled: created?.byokEnabled ?? false,
     aiProvider: null,
     aiApiKey: null,
     aiModel: null,

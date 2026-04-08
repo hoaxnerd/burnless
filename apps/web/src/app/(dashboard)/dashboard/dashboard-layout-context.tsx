@@ -144,7 +144,11 @@ export function DashboardLayoutProvider({
 
   // Save card preferences to API with retry
   const savePrefs = useCallback(
-    (updated: DashboardCardPreferences): Promise<void> => {
+    (updated: DashboardCardPreferences | undefined): Promise<void> => {
+      if (!updated) {
+        console.warn("savePrefs called with undefined — skipping");
+        return Promise.resolve();
+      }
       setIsSaving(true);
       // Only save card-related fields — layout is managed by PageLayoutProvider
       const body = JSON.stringify({
@@ -198,7 +202,7 @@ export function DashboardLayoutProvider({
         next = updater(prev);
         return next;
       });
-      return savePrefs(next!);
+      return savePrefs(next);
     },
     [savePrefs]
   );

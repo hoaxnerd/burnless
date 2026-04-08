@@ -197,6 +197,13 @@
       "when": 1775520000000,
       "tag": "0027_scenario_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1775606400000,
+      "tag": "0028_add_byok_enabled",
+      "breakpoints": true
     }
   ]
 }

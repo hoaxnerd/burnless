@@ -136,12 +136,12 @@ describe("scenario override queries", () => {
       );
 
       expect(override).toBeDefined();
-      expect(override.scenarioId).toBe(ctx.scenario.id);
-      expect(override.entityType).toBe("forecast_line");
-      expect(override.entityId).toBe("new-entity-1");
-      expect(override.action).toBe("modify");
-      expect(override.data).toEqual({ amount: 9999 });
-      expect(override.originalData).toEqual({ amount: 5000 });
+      expect(override!.scenarioId).toBe(ctx.scenario.id);
+      expect(override!.entityType).toBe("forecast_line");
+      expect(override!.entityId).toBe("new-entity-1");
+      expect(override!.action).toBe("modify");
+      expect(override!.data).toEqual({ amount: 9999 });
+      expect(override!.originalData).toEqual({ amount: 5000 });
     });
 
     it("updates existing override (last-write-wins)", async () => {
@@ -170,8 +170,8 @@ describe("scenario override queries", () => {
         { amount: 500 },
       );
 
-      expect(updated.id).toBe(first.id); // same row, not a new one
-      expect(updated.data).toEqual({ amount: 2000 });
+      expect(updated!.id).toBe(first!.id); // same row, not a new one
+      expect(updated!.data).toEqual({ amount: 2000 });
 
       // Verify only one override exists
       const overrides = await getOverridesForScenario(ctx.scenario.id);

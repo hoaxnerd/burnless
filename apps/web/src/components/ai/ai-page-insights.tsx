@@ -12,9 +12,11 @@ import {
   ChevronUp,
   Clock,
   Info,
+  ArrowUp,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { AiGate } from "./ai-gate";
-import { useAiFeature } from "./ai-feature-context";
+import { useAiFeature, useAiFlags } from "./ai-feature-context";
 import { useOptionalPageLayout } from "@/components/providers/page-layout-context";
 import { DataLoadError } from "@/components/ui/data-load-error";
 import { MarkdownRenderer } from "./markdown-renderer";
@@ -35,17 +37,20 @@ interface PageInsight {
   title: string;
   summary: string;
   severity: "info" | "warning" | "critical";
+  continuationPrompt?: string;
 }
 
 interface AiPageInsightsProps {
   /** Which page these insights are for */
-  page: "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
+  page: "dashboard" | "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
   /** Scenario ID for context (optional for non-scenario pages like funding, team, reports) */
   scenarioId?: string;
   /** Additional page-specific data to send to the API */
   pageData?: Record<string, unknown>;
   /** Widget ID for grid readiness reporting (default: "ai-insights") */
   widgetId?: string;
+  /** Show a chat input below insights (only used on dashboard) */
+  showChatInput?: boolean;
 }
 
 /** Human-readable labels for stale reasons. */
@@ -107,11 +112,14 @@ function formatAge(dateStr: string): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insights" }: AiPageInsightsProps) {
+export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insights", showChatInput }: AiPageInsightsProps) {
   const { enabled, loaded } = useAiFeature("insights");
-  const cache = useInsightCache<PageInsight>({ page, scenarioId, pageData, aiEnabled: loaded && enabled });
+  const { budget } = useAiFlags();
+  const isBudgetExceeded = budget?.exceeded ?? false;
+  const cache = useInsightCache<PageInsight>({ page, scenarioId, pageData, aiEnabled: loaded && enabled, budgetExceeded: isBudgetExceeded });
   const [expanded, setExpanded] = useState(true);
   const pageLayout = useOptionalPageLayout();
+  const router = useRouter();
 
   // Report readiness to the grid: ready when AI is enabled AND we have data to show.
   // Stay ready during refresh if we have stale data (stale-while-revalidate).
@@ -153,9 +161,10 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
       <AiGate feature="insights" hideWhenOff>
         <div className="mb-6">
           <DataLoadError
-            title="Couldn't load insights"
+            title={isBudgetExceeded ? "AI budget exceeded" : "Couldn't load insights"}
+            message={isBudgetExceeded ? "Your monthly AI budget has been reached. Adjust your budget in Settings to continue generating insights." : undefined}
             variant={cache.errorVariant}
-            onRetry={() => cache.fetchCached()}
+            onRetry={isBudgetExceeded ? undefined : () => cache.fetchCached()}
             retrying={cache.loading}
             compact
           />
@@ -190,7 +199,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
             )}
           </div>
           <div className="flex items-center gap-2">
-            {cache.canRefresh && (
+            {cache.canRefresh && !cache.budgetExceeded && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -216,14 +225,19 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
           <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-danger-500/20 bg-danger-50/50 px-3 py-2">
             <Info className="h-3.5 w-3.5 text-danger-500 flex-shrink-0" />
             <p className="text-xs text-danger-700">
-              Failed to refresh insights. Showing previous version.
-              <button
-                onClick={() => cache.refresh()}
-                disabled={cache.loading}
-                className="ml-1 underline hover:no-underline font-medium"
-              >
-                Try again
-              </button>
+              {isBudgetExceeded
+                ? "AI budget exceeded. Showing previously generated insights."
+                : <>
+                    Failed to refresh insights. Showing previous version.
+                    <button
+                      onClick={() => cache.refresh()}
+                      disabled={cache.loading}
+                      className="ml-1 underline hover:no-underline font-medium"
+                    >
+                      Try again
+                    </button>
+                  </>
+              }
             </p>
           </div>
         )}
@@ -252,10 +266,17 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
 
               const isStale = cache.stale && (cache.dataChanged || cache.staleReason);
 
+              const prompt = insight.continuationPrompt || `Tell me more about: ${insight.title}`;
+              const handleClick = () => router.push(`/ai?prompt=${encodeURIComponent(prompt)}`);
+
               return (
                 <div
                   key={`${insight.type}-${i}`}
-                  className={`rounded-xl border ${isStale ? "border-warning-500/30" : style.border} ${isStale ? "bg-warning-50/20" : style.bg} p-3.5 transition-all`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleClick}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleClick(); } }}
+                  className={`rounded-xl border ${isStale ? "border-warning-500/30" : style.border} ${isStale ? "bg-warning-50/20" : style.bg} p-3.5 transition-all cursor-pointer hover:shadow-sm hover:brightness-[0.98]`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
@@ -282,6 +303,13 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
                 </div>
               );
             })}
+
+            {/* Chat input — dashboard only */}
+            {showChatInput && (
+              <div className="pt-2">
+                <ChatInputInline />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -311,6 +339,41 @@ function InsightsSkeleton() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Inline chat input (navigates to AI chat page) ──────────────────────────
+
+function ChatInputInline() {
+  const [query, setQuery] = useState("");
+  const router = useRouter();
+
+  const handleSubmit = () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    router.push(`/ai?send=${encodeURIComponent(trimmed)}`);
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-surface-200 bg-surface-50/80 px-3 py-2.5 transition-all focus-within:border-brand-500/40 focus-within:ring-2 focus-within:ring-brand-500/10">
+      <Sparkles className="h-3.5 w-3.5 text-surface-400 shrink-0" />
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSubmit(); } }}
+        placeholder="Ask anything about your financials..."
+        className="flex-1 bg-transparent text-sm text-surface-900 placeholder:text-surface-400 outline-none"
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={!query.trim()}
+        className="shrink-0 rounded-lg bg-brand-600 p-1.5 text-white hover:bg-brand-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        aria-label="Ask"
+      >
+        <ArrowUp className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SYSTEM_PROMPT, buildSystemMessage } from "../prompts";
+import { SYSTEM_PROMPT, buildSystemPrompt, buildSystemMessage } from "../prompts";
 
 describe("SYSTEM_PROMPT", () => {
   it("identifies as Burnless AI", () => {
@@ -31,7 +31,7 @@ describe("SYSTEM_PROMPT", () => {
 describe("buildSystemMessage", () => {
   it("prepends system prompt to financial context", () => {
     const result = buildSystemMessage("MRR: $10,000");
-    expect(result).toContain(SYSTEM_PROMPT);
+    expect(result).toContain(buildSystemPrompt());
     expect(result).toContain("MRR: $10,000");
   });
 
@@ -42,7 +42,7 @@ describe("buildSystemMessage", () => {
 
   it("handles empty context", () => {
     const result = buildSystemMessage("");
-    expect(result).toContain(SYSTEM_PROMPT);
+    expect(result).toContain(buildSystemPrompt());
     expect(result).toContain("Current Financial Data");
   });
 });

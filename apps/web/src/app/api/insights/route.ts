@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { db, scenarios as scenariosTable, aiInsightCache } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { generateInsights, generatePageInsights, type InsightPage } from "@burnless/ai";
+import { generatePageInsights, type InsightPage } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getAiFlags, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
@@ -134,7 +134,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   // Check grace period — unless user explicitly forced a refresh
-  if (!forceRefresh && page !== "dashboard") {
+  if (!forceRefresh) {
     const cacheType = page === "expenses" ? "expense" as const : page === "scenarios" ? "scenario" as const : page;
     const cached = await db
       .select()
@@ -199,29 +199,24 @@ export const POST = withErrorHandler(async (request: Request) => {
   let insights: unknown[];
   let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "funding" | "team" | "reports" | "general";
 
-  if (page === "dashboard") {
-    insights = generateInsights(snapshot);
-    cacheType = "dashboard";
-  } else {
-    // LLM-powered page insights — wrapped in try/catch so failures return empty insights
-    const pageKey = page as InsightPage;
-    try {
-      const companyProviderConfig = await getCompanyProviderConfig(ctx.companyId);
-      insights = await generatePageInsights({
-        page: pageKey,
-        snapshot,
-        pageData,
-        providerConfig: companyProviderConfig,
-      });
-    } catch (err) {
-      logger("insights").warn(
-        `generatePageInsights failed for page="${page}":`,
-        err instanceof Error ? err.message : err
-      );
-      insights = [];
-    }
-    cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
+  // LLM-powered page insights — wrapped in try/catch so failures return empty insights
+  const pageKey = page as InsightPage;
+  try {
+    const companyProviderConfig = await getCompanyProviderConfig(ctx.companyId);
+    insights = await generatePageInsights({
+      page: pageKey,
+      snapshot,
+      pageData,
+      providerConfig: companyProviderConfig,
+    });
+  } catch (err) {
+    logger("insights").warn(
+      `generatePageInsights failed for page="${page}":`,
+      err instanceof Error ? err.message : err
+    );
+    insights = [];
   }
+  cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
 
   // Cache the generated insights — skip caching empty results so they retry next time
   const cacheKey = `scenario:${scenario.id}`;

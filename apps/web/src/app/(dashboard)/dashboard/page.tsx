@@ -1,12 +1,10 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { Suspense } from "react";
 import {
   getCompany,
   getActiveScenario,
   getScenarios,
-  getAccounts,
   getRevenueStreams,
   getFundingRounds,
   getDashboardPreferences,
@@ -27,8 +25,7 @@ import {
   chartColors,
   formatCompactCurrency,
 } from "./dashboard-charts";
-import { AiCommandCenter } from "./ai-command-center";
-import { QuickActions } from "./quick-actions";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
 import { PinnedInsights } from "./pinned-insights";
@@ -58,11 +55,10 @@ export default async function DashboardPage({
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
-  const [data, allScenarios, accounts, revenueStreams, fundingRounds, dashPrefs] =
+  const [data, allScenarios, revenueStreams, fundingRounds, dashPrefs] =
     await Promise.all([
       computeDashboardData(company.id, scenario.id),
       getScenarios(company.id),
-      getAccounts(company.id),
       getRevenueStreams(scenario.id),
       getFundingRounds(company.id),
       getDashboardPreferences().catch(() => null),
@@ -219,30 +215,12 @@ export default async function DashboardPage({
               /* ── Pinned Insights ─────────────────────────────────────── */
               "pinned-insights": <PinnedInsights />,
 
-              /* ── AI Command Center ─────────────────────────────────── */
-              "ai-command-center": (
-                <Suspense fallback={<div className="h-full rounded-2xl bg-surface-50 animate-pulse" />}>
-                  <AiCommandCenter
-                    runway={currentRunway}
-                    burnRate={currentBurn}
-                    mrr={currentMrr}
-                    mrrGrowth={mrrGrowthPct}
-                    cash={currentCash}
-                  />
-                </Suspense>
-              ),
-
-              /* ── Quick Actions ──────────────────────────────────────── */
-              "quick-actions": (
-                <QuickActions
-                  scenarioId={scenario.id}
-                  accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
-                  context={{
-                    hasRevenue,
-                    hasMultipleScenarios: allScenarios.length > 1,
-                    burnRate: currentBurn,
-                    runway: currentRunway,
-                  }}
+              /* ── AI Insights ────────────────────────────────────────── */
+              "ai-insights": (
+                <AiPageInsights
+                  page="dashboard"
+                  widgetId="ai-insights"
+                  showChatInput
                 />
               ),
 

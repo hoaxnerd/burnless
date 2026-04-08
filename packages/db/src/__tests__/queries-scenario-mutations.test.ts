@@ -105,7 +105,7 @@ describe("scenarioUpdate", () => {
     );
 
     expect(updated).toBeDefined();
-    expect(updated.name).toBe("Updated Name");
+    expect(updated!.name).toBe("Updated Name");
   });
 
   it("active scenario, first override creates override with action=modify and captures original", async () => {
@@ -123,7 +123,7 @@ describe("scenarioUpdate", () => {
       ctx.scenario.id,
     );
 
-    expect(result.name).toBe("Modified Stream");
+    expect(result!.name).toBe("Modified Stream");
 
     const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
     expect(overrides).toHaveLength(1);
@@ -160,7 +160,7 @@ describe("scenarioUpdate", () => {
       ctx.scenario.id,
     );
 
-    expect(result.name).toBe("Second Edit");
+    expect(result!.name).toBe("Second Edit");
 
     // Should still be only one override
     const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
