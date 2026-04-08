@@ -4,7 +4,7 @@
  *
  * Supports page-specific insights via the `page` body parameter:
  *   - "dashboard" (default) — deterministic rule-based insights
- *   - "expenses" / "revenue" / "scenarios" — LLM-generated page insights (fast tier)
+ *   - "expenses" / "revenue" / "scenarios" / "funding" / "team" / "reports" — LLM-generated page insights (fast tier)
  *
  * POST caches results for later retrieval via GET.
  */
@@ -20,9 +20,10 @@ import { resolveFeatureStatus } from "@burnless/ai";
 import { getDefaultScenario } from "@/lib/data";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { logger } from "@/lib/logger";
+import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { checkInsightFreshness, MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
 
-const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios"] as const;
+const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios", "funding", "team", "reports"] as const;
 type PageType = (typeof VALID_PAGES)[number];
 
 // ── GET: serve cached insights ─────────────────────────────────────────────
@@ -56,7 +57,7 @@ export const GET = withErrorHandler(async (request: Request) => {
     .limit(1);
 
   if (!cached[0]) {
-    return NextResponse.json({ insights: [], cached: true });
+    return NextResponse.json({ insights: [], cached: false });
   }
 
   const cachedAt = cached[0].updatedAt;
@@ -98,6 +99,8 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+
+  setTrackingCompanyId(ctx.companyId);
 
   // Check AI feature flags — insights need LLM access
   const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "insights");
@@ -194,7 +197,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Route to appropriate insight generator
   let insights: unknown[];
-  let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "general";
+  let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "funding" | "team" | "reports" | "general";
 
   if (page === "dashboard") {
     insights = generateInsights(snapshot);
@@ -220,26 +223,28 @@ export const POST = withErrorHandler(async (request: Request) => {
     cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
   }
 
-  // Cache the generated insights
+  // Cache the generated insights — skip caching empty results so they retry next time
   const cacheKey = `scenario:${scenario.id}`;
-  await db
-    .insert(aiInsightCache)
-    .values({
-      companyId: ctx.companyId,
-      type: cacheType,
-      key: cacheKey,
-      content: insights,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
-    })
-    .onConflictDoUpdate({
-      target: [aiInsightCache.companyId, aiInsightCache.type, aiInsightCache.key],
-      set: {
+  if (insights.length > 0) {
+    await db
+      .insert(aiInsightCache)
+      .values({
+        companyId: ctx.companyId,
+        type: cacheType,
+        key: cacheKey,
         content: insights,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        staleAt: null,
-        staleReason: null,
-      },
-    });
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+      })
+      .onConflictDoUpdate({
+        target: [aiInsightCache.companyId, aiInsightCache.type, aiInsightCache.key],
+        set: {
+          content: insights,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          staleAt: null,
+          staleReason: null,
+        },
+      });
+  }
 
   return NextResponse.json({
     insights,

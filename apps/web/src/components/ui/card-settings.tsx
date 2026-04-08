@@ -6,7 +6,7 @@
  * Opens a modal with mode selector and optional inline metric catalog.
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   Settings,
   Brain,
@@ -276,6 +276,38 @@ function ModeSelector({
   aiEnabled: boolean;
   variant: "detailed";
 }) {
+  // Track whether mode was auto-downgraded from intelligence → dynamic
+  // so we can auto-restore when AI comes back (unless user manually changed it)
+  const autoDowngradedRef = useRef(false);
+  const userManuallyChangedRef = useRef(false);
+
+  // When AI goes off while intelligence is selected, mark as auto-downgraded
+  useEffect(() => {
+    if (!aiEnabled && currentMode === "intelligence") {
+      autoDowngradedRef.current = true;
+      userManuallyChangedRef.current = false;
+    }
+  }, [aiEnabled, currentMode]);
+
+  // When AI comes back and mode was auto-downgraded (user didn't manually change), restore
+  useEffect(() => {
+    if (aiEnabled && autoDowngradedRef.current && !userManuallyChangedRef.current) {
+      autoDowngradedRef.current = false;
+      // currentMode is still "intelligence" in storage — just re-select to trigger any UI refresh
+      onSelect("intelligence");
+    }
+  }, [aiEnabled, onSelect]);
+
+  // Effective mode for display: if AI is off and stored mode is intelligence, show dynamic
+  const effectiveMode = !aiEnabled && currentMode === "intelligence" ? "dynamic" : currentMode;
+
+  const handleSelect = useCallback((mode: CardMode) => {
+    // User is manually choosing — clear auto-downgrade tracking
+    userManuallyChangedRef.current = true;
+    autoDowngradedRef.current = false;
+    onSelect(mode);
+  }, [onSelect]);
+
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-surface-500 uppercase tracking-wider">
@@ -284,7 +316,7 @@ function ModeSelector({
       <div className="grid gap-2">
         {MODES.map((m) => {
           const Icon = m.icon;
-          const isActive = currentMode === m.value;
+          const isActive = effectiveMode === m.value;
           const isDisabled = m.value === "intelligence" && !aiEnabled;
 
           return (
@@ -292,7 +324,7 @@ function ModeSelector({
               key={m.value}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isDisabled) onSelect(m.value);
+                if (!isDisabled) handleSelect(m.value);
               }}
               disabled={isDisabled}
               className={`

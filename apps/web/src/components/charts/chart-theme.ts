@@ -13,11 +13,11 @@ import {
 } from "@burnless/types";
 
 export const chartColors = {
-  brand: "#2563eb", // brand-600
+  brand: "#2563eb", // --color-brand-600
   brandLight: "#93bbfd",
-  success: "#16a34a",
-  danger: "#dc2626",
-  warning: "#f59e0b",
+  success: "#10b981", // --color-success-500
+  danger: "#ef4444", // --color-danger-500
+  warning: "#f59e0b", // --color-warning-500
   info: "#0ea5e9",
   gray: "#94a3b8",
   grayLight: "#e2e8f0",

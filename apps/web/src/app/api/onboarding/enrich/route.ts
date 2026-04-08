@@ -15,6 +15,7 @@ import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers"
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
+import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 
 const enrichSchema = z.object({
   websiteUrl: z
@@ -57,6 +58,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   // Check if user already has a company (to decide if we need to check AI flags)
   const membership = await getUserCompany(user.id);
   if (membership) {
+    setTrackingCompanyId(membership.companyId);
     const aiCheck = await checkAiFeatureAllowed(membership.companyId, "onboarding");
     if (!aiCheck.allowed) {
       return errorResponse(aiCheck.reason ?? "AI onboarding is disabled", 403);

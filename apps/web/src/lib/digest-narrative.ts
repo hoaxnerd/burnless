@@ -8,6 +8,7 @@ import { chat } from "@burnless/ai";
 import type { DigestMetrics } from "./compute-digest";
 import { buildDeterministicSummary } from "./compute-digest";
 import { checkAiFeatureAllowed } from "./ai-feature-flags";
+import { setTrackingCompanyId } from "./ai-usage-tracker";
 
 const _DIGEST_SYSTEM_PROMPT = `You are the CFO of a startup. Write a concise weekly financial briefing for the founder.
 
@@ -26,6 +27,8 @@ export async function generateDigestNarrative(
   companyId: string,
   metrics: DigestMetrics
 ): Promise<string | null> {
+  setTrackingCompanyId(companyId);
+
   const { allowed } = await checkAiFeatureAllowed(companyId, "weeklyDigest");
   if (!allowed) return null;
 

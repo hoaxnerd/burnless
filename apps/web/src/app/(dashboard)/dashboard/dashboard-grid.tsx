@@ -27,6 +27,7 @@ export type WidgetId =
   | `hero-${number}`
   | "ai-command-center"
   | "weekly-digest"
+  | "pinned-insights"
   | "quick-actions"
   | "chart-cash"
   | "chart-rev-exp"

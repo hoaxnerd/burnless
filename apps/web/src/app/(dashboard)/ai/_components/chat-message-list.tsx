@@ -57,6 +57,7 @@ interface ChatMessageListProps {
   onCopy: (content: string, index: number) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   isLoading?: boolean;
+  companionName?: string;
 }
 
 export function ChatMessageList({
@@ -65,6 +66,7 @@ export function ChatMessageList({
   onCopy,
   messagesEndRef,
   isLoading,
+  companionName = "Financial Companion",
 }: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
@@ -94,7 +96,7 @@ export function ChatMessageList({
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-100 px-2 py-0.5 text-[10px] font-medium text-accent-600">
                       <Sparkles className="h-2.5 w-2.5" />
-                      Financial Companion
+                      {companionName}
                     </span>
                   </div>
                 )}

@@ -61,7 +61,7 @@ export function PageEmptyState({
 
 /* ── Setup / Scenario prompts (reusable) ───────────────────────────────────── */
 
-export function SetupPrompt({ context }: { context?: string }) {
+export function SetupPrompt({ context, companionName = "Companion" }: { context?: string; companionName?: string }) {
   return (
     <PageEmptyState
       icon={Sparkles}
@@ -69,12 +69,12 @@ export function SetupPrompt({ context }: { context?: string }) {
       description={`Complete onboarding to set up your company${context ? ` and start ${context}` : ""}.`}
       ctaLabel="Get started"
       ctaHref="/onboarding"
-      aiHint="Companion will guide you through setup in under 2 minutes"
+      aiHint={`${companionName} will guide you through setup in under 2 minutes`}
     />
   );
 }
 
-export function ScenarioPrompt({ context }: { context?: string }) {
+export function ScenarioPrompt({ context, companionName = "Companion" }: { context?: string; companionName?: string }) {
   return (
     <PageEmptyState
       icon={GitBranch}
@@ -82,14 +82,14 @@ export function ScenarioPrompt({ context }: { context?: string }) {
       description={`A scenario is your financial model.${context ? ` You need one to ${context}.` : " Start with a base case and explore alternatives."}`}
       ctaLabel="Create scenario"
       ctaHref="/scenarios/new"
-      aiHint="Try asking Companion: &ldquo;Create a base scenario for my startup&rdquo;"
+      aiHint={`Try asking ${companionName}: \u201CCreate a base scenario for my startup\u201D`}
     />
   );
 }
 
 /* ── Page-specific empty states ────────────────────────────────────────────── */
 
-export function ExpensesEmptyState() {
+export function ExpensesEmptyState({ companionName = "Companion" }: { companionName?: string } = {}) {
   return (
     <PageEmptyState
       icon={Receipt}
@@ -97,12 +97,12 @@ export function ExpensesEmptyState() {
       description="Add your first expense or import from a CSV. AI will auto-categorize everything and flag anomalies."
       ctaLabel="Add expenses"
       ctaHref="/import"
-      aiHint="Drag &amp; drop a CSV and Companion handles the rest"
+      aiHint={`Drag & drop a CSV and ${companionName} handles the rest`}
     />
   );
 }
 
-export function RevenueEmptyState() {
+export function RevenueEmptyState({ companionName = "Companion" }: { companionName?: string } = {}) {
   return (
     <PageEmptyState
       icon={TrendingUp}
@@ -110,12 +110,12 @@ export function RevenueEmptyState() {
       description="Add revenue streams — subscriptions, one-time sales, or usage-based pricing. See MRR, ARR, and growth projections instantly."
       ctaLabel="Add revenue stream"
       ctaHref="/revenue"
-      aiHint="Ask Companion: &ldquo;Help me model my SaaS revenue&rdquo;"
+      aiHint={`Ask ${companionName}: \u201CHelp me model my SaaS revenue\u201D`}
     />
   );
 }
 
-export function FundingEmptyState() {
+export function FundingEmptyState({ companionName = "Companion" }: { companionName?: string } = {}) {
   return (
     <PageEmptyState
       icon={Landmark}
@@ -123,12 +123,12 @@ export function FundingEmptyState() {
       description="Record funding rounds to calculate runway, cash position, and ownership dilution. Plan your next raise with confidence."
       ctaLabel="Add funding round"
       ctaHref="/funding"
-      aiHint="Companion can suggest optimal raise timing based on your burn rate"
+      aiHint={`${companionName} can suggest optimal raise timing based on your burn rate`}
     />
   );
 }
 
-export function TeamEmptyState() {
+export function TeamEmptyState({ companionName = "Companion" }: { companionName?: string } = {}) {
   return (
     <PageEmptyState
       icon={Users}
@@ -136,7 +136,7 @@ export function TeamEmptyState() {
       description="Map your org structure and model hiring plans. See how each hire impacts runway and per-employee efficiency."
       ctaLabel="Add team member"
       ctaHref="/team"
-      aiHint="Ask Companion: &ldquo;What&rsquo;s the runway impact of hiring 3 engineers?&rdquo;"
+      aiHint={`Ask ${companionName}: \u201CWhat\u2019s the runway impact of hiring 3 engineers?\u201D`}
     />
   );
 }

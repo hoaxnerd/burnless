@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { apiFetch } from "@/lib/api-fetch";
-import { captureException } from "@/lib/error-reporting";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   TrendingUp,
-  AlertTriangle,
   ShieldAlert,
   BarChart3,
   GraduationCap,
@@ -19,8 +16,10 @@ import {
 import { AiGate } from "./ai-gate";
 import { useAiFeature } from "./ai-feature-context";
 import { useOptionalPageLayout } from "@/components/providers/page-layout-context";
-import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
+import { DataLoadError } from "@/components/ui/data-load-error";
 import { MarkdownRenderer } from "./markdown-renderer";
+import { useInsightCache } from "./use-insight-cache";
+import { StaleInsightBanner } from "./stale-insight-banner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,9 +39,9 @@ interface PageInsight {
 
 interface AiPageInsightsProps {
   /** Which page these insights are for */
-  page: "expenses" | "revenue" | "scenarios";
-  /** Scenario ID for context */
-  scenarioId: string;
+  page: "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
+  /** Scenario ID for context (optional for non-scenario pages like funding, team, reports) */
+  scenarioId?: string;
   /** Additional page-specific data to send to the API */
   pageData?: Record<string, unknown>;
   /** Widget ID for grid readiness reporting (default: "ai-insights") */
@@ -106,128 +105,36 @@ function formatAge(dateStr: string): string {
   return `${days}d ago`;
 }
 
-/** Format remaining grace period as human-readable. */
-function formatGraceRemaining(ms: number): string {
-  const mins = Math.ceil(ms / 60_000);
-  if (mins <= 1) return "less than a minute";
-  return `~${mins} minutes`;
-}
-
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insights" }: AiPageInsightsProps) {
-  const [insights, setInsights] = useState<PageInsight[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [errorVariant, setErrorVariant] = useState<ReturnType<typeof classifyError>>("generic");
-  const [cached, setCached] = useState(false);
-  const [cachedAt, setCachedAt] = useState<string | null>(null);
-  const [stale, setStale] = useState(false);
-  const [dataChanged, setDataChanged] = useState(false);
-  const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
-  const [canRefresh, setCanRefresh] = useState(true);
-  const [staleReason, setStaleReason] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(true);
-  const [slow, setSlow] = useState(false);
   const { enabled, loaded } = useAiFeature("insights");
+  const cache = useInsightCache<PageInsight>({ page, scenarioId, pageData, aiEnabled: loaded && enabled });
+  const [expanded, setExpanded] = useState(true);
   const pageLayout = useOptionalPageLayout();
 
-  /** Fetch cached insights only — never auto-triggers LLM generation. */
-  const fetchCached = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-
-    try {
-      const res = await apiFetch(`/api/insights?page=${page}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.insights?.length > 0) {
-          setInsights(data.insights);
-          setCached(true);
-          setCachedAt(data.cachedAt ?? null);
-          setStale(data.stale ?? false);
-          setDataChanged(data.dataChanged ?? false);
-          setGraceRemaining(data.graceRemaining ?? null);
-          setCanRefresh(data.canRefresh ?? true);
-          setStaleReason(data.staleReason ?? null);
-        }
-      }
-    } catch (err) {
-      setError(true);
-      setErrorVariant(classifyError(err));
-      if (!(err instanceof DOMException && err.name === "AbortError")) {
-        captureException(err);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
-
-  /** User-triggered refresh — sends forceRefresh to bypass grace period. */
-  const refreshInsights = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    setSlow(false);
-
-    const controller = new AbortController();
-    const slowTimer = setTimeout(() => setSlow(true), 5000);
-    const abortTimer = setTimeout(() => controller.abort(), 15000);
-
-    try {
-      const res = await apiFetch("/api/insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, scenarioId, pageData, forceRefresh: true }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) throw new Error("Failed to generate insights");
-
-      const data = await res.json();
-      setInsights(data.insights ?? []);
-      setCached(false);
-      setCachedAt(null);
-      setStale(false);
-      setDataChanged(false);
-      setGraceRemaining(null);
-      setCanRefresh(true);
-      setStaleReason(null);
-    } catch (err) {
-      setError(true);
-      setErrorVariant(classifyError(err));
-      if (!(err instanceof DOMException && err.name === "AbortError")) {
-        captureException(err);
-      }
-    } finally {
-      setLoading(false);
-      setSlow(false);
-      clearTimeout(slowTimer);
-      clearTimeout(abortTimer);
-    }
-  }, [page, scenarioId, pageData]);
-
-  // On mount: only fetch cached insights — never auto-generate
+  // Report readiness to the grid: ready when AI is enabled AND we have data to show.
+  // Stay ready during refresh if we have stale data (stale-while-revalidate).
+  // Don't report not-ready while still settling (initial fetch + auto-generate).
+  const hasData = cache.displayData.length > 0;
+  const isReady = loaded && enabled && hasData;
   useEffect(() => {
-    fetchCached();
-  }, [fetchCached]);
-
-  // Report readiness to the grid: ready when AI is enabled AND we have insights to show
-  const isReady = loaded && enabled && !loading && insights.length > 0;
-  useEffect(() => {
-    if (!loaded || loading) return; // Don't report until we know the state
+    if (!loaded) return;
     if (pageLayout) {
       if (isReady) {
         pageLayout.reportWidgetReady(widgetId);
-      } else {
+      } else if (!cache.settling) {
+        // Only report not-ready after all initial loading is complete
         pageLayout.reportWidgetNotReady(widgetId);
       }
     }
-  }, [isReady, loaded, loading, widgetId, pageLayout]);
+  }, [isReady, loaded, cache.settling, widgetId, pageLayout]);
 
-  if (loading && insights.length === 0) {
+  // Pure loading with no previous data — show skeleton
+  if (cache.settling && cache.displayData.length === 0) {
     return (
       <AiGate feature="insights" hideWhenOff>
-        {slow ? (
+        {cache.slow ? (
           <div className="rounded-2xl border border-surface-200 bg-surface-0 p-4 mb-6 animate-slide-up">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-4 w-4 text-brand-400 animate-spin flex-shrink-0" />
@@ -241,15 +148,15 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
     );
   }
 
-  if (error && insights.length === 0) {
+  if (cache.error && cache.displayData.length === 0) {
     return (
       <AiGate feature="insights" hideWhenOff>
         <div className="mb-6">
           <DataLoadError
             title="Couldn't load insights"
-            variant={errorVariant}
-            onRetry={() => fetchCached()}
-            retrying={loading}
+            variant={cache.errorVariant}
+            onRetry={() => cache.fetchCached()}
+            retrying={cache.loading}
             compact
           />
         </div>
@@ -257,7 +164,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
     );
   }
 
-  if (insights.length === 0) return null;
+  if (cache.displayData.length === 0) return null;
 
   return (
     <AiGate feature="insights" hideWhenOff>
@@ -275,25 +182,25 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
             <span className="text-xs font-semibold uppercase tracking-widest text-surface-400">
               AI Insights
             </span>
-            {cached && cachedAt && (
-              <span className={`text-[10px] flex items-center gap-1 ${stale ? "text-warning-500" : "text-surface-300"}`}>
-                {stale && <Clock className="h-2.5 w-2.5" />}
-                {formatAge(cachedAt)}
+            {cache.cached && cache.cachedAt && (
+              <span className={`text-[10px] flex items-center gap-1 ${cache.stale ? "text-warning-500" : "text-surface-300"}`}>
+                {cache.stale && <Clock className="h-2.5 w-2.5" />}
+                {formatAge(cache.cachedAt)}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            {canRefresh && (
+            {cache.canRefresh && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  refreshInsights();
+                  cache.refresh();
                 }}
-                disabled={loading}
+                disabled={cache.loading}
                 className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-all disabled:opacity-50"
                 title="Refresh insights"
               >
-                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3 w-3 ${cache.loading ? "animate-spin" : ""}`} />
               </button>
             )}
             {expanded ? (
@@ -304,71 +211,46 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
           </div>
         </div>
 
-        {/* Data changed + grace period banner */}
-        {dataChanged && graceRemaining !== null && graceRemaining > 0 && expanded && (
-          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-brand-500/15 bg-brand-50/30 px-3 py-2">
-            <Info className="h-3.5 w-3.5 text-brand-500 flex-shrink-0" />
-            <p className="text-xs text-brand-700">
-              Your data has changed. New insights will be available in {formatGraceRemaining(graceRemaining)}.
+        {/* Refresh error banner — shown when refresh failed but stale data is visible */}
+        {expanded && cache.refreshError && (
+          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-danger-500/20 bg-danger-50/50 px-3 py-2">
+            <Info className="h-3.5 w-3.5 text-danger-500 flex-shrink-0" />
+            <p className="text-xs text-danger-700">
+              Failed to refresh insights. Showing previous version.
               <button
-                onClick={() => refreshInsights()}
-                disabled={loading}
+                onClick={() => cache.refresh()}
+                disabled={cache.loading}
                 className="ml-1 underline hover:no-underline font-medium"
               >
-                Refresh now
+                Try again
               </button>
             </p>
           </div>
         )}
 
-        {/* Data changed + grace elapsed banner */}
-        {dataChanged && (graceRemaining === null || graceRemaining <= 0) && expanded && (
-          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
-            <p className="text-xs text-warning-700">
-              {staleReason && STALE_REASON_LABELS[staleReason]
-                ? `These insights were generated before your recent changes to ${STALE_REASON_LABELS[staleReason]}. They may no longer be accurate.`
-                : "These insights may not reflect your recent data changes."}
-              {canRefresh && (
-                <button
-                  onClick={() => refreshInsights()}
-                  disabled={loading}
-                  className="ml-1 underline hover:no-underline font-medium"
-                >
-                  Refresh now
-                </button>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* Time-based staleness banner (>24h, no data change) */}
-        {stale && !dataChanged && expanded && (
-          <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-warning-500/20 bg-warning-50/50 px-3 py-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-warning-500 flex-shrink-0" />
-            <p className="text-xs text-warning-700">
-              These insights are over 24 hours old and may not reflect recent changes.
-              {canRefresh && (
-                <button
-                  onClick={() => refreshInsights()}
-                  disabled={loading}
-                  className="ml-1 underline hover:no-underline font-medium"
-                >
-                  Refresh now
-                </button>
-              )}
-            </p>
+        {/* Staleness banners */}
+        {expanded && !cache.refreshError && (
+          <div className="mx-4 mb-2">
+            <StaleInsightBanner
+              stale={cache.stale}
+              dataChanged={cache.dataChanged}
+              graceRemaining={cache.graceRemaining}
+              staleReason={cache.staleReason}
+              canRefresh={cache.canRefresh}
+              loading={cache.loading}
+              onRefresh={cache.refresh}
+            />
           </div>
         )}
 
         {/* Insights list */}
         {expanded && (
-          <div className="px-4 pb-4 space-y-2">
-            {insights.map((insight, i) => {
+          <div className={`px-4 pb-4 space-y-2 transition-opacity ${cache.loading ? "opacity-60" : ""}`}>
+            {cache.displayData.map((insight, i) => {
               const style = severityConfig[insight.severity];
               const Icon = typeIcons[insight.type] ?? TrendingUp;
 
-              const isStale = stale && (dataChanged || staleReason);
+              const isStale = cache.stale && (cache.dataChanged || cache.staleReason);
 
               return (
                 <div
@@ -390,7 +272,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
                       />
                     </div>
                     {isStale ? (
-                      <div className="flex-shrink-0 mt-0.5" title={staleReason && STALE_REASON_LABELS[staleReason] ? `Data changed: ${STALE_REASON_LABELS[staleReason]}` : "Data may have changed since this insight was generated"}>
+                      <div className="flex-shrink-0 mt-0.5" title={cache.staleReason && STALE_REASON_LABELS[cache.staleReason] ? `Data changed: ${STALE_REASON_LABELS[cache.staleReason]}` : "Data may have changed since this insight was generated"}>
                         <Info className="h-3.5 w-3.5 text-warning-400" />
                       </div>
                     ) : (

@@ -31,6 +31,7 @@ import { AiCommandCenter } from "./ai-command-center";
 import { QuickActions } from "./quick-actions";
 import { DashboardEmptyState } from "./empty-state";
 import { WeeklyDigestBanner } from "./weekly-digest-banner";
+import { PinnedInsights } from "./pinned-insights";
 import { DashboardLayoutProvider } from "./dashboard-layout-context";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { DashboardHeader } from "./dashboard-header";
@@ -214,6 +215,9 @@ export default async function DashboardPage({
 
               /* ── Weekly Digest ─────────────────────────────────────── */
               "weekly-digest": <WeeklyDigestBanner />,
+
+              /* ── Pinned Insights ─────────────────────────────────────── */
+              "pinned-insights": <PinnedInsights />,
 
               /* ── AI Command Center ─────────────────────────────────── */
               "ai-command-center": (

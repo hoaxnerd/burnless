@@ -12,7 +12,7 @@ import { createProvider, type CreateProviderOptions } from "./providers";
 
 // ── Page types ──────────────────────────────────────────────────────────────
 
-export type InsightPage = "expenses" | "revenue" | "scenarios";
+export type InsightPage = "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
 
 export interface PageInsightContext {
   page: InsightPage;
@@ -182,6 +182,114 @@ Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an
 Return ONLY the JSON array, no markdown fences.`;
 }
 
+function buildFundingPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
+  const { keyMetrics, company } = snapshot;
+  const currency = company.currency;
+
+  const fundingRounds = pageData?.fundingRounds as Array<{
+    name: string;
+    type: string;
+    amount: number;
+    date: string;
+    isProjected: boolean;
+  }> | undefined;
+
+  const roundLines = fundingRounds
+    ?.map((r) => `  ${r.name} (${r.type}): ${currency} ${r.amount.toLocaleString()} — ${r.date}${r.isProjected ? " [projected]" : ""}`)
+    .join("\n") ?? "  No funding rounds recorded";
+
+  return `You are a senior financial advisor analyzing a startup's fundraising position. Be direct and data-driven.
+
+Company: ${company.name} (${company.stage}, ${company.businessModel})
+Currency: ${currency}
+Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
+Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
+MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
+Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
+
+Funding History:
+${roundLines}
+
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "financial_narrative", "benchmark"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+
+Focus on:
+1. Fundraising readiness — based on runway, growth rate, and stage, assess timing urgency
+2. Round sizing — given current burn and growth trajectory, suggest appropriate round size and expected valuation range
+3. Investor narrative — what metrics are strong vs weak for the next fundraise
+
+Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an insight, skip it.
+Return ONLY the JSON array, no markdown fences.`;
+}
+
+function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
+  const { keyMetrics, company } = snapshot;
+  const currency = company.currency;
+
+  const departments = pageData?.departments as Array<{
+    name: string;
+    headcount: number;
+    monthlyCost: number;
+  }> | undefined;
+
+  const deptLines = departments
+    ?.map((d) => `  ${d.name}: ${d.headcount} people, ${currency} ${d.monthlyCost.toLocaleString()}/mo`)
+    .join("\n") ?? "  No department data";
+
+  const plannedHires = pageData?.plannedHires as number | undefined;
+
+  return `You are a senior financial advisor analyzing a startup's team and headcount plan. Be direct and data-driven.
+
+Company: ${company.name} (${company.stage}, ${company.businessModel})
+Currency: ${currency}
+Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
+Headcount: ${keyMetrics.headcount ?? "N/A"}
+Revenue per Employee: ${keyMetrics.mrr && keyMetrics.headcount ? `${currency} ${Math.round(keyMetrics.mrr / keyMetrics.headcount).toLocaleString()}/mo` : "N/A"}
+Planned Hires: ${plannedHires ?? 0}
+
+Departments:
+${deptLines}
+
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "coaching", "benchmark", "financial_narrative"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+
+Focus on:
+1. Hiring impact — how planned hires affect runway and burn rate
+2. Team efficiency — revenue per employee vs stage benchmarks, department balance
+3. Timing recommendation — given runway and growth, optimal hiring pace
+
+Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an insight, skip it.
+Return ONLY the JSON array, no markdown fences.`;
+}
+
+function buildReportsPrompt(snapshot: FinancialSnapshot): string {
+  const { keyMetrics, company } = snapshot;
+  const currency = company.currency;
+
+  return `You are a senior financial advisor preparing executive-level insights for a board report. Be direct and data-driven.
+
+Company: ${company.name} (${company.stage}, ${company.businessModel})
+Currency: ${currency}
+MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
+ARR: ${currency} ${keyMetrics.arr?.toLocaleString() ?? "N/A"}
+Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
+Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
+Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
+Gross Margin: ${keyMetrics.grossMargin?.toFixed(1) ?? "N/A"}%
+Headcount: ${keyMetrics.headcount ?? "N/A"}
+
+Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical").
+
+Focus on:
+1. Overall health — one-sentence verdict on the company's financial trajectory
+2. Key risk — the single biggest financial risk right now (runway, churn, concentration, margin compression)
+3. Board-ready highlight — one metric or trend that tells the strongest story for investors
+
+Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an insight, skip it.
+Return ONLY the JSON array, no markdown fences.`;
+}
+
 // ── Main generation function ────────────────────────────────────────────────
 
 /**
@@ -210,6 +318,15 @@ export async function generatePageInsights(
       break;
     case "scenarios":
       prompt = buildScenariosPrompt(context.snapshot);
+      break;
+    case "funding":
+      prompt = buildFundingPrompt(context.snapshot, context.pageData);
+      break;
+    case "team":
+      prompt = buildTeamPrompt(context.snapshot, context.pageData);
+      break;
+    case "reports":
+      prompt = buildReportsPrompt(context.snapshot);
       break;
     default:
       return [];

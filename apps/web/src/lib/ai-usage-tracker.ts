@@ -2,7 +2,8 @@
  * AI usage persistence — wires the @burnless/ai usage event system
  * to the database for cost tracking and analytics.
  *
- * Called once at app startup (in instrumentation.ts or layout).
+ * Registers a global listener once. Each request sets the current
+ * company ID before making AI calls via `setTrackingCompanyId()`.
  */
 
 import { onUsage, type UsageRecord } from "@burnless/ai";
@@ -11,16 +12,28 @@ import { db, aiUsageLogs } from "@burnless/db";
 let initialized = false;
 
 /**
- * Initialize AI usage tracking. Safe to call multiple times — only registers once.
- *
- * Must be called with a companyId resolver since the AI layer doesn't know about companies.
+ * Per-request company ID for usage tracking.
+ * Set by API routes before making AI calls.
+ * Uses a simple mutable ref — safe because Next.js API routes
+ * are sequential within a single request/response cycle.
  */
-export function initAiUsageTracking(getCompanyId: () => string | null) {
+let _currentCompanyId: string | null = null;
+
+/** Set the company ID for the current AI operation. Call before any LLM call. */
+export function setTrackingCompanyId(companyId: string): void {
+  _currentCompanyId = companyId;
+}
+
+/**
+ * Initialize AI usage tracking. Safe to call multiple times — only registers once.
+ * Must be called at least once before any AI operation to ensure the listener exists.
+ */
+export function initAiUsageTracking() {
   if (initialized) return;
   initialized = true;
 
   onUsage((record: UsageRecord) => {
-    const companyId = getCompanyId();
+    const companyId = _currentCompanyId;
     if (!companyId) return;
 
     // Fire-and-forget — don't block AI responses for logging
@@ -41,3 +54,6 @@ export function initAiUsageTracking(getCompanyId: () => string | null) {
       });
   });
 }
+
+// Auto-initialize on import so all routes get tracking
+initAiUsageTracking();

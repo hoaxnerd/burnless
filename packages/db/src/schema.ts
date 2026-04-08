@@ -780,6 +780,9 @@ export const aiInsightCacheTypeEnum = pgEnum("ai_insight_cache_type", [
   "revenue",
   "expense",
   "scenario",
+  "funding",
+  "team",
+  "reports",
   "general",
 ]);
 

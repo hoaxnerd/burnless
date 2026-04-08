@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, TrendingUp, TrendingDown, AlertTriangle, ArrowRight, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
 import { AiGate } from "@/components/ai/ai-gate";
 import { formatCompactCurrency } from "@/components/charts";
@@ -170,11 +170,12 @@ function AiInsightsList({ growthMetrics, streams, hasSaaS }: RevenueInsightsProp
 
   return (
     <div className="space-y-3">
+      {/* Header — these are deterministic/data-driven insights, not LLM-generated */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-accent-500" />
+          <TrendingUp className="h-3.5 w-3.5 text-surface-400" />
           <span className="text-[10px] font-medium uppercase tracking-widest text-surface-400">
-            AI Revenue Intelligence
+            Revenue Insights
           </span>
         </div>
         <Link
@@ -195,10 +196,7 @@ export function RevenueInsights({ growthMetrics, streams, hasSaaS }: RevenueInsi
   if (streams.length === 0) return null;
 
   return (
-    <AiGate
-      feature="insights"
-      fallback={<InsightsList growthMetrics={growthMetrics} streams={streams} hasSaaS={hasSaaS} />}
-    >
+    <AiGate feature="insights" hideWhenOff>
       <AiInsightsList growthMetrics={growthMetrics} streams={streams} hasSaaS={hasSaaS} />
     </AiGate>
   );

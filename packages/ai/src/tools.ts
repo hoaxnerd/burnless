@@ -21,30 +21,21 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           type: "string",
           description: "Name for the scenario (e.g., 'Aggressive Growth', 'Conservative')",
         },
-        type: {
-          type: "string",
-          enum: ["base", "best", "worst", "custom"],
-          description: "Scenario type",
-        },
         description: {
           type: "string",
           description: "Description of the scenario assumptions",
         },
       },
-      required: ["name", "type"],
+      required: ["name"],
     },
   },
   {
     name: "create_forecast_line",
     description:
-      "Add a forecast line to a scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account).",
+      "Add a forecast line to the current scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account). Always operates on the active scenario from context.",
     inputSchema: {
       type: "object",
       properties: {
-        scenarioId: {
-          type: "string",
-          description: "The scenario to add the forecast to. Use the current scenario ID from context unless the user specifies otherwise.",
-        },
         accountId: {
           type: "string",
           description: "The account this forecast applies to (from Chart of Accounts in context)",
@@ -67,20 +58,16 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           description: "Optional end date in YYYY-MM-DD format. Omit for open-ended forecasts.",
         },
       },
-      required: ["scenarioId", "accountId", "method", "parameters", "startDate"],
+      required: ["accountId", "method", "parameters", "startDate"],
     },
   },
   {
     name: "add_headcount",
     description:
-      "Add a headcount plan entry — plan to hire a role with salary and start date. Automatically creates personnel cost forecasts.",
+      "Add a headcount plan entry to the current scenario — plan to hire a role with salary and start date. Automatically creates personnel cost forecasts.",
     inputSchema: {
       type: "object",
       properties: {
-        scenarioId: {
-          type: "string",
-          description: "Scenario to add headcount to",
-        },
         departmentId: {
           type: "string",
           description: "Department ID (from context)",
@@ -110,7 +97,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           description: "Benefits as a fraction of salary (e.g., 0.25 for 25%). Defaults to 0.2.",
         },
       },
-      required: ["scenarioId", "departmentId", "title", "count", "salary", "startDate"],
+      required: ["departmentId", "title", "count", "salary", "startDate"],
     },
   },
   {
@@ -208,14 +195,10 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "add_revenue_stream",
     description:
-      "Add a revenue stream to model income — supports subscription (SaaS MRR), one-time, usage-based, and services revenue.",
+      "Add a revenue stream to the current scenario — supports subscription (SaaS MRR), one-time, usage-based, and services revenue.",
     inputSchema: {
       type: "object",
       properties: {
-        scenarioId: {
-          type: "string",
-          description: "Scenario to add revenue to",
-        },
         name: {
           type: "string",
           description: "Name of the revenue stream (e.g., 'SaaS Subscriptions', 'Consulting')",
@@ -230,7 +213,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           description: "Type-specific parameters. For 'subscription': { startingCustomers, monthlyPrice, growthRate, churnRate }. For 'one_time': { amount, frequency }. For 'usage_based': { usersCount, usagePerUser, pricePerUnit }. For 'services': { monthlyRevenue, growthRate }.",
         },
       },
-      required: ["scenarioId", "name", "type", "parameters"],
+      required: ["name", "type", "parameters"],
     },
   },
   {
@@ -341,14 +324,10 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "compute_metrics",
     description:
-      "Compute all financial metrics for a scenario over a time period. Returns MRR, ARR, burn rate, runway, growth rates, SaaS metrics, etc.",
+      "Compute all financial metrics for the active scenario over a time period. Returns MRR, ARR, burn rate, runway, growth rates, SaaS metrics, etc.",
     inputSchema: {
       type: "object",
       properties: {
-        scenarioId: {
-          type: "string",
-          description: "Scenario to compute metrics for",
-        },
         startDate: {
           type: "string",
           description: "Start date (YYYY-MM)",
@@ -358,20 +337,16 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           description: "End date (YYYY-MM)",
         },
       },
-      required: ["scenarioId"],
+      required: [],
     },
   },
   {
     name: "generate_financial_statements",
     description:
-      "Generate P&L (Profit & Loss), Cash Flow Statement, and Balance Sheet for a scenario.",
+      "Generate P&L (Profit & Loss), Cash Flow Statement, and Balance Sheet for the active scenario.",
     inputSchema: {
       type: "object",
       properties: {
-        scenarioId: {
-          type: "string",
-          description: "Scenario to generate statements for",
-        },
         startDate: {
           type: "string",
           description: "Start date (YYYY-MM)",
@@ -381,7 +356,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           description: "End date (YYYY-MM)",
         },
       },
-      required: ["scenarioId"],
+      required: [],
     },
   },
   {
@@ -672,7 +647,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "suggest_cost_cuts",
     description:
-      "Analyze current expenses and identify optimization opportunities — areas where spend could be reduced, renegotiated, or eliminated to extend runway.",
+      "Analyze current expenses in the active scenario and identify optimization opportunities — areas where spend could be reduced, renegotiated, or eliminated to extend runway.",
     inputSchema: {
       type: "object",
       properties: {
@@ -684,10 +659,6 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           type: "array",
           items: { type: "string" },
           description: "Account categories to exclude from cost-cut suggestions (e.g., 'revenue', 'cogs')",
-        },
-        scenarioId: {
-          type: "string",
-          description: "Scenario to analyze. Uses current scenario if omitted.",
         },
       },
       required: [],
@@ -787,7 +758,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "forecast_revenue",
     description:
-      "Project future revenue based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",
+      "Project future revenue for the active scenario based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",
     inputSchema: {
       type: "object",
       properties: {
@@ -799,10 +770,6 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           type: "string",
           enum: ["linear", "exponential", "conservative", "auto"],
           description: "Forecasting method. 'auto' picks the best fit. Defaults to 'auto'.",
-        },
-        scenarioId: {
-          type: "string",
-          description: "Scenario to base forecast on. Uses current scenario if omitted.",
         },
         includeConfidenceIntervals: {
           type: "boolean",

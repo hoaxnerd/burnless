@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
 import { AiGate } from "@/components/ai/ai-gate";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
@@ -158,15 +159,8 @@ function ReportSection({
         <h2 className="text-lg font-semibold text-surface-900">{title}</h2>
       </div>
 
-      {/* AI Narrative */}
-      <AiGate
-        feature="insights"
-        fallback={
-          <div className="px-6 py-3 border-b border-surface-100 bg-surface-50/50">
-            <p className="text-xs text-surface-600 leading-relaxed">{narrative}</p>
-          </div>
-        }
-      >
+      {/* AI Narrative — hidden when AI is off, will be replaced by LLM-generated narrative */}
+      <AiGate feature="insights" hideWhenOff>
         <div className="px-6 py-3 border-b border-surface-100 bg-brand-50/30">
           <div className="flex items-start gap-2">
             <Sparkles className="h-3 w-3 text-brand-500 mt-0.5 flex-shrink-0" />
@@ -201,6 +195,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "ai-insights", x: 0, w: 12, h: 8, minH: 4 },
     { i: "revenue-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 12, h: 14, minH: 8 },
@@ -212,6 +207,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
+    { i: "ai-insights", x: 0, w: 6, h: 8, minH: 4 },
     { i: "revenue-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 6, h: 14, minH: 8 },
@@ -244,6 +240,9 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
           />,
         ];
       })
+    ),
+    "ai-insights": (
+      <AiPageInsights page="reports" />
     ),
     "revenue-section": (
       <ReportSection

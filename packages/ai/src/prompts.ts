@@ -2,7 +2,12 @@
  * System prompts for the Burnless Companion.
  */
 
-export const SYSTEM_PROMPT = `You are the Burnless Companion, an expert financial planning companion for startup founders and finance teams. You combine deep financial expertise with a friendly, approachable style.
+/** Build the system prompt with the configured companion name. */
+export function buildSystemPrompt(companionName = "Companion"): string {
+  return SYSTEM_PROMPT.replace("{{COMPANION_NAME}}", companionName);
+}
+
+export const SYSTEM_PROMPT = `You are {{COMPANION_NAME}}, an expert financial planning companion for startup founders and finance teams. You combine deep financial expertise with a friendly, approachable style.
 
 ## Your Capabilities
 
@@ -78,8 +83,8 @@ Structure every response with clear markdown:
 `;
 
 /** Build the full system message including financial context. */
-export function buildSystemMessage(financialContext: string): string {
-  return `${SYSTEM_PROMPT}
+export function buildSystemMessage(financialContext: string, companionName?: string): string {
+  return `${buildSystemPrompt(companionName)}
 
 ---
 

@@ -6,6 +6,7 @@ import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useAiFeature } from "@/components/ai/ai-feature-context";
 
 interface DigestData {
   id: string;
@@ -20,6 +21,7 @@ export function WeeklyDigestBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { enabled: aiEnabled, loaded: aiLoaded } = useAiFeature("weeklyDigest");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,11 +61,14 @@ export function WeeklyDigestBanner() {
     }
   }, [isReady, loading, reportWidgetReady, reportWidgetNotReady]);
 
-  // Nothing to show yet or dismissed
-  if (!digest || dismissed) return null;
+  // Nothing to show yet, dismissed, or flags still loading
+  if (!digest || dismissed || !aiLoaded) return null;
 
-  const content = digest.narrative || digest.deterministicSummary;
-  const isAI = !!digest.narrative;
+  // Only use AI narrative when AI is enabled; otherwise show deterministic summary
+  const content = aiEnabled && digest.narrative
+    ? digest.narrative
+    : digest.deterministicSummary;
+  const isAI = aiEnabled && !!digest.narrative;
   const weekDate = new Date(digest.weekStart).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { DollarSign, Calculator, TrendingUp, Clock, Pencil } from "lucide-react";
+import { AiGate } from "@/components/ai/ai-gate";
+import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { AddFundingForm, type EditRound } from "./add-funding-form";
 import { formatCurrency } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
@@ -487,7 +489,7 @@ export function DilutionCalculator({
   );
 }
 
-/** AI Fundraising Insight banner. Visibility is controlled externally via staticHiddenWidgets. */
+/** AI Fundraising Insight banner. Hidden when AI is off — will be replaced by AI-generated insights. */
 export function FundraisingReadinessTip({
   currentRunway,
   currentBurn,
@@ -495,7 +497,10 @@ export function FundraisingReadinessTip({
   currentRunway: number;
   currentBurn: number;
 }) {
+  const aiFlags = useOptionalAiFlags();
+  const name = aiFlags?.companionName ?? "companion";
   return (
+    <AiGate feature="insights" hideWhenOff>
     <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
@@ -511,10 +516,11 @@ export function FundraisingReadinessTip({
               : currentRunway <= 12
               ? " consider starting fundraising conversations in the next few months."
               : " you have time to focus on growth before your next raise."}
-            {" "}Ask the companion for a detailed fundraising readiness assessment.
+            {" "}Ask the {name} for a detailed fundraising readiness assessment.
           </p>
         </div>
       </div>
     </div>
+    </AiGate>
   );
 }

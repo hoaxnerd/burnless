@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { AiGate } from "@/components/ai/ai-gate";
+import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { formatCurrency } from "@burnless/types";
 import { AddHireForm, type EditHire } from "./add-hire-form";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
@@ -541,12 +543,15 @@ interface HiringInsightTipProps {
 }
 
 export function HiringInsightTip({ plannedHires }: HiringInsightTipProps) {
+  const aiFlags = useOptionalAiFlags();
+  const companionName = aiFlags?.companionName ?? "companion";
   const totalMonthlyImpact = plannedHires.reduce(
     (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
     0,
   );
 
   return (
+    <AiGate feature="insights" hideWhenOff>
     <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50/30 p-5">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5 h-8 w-8 rounded-lg bg-brand-100 flex items-center justify-center">
@@ -560,11 +565,12 @@ export function HiringInsightTip({ plannedHires }: HiringInsightTipProps) {
               {formatCurrency(totalMonthlyImpact, "USD", undefined, { compact: true })}
               /mo
             </span>{" "}
-            to your burn rate. Ask the companion to model the impact on runway
+            to your burn rate. Ask the {companionName} to model the impact on runway
             and suggest optimal hiring timing.
           </p>
         </div>
       </div>
     </div>
+    </AiGate>
   );
 }

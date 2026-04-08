@@ -7,12 +7,12 @@
  * after a grace period and regenerate affected insight types.
  *
  * Mutation source → affected insight types:
- *   expenses   → [expense, dashboard, scenario]
- *   revenue    → [revenue, dashboard, scenario]
- *   headcount  → [dashboard, scenario]
- *   funding    → [dashboard, scenario]
+ *   expenses   → [expense, dashboard, scenario, reports]
+ *   revenue    → [revenue, dashboard, scenario, reports]
+ *   headcount  → [dashboard, scenario, team, reports]
+ *   funding    → [dashboard, scenario, funding, reports]
  *   scenarios  → [scenario, dashboard]
- *   accounts   → [expense, revenue, dashboard]
+ *   accounts   → [expense, revenue, dashboard, reports]
  */
 
 import { db, insightInvalidations } from "@burnless/db";
@@ -23,14 +23,14 @@ const log = logger("insight-invalidation");
 
 /** Maps a data mutation source to the insight types it invalidates. */
 const INVALIDATION_MAP: Record<string, string[]> = {
-  expenses: ["expense", "dashboard", "scenario"],
-  revenue: ["revenue", "dashboard", "scenario"],
-  headcount: ["dashboard", "scenario"],
-  funding: ["dashboard", "scenario"],
+  expenses: ["expense", "dashboard", "scenario", "reports"],
+  revenue: ["revenue", "dashboard", "scenario", "reports"],
+  headcount: ["dashboard", "scenario", "team", "reports"],
+  funding: ["dashboard", "scenario", "funding", "reports"],
   scenarios: ["scenario", "dashboard"],
-  accounts: ["expense", "revenue", "dashboard"],
-  "forecast-lines": ["revenue", "dashboard", "scenario"],
-  departments: ["expense", "dashboard"],
+  accounts: ["expense", "revenue", "dashboard", "reports"],
+  "forecast-lines": ["revenue", "dashboard", "scenario", "reports"],
+  departments: ["expense", "dashboard", "team"],
 };
 
 export type MutationSource = keyof typeof INVALIDATION_MAP;

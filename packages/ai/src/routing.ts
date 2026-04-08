@@ -105,6 +105,12 @@ const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   // OpenAI (per 1M tokens, in microdollars)
   "gpt-4o-mini": { input: 150_000, output: 600_000 },
   "gpt-4o": { input: 2_500_000, output: 10_000_000 },
+  // Ollama / local models — estimated electricity + hardware amortization cost
+  // These are approximate; actual costs depend on hardware. Using ~$0.10/1M tokens as baseline.
+  "gemma4:26b": { input: 100_000, output: 100_000 },
+  "gemma3:12b": { input: 50_000, output: 50_000 },
+  "llama3.1:8b": { input: 30_000, output: 30_000 },
+  "mistral:7b": { input: 30_000, output: 30_000 },
 };
 
 /** Estimate cost in microdollars for a given model and token count. */

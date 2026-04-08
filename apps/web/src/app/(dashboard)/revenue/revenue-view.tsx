@@ -74,7 +74,8 @@ export function RevenueView({
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",   x: 0, w: 12, h: 4, minH: 3 },
-    { i: "insights",      x: 0, w: 12, h: 4, minH: 3 },
+    // "insights" (deterministic RevenueInsights) disabled — redundant with AI-generated insights above
+    // { i: "insights",      x: 0, w: 12, h: 4, minH: 3 },
     { i: "revenue-chart",  x: 0, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "mrr-chart",      x: 6, w: 6, h: 12, minW: 4, minH: 8 },
     { i: "waterfall",     x: 0, w: 12, h: 10, minH: 6 },
@@ -87,7 +88,7 @@ export function RevenueView({
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",   x: 0, w: 6, h: 4, minH: 3 },
-    { i: "insights",      x: 0, w: 6, h: 4, minH: 3 },
+    // { i: "insights",      x: 0, w: 6, h: 4, minH: 3 },
     { i: "revenue-chart",  x: 0, w: 6, h: 12, minH: 8 },
     { i: "mrr-chart",      x: 0, w: 6, h: 12, minH: 8 },
     { i: "waterfall",     x: 0, w: 6, h: 10, minH: 6 },
@@ -137,15 +138,16 @@ export function RevenueView({
         }}
       />
     ),
-    "insights": (
-      <div className="animate-fade-in">
-        <RevenueInsights
-          growthMetrics={g}
-          streams={streamBreakdown}
-          hasSaaS={hasSaaS}
-        />
-      </div>
-    ),
+    // "insights" (deterministic RevenueInsights) disabled — redundant with AI-generated insights above
+    // "insights": (
+    //   <div className="animate-fade-in">
+    //     <RevenueInsights
+    //       growthMetrics={g}
+    //       streams={streamBreakdown}
+    //       hasSaaS={hasSaaS}
+    //     />
+    //   </div>
+    // ),
     "revenue-chart": (
       <ChartCard title="Revenue Over Time" subtitle="Total monthly revenue trend">
         <AreaChartWidget data={revenueTimeline} color={chartColors.brand} />

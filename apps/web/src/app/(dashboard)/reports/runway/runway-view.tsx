@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { AiGate } from "@/components/ai/ai-gate";
 import type { MetricValue, ResolvedSlotData } from "@burnless/engine";
 import { AreaChartWidget, MultiLineChart, chartColors } from "@/components/charts";
 import { ChartCard, ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
@@ -189,11 +190,13 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       </ChartCard>
     ),
     "warning": zeroCashMonth ? (
+      <AiGate feature="insights" hideWhenOff>
       <div className="rounded-xl bg-red-50 border border-red-200 p-4">
         <p className="text-sm text-red-800 font-medium">
           Warning: Cash is projected to reach zero in {zeroCashMonth.month}. Consider reducing expenses or raising additional funding.
         </p>
       </div>
+      </AiGate>
     ) : <div />,
   }), [handleExportCSV, handleExportPDF, slotById, lowerIsBetterSlugs, zeroCashMonth, cashPosition, runway, burnData]);
 

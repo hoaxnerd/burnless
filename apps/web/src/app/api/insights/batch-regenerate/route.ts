@@ -26,6 +26,7 @@ import {
 } from "@burnless/ai";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
+import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { getDefaultScenario } from "@/lib/data";
 import { logger } from "@/lib/logger";
 import { withErrorHandler } from "@/lib/api-helpers";
@@ -107,6 +108,8 @@ export const POST = withErrorHandler(async function POST(request: Request) {
   const results: RegenerationResult[] = [];
 
   for (const [companyId, invalidations] of byCompany) {
+    setTrackingCompanyId(companyId);
+
     // Check if AI insights are allowed for this company
     const aiCheck = await checkAiFeatureAllowed(companyId, "insights");
     if (!aiCheck.allowed) {

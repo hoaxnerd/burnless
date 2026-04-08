@@ -5,6 +5,7 @@ import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { TeamRoster, PlannedHiresSection, HiringInsightTip } from "./team-details";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
@@ -155,6 +156,16 @@ export function TeamView({
     ),
     "hiring-insight": (
       <HiringInsightTip plannedHires={plannedHires} />
+    ),
+    "ai-insights": (
+      <AiPageInsights
+        page="team"
+        scenarioId={scenarioId}
+        pageData={{
+          departments: departmentBreakdown,
+          plannedHires: plannedHires.length,
+        }}
+      />
     ),
   }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
 

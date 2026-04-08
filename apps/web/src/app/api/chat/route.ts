@@ -13,11 +13,11 @@ import { chatStream, type ChatMessage } from "@burnless/ai";
 import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { canPerformAction } from "@/lib/feature-gate";
-import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
-import { initAiUsageTracking } from "@/lib/ai-usage-tracker";
+import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 
 const chatSchema = z.object({
   message: z.string().min(1),
@@ -32,8 +32,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
 
-  // Initialize cost tracking (idempotent — runs once)
-  initAiUsageTracking(() => ctx.companyId);
+  // Set company context for usage tracking
+  setTrackingCompanyId(ctx.companyId);
 
   let body: z.infer<typeof chatSchema>;
   try {
@@ -167,9 +167,11 @@ export const POST = withErrorHandler(async (request: Request) => {
       );
 
       try {
+        const aiFlags = await getAiFlags(ctx.companyId);
         const chunks = chatStream({
           messages,
           financialContext: contextText,
+          companionName: aiFlags.companionName,
           providerConfig,
           onToolCall: async (toolName, input) => {
             return executeToolCall(toolName, input, {

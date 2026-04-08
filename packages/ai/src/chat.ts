@@ -38,6 +38,8 @@ interface ChatOptions {
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** AI feature name for model routing. Defaults to "chat". */
   feature?: string;
+  /** Configured companion name for the system prompt. */
+  companionName?: string;
   /** Override provider config (e.g., from per-company DB settings). */
   providerConfig?: {
     provider?: string;
@@ -63,7 +65,7 @@ export async function chat(options: ChatOptions): Promise<{
     };
   }
 
-  const system = buildSystemMessage(options.financialContext);
+  const system = buildSystemMessage(options.financialContext, options.companionName);
   const tools = getFinancialTools();
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
@@ -143,7 +145,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     return;
   }
 
-  const system = buildSystemMessage(options.financialContext);
+  const system = buildSystemMessage(options.financialContext, options.companionName);
   const tools = getFinancialTools();
 
   const messages: LlmMessage[] = options.messages.map((m) => ({

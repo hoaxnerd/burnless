@@ -5,6 +5,7 @@ import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { OwnershipChart, FundingRoundsList, DilutionCalculator, FundraisingReadinessTip } from "./funding-details";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
@@ -155,6 +156,14 @@ export function FundingView({
     ),
     "fundraising-tip": (
       <FundraisingReadinessTip currentRunway={currentRunway} currentBurn={currentBurn} />
+    ),
+    "ai-insights": (
+      <AiPageInsights
+        page="funding"
+        pageData={{
+          fundingRounds: rounds,
+        }}
+      />
     ),
   }), [slotById, rounds, foundersOwnership, currentBurn, currentRunway, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney]);
 

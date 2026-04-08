@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
-import { useAiFeature } from "@/components/ai/ai-feature-context";
+import { useAiFeature, useAiFlags } from "@/components/ai/ai-feature-context";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
@@ -38,6 +38,7 @@ export function AiCommandCenter({
 }: AiCommandCenterProps) {
   const { activeScenarioId } = useScenario();
   const { enabled, loaded } = useAiFeature("insights");
+  const { companionName } = useAiFlags();
   const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
 
   // Report readiness: only ready when AI feature is loaded AND enabled
@@ -216,7 +217,7 @@ export function AiCommandCenter({
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-surface-900">
-                  AI Financial Companion
+                  {companionName}
                 </h2>
                 <p className="text-[10px] text-surface-400 mt-0.5">
                   Powered by your live data

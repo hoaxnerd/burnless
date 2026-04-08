@@ -106,7 +106,8 @@ export function ExpensesView({
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",  x: 0, w: 12, h: 4, minH: 3 },
-    { i: "insights",     x: 0, w: 12, h: 4, minH: 3 },
+    // "insights" (deterministic ExpenseInsights) disabled — redundant with AI-generated insights above
+    // { i: "insights",     x: 0, w: 12, h: 4, minH: 3 },
     { i: "charts",       x: 0, w: 12, h: 14, minH: 8 },
     { i: "table",        x: 0, w: 12, h: 16, minH: 8 },
   ], []);
@@ -117,7 +118,7 @@ export function ExpensesView({
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "ai-insights",  x: 0, w: 6, h: 4, minH: 3 },
-    { i: "insights",     x: 0, w: 6, h: 4, minH: 3 },
+    // { i: "insights",     x: 0, w: 6, h: 4, minH: 3 },
     { i: "charts",       x: 0, w: 6, h: 14, minH: 8 },
     { i: "table",        x: 0, w: 6, h: 16, minH: 8 },
   ], []);
@@ -160,32 +161,33 @@ export function ExpensesView({
         }}
       />
     ),
-    "insights": (
-      <div className="animate-fade-in">
-        <ExpenseInsights
-          breakdown={expenseDetails.subcategoryBreakdown}
-          lineItems={expenseDetails.lineItems}
-          totalMonthly={summaryMetrics.totalMonthly}
-          anomalyCount={anomalyCount}
-          recurringCount={recurringCount}
-        />
-      </div>
-    ),
+    // "insights" (deterministic ExpenseInsights) disabled — redundant with AI-generated insights above
+    // "insights": (
+    //   <div className="animate-fade-in">
+    //     <ExpenseInsights
+    //       breakdown={expenseDetails.subcategoryBreakdown}
+    //       lineItems={expenseDetails.lineItems}
+    //       totalMonthly={summaryMetrics.totalMonthly}
+    //       anomalyCount={anomalyCount}
+    //       recurringCount={recurringCount}
+    //     />
+    //   </div>
+    // ),
     "charts": (
       <div className="space-y-6">
-        {/* View toggle */}
-        <div className="flex items-center gap-1 rounded-lg bg-surface-100 p-1 w-fit">
-          <button
-            onClick={() => setView("overview")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              view === "overview"
-                ? "bg-surface-0 text-surface-900 shadow-sm"
-                : "text-surface-500 hover:text-surface-700"
-            }`}
-          >
-            Category Overview
-          </button>
-          {budgetTimeline && (
+        {/* View toggle — only show when budget data exists (otherwise only one view) */}
+        {budgetTimeline && (
+          <div className="flex items-center gap-1 rounded-lg bg-surface-100 p-1 w-fit">
+            <button
+              onClick={() => setView("overview")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                view === "overview"
+                  ? "bg-surface-0 text-surface-900 shadow-sm"
+                  : "text-surface-500 hover:text-surface-700"
+              }`}
+            >
+              Category Overview
+            </button>
             <button
               onClick={() => setView("budget")}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -196,8 +198,8 @@ export function ExpensesView({
             >
               Budget vs Actuals
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {view === "overview" ? (
           <ExpenseCategoryChart

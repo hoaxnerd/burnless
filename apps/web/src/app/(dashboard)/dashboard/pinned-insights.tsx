@@ -3,6 +3,7 @@
 import { Sparkles, X, Pin } from "lucide-react";
 import { usePinnedInsights } from "@/components/ai/use-pinned-insights";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
+import { AiGate } from "@/components/ai/ai-gate";
 
 export function PinnedInsights() {
   const { pins, unpin } = usePinnedInsights();
@@ -12,6 +13,7 @@ export function PinnedInsights() {
   if (pins.length === 0) return null;
 
   return (
+    <AiGate feature="insights" hideWhenOff>
     <div className="rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up">
       <div className="flex items-center gap-2 mb-4">
         <Pin className="h-3.5 w-3.5 text-brand-500" />
@@ -52,5 +54,6 @@ export function PinnedInsights() {
         ))}
       </div>
     </div>
+    </AiGate>
   );
 }

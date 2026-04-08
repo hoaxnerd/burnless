@@ -51,7 +51,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   anthropic: process.env.AI_MODEL_DEFAULT_ANTHROPIC ?? "claude-sonnet-4-20250514",
   openai: process.env.AI_MODEL_DEFAULT_OPENAI ?? "gpt-4o",
   openrouter: process.env.AI_MODEL_DEFAULT_OPENROUTER ?? "anthropic/claude-sonnet-4-20250514",
-  ollama: process.env.AI_MODEL_DEFAULT_OLLAMA ?? "gemma3:12b",
+  ollama: process.env.AI_MODEL_DEFAULT_OLLAMA ?? "gemma4:26b",
 };
 
 // ── Tier → model mapping per provider ───────────────────────────────────────
@@ -75,9 +75,9 @@ const TIER_MODELS: Record<string, Record<ModelTier, string>> = {
   // Ollama uses the same model for all tiers (single local model)
   // Override via AI_MODEL_OLLAMA_FAST etc. if running multiple models
   ollama: {
-    fast: process.env.AI_MODEL_OLLAMA_FAST ?? "gemma3:12b",
-    standard: process.env.AI_MODEL_OLLAMA_STANDARD ?? "gemma3:12b",
-    deep: process.env.AI_MODEL_OLLAMA_DEEP ?? "gemma3:12b",
+    fast: process.env.AI_MODEL_OLLAMA_FAST ?? "gemma4:26b",
+    standard: process.env.AI_MODEL_OLLAMA_STANDARD ?? "gemma4:26b",
+    deep: process.env.AI_MODEL_OLLAMA_DEEP ?? "gemma4:26b",
   },
 };
 
@@ -142,7 +142,7 @@ export function createProvider(
   // Ollama doesn't need an API key — skip the key check entirely
   if (providerName === "ollama") {
     const model =
-      options.model ?? process.env.AI_MODEL ?? DEFAULT_MODELS[providerName] ?? "gemma3:12b";
+      options.model ?? process.env.AI_MODEL ?? DEFAULT_MODELS[providerName] ?? "gemma4:26b";
     return factory({
       apiKey: "ollama",
       baseUrl: options.baseUrl ?? process.env.AI_BASE_URL,

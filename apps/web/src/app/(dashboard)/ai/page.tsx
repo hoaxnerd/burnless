@@ -24,6 +24,7 @@ import { ConversationSidebar } from "./_components/conversation-sidebar";
 import { InsightsPanel } from "./_components/insights-panel";
 import type { Message, Insight, Conversation } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
+import { useAiFlags } from "@/components/ai/ai-feature-context";
 
 /* ─── Quick-Start Template Definitions ─────────────────────────────── */
 
@@ -100,6 +101,7 @@ export default function AiCompanionPage() {
   const [, setTick] = useState(0);
   const { planLimit, checkResponse, clearLimit } = usePlanLimit();
   const { activeScenarioId } = useScenario();
+  const { companionName } = useAiFlags();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { success } = useToast();
@@ -373,7 +375,7 @@ export default function AiCompanionPage() {
                 <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-accent-600" />
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white" />
               </div>
-              Financial Companion
+              {companionName}
             </h1>
             <p className="mt-1 text-sm text-surface-500">
               Your personal CFO that understands your numbers
@@ -497,6 +499,7 @@ export default function AiCompanionPage() {
               onCopy={handleCopy}
               messagesEndRef={messagesEndRef}
               isLoading={isLoading}
+              companionName={companionName}
             />
             {planLimit && (
               <div className="mx-4 mb-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, TrendingDown, AlertTriangle, RotateCw, ArrowRight } from "lucide-react";
+import { TrendingDown, AlertTriangle, RotateCw, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { AiGate } from "@/components/ai/ai-gate";
 import { formatCompactCurrency } from "@/components/charts";
@@ -149,12 +149,12 @@ function AiInsights({ breakdown, lineItems, totalMonthly }: Omit<ExpenseInsights
 
   return (
     <div className="space-y-3">
-      {/* AI header */}
+      {/* Header — these are deterministic/data-driven insights, not LLM-generated */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+          <TrendingDown className="h-3.5 w-3.5 text-surface-400" />
           <span className="text-[10px] font-medium uppercase tracking-widest text-surface-400">
-            AI Expense Insights
+            Expense Insights
           </span>
         </div>
         <Link
@@ -180,10 +180,7 @@ export function ExpenseInsights({
   if (lineItems.length === 0) return null;
 
   return (
-    <AiGate
-      feature="insights"
-      fallback={<StaticInsights breakdown={breakdown} lineItems={lineItems} totalMonthly={totalMonthly} />}
-    >
+    <AiGate feature="insights" hideWhenOff>
       <AiInsights breakdown={breakdown} lineItems={lineItems} totalMonthly={totalMonthly} />
     </AiGate>
   );
