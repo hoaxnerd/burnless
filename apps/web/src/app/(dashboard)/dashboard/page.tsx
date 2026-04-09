@@ -4,7 +4,6 @@ export const revalidate = 0;
 import {
   getCompany,
   getActiveScenario,
-  getScenarios,
   getRevenueStreams,
   getFundingRounds,
   getDashboardPreferences,
@@ -38,7 +37,6 @@ import { FormulaViewer } from "./formula-viewer";
 import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
-import { ScenariosWidget } from "./scenarios-widget";
 import type { PageWidgetLayout } from "@/components/ui/page-grid";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
@@ -55,10 +53,9 @@ export default async function DashboardPage({
   const scenario = await getActiveScenario(company.id, params.scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
-  const [data, allScenarios, revenueStreams, fundingRounds, dashPrefs] =
+  const [data, revenueStreams, fundingRounds, dashPrefs] =
     await Promise.all([
       computeDashboardData(company.id, scenario.id),
-      getScenarios(company.id),
       getRevenueStreams(scenario.id),
       getFundingRounds(company.id),
       getDashboardPreferences().catch(() => null),
@@ -119,7 +116,6 @@ export default async function DashboardPage({
   const heroSwapCards = buildHeroSwapCards(heroSlugs, heroCards, metrics, currentMonth, prevMonth);
 
   /* ── Pinned secondary metrics ───────────────────────────────────── */
-  const pinnedScenarios = allScenarios.filter((s) => s.status === "active").slice(0, 4);
 
   /* ── Board Meeting Mode data ──────────────────────────────────── */
   const mrrGrowthPct = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
@@ -296,11 +292,6 @@ export default async function DashboardPage({
                 >
                   <AreaChartWidget data={metrics.cashPosition} color={chartColors.brand} />
                 </DashboardChartCard>
-              ),
-
-              /* ── Scenarios Panel ────────────────────────────────────── */
-              "scenarios": (
-                <ScenariosWidget scenarios={pinnedScenarios.map((s) => ({ id: s.id, name: s.name, source: s.source }))} />
               ),
 
               /* ── Customizable Metrics ───────────────────────────────── */

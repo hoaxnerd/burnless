@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   DEFAULT_HERO_CARDS,
@@ -96,6 +97,7 @@ export function DashboardLayoutProvider({
   initialPreferences,
 }: ProviderProps) {
   const { mode } = useMetrics();
+  const router = useRouter();
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -188,6 +190,8 @@ export function DashboardLayoutProvider({
             isSavePendingRef.current = false;
           }
           setIsSaving(false);
+          // Refresh server data so hero cards re-render immediately
+          router.refresh();
         });
       saveQueueRef.current = thisPromise;
       return thisPromise;

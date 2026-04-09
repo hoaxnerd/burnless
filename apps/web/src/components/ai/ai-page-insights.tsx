@@ -126,17 +126,16 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
   // Don't report not-ready while still settling (initial fetch + auto-generate).
   const hasData = cache.displayData.length > 0;
   const isReady = loaded && enabled && hasData;
+  const reportReady = pageLayout?.reportWidgetReady;
+  const reportNotReady = pageLayout?.reportWidgetNotReady;
   useEffect(() => {
     if (!loaded) return;
-    if (pageLayout) {
-      if (isReady) {
-        pageLayout.reportWidgetReady(widgetId);
-      } else if (!cache.settling) {
-        // Only report not-ready after all initial loading is complete
-        pageLayout.reportWidgetNotReady(widgetId);
-      }
+    if (isReady) {
+      reportReady?.(widgetId);
+    } else if (!cache.settling) {
+      reportNotReady?.(widgetId);
     }
-  }, [isReady, loaded, cache.settling, widgetId, pageLayout]);
+  }, [isReady, loaded, cache.settling, widgetId, reportReady, reportNotReady]);
 
   // Pure loading with no previous data — show skeleton
   if (cache.settling && cache.displayData.length === 0) {
