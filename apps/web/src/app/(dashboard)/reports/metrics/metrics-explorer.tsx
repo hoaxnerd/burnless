@@ -134,7 +134,10 @@ export function MetricsExplorer({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredMetrics.map((def) => {
           const data = metrics[def.key] as MetricValue[];
-          const current = data.find((d) => d.month === currentMonth)?.value ?? data[data.length - 1]?.value ?? 0;
+          const currentIdx = data.findIndex((d) => d.month === currentMonth);
+          const resolvedIdx = currentIdx >= 0 ? currentIdx : data.length - 1;
+          const current = data[resolvedIdx]?.value ?? 0;
+          const previous = resolvedIdx > 0 ? data[resolvedIdx - 1]?.value ?? 0 : 0;
           const isExpanded = expandedMetric === def.key;
 
           return (
@@ -166,8 +169,8 @@ export function MetricsExplorer({
                     <p className="text-lg font-bold text-surface-900 tabular-nums">
                       {formatMetricValue(current, def.format)}
                     </p>
-                    {data.length >= 2 && (
-                      <TrendIndicator current={current} previous={data[data.length - 2]?.value ?? 0} />
+                    {resolvedIdx > 0 && (
+                      <TrendIndicator current={current} previous={previous} />
                     )}
                   </div>
                 </div>

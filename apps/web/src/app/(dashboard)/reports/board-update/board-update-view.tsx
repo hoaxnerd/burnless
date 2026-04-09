@@ -345,34 +345,41 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         </div>
       </ReportSection>
     ),
-    "pnl-table": (
-      <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden print:break-inside-avoid">
-        <div className="px-6 py-4 border-b border-surface-200 bg-surface-50">
-          <h2 className="text-lg font-semibold text-surface-900">P&L Summary</h2>
+    "pnl-table": (() => {
+      const upToCurrent = d.pnlSummary.revenue.filter((pt) => pt.month <= d.reportMonth);
+      const pnlMonths = (upToCurrent.length >= 6
+        ? upToCurrent.slice(-6)
+        : d.pnlSummary.revenue.slice(0, 6)
+      ).map((pt) => pt.month);
+      return (
+        <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden print:break-inside-avoid">
+          <div className="px-6 py-4 border-b border-surface-200 bg-surface-50">
+            <h2 className="text-lg font-semibold text-surface-900">P&L Summary</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-200 bg-surface-50">
+                  <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Line Item</th>
+                  {pnlMonths.map((m) => (
+                    <th key={m} scope="col" className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">
+                      {formatShortMonth(m)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100">
+                <PnlRow label="Revenue" values={d.pnlSummary.revenue} months={pnlMonths} bold />
+                <PnlRow label="COGS" values={d.pnlSummary.cogs} months={pnlMonths} indent />
+                <PnlRow label="Gross Profit" values={d.pnlSummary.grossProfit} months={pnlMonths} bold />
+                <PnlRow label="Operating Expenses" values={d.pnlSummary.opex} months={pnlMonths} indent />
+                <PnlRow label="Net Income" values={d.pnlSummary.netIncome} months={pnlMonths} bold highlight />
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-200 bg-surface-50">
-                <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Line Item</th>
-                {d.pnlSummary.revenue.slice(-6).map((pt) => (
-                  <th key={pt.month} scope="col" className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">
-                    {formatShortMonth(pt.month)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100">
-              <PnlRow label="Revenue" values={d.pnlSummary.revenue} bold />
-              <PnlRow label="COGS" values={d.pnlSummary.cogs} indent />
-              <PnlRow label="Gross Profit" values={d.pnlSummary.grossProfit} bold />
-              <PnlRow label="Operating Expenses" values={d.pnlSummary.opex} indent />
-              <PnlRow label="Net Income" values={d.pnlSummary.netIncome} bold highlight />
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
+      );
+    })(),
   }), [d]);
 
   return (
@@ -445,33 +452,44 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
 function PnlRow({
   label,
   values,
+  months,
   bold,
   indent,
   highlight,
 }: {
   label: string;
   values: MetricPoint[];
+  months: string[];
   bold?: boolean;
   indent?: boolean;
   highlight?: boolean;
 }) {
-  const last6 = values.slice(-6);
+  const valuesByMonth = new Map(values.map((pt) => [pt.month, pt.value]));
   return (
     <tr className={highlight ? "bg-surface-50" : ""}>
       <td className={`px-6 py-2.5 text-sm ${bold ? "font-semibold text-surface-900" : "text-surface-700"} ${indent ? "pl-10" : ""}`}>
         {label}
       </td>
-      {last6.map((pt) => (
-        <td
-          key={pt.month}
-          className={`px-4 py-2.5 text-right text-sm tabular-nums ${
-            bold ? "font-semibold text-surface-900" : "text-surface-700"
-          } ${highlight && pt.value < 0 ? "text-red-600" : highlight && pt.value > 0 ? "text-green-600" : ""}`}
-        >
-          {highlight && pt.value !== 0 && <span className="sr-only">{pt.value > 0 ? "Profit" : "Loss"}:</span>}
-          {formatCompactCurrency(pt.value)}
-        </td>
-      ))}
+      {months.map((m) => {
+        const hasValue = valuesByMonth.has(m);
+        const value = valuesByMonth.get(m) ?? 0;
+        return (
+          <td
+            key={m}
+            className={`px-4 py-2.5 text-right text-sm tabular-nums ${
+              !hasValue ? "text-surface-300"
+              : bold ? "font-semibold text-surface-900" : "text-surface-700"
+            } ${highlight && hasValue && value < 0 ? "text-red-600" : highlight && hasValue && value > 0 ? "text-green-600" : ""}`}
+          >
+            {hasValue ? (
+              <>
+                {highlight && value !== 0 && <span className="sr-only">{value > 0 ? "Profit" : "Loss"}:</span>}
+                {formatCompactCurrency(value)}
+              </>
+            ) : "—"}
+          </td>
+        );
+      })}
     </tr>
   );
 }

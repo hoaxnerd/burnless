@@ -41,6 +41,7 @@ import {
   getRevenueStreams,
   getHeadcountPlans,
   getFundingRounds,
+  getTransactions,
 } from "./data";
 
 export interface DashboardData {
@@ -79,12 +80,13 @@ export const computeDashboardData = cache(async function computeDashboardData(
   const periodEnd = new Date(targetYear, 11, 1);
   const currentMonth = monthKey(new Date(now.getFullYear(), now.getMonth(), 1));
 
-  const [accounts, fLines, revStreams, hcPlans, funding] = await Promise.all([
+  const [accounts, fLines, revStreams, hcPlans, funding, txns] = await Promise.all([
     getAccounts(companyId),
     getForecastLines(scenarioId),
     getRevenueStreams(scenarioId),
     getHeadcountPlans(scenarioId),
     getFundingRounds(companyId),
+    getTransactions(companyId),
   ]);
 
   // Fetch forecast value overrides
@@ -146,7 +148,18 @@ export const computeDashboardData = cache(async function computeDashboardData(
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
-  // Aggregate by category
+  // Aggregate actual transactions by account (for COGS and other imported data)
+  const actualsByAccount = new Map<string, MonthlySeries>();
+  for (const txn of txns) {
+    const txnDate = new Date(txn.date);
+    if (txnDate < periodStart || txnDate > periodEnd) continue;
+    const key = monthKey(txnDate);
+    const existing = actualsByAccount.get(txn.accountId) ?? new Map();
+    existing.set(key, (existing.get(key) ?? 0) + Number(txn.amount));
+    actualsByAccount.set(txn.accountId, existing);
+  }
+
+  // Aggregate by category (forecasts + actuals)
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
   let totalRevenue = new Map(revenueValues);
   let totalCogs: MonthlySeries = new Map();
@@ -154,14 +167,27 @@ export const computeDashboardData = cache(async function computeDashboardData(
   let totalOtherIncome: MonthlySeries = new Map();
   let totalOtherExpense: MonthlySeries = new Map();
 
+  const seenAccountIds = new Set<string>();
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
     if (!account) continue;
+    seenAccountIds.add(accountId);
     if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, values);
     else if (account.category === "cogs") totalCogs = addSeries(totalCogs, values);
     else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
     else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, values);
     else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, values);
+  }
+  // Include accounts that only have transaction data (no forecast lines)
+  for (const [accountId, actuals] of actualsByAccount) {
+    if (seenAccountIds.has(accountId)) continue;
+    const account = accountMap.get(accountId);
+    if (!account) continue;
+    if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, actuals);
+    else if (account.category === "cogs") totalCogs = addSeries(totalCogs, actuals);
+    else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, actuals);
+    else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, actuals);
+    else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, actuals);
   }
   totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
@@ -200,12 +226,20 @@ export const computeDashboardData = cache(async function computeDashboardData(
   };
   const metrics = computeAllMetrics(metricsInput);
 
-  // Financial statements
+  // Financial statements — forecasts for accounts with forecast lines, actuals for the rest
   const accountDataList: AccountData[] = [];
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
     if (!account) continue;
     accountDataList.push({ id: account.id, name: account.name, category: account.category, values });
+  }
+
+  // Add accounts that only have transaction data (no forecast lines)
+  for (const [accountId, actuals] of actualsByAccount) {
+    if (seenAccountIds.has(accountId)) continue;
+    const account = accountMap.get(accountId);
+    if (!account) continue;
+    accountDataList.push({ id: account.id, name: account.name, category: account.category, values: actuals });
   }
 
   // Add revenue from streams
@@ -245,6 +279,38 @@ export const computeDashboardData = cache(async function computeDashboardData(
 
   const profitAndLoss = generateProfitAndLoss(accountDataList);
   const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows);
+
+  // Add derived balance sheet accounts so generateBalanceSheet has data.
+  // Asset: Cash position (cumulative running balance, already computed above).
+  // Equity: Retained Earnings (cumulative net income) + Paid-in Capital (initial + funding).
+  const months = Array.from(netIncome.keys()).sort();
+  if (months.length > 0) {
+    accountDataList.push({ id: "bs-cash", name: "Cash & Equivalents", category: "asset", values: cashPosition });
+
+    const retainedEarnings: MonthlySeries = new Map();
+    let cumNI = 0;
+    for (const m of months) {
+      cumNI += netIncome.get(m) ?? 0;
+      retainedEarnings.set(m, dRound2(D(cumNI)));
+    }
+    accountDataList.push({ id: "bs-retained-earnings", name: "Retained Earnings", category: "equity", values: retainedEarnings });
+
+    const paidInCapital: MonthlySeries = new Map();
+    let cumFunding = startingCash;
+    for (const m of months) {
+      cumFunding += fundingInflows.get(m) ?? 0;
+      paidInCapital.set(m, dRound2(D(cumFunding)));
+    }
+    accountDataList.push({ id: "bs-paid-in-capital", name: "Paid-in Capital", category: "equity", values: paidInCapital });
+
+    // Liability: Accounts Payable — approximate as 1 month of total expenses (Net-30 terms).
+    const accountsPayable: MonthlySeries = new Map();
+    for (const m of months) {
+      accountsPayable.set(m, dRound2(D(totalExpenses.get(m) ?? 0)));
+    }
+    accountDataList.push({ id: "bs-accounts-payable", name: "Accounts Payable", category: "liability", values: accountsPayable });
+  }
+
   const balanceSheet = generateBalanceSheet(accountDataList);
 
   const hasData = fLines.length > 0 || revStreams.length > 0 || hcPlans.length > 0;

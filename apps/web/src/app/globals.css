@@ -689,6 +689,17 @@ a,
     font-variant-numeric: tabular-nums;
   }
 
+  /* Print: break out of the dashboard shell's viewport constraint */
+  .h-screen {
+    height: auto !important;
+  }
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+  .overflow-auto {
+    overflow: visible !important;
+  }
+
   /* Print: restore natural flow for react-grid-layout pages */
   .react-grid-layout {
     position: static !important;

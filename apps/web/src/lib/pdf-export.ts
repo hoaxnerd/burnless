@@ -101,7 +101,8 @@ function renderStatementTable(
   rows: Array<{ item: StatementLineItem; isSummary?: boolean; isSubtotal?: boolean }>,
   startY: number,
   sectionTitle?: string,
-  currencyLocale?: { currency?: CurrencyCode; locale?: string }
+  currencyLocale?: { currency?: CurrencyCode; locale?: string },
+  headerOpts?: PDFReportOptions
 ): number {
   if (rows.length === 0) return startY;
 
@@ -167,6 +168,7 @@ function renderStatementTable(
       },
     }))],
     body: body as unknown as Array<Array<string | { content: string; styles?: Record<string, unknown> }>>,
+    showHead: "everyPage",
     styles: {
       fontSize: 8,
       cellPadding: 3,
@@ -174,7 +176,15 @@ function renderStatementTable(
       lineWidth: 0.1,
     },
     theme: "plain",
-    margin: { left: 20, right: 20 },
+    margin: { left: 20, right: 20, top: headerOpts ? 52 : 20 },
+    didDrawPage: headerOpts
+      ? (hookData: { pageNumber: number }) => {
+          // Page 1 already has a header drawn by the caller; only draw on overflow pages
+          if (hookData.pageNumber > 1) {
+            addPDFHeader(doc, headerOpts);
+          }
+        }
+      : undefined,
   });
 
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
@@ -200,6 +210,8 @@ export async function generateProfitLossPDF(
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Profit & Loss Statement" });
 
+  const pdfHeaderOpts = { ...opts, title: opts.title || "Profit & Loss Statement" };
+
   renderStatementTable(
     doc,
     autoTable,
@@ -215,7 +227,8 @@ export async function generateProfitLossPDF(
     ],
     52,
     "Income Statement",
-    { currency: opts.currency, locale: opts.locale }
+    { currency: opts.currency, locale: opts.locale },
+    pdfHeaderOpts
   );
 
   addPDFFooter(doc);
@@ -235,7 +248,8 @@ export async function generateCashFlowPDF(
   const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
-  addPDFHeader(doc, { ...opts, title: opts.title || "Cash Flow Statement" });
+  const cfHeaderOpts = { ...opts, title: opts.title || "Cash Flow Statement" };
+  addPDFHeader(doc, cfHeaderOpts);
 
   const endingCashItem: StatementLineItem = {
     name: "Ending Cash Position",
@@ -254,7 +268,8 @@ export async function generateCashFlowPDF(
     ],
     52,
     "Cash Flow",
-    { currency: opts.currency, locale: opts.locale }
+    { currency: opts.currency, locale: opts.locale },
+    cfHeaderOpts
   );
 
   addPDFFooter(doc);
@@ -272,7 +287,8 @@ export async function generateBalanceSheetPDF(
   const { jsPDF, autoTable } = await loadJsPDF();
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
-  addPDFHeader(doc, { ...opts, title: opts.title || "Balance Sheet" });
+  const bsHeaderOpts = { ...opts, title: opts.title || "Balance Sheet" };
+  addPDFHeader(doc, bsHeaderOpts);
 
   renderStatementTable(
     doc,
@@ -284,7 +300,8 @@ export async function generateBalanceSheetPDF(
     ],
     52,
     "Balance Sheet",
-    { currency: opts.currency, locale: opts.locale }
+    { currency: opts.currency, locale: opts.locale },
+    bsHeaderOpts
   );
 
   addPDFFooter(doc);
@@ -455,13 +472,14 @@ export async function generateInvestorDataRoomPDF(
 
   // ── P&L page ───────────────────────────────────────────────────────────
   doc.addPage("a4", "landscape");
-  addPDFHeader(doc, {
+  const pnlHdrOpts: PDFReportOptions = {
     title: "Profit & Loss Statement",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
     currency,
     locale,
-  });
+  };
+  addPDFHeader(doc, pnlHdrOpts);
 
   renderStatementTable(
     doc,
@@ -476,18 +494,20 @@ export async function generateInvestorDataRoomPDF(
     ],
     52,
     "Income Statement",
-    clOpts
+    clOpts,
+    pnlHdrOpts
   );
 
   // ── Cash Flow page ─────────────────────────────────────────────────────
   doc.addPage("a4", "landscape");
-  addPDFHeader(doc, {
+  const cfHdrOpts: PDFReportOptions = {
     title: "Cash Flow Statement",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
     currency,
     locale,
-  });
+  };
+  addPDFHeader(doc, cfHdrOpts);
 
   const endingCashItem: StatementLineItem = {
     name: "Ending Cash Position",
@@ -506,18 +526,20 @@ export async function generateInvestorDataRoomPDF(
     ],
     52,
     "Cash Flow",
-    clOpts
+    clOpts,
+    cfHdrOpts
   );
 
   // ── Balance Sheet page ─────────────────────────────────────────────────
   doc.addPage("a4", "landscape");
-  addPDFHeader(doc, {
+  const bsHdrOpts: PDFReportOptions = {
     title: "Balance Sheet",
     companyName: data.companyName,
     scenarioName: data.scenarioName,
     currency,
     locale,
-  });
+  };
+  addPDFHeader(doc, bsHdrOpts);
 
   renderStatementTable(
     doc,
@@ -529,7 +551,8 @@ export async function generateInvestorDataRoomPDF(
     ],
     52,
     "Balance Sheet",
-    clOpts
+    clOpts,
+    bsHdrOpts
   );
 
   addPDFFooter(doc);
