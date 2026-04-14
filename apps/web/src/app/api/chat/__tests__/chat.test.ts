@@ -3,9 +3,8 @@ import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
-const { mockRequireCompanyAccess, mockGetCompanyPlan } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetCompanyPlan: vi.fn(),
 }));
 
 const {
@@ -45,10 +44,6 @@ const { mockCheckAiFeatureAllowed, mockGetCompanyProviderConfig } = vi.hoisted(
   })
 );
 
-const { mockCanPerformAction } = vi.hoisted(() => ({
-  mockCanPerformAction: vi.fn(),
-}));
-
 const { mockChatStream } = vi.hoisted(() => ({
   mockChatStream: vi.fn(),
 }));
@@ -65,15 +60,22 @@ const { mockGetDefaultScenario } = vi.hoisted(() => ({
   mockGetDefaultScenario: vi.fn(),
 }));
 
-const { mockInitAiUsageTracking } = vi.hoisted(() => ({
-  mockInitAiUsageTracking: vi.fn(),
+const { mockSetTrackingCompanyId } = vi.hoisted(() => ({
+  mockSetTrackingCompanyId: vi.fn(),
+}));
+
+const { mockGetAiFlags } = vi.hoisted(() => ({
+  mockGetAiFlags: vi.fn(),
+}));
+
+const { mockGetOverrideCount } = vi.hoisted(() => ({
+  mockGetOverrideCount: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
-  getCompanyPlan: mockGetCompanyPlan,
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
@@ -89,6 +91,7 @@ vi.mock("@burnless/db", () => ({
     insert: mockInsert,
     update: mockUpdate,
   },
+  getOverrideCount: mockGetOverrideCount,
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -108,18 +111,12 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   asc: vi.fn(),
   gte: vi.fn(),
-  sql: Object.assign((strings: TemplateStringsArray, ..._values: unknown[]) => strings.join("?"), {
-    raw: (s: string) => s,
-  }),
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({
   checkAiFeatureAllowed: mockCheckAiFeatureAllowed,
   getCompanyProviderConfig: mockGetCompanyProviderConfig,
-}));
-
-vi.mock("@/lib/feature-gate", () => ({
-  canPerformAction: mockCanPerformAction,
+  getAiFlags: mockGetAiFlags,
 }));
 
 vi.mock("@burnless/ai", () => ({
@@ -139,7 +136,7 @@ vi.mock("@/lib/data", () => ({
 }));
 
 vi.mock("@/lib/ai-usage-tracker", () => ({
-  initAiUsageTracking: mockInitAiUsageTracking,
+  setTrackingCompanyId: mockSetTrackingCompanyId,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -185,13 +182,9 @@ describe("POST /api/chat", () => {
     // Default: AI allowed
     mockCheckAiFeatureAllowed.mockResolvedValue({
       allowed: true,
-      budgetStatus: null,
+      creditStatus: null,
       writeMode: "full",
     });
-
-    // Default: plan allows AI messages
-    mockGetCompanyPlan.mockResolvedValue("pro");
-    mockCanPerformAction.mockReturnValue({ allowed: true });
 
     // Default: DB chain setup
     mockSelect.mockReturnValue({ from: mockFrom });
@@ -227,6 +220,12 @@ describe("POST /api/chat", () => {
 
     // Default: provider config
     mockGetCompanyProviderConfig.mockResolvedValue(null);
+
+    // Default: AI flags
+    mockGetAiFlags.mockResolvedValue({ companionName: "Aria" });
+
+    // Default: override count
+    mockGetOverrideCount.mockResolvedValue(0);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -287,27 +286,22 @@ describe("POST /api/chat", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 403 when monthly message limit reached", async () => {
-    mockCanPerformAction.mockReturnValue({
+  it("returns 403 when AI credits exhausted", async () => {
+    mockCheckAiFeatureAllowed.mockResolvedValue({
       allowed: false,
-      reason: "Monthly AI message limit reached (10/10)",
+      reason: "AI credits exhausted for this month",
     });
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ message: "Hello" }));
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toContain("limit");
+    expect(body.error).toContain("credits exhausted");
   });
 
   it("returns 404 when conversation not found", async () => {
-    // where() is awaited and destructured as array in the route:
-    //   const [existing] = await db.select(...).from(...).where(...)
-    // First where: monthly messages (innerJoin chain)
-    // Second where: conversation lookup → empty array = not found
-    mockWhere
-      .mockResolvedValueOnce([]) // monthly messages
-      .mockResolvedValueOnce([]); // conversation lookup → not found
+    // First where: conversation lookup → empty array = not found
+    mockWhere.mockResolvedValueOnce([]); // conversation lookup → not found
 
     const { POST } = await import("../route");
     const res = await POST(
@@ -368,10 +362,10 @@ describe("POST /api/chat", () => {
     expect(events[0]).toContain("conv1");
   });
 
-  it("includes budget warning header when budget >= 80%", async () => {
+  it("includes credit warning header when credits >= 80% used", async () => {
     mockCheckAiFeatureAllowed.mockResolvedValue({
       allowed: true,
-      budgetStatus: { percentUsed: 85, warning: true },
+      creditStatus: { percentUsed: 85, warning: true },
       writeMode: "full",
     });
 
@@ -385,7 +379,7 @@ describe("POST /api/chat", () => {
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ message: "Test" }));
 
-    expect(res.headers.get("X-AI-Budget-Warning")).toContain("85%");
+    expect(res.headers.get("X-AI-Credit-Warning")).toContain("85%");
   });
 
   it("creates new conversation when conversationId not provided", async () => {
@@ -410,11 +404,11 @@ describe("POST /api/chat", () => {
     mockReturning.mockResolvedValue([{ id: "conv1" }]);
 
     // where() calls in order:
-    // 1. Monthly messages (via innerJoin chain) → []
+    // 1. conversation lookup → found
     // 2. Load conversation history → needs .orderBy() → []
     // 3. Scenario lookup (db.select().from().where()) → found scenario
     mockWhere
-      .mockResolvedValueOnce([]) // #1 monthly messages
+      .mockResolvedValueOnce([{ id: "custom-conversation-id" }]) // #1 conversation lookup found
       .mockReturnValueOnce({ orderBy: mockOrderBy }) // #2 history → chain to orderBy
       .mockResolvedValueOnce([
         { id: "custom-scenario-id", name: "Custom", source: "ai", companyId: "c1" },
@@ -425,6 +419,7 @@ describe("POST /api/chat", () => {
     await POST(
       makeRequest({
         message: "Test",
+        conversationId: "custom-conversation-id",
         scenarioId: "custom-scenario-id",
       })
     );
@@ -432,7 +427,7 @@ describe("POST /api/chat", () => {
     expect(mockSelect).toHaveBeenCalled();
   });
 
-  it("calls initAiUsageTracking on each request", async () => {
+  it("calls setTrackingCompanyId on each request", async () => {
     async function* fakeStream() {
       yield { type: "done" as const };
     }
@@ -442,6 +437,6 @@ describe("POST /api/chat", () => {
     const { POST } = await import("../route");
     await POST(makeRequest({ message: "Track me" }));
 
-    expect(mockInitAiUsageTracking).toHaveBeenCalled();
+    expect(mockSetTrackingCompanyId).toHaveBeenCalledWith("c1");
   });
 });

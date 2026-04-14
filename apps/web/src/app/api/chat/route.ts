@@ -8,11 +8,10 @@
 import { z } from "zod";
 import { db, getOverrideCount } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc, gte, sql } from "drizzle-orm";
+import { eq, and, asc, gte } from "drizzle-orm";
 import { chatStream, type ChatMessage } from "@burnless/ai";
-import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
-import { canPerformAction } from "@/lib/feature-gate";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
 import { executeToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
@@ -42,37 +41,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     return errorResponse("Invalid request body", 400);
   }
 
-  // Feature gate: check AI feature flags (master switch + chat toggle + data mode + budget)
+  // Feature gate: check AI feature flags (master switch + chat toggle + data mode + credits)
   const aiCheck = await checkAiFeatureAllowed(ctx.companyId, "chat");
   if (!aiCheck.allowed) {
     return errorResponse(aiCheck.reason!, 403);
   }
-  const budgetWarning = aiCheck.budgetStatus?.warning;
+  const creditWarning = aiCheck.creditStatus?.warning;
   const writeMode = aiCheck.writeMode ?? "full";
-
-  // Feature gate: check AI message limit
-  const plan = await getCompanyPlan(ctx.companyId);
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const messageCountResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(aiMessages)
-    .innerJoin(
-      aiConversations,
-      eq(aiMessages.conversationId, aiConversations.id)
-    )
-    .where(
-      and(
-        eq(aiConversations.companyId, ctx.companyId),
-        eq(aiMessages.role, "user"),
-        gte(aiMessages.createdAt, monthStart)
-      )
-    );
-  const monthlyMessageCount = messageCountResult[0]?.count ?? 0;
-  const gate = canPerformAction(plan, "ai_message", monthlyMessageCount);
-  if (!gate.allowed) {
-    return errorResponse(gate.reason!, 403);
-  }
 
   // Get or create conversation
   let conversationId = body.conversationId;
@@ -267,8 +242,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
   };
-  if (budgetWarning && aiCheck.budgetStatus) {
-    headers["X-AI-Budget-Warning"] = `${aiCheck.budgetStatus.percentUsed}% of monthly budget used`;
+  if (creditWarning && aiCheck.creditStatus) {
+    headers["X-AI-Credit-Warning"] = `${aiCheck.creditStatus.percentUsed}% of monthly credits used`;
   }
 
   return new Response(stream, { headers });
