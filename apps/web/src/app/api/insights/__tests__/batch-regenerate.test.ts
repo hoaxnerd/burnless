@@ -71,6 +71,11 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@burnless/ai", () => ({
   generateInsights: mockGenerateInsights,
   generatePageInsights: mockGeneratePageInsights,
+  getPlan: vi.fn(() => ({ monthlyAiCredits: 25000, upgradeTarget: "team", name: "Pro" })),
+  getPlanLimits: vi.fn(() => ({ maxScenarios: Infinity, maxExports: Infinity, hasDataRoom: true, hasTeamAccess: false, hasCustomIntegrations: false, monthlyAiCredits: 25000 })),
+  DEFAULT_AI_FLAGS: { masterEnabled: true, dataMode: "full", writeMode: "full", companionName: "Companion", features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true } },
+  canFeatureCallLlm: vi.fn(() => true),
+  onUsage: vi.fn(() => () => {}),
 }));
 
 vi.mock("@/lib/build-ai-context", () => ({

@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   Sparkles,
-  History,
   MessageSquarePlus,
   BarChart3,
   GitBranch,
@@ -14,18 +13,26 @@ import {
   Users,
   FileText,
   Zap,
-  Wifi,
+  Lightbulb,
+  History,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
 import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
-import { ConversationSidebar } from "./_components/conversation-sidebar";
-import { InsightsPanel } from "./_components/insights-panel";
+import { MobileHistoryCard } from "./_components/conversation-sidebar";
+import { InsightsPanel, InsightCard } from "./_components/insights-panel";
 import type { Message, Insight, Conversation } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
+
+/* ─── AI Credits Configuration ────────────────────────────────────── */
+// AI credits ratio: how many cents equal 1 AI credit.
+// Change this value to adjust the credits display across the Companion page.
+// Example: 1 means 1 cent = 1 credit (5000 cents = 5,000 credits)
+//          10 means 10 cents = 1 credit (5000 cents = 500 credits)
+// Credits are now provided directly by the context — no conversion needed
 
 /* ─── Quick-Start Template Definitions ─────────────────────────────── */
 
@@ -98,12 +105,13 @@ export default function AiCompanionPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [sidePanel, setSidePanel] = useState<"history" | "insights" | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
   const { planLimit, checkResponse, clearLimit } = usePlanLimit();
   const { activeScenarioId } = useScenario();
-  const { companionName } = useAiFlags();
+  const { companionName, credits } = useAiFlags();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledParamRef = useRef<string | null>(null);
@@ -155,6 +163,7 @@ export default function AiCompanionPage() {
   }
 
   async function loadConversations() {
+    setHistoryLoading(true);
     try {
       const res = await apiFetch("/api/chat/history");
       if (res.ok) {
@@ -163,6 +172,8 @@ export default function AiCompanionPage() {
       }
     } catch {
       /* non-critical */
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -185,7 +196,7 @@ export default function AiCompanionPage() {
             )
         );
         setConversationId(id);
-        setShowHistory(false);
+        setSidePanel(null);
       }
     } catch {
       /* non-critical */
@@ -195,7 +206,7 @@ export default function AiCompanionPage() {
   function startNewConversation() {
     setMessages([]);
     setConversationId(null);
-    setShowHistory(false);
+    setSidePanel(null);
     inputRef.current?.focus();
   }
 
@@ -403,43 +414,129 @@ export default function AiCompanionPage() {
               Your personal CFO that understands your numbers
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Status badges */}
-            <div className="hidden sm:flex items-center gap-3 mr-2 text-xs text-surface-400">
-              <span className="inline-flex items-center gap-1">
-                <Wifi className="h-3 w-3 text-emerald-500" />
-                Online
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Zap className="h-3 w-3 text-accent-500" />
-                Claude
-              </span>
+          {/* Desktop: credits + buttons with labels */}
+          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 mr-2 text-xs text-surface-400">
+              <Zap className="h-3 w-3 text-accent-500" />
+              {credits ? (
+                <span>
+                  {credits.remaining.toLocaleString()}
+                  {" / "}
+                  {credits.total.toLocaleString()}
+                  {" credits"}
+                </span>
+              ) : (
+                <span>Loading credits...</span>
+              )}
             </div>
-            <button
-              onClick={() => {
-                setShowHistory(!showHistory);
-                if (!showHistory) loadConversations();
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-600 hover:bg-surface-50 transition-colors"
-            >
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">History</span>
-            </button>
             <button
               onClick={startNewConversation}
               className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm text-white hover:bg-brand-700 transition-colors"
             >
               <MessageSquarePlus className="h-4 w-4" />
-              <span className="hidden sm:inline">New Chat</span>
+              New Chat
+            </button>
+            <button
+              onClick={() => {
+                if (sidePanel !== "insights") setSidePanel("insights");
+                else setSidePanel(null);
+              }}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                sidePanel === "insights"
+                  ? "bg-brand-50 text-brand-600 border-brand-200"
+                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
+              }`}
+            >
+              <Lightbulb className="h-4 w-4" />
+              Insights
+            </button>
+            <button
+              onClick={() => {
+                if (sidePanel !== "history") {
+                  setSidePanel("history");
+                  loadConversations();
+                } else {
+                  setSidePanel(null);
+                }
+              }}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                sidePanel === "history"
+                  ? "bg-brand-50 text-brand-600 border-brand-200"
+                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
+              }`}
+            >
+              <History className="h-4 w-4" />
+              History
+            </button>
+          </div>
+
+          {/* Mobile: credits + icon-only buttons, centered and equally spaced */}
+          <div className="flex lg:hidden items-center justify-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-1 text-[11px] text-surface-400 mr-1">
+              <Zap className="h-3 w-3 text-accent-500" />
+              {credits ? (
+                <span>
+                  {credits.remaining.toLocaleString()}
+                  /{credits.total.toLocaleString()}
+                </span>
+              ) : (
+                <span>&hellip;</span>
+              )}
+            </div>
+            <button
+              onClick={startNewConversation}
+              className="flex items-center justify-center h-9 w-9 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+              title="New Chat"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (sidePanel !== "insights") setSidePanel("insights");
+                else setSidePanel(null);
+              }}
+              className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-colors ${
+                sidePanel === "insights"
+                  ? "bg-brand-50 text-brand-600 border-brand-200"
+                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
+              }`}
+              title="Insights"
+            >
+              <Lightbulb className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (sidePanel !== "history") {
+                  setSidePanel("history");
+                  loadConversations();
+                } else {
+                  setSidePanel(null);
+                }
+              }}
+              className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-colors ${
+                sidePanel === "history"
+                  ? "bg-brand-50 text-brand-600 border-brand-200"
+                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
+              }`}
+              title="History"
+            >
+              <History className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {showHistory && (
-          <ConversationSidebar
+        {/* Mobile: inline panel for history or insights (only one at a time) */}
+        {sidePanel === "history" && (
+          <MobileHistoryCard
             conversations={conversations}
             onLoadConversation={loadConversation}
+            loading={historyLoading}
           />
+        )}
+        {sidePanel === "insights" && (
+          <div className="lg:hidden">
+            <InsightsPanel insights={insights} />
+          </div>
         )}
 
         {/* ─── Empty State / Template Cards ─────────────────── */}
@@ -538,7 +635,61 @@ export default function AiCompanionPage() {
           </>
         )}
       </div>
-      <InsightsPanel insights={insights} />
+      {/* Desktop right sidebar — shows either history or insights */}
+      {sidePanel && (
+        <div className="hidden lg:flex flex-col w-80 flex-shrink-0 rounded-2xl border border-surface-200 bg-surface-0 overflow-hidden">
+          {sidePanel === "insights" && (
+            <>
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-surface-100">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                <h2 className="text-sm font-semibold text-surface-700">Insights & Alerts</h2>
+              </div>
+              <div className="flex-1 overflow-auto p-3 space-y-3">
+                {insights.length === 0 ? (
+                  <p className="text-sm text-surface-400 px-1">No insights yet</p>
+                ) : (
+                  insights.map((insight, i) => (
+                    <InsightCard key={i} insight={insight} />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+          {sidePanel === "history" && (
+            <>
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-surface-100">
+                <History className="h-4 w-4 text-surface-500" />
+                <h2 className="text-sm font-semibold text-surface-700">History</h2>
+              </div>
+              <div className="flex-1 overflow-auto p-3 max-h-[70vh]">
+                {historyLoading ? (
+                  <div className="flex items-center gap-2 px-1 py-3 text-sm text-surface-400">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-surface-300 border-t-brand-500" />
+                    Loading conversations...
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <p className="text-sm text-surface-400 px-1">No conversations yet</p>
+                ) : (
+                  <div className="space-y-1">
+                    {conversations.map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => loadConversation(conv.id)}
+                        className="w-full text-left rounded-lg px-3 py-2 text-sm text-surface-700 hover:bg-surface-100 transition-colors"
+                      >
+                        {conv.title ?? "Untitled conversation"}
+                        <span className="ml-2 text-xs text-surface-400">
+                          {new Date(conv.updatedAt).toLocaleDateString()}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

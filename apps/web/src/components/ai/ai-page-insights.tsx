@@ -114,8 +114,8 @@ function formatAge(dateStr: string): string {
 
 export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insights", showChatInput }: AiPageInsightsProps) {
   const { enabled, loaded } = useAiFeature("insights");
-  const { budget } = useAiFlags();
-  const isBudgetExceeded = budget?.exceeded ?? false;
+  const { credits } = useAiFlags();
+  const isBudgetExceeded = credits?.exceeded ?? false;
   const cache = useInsightCache<PageInsight>({ page, scenarioId, pageData, aiEnabled: loaded && enabled, budgetExceeded: isBudgetExceeded });
   const [expanded, setExpanded] = useState(true);
   const pageLayout = useOptionalPageLayout();
@@ -160,8 +160,8 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
       <AiGate feature="insights" hideWhenOff>
         <div className="mb-6">
           <DataLoadError
-            title={isBudgetExceeded ? "AI budget exceeded" : "Couldn't load insights"}
-            message={isBudgetExceeded ? "Your monthly AI budget has been reached. Adjust your budget in Settings to continue generating insights." : undefined}
+            title={isBudgetExceeded ? "AI credits exhausted" : "Couldn't load insights"}
+            message={isBudgetExceeded ? "Your monthly AI credits have been used. Upgrade your plan or wait until next month to continue generating insights." : undefined}
             variant={cache.errorVariant}
             onRetry={isBudgetExceeded ? undefined : () => cache.fetchCached()}
             retrying={cache.loading}
@@ -225,7 +225,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
             <Info className="h-3.5 w-3.5 text-danger-500 flex-shrink-0" />
             <p className="text-xs text-danger-700">
               {isBudgetExceeded
-                ? "AI budget exceeded. Showing previously generated insights."
+                ? "AI credits exhausted. Showing previously generated insights."
                 : <>
                     Failed to refresh insights. Showing previous version.
                     <button
