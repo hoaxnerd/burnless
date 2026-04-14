@@ -8,19 +8,46 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface ScenarioContextValue {
-  /** ID of the active scenario, null = base/default */
   activeScenarioId: string | null;
-  /** Name of the active scenario for display */
   activeScenarioName: string | null;
-  /** Whether we're in scenario sandbox mode */
   isInScenarioMode: boolean;
-  /** Enter a scenario sandbox — updates URL across all pages */
   enterScenario: (id: string, name: string) => void;
-  /** Exit scenario sandbox and return to base data */
   exitScenario: () => void;
+}
+
+const STORAGE_KEY = "active-scenario";
+const COOKIE_NAME = "active-scenario-id";
+
+function readSessionStorage(): { id: string; name: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.id && parsed?.name) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionStorage(id: string, name: string) {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ id, name }));
+}
+
+function clearSessionStorage() {
+  sessionStorage.removeItem(STORAGE_KEY);
+}
+
+function setCookie(id: string) {
+  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(id)}; SameSite=Strict; Path=/`;
+}
+
+function clearCookie() {
+  document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0`;
 }
 
 const ScenarioContext = createContext<ScenarioContextValue>({
@@ -33,46 +60,41 @@ const ScenarioContext = createContext<ScenarioContextValue>({
 
 export function ScenarioProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  const urlScenarioId = searchParams.get("scenarioId");
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(urlScenarioId);
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [activeScenarioName, setActiveScenarioName] = useState<string | null>(null);
 
-  // Sync state when URL changes externally
+  // Hydrate from sessionStorage on mount (survives refresh)
   useEffect(() => {
-    if (urlScenarioId !== activeScenarioId) {
-      setActiveScenarioId(urlScenarioId); // eslint-disable-line react-hooks/set-state-in-effect
-      if (!urlScenarioId) setActiveScenarioName(null);
+    const stored = readSessionStorage();
+    if (stored) {
+      setActiveScenarioId(stored.id);
+      setActiveScenarioName(stored.name);
+      // Ensure cookie is in sync (may have expired)
+      setCookie(stored.id);
     }
-  }, [urlScenarioId, activeScenarioId]);
+  }, []);
 
   const enterScenario = useCallback(
     (id: string, name: string) => {
       setActiveScenarioId(id);
       setActiveScenarioName(name);
-      // Set cookie so apiFetch can read it and inject X-Scenario-Id header
-      document.cookie = `active-scenario-id=${encodeURIComponent(id)}; SameSite=Strict; Path=/`;
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("scenarioId", id);
-      router.push(`${pathname}?${params.toString()}`);
+      // Channel 1: cookie (auto-propagated to server)
+      setCookie(id);
+      // Channel 2: sessionStorage (read by apiFetch for header)
+      writeSessionStorage(id, name);
       router.refresh();
     },
-    [pathname, router, searchParams]
+    [router]
   );
 
   const exitScenario = useCallback(() => {
-    // Clear cookie synchronously before React state clear and navigation
-    document.cookie = "active-scenario-id=; Path=/; Max-Age=0";
+    clearCookie();
+    clearSessionStorage();
     setActiveScenarioId(null);
     setActiveScenarioName(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("scenarioId");
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
     router.refresh();
-  }, [pathname, router, searchParams]);
+  }, [router]);
 
   return (
     <ScenarioContext.Provider
