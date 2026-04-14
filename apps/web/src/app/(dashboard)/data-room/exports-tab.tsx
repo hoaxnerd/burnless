@@ -31,22 +31,7 @@ export function ExportsTab({
 }: ExportsTabProps) {
   return (
     <div className="space-y-6">
-      {/* Financial snapshot */}
-      <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-50">Financial Snapshot</h2>
-          <span className="text-xs text-surface-400 dark:text-surface-500">{scenarioName} scenario</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {keyMetrics.map((m) => (
-            <div key={m.label} className="rounded-lg bg-surface-50 dark:bg-surface-750 p-3">
-              <p className="text-[11px] font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">{m.label}</p>
-              <p className="text-lg font-bold text-surface-900 dark:text-surface-50 mt-0.5">{m.value}</p>
-              <p className="text-[10px] text-surface-400 dark:text-surface-500">{m.category}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* TODO: Financial Snapshot — future release */}
 
       {/* Export items */}
       <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">

@@ -62,7 +62,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Expenses</h1>
             <p className="mt-1 text-sm text-surface-500">
-              Intelligent spend management &mdash; AI categorized, anomaly tracked, fully searchable
+              Intelligent spend management
             </p>
           </div>
           <AddExpenseForm
@@ -170,7 +170,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Expenses</h1>
           <p className="mt-1 text-sm text-surface-500">
-            Intelligent spend management &mdash; AI categorized, anomaly tracked, fully searchable
+            Intelligent spend management
           </p>
         </div>
         <AddExpenseForm

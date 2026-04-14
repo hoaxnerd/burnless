@@ -89,7 +89,7 @@ export function SidebarInner({
   return (
     <>
       {/* Logo header */}
-      <div className="p-4 flex items-center justify-between">
+      <div className={`p-4 flex ${collapsed ? "flex-col items-center gap-2" : "items-center justify-between"}`}>
         <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
           <BrandLogo className="h-8 w-8 flex-shrink-0" />
           {!collapsed && (
@@ -144,61 +144,7 @@ export function SidebarInner({
         </button>
       </div>
 
-      {/* Quick Actions — per-item mode controls, no global toggle */}
-      {!collapsed && (
-        <div className="px-3 mb-3">
-          <div className="flex items-center px-1 py-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-surface-400">
-              Quick Actions
-            </span>
-          </div>
-          <div className="space-y-0.5">
-            {quickActions.map((qa) => {
-              const itemMode = quickActionModeOverrides[qa.id] ?? quickActionMode;
-              const isOverride = qa.id in quickActionModeOverrides;
-
-              const ModeIcon = modeIcons[itemMode];
-
-              const inner = (
-                <>
-                  <Zap className="h-3 w-3 text-warning-500 flex-shrink-0" />
-                  <span className="flex-1 text-left">{qa.label}</span>
-                  {isOverride && (
-                    <span className="text-[9px] text-surface-300" title={`Mode: ${itemMode}`}>
-                      <ModeIcon className="h-2.5 w-2.5" />
-                    </span>
-                  )}
-                  <QuickActionModeButton
-                    actionId={qa.id}
-                    currentMode={itemMode}
-                    isOverride={isOverride}
-                    aiEnabled={masterEnabled}
-                    onModeChange={onSetQuickActionItemMode}
-                  />
-                </>
-              );
-
-              return qa.href ? (
-                <Link
-                  key={qa.id}
-                  href={qa.href}
-                  className="group/qa flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <button
-                  key={qa.id}
-                  onClick={qa.action}
-                  className="group/qa w-full flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-500 hover:bg-surface-50 hover:text-surface-700 transition-colors"
-                >
-                  {inner}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* TODO: Re-enable Quick Actions in next version */}
 
       {/* Divider */}
       <div className="px-4 mb-3">

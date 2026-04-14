@@ -62,7 +62,7 @@ export function buildHeroCards(
 
     // Sparkline data
     const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
-    const sparkData = hasData && Array.isArray(series) ? sparkline(series) : undefined;
+    const sparkData = hasData && Array.isArray(series) ? sparkline(series, 8, currentMonth) : undefined;
 
     // Resolve metricStyle: use DEFAULT_METRIC_STYLES for defaults, registry for others
     const metricStyle = DEFAULT_METRIC_STYLES[slug]
@@ -124,7 +124,7 @@ export function buildHeroSwapCards(
     }
 
     const swapSeries = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[swap.displaySlug];
-    const _swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries) : undefined;
+    const _swapSparkData = Array.isArray(swapSeries) ? sparkline(swapSeries, 8, currentMonth) : undefined;
 
     heroSwapCards.push({
       slotIndex: heroIndex,

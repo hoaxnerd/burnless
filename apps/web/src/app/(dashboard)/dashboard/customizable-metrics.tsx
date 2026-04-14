@@ -2,9 +2,10 @@
 
 /**
  * CustomizableMetrics — renders the Key Metrics card with user-customizable
- * metric selection and mode-aware display. Replaces the static MetricRow list.
+ * metric selection and mode-aware display using the shared DataTable component.
  */
 
+import { useMemo } from "react";
 import { LayoutGrid } from "lucide-react";
 import {
   getMetricDef,
@@ -13,21 +14,62 @@ import {
   evaluateBenchmark,
   isMetricDataAvailable,
   getMetricMissingDataHint,
-  getMetricFallbacks,
   DEFAULT_SECONDARY_METRICS,
   type ComputedMetrics,
 } from "@burnless/engine";
 import { useMetrics } from "@/components/providers/metrics-context";
-import { usePageId } from "@/components/providers/page-context";
 import { useDashboardLayout } from "./dashboard-layout-context";
-import { CardSettings } from "@/components/ui/card-settings";
-import { useAiFlags } from "@/components/ai/ai-feature-context";
+import { DataTable } from "@/components/ui/data-table";
+import { Sparkline } from "@/components/ui/hero-kpi-card";
+import { sparkline } from "./dashboard-helpers";
+
+// ── Row data type for the DataTable ─────────────────────────────────────────
+
+interface MetricRow {
+  slug: string;
+  name: string;
+  description: string;
+  value: string;
+  numericValue: number;
+  change: string | null;
+  changeDirection: "positive" | "negative" | "neutral";
+  lowerIsBetter: boolean;
+  benchmarkLabel: string | null;
+  benchmarkStatus: "good" | "warn" | "bad" | null;
+  sparkData: number[] | undefined;
+  hasData: boolean;
+  hint: string | null;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Determine sparkline color based on metric direction and change */
+/** Design tokens: success-500 (#10b981), danger-500 (#ef4444), surface-400 (#9ca3af)
+ *  Hex required for SVG gradient stopColor compatibility */
+function sparkColor(direction: "positive" | "negative" | "neutral", lowerIsBetter: boolean): string {
+  if (direction === "neutral") return "#9ca3af";
+  if (lowerIsBetter) return direction === "positive" ? "#ef4444" : "#10b981";
+  return direction === "positive" ? "#10b981" : "#ef4444";
+}
+
+function changeClass(direction: "positive" | "negative" | "neutral", lowerIsBetter: boolean): string {
+  if (direction === "neutral") return "text-surface-400";
+  if (lowerIsBetter) return direction === "positive" ? "text-danger-500" : "text-success-500";
+  return direction === "positive" ? "text-success-500" : "text-danger-500";
+}
+
+function benchmarkClass(status: "good" | "warn" | "bad"): string {
+  if (status === "good") return "text-success-500";
+  if (status === "warn") return "text-warning-500";
+  return "text-danger-500";
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 interface CustomizableMetricsProps {
   metrics: ComputedMetrics;
   currentMonth: string;
   prevMonth: string;
-  /** Specific overrides for headcount (from headcountSeries, not in ComputedMetrics) */
   headcount?: { current: number; previous: number };
 }
 
@@ -35,12 +77,167 @@ export function CustomizableMetrics({
   metrics,
   currentMonth,
   prevMonth,
-  headcount,
 }: CustomizableMetricsProps) {
-  const { setCatalogOpen } = useMetrics();
+  const { setCatalogOpen, openFormulaViewer } = useMetrics();
   const { secondaryMetrics } = useDashboardLayout();
 
   const activeMetrics = secondaryMetrics.length > 0 ? secondaryMetrics : DEFAULT_SECONDARY_METRICS;
+
+  // Build table rows from metric slugs
+  const rows: MetricRow[] = useMemo(() => {
+    return activeMetrics
+      .map((slug) => {
+        const def = getMetricDef(slug);
+        if (!def) return null;
+
+        const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
+        const hint = hasData ? null : (getMetricMissingDataHint(slug) ?? null);
+
+        if (!hasData) {
+          return {
+            slug,
+            name: def.name,
+            description: def.description ?? "",
+            value: "—",
+            numericValue: 0,
+            change: null,
+            changeDirection: "neutral" as const,
+            lowerIsBetter: def.direction === "lower_better",
+            benchmarkLabel: null,
+            benchmarkStatus: null,
+            sparkData: undefined,
+            hasData: false,
+            hint,
+          };
+        }
+
+        const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
+        const prevVal = extractMetricValue(metrics, slug, prevMonth) ?? 0;
+
+        if (!Number.isFinite(currentVal)) return null;
+
+        const formattedValue = formatMetricValue(currentVal, def.format);
+
+        // Calculate change
+        let change: string | null = null;
+        if (def.format === "percent") {
+          const diff = currentVal - prevVal;
+          if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
+            change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+          }
+        } else if (def.format === "number") {
+          const diff = currentVal - prevVal;
+          if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
+            change = `${diff >= 0 ? "+" : ""}${Number.isInteger(diff) ? diff : diff.toFixed(1)}`;
+          }
+        } else if (prevVal !== 0) {
+          const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
+          if (pct !== 0 && Number.isFinite(pct)) {
+            change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+          }
+        }
+
+        const changeDirection: "positive" | "negative" | "neutral" =
+          !change ? "neutral" : change.startsWith("+") ? "positive" : change.startsWith("-") ? "negative" : "neutral";
+
+        const benchmarkSignal = evaluateBenchmark(currentVal, def);
+        const benchmarkLabel = def.benchmark ? def.benchmark.label : null;
+        const benchmarkStatus = def.benchmark ? (benchmarkSignal ?? "good") : null;
+
+        // Sparkline data
+        const series = (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug];
+        const sparkData = Array.isArray(series) ? sparkline(series, 8, currentMonth) : undefined;
+
+        return {
+          slug,
+          name: def.name,
+          description: def.description ?? "",
+          value: formattedValue,
+          numericValue: currentVal,
+          change,
+          changeDirection,
+          lowerIsBetter: def.direction === "lower_better",
+          benchmarkLabel,
+          benchmarkStatus,
+          sparkData,
+          hasData: true,
+          hint: null,
+        };
+      })
+      .filter((r) => r !== null) as MetricRow[];
+  }, [activeMetrics, metrics, currentMonth, prevMonth]);
+
+  const columns = useMemo(
+    () => [
+      {
+        key: "name",
+        header: "Metric",
+        className: "w-0 whitespace-nowrap",
+        render: (row: MetricRow) => (
+          <span className={`text-sm ${row.hasData ? "text-surface-700" : "text-surface-400"}`}>
+            {row.name}
+          </span>
+        ),
+        sortValue: (row: MetricRow) => row.name,
+      },
+      {
+        key: "value",
+        header: "Value",
+        align: "right" as const,
+        className: "w-0 whitespace-nowrap",
+        render: (row: MetricRow) =>
+          row.hasData ? (
+            <span className="text-sm font-semibold text-surface-900 tabular-nums">
+              {row.value}
+            </span>
+          ) : (
+            <span className="text-xs text-surface-300 italic">{row.hint}</span>
+          ),
+        sortValue: (row: MetricRow) => row.numericValue,
+      },
+      {
+        key: "change",
+        header: "MoM",
+        align: "right" as const,
+        className: "w-0 whitespace-nowrap",
+        render: (row: MetricRow) => (
+          <span className={`text-xs font-medium tabular-nums ${
+            row.change ? changeClass(row.changeDirection, row.lowerIsBetter) : "text-surface-300"
+          }`}>
+            {row.change ?? "—"}
+          </span>
+        ),
+        sortValue: (row: MetricRow) => row.numericValue,
+      },
+      {
+        key: "benchmark",
+        header: "Benchmark",
+        align: "right" as const,
+        className: "w-0 whitespace-nowrap",
+        render: (row: MetricRow) => (
+          <span className={`text-xs tabular-nums ${
+            row.benchmarkStatus ? benchmarkClass(row.benchmarkStatus) : "text-surface-300"
+          }`}>
+            {row.benchmarkLabel ?? ""}
+          </span>
+        ),
+      },
+      {
+        key: "trend",
+        header: "Trend",
+        render: (row: MetricRow) =>
+          row.sparkData && row.sparkData.length >= 2 ? (
+            <Sparkline
+              data={row.sparkData}
+              color={sparkColor(row.changeDirection, row.lowerIsBetter)}
+              height={24}
+              fluid
+            />
+          ) : null,
+      },
+    ],
+    []
+  );
 
   return (
     <div className="h-full flex flex-col rounded-2xl bg-surface-0 border border-surface-200 p-5 sm:p-6 animate-slide-up stagger-6 hover-lift">
@@ -54,181 +251,15 @@ export function CustomizableMetrics({
           Customize
         </button>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-        {activeMetrics.map((slug) => (
-          <MetricRowDynamic
-            key={slug}
-            slug={slug}
-            metrics={metrics}
-            currentMonth={currentMonth}
-            prevMonth={prevMonth}
-            headcount={headcount}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MetricRowDynamic({
-  slug,
-  metrics,
-  currentMonth,
-  prevMonth,
-  headcount: _headcount,
-}: {
-  slug: string;
-  metrics: ComputedMetrics;
-  currentMonth: string;
-  prevMonth: string;
-  headcount?: { current: number; previous: number };
-}) {
-  const {
-    openFormulaViewer, getCardMode: getCardModeRaw, setCardMode: setCardModeRaw, mode: globalMode,
-  } = useMetrics();
-  const pageId = usePageId() ?? "dashboard";
-  const { masterEnabled: aiEnabled } = useAiFlags();
-  const def = getMetricDef(slug);
-  const cardMode = getCardModeRaw(pageId, slug);
-  const isOverride = cardMode !== globalMode;
-
-  if (!def) return null;
-
-  const hasData = isMetricDataAvailable(metrics, slug, currentMonth);
-
-  // If no data available, try to show available dependency metrics as fallback
-  if (!hasData) {
-    const fallbacks = getMetricFallbacks(slug, metrics, currentMonth);
-    const hint = getMetricMissingDataHint(slug);
-
-    if (fallbacks.length > 0) {
-      // Show the unavailable parent with its available children inline
-      return (
-        <div className="py-1 px-3 rounded-xl -mx-3">
-          <div className="flex items-center justify-between py-1 opacity-50" title={hint}>
-            <span className="text-sm text-surface-400">{def.name}</span>
-            <span className="text-xs text-surface-300 italic">{hint}</span>
-          </div>
-          {fallbacks.map((fb) => (
-            <div
-              key={fb.slug}
-              className="flex items-center justify-between py-1.5 pl-4 cursor-pointer hover:bg-surface-50 rounded-lg transition-colors"
-              onClick={() => openFormulaViewer(fb.slug)}
-              title={`${fb.def.description} — available as fallback`}
-            >
-              <span className="text-xs text-surface-400">
-                <span className="text-surface-300 mr-1">↳</span>
-                {fb.def.name}
-              </span>
-              <span className="text-xs font-medium text-surface-700 tabular-nums">
-                {formatMetricValue(fb.value, fb.def.format)}
-              </span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className="flex items-center justify-between py-2 px-3 rounded-xl -mx-3 opacity-50"
-        title={hint}
-      >
-        <span className="text-sm text-surface-400">{def.name}</span>
-        <span className="text-xs text-surface-300 italic">{hint}</span>
-      </div>
-    );
-  }
-
-  const currentVal = extractMetricValue(metrics, slug, currentMonth) ?? 0;
-  const prevVal = extractMetricValue(metrics, slug, prevMonth) ?? 0;
-
-  // Skip metrics that resolved to NaN or Infinity
-  if (!Number.isFinite(currentVal)) return null;
-
-  const formattedValue = formatMetricValue(currentVal, def.format);
-
-  // Calculate change
-  let change: string | null = null;
-  if (def.format === "percent") {
-    const diff = currentVal - prevVal;
-    if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
-      change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
-    }
-  } else if (def.format === "number") {
-    const diff = currentVal - prevVal;
-    if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
-      change = `${diff >= 0 ? "+" : ""}${diff}`;
-    }
-  } else if (prevVal !== 0) {
-    const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
-    if (pct !== 0 && Number.isFinite(pct)) {
-      change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
-    }
-  }
-
-  const benchmarkSignal = evaluateBenchmark(currentVal, def);
-
-  const benchmarkDisplay = def.benchmark
-    ? {
-        label: def.benchmark.label,
-        status: benchmarkSignal ?? ("good" as const),
-      }
-    : null;
-
-  return (
-    <div
-      className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-surface-50 transition-colors -mx-3 group cursor-pointer"
-      onClick={() => openFormulaViewer(slug)}
-      title={`${def.description} — click to see formula`}
-    >
-      <span className="text-sm text-surface-500 group-hover:text-surface-700 transition-colors">
-        {def.name}
-      </span>
-      <div className="flex items-center gap-2">
-        <CardSettings
-          currentMode={cardMode}
-          onModeChange={(mode) => setCardModeRaw(pageId, slug, mode)}
-          isOverride={isOverride}
-          aiEnabled={aiEnabled}
+      <div className="flex-1 min-h-0">
+        <DataTable
+          columns={columns}
+          data={rows}
+          rowKey={(row) => row.slug}
+          compact
+          onRowClick={(row) => openFormulaViewer(row.slug)}
+          emptyMessage="No metrics configured"
         />
-        <div className="flex items-center gap-3">
-          {change && (
-            <span
-              className={`text-xs font-medium tabular-nums ${
-                def.direction === "lower_better"
-                  ? change.startsWith("+")
-                    ? "text-danger-500"
-                    : change.startsWith("-")
-                      ? "text-success-500"
-                      : "text-surface-400"
-                  : change.startsWith("+")
-                    ? "text-success-500"
-                    : change.startsWith("-")
-                      ? "text-danger-500"
-                      : "text-surface-400"
-              }`}
-            >
-              {change}
-            </span>
-          )}
-          {benchmarkDisplay && (
-            <span
-              className={`text-xs tabular-nums ${
-                benchmarkDisplay.status === "good"
-                  ? "text-success-500"
-                  : benchmarkDisplay.status === "warn"
-                    ? "text-warning-500"
-                    : "text-danger-500"
-              }`}
-            >
-              {benchmarkDisplay.label}
-            </span>
-          )}
-          <span className="text-sm font-semibold text-surface-900 tabular-nums">
-            {formattedValue}
-          </span>
-        </div>
       </div>
     </div>
   );

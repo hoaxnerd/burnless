@@ -115,7 +115,7 @@ export function ChatMessageList({
                 <div
                   className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     isUser
-                      ? "bg-brand-600 text-white rounded-br-md"
+                      ? "bg-brand-600 text-white [&_*]:text-inherit rounded-br-md"
                       : "bg-surface-0 border border-surface-200 text-surface-800 rounded-bl-md shadow-sm"
                   }`}
                 >

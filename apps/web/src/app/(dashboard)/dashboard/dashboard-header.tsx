@@ -37,7 +37,7 @@ export function DashboardHeader({ companyName, hasData, boardData }: DashboardHe
             Dashboard
           </h1>
           <p className="mt-1.5 text-sm text-surface-400">
-            {companyName} &mdash; Financial command center
+            {companyName}
           </p>
         </div>
 

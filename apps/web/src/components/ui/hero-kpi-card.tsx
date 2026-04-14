@@ -20,16 +20,19 @@ import { WidgetCard } from "@/components/ui/widget-card";
 
 /* ── Mini sparkline — pure SVG, zero dependencies ─────────────────────────── */
 
-function Sparkline({
+export function Sparkline({
   data,
   color,
   height = 32,
   width = 80,
+  fluid = false,
 }: {
   data: number[];
   color: string;
   height?: number;
   width?: number;
+  /** When true, SVG stretches to fill container width */
+  fluid?: boolean;
 }) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -46,9 +49,10 @@ function Sparkline({
 
   return (
     <svg
-      width={width}
+      width={fluid ? "100%" : width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? "none" : undefined}
       className="overflow-visible"
       aria-hidden="true"
     >
@@ -235,6 +239,18 @@ export function HeroKpiCard({
     };
   }, [metricStyle]);
 
+  // Directional sparkline color: green for good trend, red for bad, brand fallback
+  const directionalSparkColor = useMemo(() => {
+    if (!change) return resolvedConfig.sparkColor;
+    const isPositive = change.startsWith("+");
+    const isNegative = change.startsWith("-");
+    if (!isPositive && !isNegative) return resolvedConfig.sparkColor;
+    // Design tokens: success-500 (#10b981), danger-500 (#ef4444)
+    // Hex required for SVG gradient stopColor compatibility
+    if (lowerIsBetter) return isPositive ? "#ef4444" : "#10b981";
+    return isPositive ? "#10b981" : "#ef4444";
+  }, [change, lowerIsBetter, resolvedConfig.sparkColor]);
+
   const Icon = resolvedConfig.icon;
   const router = useRouter();
   const ghost = hasData === false;
@@ -321,7 +337,7 @@ export function HeroKpiCard({
               <div className="hidden sm:block">
                 <Sparkline
                   data={sparkData}
-                  color={resolvedConfig.sparkColor}
+                  color={directionalSparkColor}
                 />
               </div>
             )}

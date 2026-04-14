@@ -41,9 +41,9 @@ const NON_HERO_LAYOUT_LG: DefaultLayoutItem[] = [
   { i: "ai-insights",       x: 0,  w: 12, h: 8, minW: 6, minH: 4 },
   { i: "chart-cash",        x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
   { i: "chart-rev-exp",     x: 6,  w: 6,  h: 10, minW: 4, minH: 7 },
+  { i: "custom-metrics",    x: 0,  w: 12, h: 8, minW: 6, minH: 5 },
   { i: "chart-burn-runway", x: 0,  w: 6,  h: 10, minW: 4, minH: 7 },
   { i: "chart-mrr",         x: 6,  w: 6,  h: 10, minW: 4, minH: 7 },
-  { i: "custom-metrics",    x: 6,  w: 6,  h: 8, minW: 4, minH: 5 },
 ];
 
 const NON_HERO_LAYOUT_SM: DefaultLayoutItem[] = [
@@ -51,9 +51,9 @@ const NON_HERO_LAYOUT_SM: DefaultLayoutItem[] = [
   { i: "ai-insights",       x: 0, w: 6, h: 8, minW: 6, minH: 4 },
   { i: "chart-cash",        x: 0, w: 6, h: 10, minW: 6, minH: 7 },
   { i: "chart-rev-exp",     x: 0, w: 6, h: 10, minW: 6, minH: 7 },
+  { i: "custom-metrics",    x: 0, w: 6, h: 8, minW: 6, minH: 5 },
   { i: "chart-burn-runway", x: 0, w: 6, h: 10, minW: 6, minH: 7 },
   { i: "chart-mrr",         x: 0, w: 6, h: 10, minW: 6, minH: 7 },
-  { i: "custom-metrics",    x: 0, w: 6, h: 8, minW: 6, minH: 5 },
 ];
 
 function generateHeroItems(heroCount: number, cols: number): DefaultLayoutItem[] {

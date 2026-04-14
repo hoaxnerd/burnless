@@ -26,16 +26,16 @@ export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = [
     href: "/import",
     implemented: true,
   },
+];
+
+export const COMING_SOON_INTEGRATIONS: IntegrationDef[] = [
   {
     type: "stripe",
     name: "Stripe",
     description: "Sync revenue and payment data from Stripe",
     icon: <CreditCard className="h-5 w-5" />,
-    implemented: true,
+    implemented: false,
   },
-];
-
-export const COMING_SOON_INTEGRATIONS: IntegrationDef[] = [
   {
     type: "plaid",
     name: "Plaid",

@@ -66,18 +66,18 @@ function addPDFHeader(doc: jsPDFType, opts: PDFReportOptions) {
   // Title
   doc.setFontSize(20);
   doc.setTextColor(15, 23, 42); // surface-900
-  doc.text(opts.title, 20, 30);
+  doc.text(opts.title, 20, 36);
 
   // Subtitle + date
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
   const subtitle = opts.subtitle ?? `${opts.scenarioName} scenario`;
-  doc.text(subtitle, 20, 38);
-  doc.text(`Generated ${date.toLocaleDateString(opts.locale ?? "en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 38, { align: "right" });
+  doc.text(subtitle, 20, 50);
+  doc.text(`Generated ${date.toLocaleDateString(opts.locale ?? "en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 50, { align: "right" });
 
   // Divider
   doc.setDrawColor(226, 232, 240); // surface-200
-  doc.line(20, 42, pageWidth - 20, 42);
+  doc.line(20, 56, pageWidth - 20, 56);
 }
 
 function addPDFFooter(doc: jsPDFType) {
@@ -176,7 +176,7 @@ function renderStatementTable(
       lineWidth: 0.1,
     },
     theme: "plain",
-    margin: { left: 20, right: 20, top: headerOpts ? 52 : 20 },
+    margin: { left: 20, right: 20, top: headerOpts ? 66 : 20 },
     didDrawPage: headerOpts
       ? (hookData: { pageNumber: number }) => {
           // Page 1 already has a header drawn by the caller; only draw on overflow pages
@@ -225,7 +225,7 @@ export async function generateProfitLossPDF(
       { item: profitAndLoss.otherExpenses },
       { item: profitAndLoss.netIncome, isSummary: true },
     ],
-    52,
+    66,
     "Income Statement",
     { currency: opts.currency, locale: opts.locale },
     pdfHeaderOpts
@@ -266,7 +266,7 @@ export async function generateCashFlowPDF(
       { item: cashFlow.netCashChange, isSubtotal: true },
       { item: endingCashItem, isSummary: true },
     ],
-    52,
+    66,
     "Cash Flow",
     { currency: opts.currency, locale: opts.locale },
     cfHeaderOpts
@@ -298,7 +298,7 @@ export async function generateBalanceSheetPDF(
       { item: balanceSheet.liabilities },
       { item: balanceSheet.equity, isSummary: true },
     ],
-    52,
+    66,
     "Balance Sheet",
     { currency: opts.currency, locale: opts.locale },
     bsHeaderOpts
@@ -323,7 +323,7 @@ export async function generateRunwaySummaryPDF(
 
   addPDFHeader(doc, { ...opts, title: opts.title || "Runway Summary" });
 
-  let y = 60;
+  let y = 76;
 
   const currency = opts.currency ?? "USD";
   const locale = opts.locale;
@@ -437,7 +437,7 @@ export async function generateInvestorDataRoomPDF(
   });
 
   // Key metrics summary
-  let y = 60;
+  let y = 76;
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
   doc.text("Key Financial Metrics", 20, y);
@@ -492,7 +492,7 @@ export async function generateInvestorDataRoomPDF(
       { item: data.profitAndLoss.operatingIncome, isSubtotal: true },
       { item: data.profitAndLoss.netIncome, isSummary: true },
     ],
-    52,
+    66,
     "Income Statement",
     clOpts,
     pnlHdrOpts
@@ -524,7 +524,7 @@ export async function generateInvestorDataRoomPDF(
       { item: data.cashFlow.netCashChange, isSubtotal: true },
       { item: endingCashItem, isSummary: true },
     ],
-    52,
+    66,
     "Cash Flow",
     clOpts,
     cfHdrOpts
@@ -549,7 +549,7 @@ export async function generateInvestorDataRoomPDF(
       { item: data.balanceSheet.liabilities },
       { item: data.balanceSheet.equity, isSummary: true },
     ],
-    52,
+    66,
     "Balance Sheet",
     clOpts,
     bsHdrOpts

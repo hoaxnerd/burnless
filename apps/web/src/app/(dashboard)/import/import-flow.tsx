@@ -253,10 +253,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
               onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
               History
             </Button>
-            <Button variant="secondary" size="sm" icon={<Link2 className="h-4 w-4" />}
-              onClick={() => setShowBankSync(!showBankSync)}>
-              Bank Sync
-            </Button>
+            {/* TODO: Bank Sync — future release */}
           </div>
         </div>
       )}
@@ -268,10 +265,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
             onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
             History
           </Button>
-          <Button variant="secondary" size="sm" icon={<Link2 className="h-4 w-4" />}
-            onClick={() => setShowBankSync(!showBankSync)}>
-            Bank Sync
-          </Button>
+          {/* TODO: Bank Sync — future release */}
         </div>
       )}
 
@@ -279,7 +273,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
         <ImportHistoryPanel history={history} historyLoading={historyLoading}
           setShowHistory={setShowHistory} rollbackBatch={rollbackBatch} />
       )}
-      {showBankSync && <BankSyncPanel setShowBankSync={setShowBankSync} />}
+      {/* TODO: Bank Sync — future release */}
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6 sm:mb-8 overflow-x-auto">
