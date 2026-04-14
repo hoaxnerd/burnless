@@ -2,13 +2,16 @@
  * scenario-middleware — server-side helper that extracts the active
  * scenario from an incoming request and performs safety checks.
  *
- * For mutating requests (POST/PATCH/PUT/DELETE):
- *   If the `active-scenario-id` cookie is present but the
- *   `X-Scenario-Id` header is missing, a ScenarioSafetyError is thrown.
- *   API route error handlers should catch this and return 409 Conflict.
+ * Dual-channel validation:
+ *   Channel 1: `active-scenario-id` cookie (set by ScenarioContext, auto-sent by browser)
+ *   Channel 2: `X-Scenario-Id` header (set by apiFetch from sessionStorage)
  *
- * Returns the scenario ID from the header, or null when no
- * scenario is active.
+ * For mutating requests (POST/PATCH/PUT/DELETE):
+ *   - If cookie is present but header is missing → ScenarioSafetyError (409)
+ *   - If header is present but cookie is missing → ScenarioSafetyError (409)
+ *   - If both present but values don't match → ScenarioSafetyError (409)
+ *
+ * Returns the scenario ID from the header, or null when no scenario is active.
  */
 
 export class ScenarioSafetyError extends Error {
@@ -27,10 +30,23 @@ export function getActiveScenario(request: Request): string | null {
     request.method
   );
 
-  if (cookie && !header && isMutation) {
-    throw new ScenarioSafetyError(
-      `Scenario active (cookie=${cookie}) but X-Scenario-Id header missing on ${request.method} ${request.url}`
-    );
+  if (isMutation) {
+    // Both channels must agree on mutations
+    if (cookie && !header) {
+      throw new ScenarioSafetyError(
+        `Scenario active (cookie=${cookie}) but X-Scenario-Id header missing on ${request.method} ${request.url}`
+      );
+    }
+    if (header && !cookie) {
+      throw new ScenarioSafetyError(
+        `X-Scenario-Id header present (${header}) but cookie missing on ${request.method} ${request.url}`
+      );
+    }
+    if (header && cookie && header !== cookie) {
+      throw new ScenarioSafetyError(
+        `Scenario channel mismatch: header=${header} cookie=${cookie} on ${request.method} ${request.url}`
+      );
+    }
   }
 
   return header ?? null;
