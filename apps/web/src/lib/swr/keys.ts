@@ -18,9 +18,6 @@ export const KEYS = {
   // Parameterized keys — call as functions
   aiDashboard: (days: number) => `/api/ai-dashboard?days=${days}`,
   scenario: (id: string) => `/api/scenarios/${id}`,
-  revenueStreams: (scenarioId: string) => `/api/revenue-streams?scenarioId=${scenarioId}`,
-  forecastLines: (scenarioId: string) => `/api/forecast-lines?scenarioId=${scenarioId}`,
-  headcountPlans: (scenarioId: string) => `/api/headcount-plans?scenarioId=${scenarioId}`,
   fundingRounds: () => "/api/funding-rounds",
   departments: () => "/api/departments",
   transactions: () => "/api/transactions",
