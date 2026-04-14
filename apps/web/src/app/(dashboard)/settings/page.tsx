@@ -16,7 +16,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "general" | "security" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
   >("general");
-  const { flags, updateFlags, loaded: aiLoaded, monthlyBudgetCents, budget, providerConfig } = useAiFlags();
+  const { flags, updateFlags, loaded: aiLoaded, credits, providerConfig } = useAiFlags();
 
   // Company profile state
   const [company, setCompany] = useState<CompanyProfile>({
@@ -165,7 +165,7 @@ export default function SettingsPage() {
 
       {/* TODO: Re-enable AI Features and AI Dashboard tabs in a later release */}
       {/* {activeTab === "ai" && aiLoaded && (
-        <AiFeaturesTab flags={flags} updateFlags={updateFlags} monthlyBudgetCents={monthlyBudgetCents} budget={budget} providerConfig={providerConfig} />
+        <AiFeaturesTab flags={flags} updateFlags={updateFlags} credits={credits} providerConfig={providerConfig} />
       )} */}
 
       {/* {activeTab === "ai-dashboard" && <AiDashboardTab />} */}

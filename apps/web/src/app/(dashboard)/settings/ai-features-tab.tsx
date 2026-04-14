@@ -3,15 +3,13 @@
 import { useState } from "react";
 import { Power, Database, Sparkles, Shield, Pencil, Key } from "lucide-react";
 import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
-import type { BudgetStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
+import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
 import { ProviderSection } from "./ai-provider-section";
-import { BudgetSection } from "./ai-budget-section";
 
 interface AiFeaturesTabProps {
   flags: AiFeatureFlagsState;
-  updateFlags: (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => void;
-  monthlyBudgetCents: number;
-  budget: BudgetStatus | null;
+  updateFlags: (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => void;
+  credits: CreditStatus | null;
   providerConfig: AiProviderConfig;
 }
 
@@ -27,7 +25,7 @@ const WRITE_MODES: { value: AiWriteMode; label: string; desc: string }[] = [
   { value: "read_only", label: "Read Only", desc: "AI can analyze and report but cannot modify any data" },
 ];
 
-export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, providerConfig }: AiFeaturesTabProps) {
+export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: AiFeaturesTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Level 1: Master Switch */}
@@ -151,13 +149,45 @@ export function AiFeaturesTab({ flags, updateFlags, monthlyBudgetCents, budget, 
         />
       )}
 
-      {/* Budget Enforcement */}
-      {flags.masterEnabled && (
-        <BudgetSection
-          monthlyBudgetCents={monthlyBudgetCents}
-          budget={budget}
-          updateFlags={updateFlags}
-        />
+      {/* AI Credits Status */}
+      {credits && (
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
+              <Sparkles className="h-[18px] w-[18px] text-surface-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-surface-900">AI Credits</h2>
+              <p className="text-sm text-surface-500 mt-0.5">
+                Your plan includes {credits.total.toLocaleString()} credits per month
+              </p>
+            </div>
+          </div>
+          <div className="mb-2">
+            <div className="flex justify-between items-baseline mb-2">
+              <span className="text-sm font-medium text-surface-700">
+                {credits.used.toLocaleString()} <span className="text-surface-400">of</span> {credits.total.toLocaleString()} credits
+              </span>
+              <span className={`text-xs font-medium ${
+                credits.exceeded ? "text-danger-600" : credits.warning ? "text-warning-600" : "text-surface-500"
+              }`}>
+                {credits.exceeded
+                  ? "Credits exhausted"
+                  : credits.warning
+                    ? "Running low"
+                    : `${credits.remaining.toLocaleString()} remaining`}
+              </span>
+            </div>
+            <div className="h-2 bg-surface-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  credits.exceeded ? "bg-danger-500" : credits.warning ? "bg-warning-500" : "bg-brand-500"
+                }`}
+                style={{ width: `${Math.min(credits.percentUsed, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Level 2: Per-Feature Switches */}
