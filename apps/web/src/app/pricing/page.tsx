@@ -89,7 +89,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function PricingPage() {
-  const [annual, setAnnual] = useState(true);
+  const [annual, setAnnual] = useState(false);
   const { ref: heroRef, inView: heroInView } = useInView();
   const { ref: tableRef, inView: tableInView } = useInView();
   const { ref: faqRef, inView: faqInView } = useInView();
@@ -155,11 +155,13 @@ export default function PricingPage() {
               >
                 Annual
               </span>
-              {annual && (
-                <span className="text-xs font-semibold text-brand-500 bg-brand-500/10 px-2.5 py-1 rounded-full">
-                  Save 17%
-                </span>
-              )}
+              <span
+                className={`text-xs font-semibold text-brand-500 bg-brand-500/10 rounded-full overflow-hidden transition-all duration-300 ${
+                  annual ? "px-2.5 py-1 opacity-100 max-w-24" : "px-0 py-0 opacity-0 max-w-0"
+                }`}
+              >
+                Save 17%
+              </span>
             </div>
           </div>
         </section>
@@ -171,13 +173,13 @@ export default function PricingPage() {
               {plans.map((plan, i) => (
                 <div
                   key={plan.name}
-                  className={`relative rounded-2xl border p-8 transition-all duration-500 ${
+                  className={`relative rounded-2xl border p-8 flex flex-col h-full transition-all duration-500 ${
                     heroInView
                       ? "opacity-100 translate-y-0"
                       : "opacity-0 translate-y-8"
                   } ${
                     plan.highlight
-                      ? "border-brand-500/50 bg-brand-500/[0.03] shadow-xl shadow-brand-500/10 scale-[1.02]"
+                      ? "border-brand-500/50 bg-brand-500/[0.03] shadow-xl shadow-brand-500/10"
                       : "border-surface-200/30 bg-surface-50/5"
                   }`}
                   style={{ transitionDelay: `${i * 100 + 200}ms` }}
@@ -190,23 +192,28 @@ export default function PricingPage() {
                     </div>
                   )}
 
+                  {/* Fixed: name + description */}
                   <h3 className="text-lg font-semibold text-surface-900">{plan.name}</h3>
                   <p className="mt-2 text-sm text-surface-500 h-10">{plan.description}</p>
 
-                  <div className="mt-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-surface-900 tabular-nums">
-                      ${annual ? plan.annualPrice : plan.monthlyPrice}
-                    </span>
-                    {plan.monthlyPrice > 0 && (
-                      <span className="text-sm text-surface-500">/mo</span>
+                  {/* Flexible: pricing adjusts to available space */}
+                  <div key={annual ? "annual" : "monthly"} className="mt-6 flex-1 animate-fade-in">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-surface-900 tabular-nums">
+                        ${annual ? plan.annualPrice : plan.monthlyPrice}
+                      </span>
+                      {plan.monthlyPrice > 0 && (
+                        <span className="text-sm text-surface-500">/mo</span>
+                      )}
+                    </div>
+                    {annual && plan.monthlyPrice > 0 && (
+                      <p className="mt-1 text-xs text-surface-400">
+                        Billed annually (${plan.annualPrice * 12}/yr)
+                      </p>
                     )}
                   </div>
-                  {annual && plan.monthlyPrice > 0 && (
-                    <p className="mt-1 text-xs text-surface-400">
-                      Billed annually (${plan.annualPrice * 12}/yr)
-                    </p>
-                  )}
 
+                  {/* Fixed: button + features pinned to bottom */}
                   <Link
                     href={plan.ctaHref}
                     className={`mt-8 flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all group ${
@@ -220,27 +227,12 @@ export default function PricingPage() {
                   </Link>
 
                   <ul className="mt-8 space-y-3.5">
-                    {comparisonFeatures.map((feature) => {
-                      const value = plan.comparison[feature.key];
-                      const included = value === true || (typeof value === "string" && value !== "false");
-
-                      return (
-                        <li key={feature.key} className="flex items-start gap-3">
-                          {included ? (
-                            <Check className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" />
-                          ) : (
-                            <X className="w-4 h-4 text-surface-300 mt-0.5 shrink-0" />
-                          )}
-                          <span
-                            className={`text-sm ${
-                              included ? "text-surface-700" : "text-surface-400"
-                            }`}
-                          >
-                            {typeof value === "string" ? value : feature.label}
-                          </span>
-                        </li>
-                      );
-                    })}
+                    {[plan.comparison.aiMessages, plan.comparison.scenarios].map((text) => (
+                      <li key={text} className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" />
+                        <span className="text-sm text-surface-700">{text}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               ))}

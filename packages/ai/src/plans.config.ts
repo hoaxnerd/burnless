@@ -36,8 +36,8 @@ export interface PlanDefinition {
     dashboards: boolean;
     reports: string;
     dataRoom: boolean;
-    teamAccess: boolean;
-    customIntegrations: boolean;
+    teamAccess: boolean | string;
+    customIntegrations: boolean | string;
     support: string;
   };
   upgradeTarget?: PlanKey;
@@ -125,8 +125,8 @@ export const PLANS: readonly PlanDefinition[] = [
       dashboards: true,
       reports: "Advanced reports + board updates",
       dataRoom: true,
-      teamAccess: false,
-      customIntegrations: false,
+      teamAccess: "Coming soon",
+      customIntegrations: "Coming soon",
       support: "Priority email",
     },
     upgradeTarget: "team",
