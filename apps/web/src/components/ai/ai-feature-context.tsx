@@ -18,11 +18,12 @@ import {
   type AiFeatureStatus,
 } from "@burnless/ai";
 
-// ── Budget types ────────────────────────────────────────────────────────────
+// ── Credit types ────────────────────────────────────────────────────────────
 
-export interface BudgetStatus {
-  spentCents: number;
-  budgetCents: number;
+export interface CreditStatus {
+  used: number;
+  total: number;
+  remaining: number;
   percentUsed: number;
   warning: boolean;
   exceeded: boolean;
@@ -46,13 +47,11 @@ interface AiFeatureContextValue {
   /** Check a specific feature's status */
   getFeature: (feature: AiFeatureName) => AiFeatureStatus;
   /** Update flags (calls PATCH /api/ai-features) */
-  updateFlags: (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => Promise<void>;
+  updateFlags: (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => Promise<void>;
   /** Convenience: is the master switch on? */
   masterEnabled: boolean;
-  /** Monthly budget cap in cents */
-  monthlyBudgetCents: number;
-  /** Current budget status (spend, warning, exceeded) */
-  budget: BudgetStatus | null;
+  /** Current credit status (used, remaining, warning, exceeded) */
+  credits: CreditStatus | null;
   /** AI provider configuration (masked API key) */
   providerConfig: AiProviderConfig;
   /** Configurable companion name */
@@ -65,8 +64,7 @@ const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
 
 export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [flags, setFlags] = useState<AiFeatureFlagsState>(DEFAULT_AI_FLAGS);
-  const [monthlyBudgetCents, setMonthlyBudgetCents] = useState(5000);
-  const [budget, setBudget] = useState<BudgetStatus | null>(null);
+  const [credits, setCredits] = useState<CreditStatus | null>(null);
   const [providerConfig, setProviderConfig] = useState<AiProviderConfig>({
     byokEnabled: false,
     aiProvider: null,
@@ -88,8 +86,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             companionName: data.companionName ?? DEFAULT_COMPANION_NAME,
             features: data.features,
           });
-          if (data.monthlyBudgetCents != null) setMonthlyBudgetCents(data.monthlyBudgetCents);
-          if (data.budget) setBudget(data.budget);
+          if (data.credits) setCredits(data.credits);
           setProviderConfig({
             byokEnabled: data.byokEnabled ?? false,
             aiProvider: data.aiProvider ?? null,
@@ -111,10 +108,9 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   );
 
   const updateFlags = useCallback(
-    async (patch: Partial<AiFeatureFlagsState & { monthlyBudgetCents?: number } & AiProviderConfig>) => {
+    async (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => {
       // Optimistic update for immediate UI feedback
       const prevFlags = flags;
-      const prevBudgetCents = monthlyBudgetCents;
       const prevProvider = providerConfig;
 
       if (patch.masterEnabled !== undefined || patch.dataMode || patch.writeMode || patch.features || patch.companionName) {
@@ -143,8 +139,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             companionName: updated.companionName ?? DEFAULT_COMPANION_NAME,
             features: updated.features,
           });
-          if (updated.monthlyBudgetCents != null) setMonthlyBudgetCents(updated.monthlyBudgetCents);
-          if (updated.budget) setBudget(updated.budget);
+          if (updated.credits) setCredits(updated.credits);
           setProviderConfig({
             byokEnabled: updated.byokEnabled ?? false,
             aiProvider: updated.aiProvider ?? null,
@@ -155,19 +150,17 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         } else {
           // Revert optimistic update on failure
           setFlags(prevFlags);
-          setMonthlyBudgetCents(prevBudgetCents);
           setProviderConfig(prevProvider);
           console.error(`AI feature update failed: ${res.status}`);
         }
       } catch {
         // Revert optimistic update on network error
         setFlags(prevFlags);
-        setMonthlyBudgetCents(prevBudgetCents);
         setProviderConfig(prevProvider);
         console.error("AI feature update failed: network error");
       }
     },
-    [flags, monthlyBudgetCents, providerConfig]
+    [flags, providerConfig]
   );
 
   return (
@@ -178,8 +171,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         getFeature,
         updateFlags,
         masterEnabled: flags.masterEnabled,
-        monthlyBudgetCents,
-        budget,
+        credits,
         providerConfig,
         companionName: flags.companionName ?? DEFAULT_COMPANION_NAME,
       }}
