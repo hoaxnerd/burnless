@@ -9,11 +9,16 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import {
   DEFAULT_AI_FLAGS,
   canFeatureCallLlm,
+  getPlan,
   type AiFeatureFlagsState,
   type AiFeatureName,
   type AiFeatureConfig,
   type AiWriteMode,
 } from "@burnless/ai";
+import { getCompanyPlan } from "./api-helpers";
+
+// 1 credit = 1000 microdollars (matches MICROS_PER_CREDIT in plans.config.ts)
+const MICROS_PER_CREDIT = 1000;
 
 export interface CompanyProviderConfig {
   provider?: string;
@@ -22,23 +27,35 @@ export interface CompanyProviderConfig {
   baseUrl?: string;
 }
 
-export interface AiFlagsWithBudget extends AiFeatureFlagsState {
-  monthlyBudgetCents: number;
+export interface CreditStatus {
+  used: number;
+  total: number;
+  remaining: number;
+  percentUsed: number;
+  warning: boolean;
+  exceeded: boolean;
+}
+
+/** Internal type — extends flags with BYOK fields for single-query loading. */
+interface AiFlagsInternal extends AiFeatureFlagsState {
+  byokEnabled: boolean;
+  aiApiKey: string | null;
 }
 
 /**
  * Load AI feature flags for a company. Returns defaults if none exist.
+ * Includes BYOK fields to avoid a second query in checkAiFeatureAllowed.
  */
 export async function getAiFlags(
   companyId: string
-): Promise<AiFlagsWithBudget> {
+): Promise<AiFlagsInternal> {
   const [row] = await db
     .select()
     .from(aiFeatureFlags)
     .where(eq(aiFeatureFlags.companyId, companyId))
     .limit(1);
 
-  if (!row) return { ...DEFAULT_AI_FLAGS, monthlyBudgetCents: 5000 };
+  if (!row) return { ...DEFAULT_AI_FLAGS, byokEnabled: false, aiApiKey: null };
 
   return {
     masterEnabled: row.masterEnabled,
@@ -46,14 +63,15 @@ export async function getAiFlags(
     writeMode: (row.writeMode ?? "full") as AiWriteMode,
     features: row.features as AiFeatureConfig,
     companionName: row.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    monthlyBudgetCents: row.monthlyBudgetCents,
+    byokEnabled: row.byokEnabled,
+    aiApiKey: row.aiApiKey,
   };
 }
 
 /**
- * Get the current month's AI spend in cents for a company.
+ * Get the current month's AI credit usage for a company.
  */
-export async function getMonthlySpendCents(companyId: string): Promise<number> {
+export async function getMonthlyCreditsUsed(companyId: string): Promise<number> {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -69,30 +87,26 @@ export async function getMonthlySpendCents(companyId: string): Promise<number> {
       )
     );
 
-  // Convert microdollars to cents: 1 cent = 10,000 microdollars
-  return Math.round(Number(result?.totalMicros ?? 0) / 10_000);
-}
-
-export interface BudgetStatus {
-  spentCents: number;
-  budgetCents: number;
-  percentUsed: number;
-  warning: boolean;
-  exceeded: boolean;
+  const totalMicros = Number(result?.totalMicros ?? 0);
+  return Math.ceil(totalMicros / MICROS_PER_CREDIT);
 }
 
 /**
- * Get budget status for a company.
+ * Get credit status for a company based on their plan's monthly allocation.
+ * Accepts optional planKey to avoid redundant getCompanyPlan queries.
  */
-export async function getBudgetStatus(companyId: string): Promise<BudgetStatus> {
-  const flags = await getAiFlags(companyId);
-  const spentCents = await getMonthlySpendCents(companyId);
-  const budgetCents = flags.monthlyBudgetCents;
-  const percentUsed = budgetCents > 0 ? (spentCents / budgetCents) * 100 : 0;
+export async function getCreditStatus(companyId: string, planKey?: string): Promise<CreditStatus> {
+  const resolvedPlanKey = planKey ?? await getCompanyPlan(companyId);
+  const plan = getPlan(resolvedPlanKey);
+  const used = await getMonthlyCreditsUsed(companyId);
+  const total = plan.monthlyAiCredits;
+  const remaining = Math.max(0, total - used);
+  const percentUsed = total > 0 ? (used / total) * 100 : 0;
 
   return {
-    spentCents,
-    budgetCents,
+    used,
+    total,
+    remaining,
     percentUsed: Math.round(percentUsed * 10) / 10,
     warning: percentUsed >= 80 && percentUsed < 100,
     exceeded: percentUsed >= 100,
@@ -101,12 +115,15 @@ export async function getBudgetStatus(companyId: string): Promise<BudgetStatus> 
 
 /**
  * Check if a specific AI feature is allowed to make LLM calls.
- * Returns { allowed, reason, budgetStatus } for use in API routes.
+ * Returns { allowed, reason, creditStatus } for use in API routes.
+ *
+ * Single DB query for flags (including BYOK fields) via getAiFlags.
+ * Single getCompanyPlan call shared with getCreditStatus.
  */
 export async function checkAiFeatureAllowed(
   companyId: string,
   feature: AiFeatureName
-): Promise<{ allowed: boolean; reason?: string; budgetStatus?: BudgetStatus; writeMode?: AiWriteMode }> {
+): Promise<{ allowed: boolean; reason?: string; creditStatus?: CreditStatus; writeMode?: AiWriteMode }> {
   const flags = await getAiFlags(companyId);
 
   if (!flags.masterEnabled) {
@@ -124,17 +141,24 @@ export async function checkAiFeatureAllowed(
     };
   }
 
-  // Budget enforcement: check monthly spend against cap
-  const budgetStatus = await getBudgetStatus(companyId);
-  if (budgetStatus.exceeded) {
+  // BYOK users skip credit enforcement — they pay their own LLM provider
+  if (flags.byokEnabled && flags.aiApiKey) {
+    return { allowed: true, writeMode: flags.writeMode };
+  }
+
+  // Credit enforcement: single getCompanyPlan call shared with getCreditStatus
+  const planKey = await getCompanyPlan(companyId);
+  const creditStatus = await getCreditStatus(companyId, planKey);
+  if (creditStatus.exceeded) {
+    const plan = getPlan(planKey);
     return {
       allowed: false,
-      reason: `AI budget exceeded ($${(budgetStatus.spentCents / 100).toFixed(2)} of $${(budgetStatus.budgetCents / 100).toFixed(2)} monthly cap). Adjust your budget in Settings > AI Features or wait until next month.`,
-      budgetStatus,
+      reason: `AI credits exhausted (${creditStatus.used.toLocaleString()} of ${creditStatus.total.toLocaleString()} monthly credits used). ${plan.upgradeTarget ? `Upgrade to ${getPlan(plan.upgradeTarget).name} for more credits` : "Wait until next month"} or adjust in Settings.`,
+      creditStatus,
     };
   }
 
-  return { allowed: true, budgetStatus, writeMode: flags.writeMode };
+  return { allowed: true, creditStatus, writeMode: flags.writeMode };
 }
 
 /**
@@ -156,7 +180,6 @@ export async function getCompanyProviderConfig(
     .where(eq(aiFeatureFlags.companyId, companyId))
     .limit(1);
 
-  // BYOK disabled or no custom key — use platform defaults
   if (!row?.byokEnabled || !row?.aiApiKey) return undefined;
 
   return {
