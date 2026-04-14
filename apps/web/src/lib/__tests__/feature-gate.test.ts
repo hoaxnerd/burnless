@@ -1,46 +1,51 @@
-import { describe, it, expect } from "vitest";
-import { canPerformAction, getPlanLimits } from "../feature-gate";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { canPerformAction } from "../feature-gate";
+
+// Mock @burnless/ai so tests are isolated from plan config changes
+vi.mock("@burnless/ai", () => {
+  const plans: Record<string, object> = {
+    free: {
+      maxScenarios: 1,
+      maxExports: 3,
+      hasDataRoom: false,
+      hasTeamAccess: false,
+      hasCustomIntegrations: false,
+      upgradeTarget: "pro",
+    },
+    pro: {
+      maxScenarios: Infinity,
+      maxExports: Infinity,
+      hasDataRoom: true,
+      hasTeamAccess: false,
+      hasCustomIntegrations: false,
+      upgradeTarget: "team",
+    },
+    team: {
+      maxScenarios: Infinity,
+      maxExports: Infinity,
+      hasDataRoom: true,
+      hasTeamAccess: true,
+      hasCustomIntegrations: true,
+      upgradeTarget: undefined,
+    },
+  };
+
+  return {
+    getPlan: (key: string) => plans[key] ?? plans["free"],
+  };
+});
 
 describe("feature-gate", () => {
-  describe("getPlanLimits", () => {
-    it("returns correct free plan limits", () => {
-      const limits = getPlanLimits("free");
-      expect(limits.maxScenarios).toBe(3);
-      expect(limits.maxAiMessages).toBe(10);
-      expect(limits.maxExports).toBe(3);
-      expect(limits.hasDataRoom).toBe(false);
-      expect(limits.hasTeamAccess).toBe(false);
-      expect(limits.hasCustomIntegrations).toBe(false);
-    });
-
-    it("returns correct pro plan limits", () => {
-      const limits = getPlanLimits("pro");
-      expect(limits.maxScenarios).toBe(Infinity);
-      expect(limits.maxAiMessages).toBe(Infinity);
-      expect(limits.maxExports).toBe(Infinity);
-      expect(limits.hasDataRoom).toBe(true);
-      expect(limits.hasTeamAccess).toBe(false);
-    });
-
-    it("returns correct team plan limits", () => {
-      const limits = getPlanLimits("team");
-      expect(limits.maxScenarios).toBe(Infinity);
-      expect(limits.hasDataRoom).toBe(true);
-      expect(limits.hasTeamAccess).toBe(true);
-      expect(limits.hasCustomIntegrations).toBe(true);
-    });
-  });
-
   describe("canPerformAction", () => {
     describe("create_scenario", () => {
       it("blocks free plan at limit", () => {
-        const result = canPerformAction("free", "create_scenario", 3);
+        const result = canPerformAction("free", "create_scenario", 1);
         expect(result.allowed).toBe(false);
-        expect(result.reason).toContain("Free plan");
+        expect(result.reason).toContain("Your plan is limited to 1 scenario");
       });
 
       it("allows free plan under limit", () => {
-        const result = canPerformAction("free", "create_scenario", 2);
+        const result = canPerformAction("free", "create_scenario", 0);
         expect(result.allowed).toBe(true);
       });
 
@@ -55,33 +60,20 @@ describe("feature-gate", () => {
       });
     });
 
-    describe("ai_message", () => {
-      it("blocks free plan at 10 messages", () => {
-        const result = canPerformAction("free", "ai_message", 10);
-        expect(result.allowed).toBe(false);
-        expect(result.reason).toContain("10 AI messages");
-      });
-
-      it("allows free plan under 10 messages", () => {
-        const result = canPerformAction("free", "ai_message", 9);
-        expect(result.allowed).toBe(true);
-      });
-
-      it("allows pro plan unlimited", () => {
-        const result = canPerformAction("pro", "ai_message", 10000);
-        expect(result.allowed).toBe(true);
-      });
-    });
-
     describe("export", () => {
       it("blocks free plan at 3 exports", () => {
         const result = canPerformAction("free", "export", 3);
         expect(result.allowed).toBe(false);
-        expect(result.reason).toContain("3 exports");
+        expect(result.reason).toContain("3 exports per month");
       });
 
       it("allows free plan under 3 exports", () => {
         const result = canPerformAction("free", "export", 2);
+        expect(result.allowed).toBe(true);
+      });
+
+      it("allows pro plan always", () => {
+        const result = canPerformAction("pro", "export", 10000);
         expect(result.allowed).toBe(true);
       });
     });
@@ -138,17 +130,12 @@ describe("feature-gate", () => {
     });
 
     describe("upgradeTarget", () => {
-      it("suggests pro for scenario limits", () => {
-        const result = canPerformAction("free", "create_scenario", 3);
+      it("suggests pro for scenario limits (free plan)", () => {
+        const result = canPerformAction("free", "create_scenario", 1);
         expect(result.upgradeTarget).toBe("pro");
       });
 
-      it("suggests pro for AI message limits", () => {
-        const result = canPerformAction("free", "ai_message", 10);
-        expect(result.upgradeTarget).toBe("pro");
-      });
-
-      it("suggests pro for export limits", () => {
+      it("suggests pro for export limits (free plan)", () => {
         const result = canPerformAction("free", "export", 3);
         expect(result.upgradeTarget).toBe("pro");
       });
@@ -171,16 +158,15 @@ describe("feature-gate", () => {
 
     describe("boundary conditions", () => {
       it("blocks at exact limit (not just above)", () => {
-        // Free plan: maxAiMessages = 10
-        const atLimit = canPerformAction("free", "ai_message", 10);
+        const atLimit = canPerformAction("free", "export", 3);
         expect(atLimit.allowed).toBe(false);
 
-        const belowLimit = canPerformAction("free", "ai_message", 9);
+        const belowLimit = canPerformAction("free", "export", 2);
         expect(belowLimit.allowed).toBe(true);
       });
 
       it("handles zero usage", () => {
-        const result = canPerformAction("free", "ai_message", 0);
+        const result = canPerformAction("free", "export", 0);
         expect(result.allowed).toBe(true);
       });
     });

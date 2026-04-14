@@ -1,56 +1,15 @@
 /**
- * Feature gating middleware — checks subscription plan limits before
- * allowing actions. Used by API routes to enforce plan restrictions.
- *
- * For MVP, all features are unlocked. When Stripe is connected,
- * this will check actual subscription status.
+ * Feature gating — checks subscription plan limits before allowing actions.
+ * Reads all limits from the centralized plan config.
+ * AI credits are enforced separately by ai-feature-flags.ts.
  */
 
-export type Plan = "free" | "pro" | "team";
+import { getPlan, type PlanKey } from "@burnless/ai";
 
-export interface PlanLimits {
-  maxScenarios: number;
-  maxAiMessages: number;
-  maxExports: number;
-  hasDataRoom: boolean;
-  hasTeamAccess: boolean;
-  hasCustomIntegrations: boolean;
-}
-
-const PLAN_LIMITS: Record<Plan, PlanLimits> = {
-  free: {
-    maxScenarios: 3,
-    maxAiMessages: 10,
-    maxExports: 3,
-    hasDataRoom: false,
-    hasTeamAccess: false,
-    hasCustomIntegrations: false,
-  },
-  pro: {
-    maxScenarios: Infinity,
-    maxAiMessages: Infinity,
-    maxExports: Infinity,
-    hasDataRoom: true,
-    hasTeamAccess: false,
-    hasCustomIntegrations: false,
-  },
-  team: {
-    maxScenarios: Infinity,
-    maxAiMessages: Infinity,
-    maxExports: Infinity,
-    hasDataRoom: true,
-    hasTeamAccess: true,
-    hasCustomIntegrations: true,
-  },
-};
-
-export function getPlanLimits(plan: Plan): PlanLimits {
-  return PLAN_LIMITS[plan];
-}
+export type Plan = PlanKey;
 
 export type GatedAction =
   | "create_scenario"
-  | "ai_message"
   | "export"
   | "data_room"
   | "team_access"
@@ -61,41 +20,31 @@ export function canPerformAction(
   action: GatedAction,
   currentUsage?: number
 ): { allowed: boolean; reason?: string; upgradeTarget?: Plan } {
-  const limits = PLAN_LIMITS[plan];
+  const def = getPlan(plan);
 
   switch (action) {
     case "create_scenario":
-      if (currentUsage !== undefined && currentUsage >= limits.maxScenarios) {
+      if (currentUsage !== undefined && currentUsage >= def.maxScenarios) {
         return {
           allowed: false,
-          reason: `Free plan is limited to ${limits.maxScenarios} scenarios. Upgrade to Pro for unlimited scenarios.`,
-          upgradeTarget: "pro",
-        };
-      }
-      return { allowed: true };
-
-    case "ai_message":
-      if (currentUsage !== undefined && currentUsage >= limits.maxAiMessages) {
-        return {
-          allowed: false,
-          reason: `You've used all ${limits.maxAiMessages} AI messages this month. Upgrade to Pro for unlimited AI access.`,
-          upgradeTarget: "pro",
+          reason: `Your plan is limited to ${def.maxScenarios} scenario${def.maxScenarios === 1 ? "" : "s"}. Upgrade to ${def.upgradeTarget === "pro" ? "Pro" : "Team"} for unlimited scenarios.`,
+          upgradeTarget: def.upgradeTarget,
         };
       }
       return { allowed: true };
 
     case "export":
-      if (currentUsage !== undefined && currentUsage >= limits.maxExports) {
+      if (currentUsage !== undefined && currentUsage >= def.maxExports) {
         return {
           allowed: false,
-          reason: `Free plan is limited to ${limits.maxExports} exports per month. Upgrade to Pro for unlimited exports.`,
-          upgradeTarget: "pro",
+          reason: `Your plan is limited to ${def.maxExports} exports per month. Upgrade to Pro for unlimited exports.`,
+          upgradeTarget: def.upgradeTarget,
         };
       }
       return { allowed: true };
 
     case "data_room":
-      if (!limits.hasDataRoom) {
+      if (!def.hasDataRoom) {
         return {
           allowed: false,
           reason: "Data Room is a Pro feature. Upgrade to access investor data room.",
@@ -105,7 +54,7 @@ export function canPerformAction(
       return { allowed: true };
 
     case "team_access":
-      if (!limits.hasTeamAccess) {
+      if (!def.hasTeamAccess) {
         return {
           allowed: false,
           reason: "Team access requires a Team plan.",
@@ -115,10 +64,10 @@ export function canPerformAction(
       return { allowed: true };
 
     case "custom_integrations":
-      if (!limits.hasCustomIntegrations) {
+      if (!def.hasCustomIntegrations) {
         return {
           allowed: false,
-          reason: "Custom integrations require a Team plan. Upgrade to connect accounting and banking tools.",
+          reason: "Custom integrations require a Team plan.",
           upgradeTarget: "team",
         };
       }
