@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 import { updateAiFeaturesSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
-import { getBudgetStatus } from "@/lib/ai-feature-flags";
+import { getCreditStatus } from "@/lib/ai-feature-flags";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
 
@@ -22,8 +22,8 @@ export const GET = withErrorHandler(async (_request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const flags = await getOrCreateFlags(ctx.companyId);
-  const budget = await getBudgetStatus(ctx.companyId);
-  return NextResponse.json({ ...flags, budget });
+  const credits = await getCreditStatus(ctx.companyId);
+  return NextResponse.json({ ...flags, credits });
 });
 
 // ── PATCH ───────────────────────────────────────────────────────────────────
@@ -54,9 +54,6 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   }
   if (body.writeMode !== undefined) {
     updates.writeMode = body.writeMode;
-  }
-  if (body.monthlyBudgetCents !== undefined) {
-    updates.monthlyBudgetCents = body.monthlyBudgetCents;
   }
   if (body.features) {
     updates.features = {
@@ -89,7 +86,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     return errorResponse("Failed to update AI feature flags", 500);
   }
 
-  const budget = await getBudgetStatus(ctx.companyId);
+  const credits = await getCreditStatus(ctx.companyId);
 
   return NextResponse.json({
     masterEnabled: updated.masterEnabled,
@@ -97,13 +94,12 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     writeMode: updated.writeMode,
     features: updated.features,
     companionName: updated.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    monthlyBudgetCents: updated.monthlyBudgetCents,
     byokEnabled: updated.byokEnabled,
     aiProvider: updated.aiProvider,
     aiApiKey: maskApiKey(updated.aiApiKey),
     aiModel: updated.aiModel,
     aiBaseUrl: updated.aiBaseUrl,
-    budget,
+    credits,
   });
 });
 
@@ -123,7 +119,6 @@ async function getOrCreateFlags(companyId: string) {
       writeMode: (existing.writeMode ?? "full") as "full" | "confirm" | "read_only",
       features: existing.features as AiFeatureConfig,
       companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
-      monthlyBudgetCents: existing.monthlyBudgetCents,
       byokEnabled: existing.byokEnabled,
       aiProvider: existing.aiProvider,
       aiApiKey: maskApiKey(existing.aiApiKey),
@@ -149,7 +144,6 @@ async function getOrCreateFlags(companyId: string) {
     writeMode: (created?.writeMode ?? DEFAULT_AI_FLAGS.writeMode) as "full" | "confirm" | "read_only",
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
     companionName: created?.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    monthlyBudgetCents: created?.monthlyBudgetCents ?? 5000,
     byokEnabled: created?.byokEnabled ?? false,
     aiProvider: null,
     aiApiKey: null,

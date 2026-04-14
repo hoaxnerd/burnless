@@ -181,7 +181,6 @@ export const updateAiFeaturesSchema = z.object({
   masterEnabled: z.boolean().optional(),
   dataMode: aiDataModeEnum.optional(),
   writeMode: aiWriteModeEnum.optional(),
-  monthlyBudgetCents: z.number().int().min(0).max(1_000_000).optional(),
   features: z
     .object({
       onboarding: z.boolean().optional(),

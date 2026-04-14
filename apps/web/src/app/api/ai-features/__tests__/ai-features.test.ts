@@ -30,8 +30,8 @@ const {
   mockSet: vi.fn(),
 }));
 
-const { mockGetBudgetStatus } = vi.hoisted(() => ({
-  mockGetBudgetStatus: vi.fn(),
+const { mockGetCreditStatus } = vi.hoisted(() => ({
+  mockGetCreditStatus: vi.fn(),
 }));
 
 // ── Mock modules ─────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ vi.mock("@burnless/ai", () => ({
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({
-  getBudgetStatus: mockGetBudgetStatus,
+  getCreditStatus: mockGetCreditStatus,
 }));
 
 // ── Chain setup ──────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ describe("GET /api/ai-features", () => {
         aiBaseUrl: null,
       },
     ]);
-    mockGetBudgetStatus.mockResolvedValue({
+    mockGetCreditStatus.mockResolvedValue({
       percentUsed: 25,
       warning: false,
       exceeded: false,
@@ -146,7 +146,7 @@ describe("GET /api/ai-features", () => {
     expect(res.status).toBe(200);
     expect(body.masterEnabled).toBe(true);
     expect(body.dataMode).toBe("full");
-    expect(body.budget).toBeDefined();
+    expect(body.credits).toBeDefined();
     // API key should be masked
     expect(body.aiApiKey).toContain("••••••••");
     expect(body.aiApiKey).not.toBe("sk-ant-1234567890abcdef");
@@ -163,7 +163,7 @@ describe("GET /api/ai-features", () => {
         monthlyBudgetCents: 5000,
       },
     ]);
-    mockGetBudgetStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
+    mockGetCreditStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
 
     const { GET } = await import("../route");
     const res = await GET(new Request("http://localhost/api/ai-features"));
@@ -260,7 +260,7 @@ describe("PATCH /api/ai-features", () => {
         aiBaseUrl: null,
       },
     ]);
-    mockGetBudgetStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
+    mockGetCreditStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
 
     const { PATCH } = await import("../route");
     const res = await PATCH(
@@ -284,20 +284,6 @@ describe("PATCH /api/ai-features", () => {
       new Request("http://localhost/api/ai-features", {
         method: "PATCH",
         body: JSON.stringify({ aiProvider: "invalid_provider" }),
-      })
-    );
-    expect(res.status).toBe(400);
-  });
-
-  it("validates monthlyBudgetCents range (0–1,000,000)", async () => {
-    mockRequireCompanyAccess.mockResolvedValue(CTX);
-    mockRequireRole.mockReturnValue(null);
-
-    const { PATCH } = await import("../route");
-    const res = await PATCH(
-      new Request("http://localhost/api/ai-features", {
-        method: "PATCH",
-        body: JSON.stringify({ monthlyBudgetCents: 2_000_000 }),
       })
     );
     expect(res.status).toBe(400);

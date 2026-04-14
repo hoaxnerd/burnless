@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockGetBudgetStatus } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetCreditStatus } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetBudgetStatus: vi.fn(),
+  mockGetCreditStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -12,7 +12,7 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({
-  getBudgetStatus: mockGetBudgetStatus,
+  getCreditStatus: mockGetCreditStatus,
 }));
 
 const { mockSelect, mockFrom, mockWhere, mockGroupBy, mockOrderBy } = vi.hoisted(() => ({
@@ -54,11 +54,13 @@ describe("GET /api/ai-costs", () => {
       companyId: "c1",
       role: "owner",
     });
-    mockGetBudgetStatus.mockResolvedValue({
-      monthlyLimitMicros: 10_000_000,
-      usedMicros: 2_500_000,
-      remainingMicros: 7_500_000,
+    mockGetCreditStatus.mockResolvedValue({
+      used: 2_500_000,
+      total: 10_000_000,
+      remaining: 7_500_000,
       percentUsed: 25,
+      warning: false,
+      exceeded: false,
     });
 
     // First call: featureBreakdown query chain
@@ -91,7 +93,7 @@ describe("GET /api/ai-costs", () => {
     expect(body.totalRequests).toBe(0);
     expect(body.featureBreakdown).toEqual([]);
     expect(body.dailySpend).toEqual([]);
-    expect(body.budget).toBeDefined();
+    expect(body.credits).toBeDefined();
   });
 
   it("returns cost data with feature breakdown", async () => {

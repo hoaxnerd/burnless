@@ -13,7 +13,7 @@ import { NextResponse } from "next/server";
 import { db, aiUsageLogs } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, withErrorHandler } from "@/lib/api-helpers";
-import { getBudgetStatus } from "@/lib/ai-feature-flags";
+import { getCreditStatus } from "@/lib/ai-feature-flags";
 import {
   getFeatureTierMap,
   getFeatureProviderMap,
@@ -35,7 +35,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   since.setDate(since.getDate() - days);
 
   // Run queries in parallel
-  const [featureBreakdown, dailySpend, budget] = await Promise.all([
+  const [featureBreakdown, dailySpend, credits] = await Promise.all([
     // Per-feature aggregation with latency stats
     db
       .select({
@@ -78,7 +78,7 @@ export const GET = withErrorHandler(async (request: Request) => {
       .groupBy(sql`date_trunc('day', ${aiUsageLogs.createdAt})`)
       .orderBy(sql`date_trunc('day', ${aiUsageLogs.createdAt})`),
 
-    getBudgetStatus(ctx.companyId),
+    getCreditStatus(ctx.companyId),
   ]);
 
   const totalCostMicros = featureBreakdown.reduce((s, f) => s + (f.totalCostMicros ?? 0), 0);
@@ -91,7 +91,7 @@ export const GET = withErrorHandler(async (request: Request) => {
       totalCostUSD: totalCostMicros / 1_000_000,
       totalRequests,
     },
-    budget,
+    credits,
     featureBreakdown: featureBreakdown.map((f) => ({
       ...f,
       costUSD: (f.totalCostMicros ?? 0) / 1_000_000,

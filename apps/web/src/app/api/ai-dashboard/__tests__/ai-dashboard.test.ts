@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockRequireRole, mockGetBudgetStatus } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireRole, mockGetCreditStatus } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
   mockRequireRole: vi.fn(),
-  mockGetBudgetStatus: vi.fn(),
+  mockGetCreditStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -14,7 +14,7 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@/lib/ai-feature-flags", () => ({
-  getBudgetStatus: mockGetBudgetStatus,
+  getCreditStatus: mockGetCreditStatus,
 }));
 
 const { mockGetFeatureTierMap, mockGetFeatureProviderMap, mockGetAllProviderHealth } = vi.hoisted(() => ({
@@ -70,11 +70,13 @@ describe("GET /api/ai-dashboard", () => {
       role: "admin",
     });
     mockRequireRole.mockReturnValue(null); // no error = authorized
-    mockGetBudgetStatus.mockResolvedValue({
-      monthlyLimitMicros: 10_000_000,
-      usedMicros: 500_000,
-      remainingMicros: 9_500_000,
+    mockGetCreditStatus.mockResolvedValue({
+      used: 500_000,
+      total: 10_000_000,
+      remaining: 9_500_000,
       percentUsed: 5,
+      warning: false,
+      exceeded: false,
     });
     mockGetFeatureTierMap.mockReturnValue({ chat: "standard", insights: "premium" });
     mockGetFeatureProviderMap.mockReturnValue({ chat: "anthropic", insights: "openai" });
@@ -106,7 +108,7 @@ describe("GET /api/ai-dashboard", () => {
     expect(body.summary).toBeDefined();
     expect(body.summary.totalCostMicros).toBe(0);
     expect(body.summary.totalCostUSD).toBe(0);
-    expect(body.budget).toBeDefined();
+    expect(body.credits).toBeDefined();
     expect(body.providerHealth).toBeDefined();
     expect(body.routing.featureTiers).toEqual({ chat: "standard", insights: "premium" });
     expect(body.routing.featureProviders).toEqual({ chat: "anthropic", insights: "openai" });
