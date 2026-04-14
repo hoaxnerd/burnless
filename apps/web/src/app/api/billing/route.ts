@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireCompanyAccess, requireRole, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { db, companies, scenarios, aiMessages, aiConversations, exportLogs, users } from "@burnless/db";
+import { db, companies, scenarios, exportLogs, users } from "@burnless/db";
 import { eq, and, gte, count, isNull } from "drizzle-orm";
-import { getPlanLimits } from "@/lib/feature-gate";
+import { getPlan } from "@burnless/ai";
+import { getCreditStatus } from "@/lib/ai-feature-flags";
 import { env } from "@/lib/env";
 import {
   getPaymentProvider,
@@ -31,7 +32,7 @@ interface SubscriptionStatus {
   portalUrl?: string;
   usage: {
     scenarios: { used: number; limit: number };
-    aiMessages: { used: number; limit: number };
+    aiCredits: { used: number; total: number; remaining: number };
     exports: { used: number; limit: number };
   };
 }
@@ -41,7 +42,7 @@ export const GET = withErrorHandler(async (_request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const plan = await getCompanyPlan(ctx.companyId);
-  const limits = getPlanLimits(plan);
+  const planDef = getPlan(plan);
 
   // Get real usage counts
   const scenarioRows = await db
@@ -50,23 +51,11 @@ export const GET = withErrorHandler(async (_request: Request) => {
     .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   const scenarioCount = scenarioRows[0]?.cnt ?? 0;
 
-  // Monthly AI messages
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const aiMessageRows = await db
-    .select({ cnt: count() })
-    .from(aiMessages)
-    .innerJoin(aiConversations, eq(aiMessages.conversationId, aiConversations.id))
-    .where(
-      and(
-        eq(aiConversations.companyId, ctx.companyId),
-        eq(aiMessages.role, "user"),
-        gte(aiMessages.createdAt, monthStart)
-      )
-    );
-  const aiMessageCount = aiMessageRows[0]?.cnt ?? 0;
+  const creditStatus = await getCreditStatus(ctx.companyId, plan);
 
   // Monthly exports
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const exportRows = await db
     .select({ cnt: count() })
     .from(exportLogs)
@@ -121,15 +110,16 @@ export const GET = withErrorHandler(async (_request: Request) => {
     usage: {
       scenarios: {
         used: scenarioCount,
-        limit: limits.maxScenarios === Infinity ? -1 : limits.maxScenarios,
+        limit: planDef.maxScenarios === Infinity ? -1 : planDef.maxScenarios,
       },
-      aiMessages: {
-        used: aiMessageCount,
-        limit: limits.maxAiMessages === Infinity ? -1 : limits.maxAiMessages,
+      aiCredits: {
+        used: creditStatus.used,
+        total: creditStatus.total,
+        remaining: creditStatus.remaining,
       },
       exports: {
         used: exportCount,
-        limit: limits.maxExports === Infinity ? -1 : limits.maxExports,
+        limit: planDef.maxExports === Infinity ? -1 : planDef.maxExports,
       },
     },
   };

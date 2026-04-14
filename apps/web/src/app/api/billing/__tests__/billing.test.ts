@@ -22,8 +22,12 @@ const {
   mockIsBillingEnabled: vi.fn(),
 }));
 
-const { mockGetPlanLimits } = vi.hoisted(() => ({
-  mockGetPlanLimits: vi.fn(),
+const { mockGetPlan } = vi.hoisted(() => ({
+  mockGetPlan: vi.fn(),
+}));
+
+const { mockGetCreditStatus } = vi.hoisted(() => ({
+  mockGetCreditStatus: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -75,8 +79,6 @@ vi.mock("@burnless/db", () => {
     },
     companies: { id: "id", billingProvider: "billingProvider", stripeCustomerId: "stripeCustomerId", stripeSubscriptionId: "stripeSubscriptionId", currency: "currency" },
     scenarios: { companyId: "companyId" },
-    aiMessages: { conversationId: "conversationId", role: "role", createdAt: "createdAt" },
-    aiConversations: { id: "id", companyId: "companyId" },
     users: { id: "id", email: "email", name: "name" },
     exportLogs: { companyId: "companyId", createdAt: "createdAt" },
   };
@@ -90,8 +92,12 @@ vi.mock("drizzle-orm", () => ({
   isNull: vi.fn(),
 }));
 
-vi.mock("@/lib/feature-gate", () => ({
-  getPlanLimits: mockGetPlanLimits,
+vi.mock("@burnless/ai", () => ({
+  getPlan: mockGetPlan,
+}));
+
+vi.mock("@/lib/ai-feature-flags", () => ({
+  getCreditStatus: mockGetCreditStatus,
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -143,15 +149,13 @@ describe("GET /api/billing", () => {
       userId: "user-1", companyId: "company-1", role: "viewer",
     });
     mockGetCompanyPlan.mockResolvedValue("free");
-    mockGetPlanLimits.mockReturnValue({
-      maxScenarios: 1, maxAiMessages: 10, maxExports: 3,
-    });
+    mockGetPlan.mockReturnValue({ maxScenarios: 1, maxExports: 3 });
+    mockGetCreditStatus.mockResolvedValue({ used: 0, total: 500, remaining: 500 });
     mockIsBillingEnabled.mockReturnValue(false);
 
-    // GET does: scenarioCount, aiMessageCount, company query
+    // GET does: scenarioCount, export count, company query
     dbResults = [
       [{ cnt: 0 }],   // scenario count
-      [{ cnt: 0 }],   // AI message count
       [{ cnt: 0 }],   // export count
       [{              // company
         billingProvider: null, stripeCustomerId: null,
@@ -167,7 +171,7 @@ describe("GET /api/billing", () => {
     expect(body.status).toBe("none");
     expect(body.seats).toBe(1);
     expect(body.usage.scenarios).toEqual({ used: 0, limit: 1 });
-    expect(body.usage.aiMessages).toEqual({ used: 0, limit: 10 });
+    expect(body.usage.aiCredits).toEqual({ used: 0, total: 500, remaining: 500 });
     expect(body.usage.exports).toEqual({ used: 0, limit: 3 });
   });
 
@@ -176,14 +180,12 @@ describe("GET /api/billing", () => {
       userId: "user-1", companyId: "company-1", role: "admin",
     });
     mockGetCompanyPlan.mockResolvedValue("pro");
-    mockGetPlanLimits.mockReturnValue({
-      maxScenarios: Infinity, maxAiMessages: Infinity, maxExports: Infinity,
-    });
+    mockGetPlan.mockReturnValue({ maxScenarios: Infinity, maxExports: Infinity });
+    mockGetCreditStatus.mockResolvedValue({ used: 15, total: 25000, remaining: 24985 });
     mockIsBillingEnabled.mockReturnValue(false);
 
     dbResults = [
       [{ cnt: 3 }],    // scenario count
-      [{ cnt: 15 }],   // AI messages
       [{ cnt: 0 }],    // export count
       [{               // company - no subscription
         billingProvider: null, stripeCustomerId: null,
@@ -198,7 +200,7 @@ describe("GET /api/billing", () => {
     expect(body.plan).toBe("pro");
     expect(body.status).toBe("active");
     expect(body.usage.scenarios).toEqual({ used: 3, limit: -1 });
-    expect(body.usage.aiMessages).toEqual({ used: 15, limit: -1 });
+    expect(body.usage.aiCredits).toEqual({ used: 15, total: 25000, remaining: 24985 });
   });
 
   it("returns subscription details from Stripe when billing is enabled", async () => {
@@ -206,14 +208,12 @@ describe("GET /api/billing", () => {
       userId: "user-1", companyId: "company-1", role: "admin",
     });
     mockGetCompanyPlan.mockResolvedValue("pro");
-    mockGetPlanLimits.mockReturnValue({
-      maxScenarios: Infinity, maxAiMessages: Infinity, maxExports: Infinity,
-    });
+    mockGetPlan.mockReturnValue({ maxScenarios: Infinity, maxExports: Infinity });
+    mockGetCreditStatus.mockResolvedValue({ used: 5, total: 25000, remaining: 24995 });
     mockIsBillingEnabled.mockReturnValue(true);
 
     dbResults = [
       [{ cnt: 2 }],
-      [{ cnt: 5 }],
       [{ cnt: 0 }],
       [{
         billingProvider: "stripe", stripeCustomerId: "cus_123",
@@ -244,13 +244,11 @@ describe("GET /api/billing", () => {
       userId: "user-1", companyId: "company-1", role: "admin",
     });
     mockGetCompanyPlan.mockResolvedValue("pro");
-    mockGetPlanLimits.mockReturnValue({
-      maxScenarios: Infinity, maxAiMessages: Infinity, maxExports: Infinity,
-    });
+    mockGetPlan.mockReturnValue({ maxScenarios: Infinity, maxExports: Infinity });
+    mockGetCreditStatus.mockResolvedValue({ used: 0, total: 25000, remaining: 25000 });
     mockIsBillingEnabled.mockReturnValue(true);
 
     dbResults = [
-      [{ cnt: 0 }],
       [{ cnt: 0 }],
       [{ cnt: 0 }],
       [{
