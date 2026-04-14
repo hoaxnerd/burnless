@@ -46,9 +46,10 @@ interface ProviderHealth {
   rateLimit: { remaining: number; maxRequests: number; windowMs: number };
 }
 
-interface BudgetStatus {
-  spentCents: number;
-  budgetCents: number;
+interface CreditStatus {
+  used: number;
+  total: number;
+  remaining: number;
   percentUsed: number;
   warning: boolean;
   exceeded: boolean;
@@ -57,7 +58,7 @@ interface BudgetStatus {
 interface DashboardData {
   period: { days: number; since: string };
   summary: { totalCostMicros: number; totalCostUSD: number; totalRequests: number };
-  budget: BudgetStatus;
+  credits: CreditStatus;
   featureBreakdown: FeatureBreakdownRow[];
   dailySpend: DailySpend[];
   providerHealth: ProviderHealth[];
@@ -127,9 +128,9 @@ export function AiDashboardTab() {
         />
         <SummaryCard
           icon={<Zap className="h-4 w-4" />}
-          label="Budget Used"
-          value={`${data.budget.percentUsed.toFixed(1)}%`}
-          color={data.budget.exceeded ? "red" : data.budget.warning ? "amber" : "green"}
+          label="Credits Used"
+          value={`${data.credits.percentUsed.toFixed(1)}%`}
+          color={data.credits.exceeded ? "red" : data.credits.warning ? "amber" : "green"}
         />
         <SummaryCard
           icon={<Clock className="h-4 w-4" />}
@@ -146,24 +147,24 @@ export function AiDashboardTab() {
         />
       </div>
 
-      {/* Budget Bar */}
+      {/* Credits Bar */}
       <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-surface-900">Monthly Budget</h3>
+          <h3 className="text-sm font-semibold text-surface-900">Monthly Credits</h3>
           <span className="text-xs text-surface-500">
-            ${(data.budget.spentCents / 100).toFixed(2)} / ${(data.budget.budgetCents / 100).toFixed(2)}
+            {data.credits.used.toLocaleString()} / {data.credits.total.toLocaleString()} credits
           </span>
         </div>
         <div className="h-3 bg-surface-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              data.budget.exceeded
+              data.credits.exceeded
                 ? "bg-red-500"
-                : data.budget.warning
+                : data.credits.warning
                   ? "bg-amber-500"
                   : "bg-brand-500"
             }`}
-            style={{ width: `${Math.min(data.budget.percentUsed, 100)}%` }}
+            style={{ width: `${Math.min(data.credits.percentUsed, 100)}%` }}
           />
         </div>
       </div>
