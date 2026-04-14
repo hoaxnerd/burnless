@@ -4,6 +4,7 @@ export const revalidate = 0;
 import {
   getCompany,
   getActiveScenario,
+  getServerScenarioId,
   getRevenueStreams,
   getFundingRounds,
   getDashboardPreferences,
@@ -41,16 +42,12 @@ import type { PageWidgetLayout } from "@/components/ui/page-grid";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function DashboardPage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
   if (!company) return <SetupPrompt />;
 
-  const scenario = await getActiveScenario(company.id, params.scenarioId);
+  const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
   const [data, revenueStreams, fundingRounds, dashPrefs] =

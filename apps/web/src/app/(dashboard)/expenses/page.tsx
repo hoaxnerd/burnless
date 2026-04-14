@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getAccounts } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getAccounts } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
@@ -14,12 +14,8 @@ import { AddExpenseForm } from "./add-expense-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { ExpensesEmptyState } from "@/components/ui/empty-state";
 
-export default async function ExpensesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function ExpensesPage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
   if (!company) {
     return (
@@ -30,7 +26,7 @@ export default async function ExpensesPage({
     );
   }
 
-  const scenario = await getActiveScenario(company.id, params.scenarioId);
+  const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -13,18 +13,14 @@ import { AddFundingForm } from "./add-funding-form";
 import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
-export default async function FundingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function FundingPage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
   if (!company) return <SetupPrompt context="tracking funding" />;
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <FundingContent companyId={company.id} scenarioId={params.scenarioId} />
+      <FundingContent companyId={company.id} scenarioId={scenarioId} />
     </Suspense>
   );
 }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getFundingRounds } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
@@ -13,16 +13,12 @@ import { BoardUpdateView } from "./board-update-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
-export default async function BoardUpdatePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function BoardUpdatePage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
   if (!company) return <SetupPrompt context="generating reports" />;
 
-  const scenario = await getActiveScenario(company.id, params.scenarioId);
+  const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <ScenarioPrompt context="generate reports" />;
 
   return (

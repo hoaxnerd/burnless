@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getHeadcountPlans, getDepartments } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getHeadcountPlans, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -12,14 +12,10 @@ import { TeamView } from "./team-view";
 import { AddHireForm } from "./add-hire-form";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
-export default async function TeamPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function TeamPage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
-  const scenario = company ? await getActiveScenario(company.id, params.scenarioId) : null;
+  const scenario = company ? await getActiveScenario(company.id, scenarioId) : null;
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>

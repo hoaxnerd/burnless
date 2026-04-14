@@ -27,6 +27,7 @@ import {
 } from "@burnless/db";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
 import { auth } from "./auth";
 
 // ── Date revival for unstable_cache ─────────────────────────────────────────
@@ -210,6 +211,15 @@ export const getScenarioById = cachedQuery(
   ["scenario-by-id"],
   { revalidate: 30, tags: ["scenarios"] }
 );
+
+/**
+ * Read the active scenario ID from the cookie for server components.
+ * SSR is read-only rendering — single channel (cookie) is sufficient.
+ */
+export async function getServerScenarioId(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get("active-scenario-id")?.value;
+}
 
 /**
  * Get the active scenario for a page: uses scenarioId from searchParams

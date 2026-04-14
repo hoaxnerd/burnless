@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
@@ -14,16 +14,12 @@ import { AddRevenueStreamForm } from "./add-revenue-stream-form";
 import { SetupPrompt, ScenarioPrompt, RevenueEmptyState } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
-export default async function RevenuePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scenarioId?: string }>;
-}) {
-  const params = await searchParams;
+export default async function RevenuePage() {
+  const scenarioId = await getServerScenarioId();
   const company = await getCompany();
   if (!company) return <SetupPrompt context="modeling revenue" />;
 
-  const scenario = await getActiveScenario(company.id, params.scenarioId);
+  const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <ScenarioPrompt context="model revenue" />;
 
   return (
