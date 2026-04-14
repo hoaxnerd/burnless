@@ -120,7 +120,14 @@ export function estimateCostMicros(
   outputTokens: number
 ): number {
   const costs = MODEL_COSTS[model];
-  if (!costs) return 0;
+  if (!costs) {
+    // Conservative fallback: standard-tier pricing for unknown models.
+    // Prevents unknown models from being silently free.
+    const FALLBACK_COSTS = { input: 3_000_000, output: 15_000_000 };
+    return Math.max(1000, Math.round(
+      (inputTokens * FALLBACK_COSTS.input + outputTokens * FALLBACK_COSTS.output) / 1_000_000
+    ));
+  }
   return Math.round(
     (inputTokens * costs.input + outputTokens * costs.output) / 1_000_000
   );
