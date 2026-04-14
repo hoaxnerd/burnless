@@ -40,7 +40,6 @@ export interface SidebarInnerProps {
   isMobile: boolean;
   orderedNavItems: NavItem[];
   navOrder: string[];
-  buildHref: (base: string) => string;
   pathname: string;
   sensors: ReturnType<typeof useSensors>;
   onDragEnd: (event: DragEndEvent) => void;
@@ -64,7 +63,6 @@ export function SidebarInner({
   isMobile,
   orderedNavItems,
   navOrder,
-  buildHref,
   pathname,
   sensors,
   onDragEnd,
@@ -170,7 +168,7 @@ export function SidebarInner({
                   key={item.id}
                   item={item}
                   isActive={isActive}
-                  href={buildHref(item.href)}
+                  href={item.href}
                   collapsed={collapsed}
                 />
               );

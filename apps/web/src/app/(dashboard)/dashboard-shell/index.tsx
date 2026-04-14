@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-fetch";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Receipt,
@@ -135,7 +135,6 @@ function DashboardContent({
   user: UserInfo | null;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { masterEnabled, getFeature } = useAiFlags();
   const chatEnabled = getFeature("chat").enabled;
 
@@ -210,10 +209,6 @@ function DashboardContent({
     });
   }, [masterEnabled, prefsLoaded]);
   /* eslint-enable react-hooks/set-state-in-effect */
-
-  const scenarioId = searchParams.get("scenarioId");
-  const buildHref = (base: string) =>
-    scenarioId ? `${base}?scenarioId=${scenarioId}` : base;
 
   // DnD sensors
   const sensors = useSensors(
@@ -332,7 +327,6 @@ function DashboardContent({
               isMobile={false}
               orderedNavItems={orderedNavItems}
               navOrder={navOrder}
-              buildHref={buildHref}
               pathname={pathname}
               sensors={sensors}
               onDragEnd={handleDragEnd}
@@ -370,7 +364,6 @@ function DashboardContent({
             isMobile={true}
             orderedNavItems={orderedNavItems}
             navOrder={navOrder}
-            buildHref={buildHref}
             pathname={pathname}
             sensors={sensors}
             onDragEnd={handleDragEnd}
