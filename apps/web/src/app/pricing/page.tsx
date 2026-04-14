@@ -6,73 +6,7 @@ import { Check, X, ArrowRight, HelpCircle } from "lucide-react";
 import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 import { useInView } from "@/components/landing/use-in-view";
-
-const tiers = [
-  {
-    name: "Free",
-    description: "For founders getting started with runway planning.",
-    monthlyPrice: 0,
-    annualPrice: 0,
-    cta: "Start free",
-    ctaHref: "/login",
-    highlight: false,
-    features: {
-      scenarios: "1 scenario",
-      aiMessages: "10 AI messages/mo",
-      exports: "3 exports/mo",
-      dataRoom: false,
-      teamAccess: false,
-      customIntegrations: false,
-      bankSync: true,
-      dashboards: true,
-      reports: "Basic reports",
-      support: "Community",
-    },
-  },
-  {
-    name: "Pro",
-    description: "For founders who need unlimited planning power.",
-    monthlyPrice: 29,
-    annualPrice: 24,
-    cta: "Upgrade to Pro",
-    ctaHref: "/login",
-    highlight: true,
-    badge: "Most popular",
-    features: {
-      scenarios: "Unlimited scenarios",
-      aiMessages: "Unlimited AI messages",
-      exports: "Unlimited exports",
-      dataRoom: true,
-      teamAccess: false,
-      customIntegrations: false,
-      bankSync: true,
-      dashboards: true,
-      reports: "Advanced reports + board updates",
-      support: "Priority email",
-    },
-  },
-  {
-    name: "Team",
-    description: "For teams managing finances together.",
-    monthlyPrice: 79,
-    annualPrice: 66,
-    cta: "Upgrade to Team",
-    ctaHref: "/login",
-    highlight: false,
-    features: {
-      scenarios: "Unlimited scenarios",
-      aiMessages: "Unlimited AI messages",
-      exports: "Unlimited exports",
-      dataRoom: true,
-      teamAccess: true,
-      customIntegrations: true,
-      bankSync: true,
-      dashboards: true,
-      reports: "Advanced reports + board updates",
-      support: "Dedicated support",
-    },
-  },
-];
+import { getEnabledPlans, type PlanDefinition } from "@burnless/ai";
 
 const comparisonFeatures = [
   { label: "Scenarios", key: "scenarios" as const, type: "text" },
@@ -94,7 +28,7 @@ const faqs = [
   },
   {
     q: "What happens when I hit my Free plan limits?",
-    a: "You'll get a friendly prompt to upgrade. Your data is never deleted — you just can't create new scenarios or send AI messages until the next billing cycle or until you upgrade.",
+    a: "You'll get a friendly prompt to upgrade. Your data is never deleted — you just can't create new scenarios or use AI credits until the next billing cycle or until you upgrade.",
   },
   {
     q: "Can I switch plans or cancel anytime?",
@@ -159,6 +93,8 @@ export default function PricingPage() {
   const { ref: heroRef, inView: heroInView } = useInView();
   const { ref: tableRef, inView: tableInView } = useInView();
   const { ref: faqRef, inView: faqInView } = useInView();
+
+  const plans = getEnabledPlans();
 
   return (
     <div className="min-h-screen bg-surface-0">
@@ -232,60 +168,60 @@ export default function PricingPage() {
         <section className="pb-20 sm:pb-28">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-              {tiers.map((tier, i) => (
+              {plans.map((plan, i) => (
                 <div
-                  key={tier.name}
+                  key={plan.name}
                   className={`relative rounded-2xl border p-8 transition-all duration-500 ${
                     heroInView
                       ? "opacity-100 translate-y-0"
                       : "opacity-0 translate-y-8"
                   } ${
-                    tier.highlight
+                    plan.highlight
                       ? "border-brand-500/50 bg-brand-500/[0.03] shadow-xl shadow-brand-500/10 scale-[1.02]"
                       : "border-surface-200/30 bg-surface-50/5"
                   }`}
                   style={{ transitionDelay: `${i * 100 + 200}ms` }}
                 >
-                  {tier.badge && (
+                  {plan.badge && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                       <span className="bg-brand-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-brand-500/25">
-                        {tier.badge}
+                        {plan.badge}
                       </span>
                     </div>
                   )}
 
-                  <h3 className="text-lg font-semibold text-surface-900">{tier.name}</h3>
-                  <p className="mt-2 text-sm text-surface-500 h-10">{tier.description}</p>
+                  <h3 className="text-lg font-semibold text-surface-900">{plan.name}</h3>
+                  <p className="mt-2 text-sm text-surface-500 h-10">{plan.description}</p>
 
                   <div className="mt-6 flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-surface-900 tabular-nums">
-                      ${annual ? tier.annualPrice : tier.monthlyPrice}
+                      ${annual ? plan.annualPrice : plan.monthlyPrice}
                     </span>
-                    {tier.monthlyPrice > 0 && (
+                    {plan.monthlyPrice > 0 && (
                       <span className="text-sm text-surface-500">/mo</span>
                     )}
                   </div>
-                  {annual && tier.monthlyPrice > 0 && (
+                  {annual && plan.monthlyPrice > 0 && (
                     <p className="mt-1 text-xs text-surface-400">
-                      Billed annually (${tier.annualPrice * 12}/yr)
+                      Billed annually (${plan.annualPrice * 12}/yr)
                     </p>
                   )}
 
                   <Link
-                    href={tier.ctaHref}
+                    href={plan.ctaHref}
                     className={`mt-8 flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all group ${
-                      tier.highlight
+                      plan.highlight
                         ? "bg-brand-500 text-white hover:bg-brand-400 shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30 hover:-translate-y-0.5"
                         : "bg-surface-200/15 text-surface-900 border border-surface-200/30 hover:bg-surface-200/25 hover:border-surface-200/50"
                     }`}
                   >
-                    {tier.cta}
+                    {plan.cta}
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </Link>
 
                   <ul className="mt-8 space-y-3.5">
                     {comparisonFeatures.map((feature) => {
-                      const value = tier.features[feature.key];
+                      const value = plan.comparison[feature.key];
                       const included = value === true || (typeof value === "string" && value !== "false");
 
                       return (
@@ -328,15 +264,15 @@ export default function PricingPage() {
                 <thead>
                   <tr className="border-b border-surface-200/30">
                     <th scope="col" className="py-4 pr-4 text-sm font-medium text-surface-500 w-1/3">Feature</th>
-                    {tiers.map((tier) => (
+                    {plans.map((plan) => (
                       <th
-                        key={tier.name}
+                        key={plan.name}
                         scope="col"
                         className={`py-4 px-4 text-sm font-semibold text-center ${
-                          tier.highlight ? "text-brand-500" : "text-surface-900"
+                          plan.highlight ? "text-brand-500" : "text-surface-900"
                         }`}
                       >
-                        {tier.name}
+                        {plan.name}
                       </th>
                     ))}
                   </tr>
@@ -345,10 +281,10 @@ export default function PricingPage() {
                   {comparisonFeatures.map((feature) => (
                     <tr key={feature.key} className="border-b border-surface-200/15">
                       <td className="py-4 pr-4 text-sm text-surface-700">{feature.label}</td>
-                      {tiers.map((tier) => {
-                        const value = tier.features[feature.key];
+                      {plans.map((plan) => {
+                        const value = plan.comparison[feature.key];
                         return (
-                          <td key={tier.name} className="py-4 px-4 text-center">
+                          <td key={plan.name} className="py-4 px-4 text-center">
                             {typeof value === "boolean" ? (
                               value ? (
                                 <Check className="w-4 h-4 text-brand-500 mx-auto" />
