@@ -77,7 +77,7 @@ vi.mock("@burnless/db", () => {
       update: () => makeChain(),
       delete: () => makeChain(),
     },
-    companies: { id: "id", billingProvider: "billingProvider", stripeCustomerId: "stripeCustomerId", stripeSubscriptionId: "stripeSubscriptionId", currency: "currency" },
+    companies: { id: "id", billingProvider: "billingProvider", billingCustomerId: "billingCustomerId", billingSubscriptionId: "billingSubscriptionId", currency: "currency" },
     scenarios: { companyId: "companyId" },
     users: { id: "id", email: "email", name: "name" },
     exportLogs: { companyId: "companyId", createdAt: "createdAt" },
@@ -158,8 +158,8 @@ describe("GET /api/billing", () => {
       [{ cnt: 0 }],   // scenario count
       [{ cnt: 0 }],   // export count
       [{              // company
-        billingProvider: null, stripeCustomerId: null,
-        stripeSubscriptionId: null, currency: "USD",
+        billingProvider: null, billingCustomerId: null,
+        billingSubscriptionId: null, currency: "USD",
       }],
     ];
 
@@ -188,8 +188,8 @@ describe("GET /api/billing", () => {
       [{ cnt: 3 }],    // scenario count
       [{ cnt: 0 }],    // export count
       [{               // company - no subscription
-        billingProvider: null, stripeCustomerId: null,
-        stripeSubscriptionId: null, currency: "USD",
+        billingProvider: null, billingCustomerId: null,
+        billingSubscriptionId: null, currency: "USD",
       }],
     ];
 
@@ -216,8 +216,8 @@ describe("GET /api/billing", () => {
       [{ cnt: 2 }],
       [{ cnt: 0 }],
       [{
-        billingProvider: "stripe", stripeCustomerId: "cus_123",
-        stripeSubscriptionId: "sub_456", currency: "USD",
+        billingProvider: "stripe", billingCustomerId: "cus_123",
+        billingSubscriptionId: "sub_456", currency: "USD",
       }],
     ];
 
@@ -252,8 +252,8 @@ describe("GET /api/billing", () => {
       [{ cnt: 0 }],
       [{ cnt: 0 }],
       [{
-        billingProvider: "stripe", stripeCustomerId: "cus_123",
-        stripeSubscriptionId: "sub_gone", currency: "USD",
+        billingProvider: "stripe", billingCustomerId: "cus_123",
+        billingSubscriptionId: "sub_gone", currency: "USD",
       }],
     ];
     mockGetProviderByType.mockReturnValue({
@@ -316,8 +316,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: null, stripeCustomerId: null,
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: null, billingCustomerId: null,
+      billingSubscriptionId: null, currency: "USD",
     }]];
     mockGetPaymentProvider.mockReturnValue({ type: "stripe" });
 
@@ -334,8 +334,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: null, stripeCustomerId: null,
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: null, billingCustomerId: null,
+      billingSubscriptionId: null, currency: "USD",
     }]];
     mockGetPaymentProvider.mockReturnValue({ type: "stripe" });
 
@@ -352,8 +352,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_123",
-      stripeSubscriptionId: "sub_456", currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_123",
+      billingSubscriptionId: "sub_456", currency: "USD",
     }]];
 
     const mockProvider = {
@@ -378,8 +378,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_123",
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_123",
+      billingSubscriptionId: null, currency: "USD",
     }]];
     mockGetPaymentProvider.mockReturnValue({ type: "stripe" });
 
@@ -396,8 +396,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_123",
-      stripeSubscriptionId: "sub_456", currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_123",
+      billingSubscriptionId: "sub_456", currency: "USD",
     }]];
 
     const periodEnd = new Date("2026-04-22T00:00:00.000Z");
@@ -425,8 +425,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_123",
-      stripeSubscriptionId: "sub_456", currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_123",
+      billingSubscriptionId: "sub_456", currency: "USD",
     }]];
 
     const mockProvider = {
@@ -451,8 +451,8 @@ describe("POST /api/billing", () => {
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [
       [{  // company query
-        billingProvider: null, stripeCustomerId: null,
-        stripeSubscriptionId: null, currency: "USD",
+        billingProvider: null, billingCustomerId: null,
+        billingSubscriptionId: null, currency: "USD",
       }],
       [{ email: "founder@startup.com", name: "Founder" }], // user email
       undefined, // update (persist customer)
@@ -487,8 +487,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_existing",
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_existing",
+      billingSubscriptionId: null, currency: "USD",
     }]];
 
     const mockProvider = {
@@ -513,8 +513,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: null, stripeCustomerId: null,
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: null, billingCustomerId: null,
+      billingSubscriptionId: null, currency: "USD",
     }]];
     mockGetPaymentProvider.mockReturnValue({ type: "stripe" });
     mockResolvePlanId.mockReturnValue(null);
@@ -532,8 +532,8 @@ describe("POST /api/billing", () => {
     });
     mockIsBillingEnabled.mockReturnValue(true);
     dbResults = [[{
-      billingProvider: "stripe", stripeCustomerId: "cus_123",
-      stripeSubscriptionId: null, currency: "USD",
+      billingProvider: "stripe", billingCustomerId: "cus_123",
+      billingSubscriptionId: null, currency: "USD",
     }]];
     mockGetPaymentProvider.mockReturnValue({ type: "stripe" });
 

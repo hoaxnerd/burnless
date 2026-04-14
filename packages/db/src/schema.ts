@@ -249,9 +249,9 @@ export const companies = pgTable("companies", {
     .notNull()
     .references(() => users.id),
   billingProvider: text("billing_provider"),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  stripePlan: text("stripe_plan").default("free"),
+  billingCustomerId: text("billing_customer_id"),
+  billingSubscriptionId: text("billing_subscription_id"),
+  billingPlan: text("billing_plan").default("free"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()

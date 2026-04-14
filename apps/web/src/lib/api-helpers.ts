@@ -75,11 +75,11 @@ export async function getCompanyPlan(
   companyId: string
 ): Promise<"free" | "pro" | "team"> {
   const [company] = await db
-    .select({ stripePlan: companies.stripePlan })
+    .select({ billingPlan: companies.billingPlan })
     .from(companies)
     .where(eq(companies.id, companyId))
     .limit(1);
-  const plan = company?.stripePlan;
+  const plan = company?.billingPlan;
   if (plan === "pro" || plan === "team") return plan;
   return "free";
 }

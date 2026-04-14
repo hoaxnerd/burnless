@@ -75,19 +75,19 @@ export const GET = withErrorHandler(async (_request: Request) => {
   const [company] = await db
     .select({
       billingProvider: companies.billingProvider,
-      stripeCustomerId: companies.stripeCustomerId,
-      stripeSubscriptionId: companies.stripeSubscriptionId,
+      billingCustomerId: companies.billingCustomerId,
+      billingSubscriptionId: companies.billingSubscriptionId,
       currency: companies.currency,
     })
     .from(companies)
     .where(eq(companies.id, ctx.companyId))
     .limit(1);
 
-  if (company?.stripeSubscriptionId && isBillingEnabled()) {
+  if (company?.billingSubscriptionId && isBillingEnabled()) {
     try {
       const providerType = (company.billingProvider ?? "stripe") as "stripe" | "razorpay";
       const provider = getProviderByType(providerType);
-      const sub = await provider.getSubscription(company.stripeSubscriptionId);
+      const sub = await provider.getSubscription(company.billingSubscriptionId);
       if (sub) {
         status = sub.status;
         currentPeriodEnd = sub.currentPeriodEnd.toISOString();
@@ -135,7 +135,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (!isBillingEnabled()) {
     return errorResponse(
-      "No billing provider configured. Set Stripe or Razorpay credentials.",
+      "No billing provider configured. Set payment provider credentials.",
       503
     );
   }
@@ -148,8 +148,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     const [company] = await db
       .select({
         billingProvider: companies.billingProvider,
-        stripeCustomerId: companies.stripeCustomerId,
-        stripeSubscriptionId: companies.stripeSubscriptionId,
+        billingCustomerId: companies.billingCustomerId,
+        billingSubscriptionId: companies.billingSubscriptionId,
         currency: companies.currency,
       })
       .from(companies)
@@ -163,12 +163,12 @@ export const POST = withErrorHandler(async (request: Request) => {
     // Action: portal — open self-service billing portal
     // ----------------------------------------------------------------
     if (action === "portal") {
-      if (!company?.stripeCustomerId) {
+      if (!company?.billingCustomerId) {
         return errorResponse("No billing account found. Subscribe to a plan first.", 400);
       }
 
       const portal = await provider.createPortalSession(
-        company.stripeCustomerId,
+        company.billingCustomerId,
         `${env.APP_URL}/settings?tab=billing`
       );
 
@@ -183,13 +183,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     // Action: cancel — schedule cancellation at period end
     // ----------------------------------------------------------------
     if (action === "cancel") {
-      if (!company?.stripeSubscriptionId) {
+      if (!company?.billingSubscriptionId) {
         return errorResponse("No active subscription to cancel.", 400);
       }
 
-      await provider.cancelSubscription(company.stripeSubscriptionId, true);
+      await provider.cancelSubscription(company.billingSubscriptionId, true);
 
-      const sub = await provider.getSubscription(company.stripeSubscriptionId);
+      const sub = await provider.getSubscription(company.billingSubscriptionId);
       return NextResponse.json({
         cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? true,
         currentPeriodEnd: sub?.currentPeriodEnd.toISOString() ?? null,
@@ -200,13 +200,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     // Action: reactivate — undo scheduled cancellation
     // ----------------------------------------------------------------
     if (action === "reactivate") {
-      if (!company?.stripeSubscriptionId) {
+      if (!company?.billingSubscriptionId) {
         return errorResponse("No subscription to reactivate.", 400);
       }
 
-      await provider.reactivateSubscription(company.stripeSubscriptionId);
+      await provider.reactivateSubscription(company.billingSubscriptionId);
 
-      const sub = await provider.getSubscription(company.stripeSubscriptionId);
+      const sub = await provider.getSubscription(company.billingSubscriptionId);
       return NextResponse.json({ cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false });
     }
 
@@ -224,7 +224,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     }
 
     // Ensure company has a billing customer
-    let customerId = company?.stripeCustomerId;
+    let customerId = company?.billingCustomerId;
     if (!customerId) {
       const [user] = await db
         .select({ email: users.email, name: users.name })
@@ -247,7 +247,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       await db
         .update(companies)
         .set({
-          stripeCustomerId: customerId,
+          billingCustomerId: customerId,
           billingProvider: provider.type,
         })
         .where(eq(companies.id, ctx.companyId));

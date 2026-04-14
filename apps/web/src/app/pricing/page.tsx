@@ -40,7 +40,7 @@ const faqs = [
   },
   {
     q: "Do you support payment methods outside the US?",
-    a: "We support all major credit cards globally through Stripe. Razorpay integration for India is coming soon.",
+    a: "We support all major credit cards globally. Additional payment methods and regional providers are coming soon.",
   },
   {
     q: "What's included in the AI Financial Companion?",
@@ -167,7 +167,7 @@ export default function PricingPage() {
         {/* Pricing cards */}
         <section className="pb-20 sm:pb-28">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            <div className={`grid grid-cols-1 gap-6 lg:gap-8 ${plans.length === 2 ? "md:grid-cols-2 max-w-4xl mx-auto" : "md:grid-cols-3"}`}>
               {plans.map((plan, i) => (
                 <div
                   key={plan.name}

@@ -23,7 +23,7 @@ async function findCompanyByCustomerId(customerId: string) {
   const [company] = await db
     .select({ id: companies.id, ownerId: companies.ownerId })
     .from(companies)
-    .where(eq(companies.stripeCustomerId, customerId))
+    .where(eq(companies.billingCustomerId, customerId))
     .limit(1);
   return company ?? null;
 }
@@ -66,7 +66,7 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
 
     // Direction 2: does the claimed company already have a different customerId?
     const [claimedCompany] = await db
-      .select({ id: companies.id, stripeCustomerId: companies.stripeCustomerId })
+      .select({ id: companies.id, billingCustomerId: companies.billingCustomerId })
       .from(companies)
       .where(eq(companies.id, metadataCompanyId))
       .limit(1);
@@ -76,9 +76,9 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
       return;
     }
 
-    if (claimedCompany.stripeCustomerId && claimedCompany.stripeCustomerId !== customerId) {
+    if (claimedCompany.billingCustomerId && claimedCompany.billingCustomerId !== customerId) {
       log.error(
-        `webhook rejected: companyId=${metadataCompanyId} has customerId=${claimedCompany.stripeCustomerId} but webhook sent customerId=${customerId}`
+        `webhook rejected: companyId=${metadataCompanyId} has customerId=${claimedCompany.billingCustomerId} but webhook sent customerId=${customerId}`
       );
       return;
     }
@@ -100,9 +100,9 @@ async function handleCheckoutCompleted(data: NormalizedWebhookData, providerType
     .update(companies)
     .set({
       billingProvider: providerType,
-      stripeCustomerId: customerId ?? null,
-      stripeSubscriptionId: subscriptionId ?? null,
-      stripePlan: plan,
+      billingCustomerId: customerId ?? null,
+      billingSubscriptionId: subscriptionId ?? null,
+      billingPlan: plan,
     })
     .where(eq(companies.id, metadataCompanyId));
 
@@ -129,8 +129,8 @@ async function handleSubscriptionUpdated(data: NormalizedWebhookData) {
   await db
     .update(companies)
     .set({
-      stripeSubscriptionId: data.subscriptionId ?? null,
-      stripePlan: plan,
+      billingSubscriptionId: data.subscriptionId ?? null,
+      billingPlan: plan,
     })
     .where(eq(companies.id, company.id));
 
@@ -157,8 +157,8 @@ async function handleSubscriptionDeleted(data: NormalizedWebhookData) {
   await db
     .update(companies)
     .set({
-      stripeSubscriptionId: null,
-      stripePlan: "free",
+      billingSubscriptionId: null,
+      billingPlan: "free",
     })
     .where(eq(companies.id, company.id));
 

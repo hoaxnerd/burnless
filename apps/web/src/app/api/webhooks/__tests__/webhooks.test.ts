@@ -42,9 +42,9 @@ vi.mock("@burnless/db", () => ({
   companies: {
     id: "id",
     ownerId: "ownerId",
-    stripeCustomerId: "stripeCustomerId",
-    stripeSubscriptionId: "stripeSubscriptionId",
-    stripePlan: "stripePlan",
+    billingCustomerId: "billingCustomerId",
+    billingSubscriptionId: "billingSubscriptionId",
+    billingPlan: "billingPlan",
     billingProvider: "billingProvider",
   },
   users: {
@@ -197,7 +197,7 @@ describe("POST /api/webhooks/[provider]", () => {
       // ownerEmail → returns email
       setupSelectChain([
         [{ id: "comp-1", ownerId: "user-1" }],
-        [{ id: "comp-1", stripeCustomerId: "cus_123" }],
+        [{ id: "comp-1", billingCustomerId: "cus_123" }],
         [{ email: "user@test.com" }],
       ]);
 
@@ -221,10 +221,10 @@ describe("POST /api/webhooks/[provider]", () => {
       });
       mockGetSubscription.mockResolvedValue(null);
 
-      // No company owns this customer yet; claimed company has no stripeCustomerId
+      // No company owns this customer yet; claimed company has no billingCustomerId
       setupSelectChain([
         [],
-        [{ id: "comp-2", stripeCustomerId: null }],
+        [{ id: "comp-2", billingCustomerId: null }],
         [{ email: "owner@test.com" }],
       ]);
 
@@ -273,7 +273,7 @@ describe("POST /api/webhooks/[provider]", () => {
       // No company owns this customerId, but target already has a different one
       setupSelectChain([
         [],
-        [{ id: "comp-target", stripeCustomerId: "cus_legitimate" }],
+        [{ id: "comp-target", billingCustomerId: "cus_legitimate" }],
       ]);
 
       const [req, ctx] = webhookRequest("stripe", "{}", "valid-sig");

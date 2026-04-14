@@ -238,7 +238,7 @@ async function seedTestAccounts() {
     locale: "en-US",
     timezone: "America/Los_Angeles",
     ownerId: FREE.user,
-    stripePlan: "free",
+    billingPlan: "free",
   }).onConflictDoNothing();
 
   await db.insert(schema.companyMembers).values({
@@ -309,7 +309,7 @@ async function seedTestAccounts() {
     locale: "en-US",
     timezone: "America/New_York",
     ownerId: PRO.user,
-    stripePlan: "pro",
+    billingPlan: "pro",
   }).onConflictDoNothing();
 
   await db.insert(schema.companyMembers).values({
@@ -521,7 +521,7 @@ async function seedTestAccounts() {
     locale: "en-US",
     timezone: "America/Chicago",
     ownerId: TEAM.user,
-    stripePlan: "team",
+    billingPlan: "team",
   }).onConflictDoNothing();
 
   console.log("    → 3 memberships (owner, admin, viewer)");
