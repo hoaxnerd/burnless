@@ -112,10 +112,4 @@ describe("GET /api/metrics", () => {
     expect(mockGetResolvedData).toHaveBeenCalledWith("company-1", "scen-1");
   });
 
-  it("falls back to scenarioId query param", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "company-1", role: "owner" });
-
-    await GET(getRequest({ scenarioId: "scen-2" }));
-    expect(mockGetResolvedData).toHaveBeenCalledWith("company-1", "scen-2");
-  });
 });

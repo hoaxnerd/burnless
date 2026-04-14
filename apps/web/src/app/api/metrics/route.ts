@@ -29,7 +29,7 @@ import {
  * GET /api/metrics?startDate=2026-01&endDate=2026-12
  *
  * Returns all computed financial and SaaS metrics.
- * Scenario ID comes from the X-Scenario-Id header or ?scenarioId query param.
+ * Scenario ID comes from the X-Scenario-Id header via getActiveScenario.
  */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "heavy");
@@ -39,7 +39,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const url = new URL(request.url);
-  const scenarioId = getActiveScenario(request) ?? url.searchParams.get("scenarioId");
+  const scenarioId = getActiveScenario(request);
   const startDateStr = url.searchParams.get("startDate") ?? "2026-01";
   const endDateStr = url.searchParams.get("endDate") ?? "2026-12";
 

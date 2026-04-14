@@ -138,14 +138,6 @@ describe("GET /api/statements", () => {
     expect(mockGetResolvedData).toHaveBeenCalledWith("company-1", "scen-1");
   });
 
-  it("falls back to scenarioId query param", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "company-1", role: "viewer" });
-    setupEmptyEngine();
-
-    await GET(makeRequest({ scenarioId: "scen-2" }));
-    expect(mockGetResolvedData).toHaveBeenCalledWith("company-1", "scen-2");
-  });
-
   it("uses default date range when not specified", async () => {
     mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "company-1", role: "viewer" });
     setupEmptyEngine();

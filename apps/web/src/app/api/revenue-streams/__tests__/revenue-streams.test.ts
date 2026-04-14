@@ -4,7 +4,7 @@
  * Updated for the overlay scenario system:
  * - GET fetches base entities by companyId, then resolves via resolveEntities
  * - POST uses scenarioInsert to route to base or override
- * - scenarioId comes from header via getActiveScenario (or query param fallback)
+ * - scenarioId comes from header via getActiveScenario
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
@@ -121,17 +121,6 @@ describe("GET /api/revenue-streams", () => {
     expect(mockResolveEntities).toHaveBeenCalledWith("revenue_stream", base, "scen-1");
   });
 
-  it("falls back to scenarioId query param", async () => {
-    mockGetActiveScenario.mockReturnValue(null);
-    const base = [{ id: "rs-1", name: "SaaS", type: "subscription" }];
-    mockWhere.mockResolvedValue(base);
-    mockResolveEntities.mockResolvedValue(
-      base.map((e) => ({ ...e, _override: null }))
-    );
-
-    await GET(jsonRequest("http://localhost/api/revenue-streams?scenarioId=scen-2", "GET"));
-    expect(mockResolveEntities).toHaveBeenCalledWith("revenue_stream", base, "scen-2");
-  });
 });
 
 describe("POST /api/revenue-streams", () => {

@@ -14,7 +14,7 @@ export const GET = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const url = new URL(request.url);
-  const scenarioId = getActiveScenario(request) ?? url.searchParams.get("scenarioId");
+  const scenarioId = getActiveScenario(request);
 
   // Fetch base departments for the company
   const base = await db
