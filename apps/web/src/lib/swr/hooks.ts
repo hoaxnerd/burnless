@@ -49,7 +49,7 @@ export interface BillingData {
   seats: number;
   usage: {
     scenarios: { used: number; limit: number };
-    aiMessages: { used: number; limit: number };
+    aiCredits: { used: number; total: number; remaining: number };
     exports: { used: number; limit: number };
   };
 }

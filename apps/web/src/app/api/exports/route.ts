@@ -11,7 +11,8 @@ import { z } from "zod";
 import { db, exportLogs } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
 import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { canPerformAction, getPlanLimits } from "@/lib/feature-gate";
+import { canPerformAction } from "@/lib/feature-gate";
+import { getPlanLimits } from "@burnless/ai";
 
 function getMonthStart() {
   const now = new Date();

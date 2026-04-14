@@ -35,6 +35,9 @@ vi.mock("@/lib/api-helpers", () => ({
 
 vi.mock("@/lib/feature-gate", () => ({
   canPerformAction: mockCanPerformAction,
+}));
+
+vi.mock("@burnless/ai", () => ({
   getPlanLimits: mockGetPlanLimits,
 }));
 
