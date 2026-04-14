@@ -4,48 +4,7 @@ import { useState } from "react";
 import { Loader2, Check, ExternalLink, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { useBilling, billingAction } from "@/lib/swr";
-
-const TIERS = [
-  {
-    key: "free" as const,
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    features: [
-      "1 scenario",
-      "10 AI messages / month",
-      "3 exports / month",
-      "CSV import",
-    ],
-  },
-  {
-    key: "pro" as const,
-    name: "Pro",
-    price: "$29",
-    period: "/month",
-    popular: true,
-    features: [
-      "Unlimited scenarios",
-      "Unlimited Companion",
-      "PDF & CSV export",
-      "Data room",
-      "Priority support",
-    ],
-  },
-  {
-    key: "team" as const,
-    name: "Team",
-    price: "$79",
-    period: "/month + $20/seat",
-    features: [
-      "Everything in Pro",
-      "Team collaboration",
-      "Role-based access",
-      "Audit log",
-      "Custom integrations",
-    ],
-  },
-];
+import { getEnabledPlans, type PlanDefinition } from "@burnless/ai";
 
 export function BillingTab() {
   const { data: billing, isLoading: loading } = useBilling();
@@ -223,16 +182,16 @@ export function BillingTab() {
           <h2 className="text-base font-semibold text-surface-900 mb-4">Usage This Month</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { label: "Scenarios", ...billing.usage.scenarios },
-              { label: "AI Messages", ...billing.usage.aiMessages },
-              { label: "Exports", ...billing.usage.exports },
+              { label: "Scenarios", used: billing.usage.scenarios.used, limit: billing.usage.scenarios.limit, large: false },
+              { label: "AI Credits", used: billing.usage.aiCredits.used, limit: billing.usage.aiCredits.total, large: true },
+              { label: "Exports", used: billing.usage.exports.used, limit: billing.usage.exports.limit, large: false },
             ].map((u) => (
               <div key={u.label} className="rounded-xl bg-surface-50 p-4">
                 <p className="text-xs text-surface-500 mb-1">{u.label}</p>
                 <p className="text-lg font-bold text-surface-900 tabular-nums">
-                  {u.used}
+                  {u.large ? u.used.toLocaleString() : u.used}
                   <span className="text-sm font-normal text-surface-400">
-                    {u.limit === -1 ? " / unlimited" : ` / ${u.limit}`}
+                    {u.limit === -1 ? " / unlimited" : ` / ${u.large ? u.limit.toLocaleString() : u.limit}`}
                   </span>
                 </p>
               </div>
@@ -243,35 +202,35 @@ export function BillingTab() {
 
       {/* Pricing tiers */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
-        {TIERS.map((tier) => {
-          const isCurrent = tier.key === currentPlan;
+        {getEnabledPlans().map((plan: PlanDefinition) => {
+          const isCurrent = plan.key === currentPlan;
           return (
             <div
-              key={tier.key}
+              key={plan.key}
               className={`rounded-2xl border p-6 sm:p-7 transition-all ${
-                tier.popular
+                plan.highlight
                   ? "border-brand-500 bg-brand-50/50 shadow-md shadow-brand-500/10 relative"
                   : "border-surface-200 bg-surface-0 hover:border-surface-300"
               }`}
             >
-              {tier.popular && (
+              {plan.badge && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center rounded-full bg-brand-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
-                  Most Popular
+                  {plan.badge}
                 </span>
               )}
               <h3 className="text-lg font-bold text-surface-900">
-                {tier.name}
+                {plan.name}
               </h3>
               <div className="mt-3 mb-5">
                 <span className="text-3xl font-bold text-surface-900 tabular-nums">
-                  {tier.price}
+                  {plan.priceLabel}
                 </span>
                 <span className="text-sm text-surface-500 ml-1">
-                  {tier.period}
+                  {plan.period}
                 </span>
               </div>
               <ul className="space-y-2.5 mb-7">
-                {tier.features.map((f) => (
+                {plan.features.map((f) => (
                   <li
                     key={f}
                     className="flex items-center gap-2.5 text-sm text-surface-600"
@@ -282,25 +241,27 @@ export function BillingTab() {
                 ))}
               </ul>
               <button
-                disabled={isCurrent || actionLoading === tier.key}
+                disabled={isCurrent || plan.key === "free" || actionLoading === plan.key}
                 onClick={() => {
-                  if (tier.key !== "free") handleUpgrade(tier.key);
+                  if (plan.key !== "free" && plan.key !== currentPlan) {
+                    handleUpgrade(plan.key as "pro" | "team");
+                  }
                 }}
                 className={`w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
                   isCurrent
                     ? "bg-surface-100 text-surface-400 cursor-not-allowed"
-                    : tier.popular
+                    : plan.highlight
                       ? "bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/20 hover:shadow-md hover:shadow-brand-600/25 disabled:opacity-50"
-                      : tier.key === "free"
+                      : plan.key === "free"
                         ? "bg-surface-100 text-surface-400 cursor-not-allowed"
                         : "border border-surface-300 text-surface-700 hover:bg-surface-50 hover:border-surface-400 disabled:opacity-50"
                 }`}
               >
                 {isCurrent ? (
                   "Current Plan"
-                ) : actionLoading === tier.key ? (
+                ) : actionLoading === plan.key ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                ) : tier.key === "free" ? (
+                ) : plan.key === "free" ? (
                   "Free Forever"
                 ) : (
                   "Upgrade"
