@@ -80,6 +80,19 @@ export type {
   AiFeatureMeta,
 } from "./feature-flags";
 
+// Plan configuration (single source of truth for all plan data)
+// Note: MICROS_PER_CREDIT is intentionally NOT exported here — it's an internal
+// conversion constant used only by server-side ai-feature-flags.ts. Import it
+// directly from "./plans.config" where needed.
+export {
+  PLANS,
+  AI_CREDITS_PER_USD,
+  getEnabledPlans,
+  getPlan,
+  getPlanLimits,
+} from "./plans.config";
+export type { PlanKey, PlanDefinition } from "./plans.config";
+
 // Embeddings
 export {
   createEmbeddingService,
