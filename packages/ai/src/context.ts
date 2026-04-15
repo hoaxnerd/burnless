@@ -119,7 +119,8 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
   };
   const fmtPct = (val: number | null) => {
     if (val === null) return "N/A";
-    return `${(val * 100).toFixed(1)}%`;
+    // Engine metrics are already in percentage points (e.g. 4.0 = 4%), not decimals
+    return `${val.toFixed(1)}%`;
   };
 
   const lines = [

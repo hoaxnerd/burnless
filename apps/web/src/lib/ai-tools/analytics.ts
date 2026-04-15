@@ -64,13 +64,14 @@ export const benchmarkMetricsSchema = z.object({
 // ── Industry benchmarks ──────────────────────────────────────────────────────
 
 const BENCHMARKS: Record<string, Record<string, { median: number; top25: number; bottom25: number; unit: string }>> = {
+  // All percentage benchmarks are in percentage points (e.g. 5 = 5%) to match engine output
   seed: {
     burn_rate: { median: 75000, top25: 50000, bottom25: 120000, unit: "$/month" },
     runway: { median: 18, top25: 24, bottom25: 12, unit: "months" },
-    revenue_growth: { median: 0.15, top25: 0.25, bottom25: 0.05, unit: "MoM %" },
-    gross_margin: { median: 0.70, top25: 0.85, bottom25: 0.50, unit: "%" },
+    revenue_growth: { median: 15, top25: 25, bottom25: 5, unit: "MoM %" },
+    gross_margin: { median: 70, top25: 85, bottom25: 50, unit: "%" },
     ltv_cac_ratio: { median: 2.5, top25: 4.0, bottom25: 1.5, unit: "x" },
-    churn_rate: { median: 0.05, top25: 0.02, bottom25: 0.10, unit: "monthly %" },
+    churn_rate: { median: 5, top25: 2, bottom25: 10, unit: "monthly %" },
     burn_multiple: { median: 3.0, top25: 1.5, bottom25: 6.0, unit: "x" },
     rule_of_40: { median: 15, top25: 40, bottom25: -10, unit: "%" },
     magic_number: { median: 0.5, top25: 0.8, bottom25: 0.2, unit: "x" },
@@ -78,10 +79,10 @@ const BENCHMARKS: Record<string, Record<string, { median: number; top25: number;
   series_a: {
     burn_rate: { median: 200000, top25: 150000, bottom25: 350000, unit: "$/month" },
     runway: { median: 20, top25: 30, bottom25: 14, unit: "months" },
-    revenue_growth: { median: 0.12, top25: 0.20, bottom25: 0.05, unit: "MoM %" },
-    gross_margin: { median: 0.72, top25: 0.85, bottom25: 0.55, unit: "%" },
+    revenue_growth: { median: 12, top25: 20, bottom25: 5, unit: "MoM %" },
+    gross_margin: { median: 72, top25: 85, bottom25: 55, unit: "%" },
     ltv_cac_ratio: { median: 3.0, top25: 5.0, bottom25: 2.0, unit: "x" },
-    churn_rate: { median: 0.04, top25: 0.015, bottom25: 0.08, unit: "monthly %" },
+    churn_rate: { median: 4, top25: 1.5, bottom25: 8, unit: "monthly %" },
     burn_multiple: { median: 2.0, top25: 1.0, bottom25: 4.0, unit: "x" },
     rule_of_40: { median: 25, top25: 50, bottom25: 0, unit: "%" },
     magic_number: { median: 0.7, top25: 1.0, bottom25: 0.3, unit: "x" },
@@ -89,10 +90,10 @@ const BENCHMARKS: Record<string, Record<string, { median: number; top25: number;
   series_b: {
     burn_rate: { median: 500000, top25: 350000, bottom25: 800000, unit: "$/month" },
     runway: { median: 24, top25: 36, bottom25: 16, unit: "months" },
-    revenue_growth: { median: 0.08, top25: 0.15, bottom25: 0.03, unit: "MoM %" },
-    gross_margin: { median: 0.75, top25: 0.88, bottom25: 0.60, unit: "%" },
+    revenue_growth: { median: 8, top25: 15, bottom25: 3, unit: "MoM %" },
+    gross_margin: { median: 75, top25: 88, bottom25: 60, unit: "%" },
     ltv_cac_ratio: { median: 3.5, top25: 6.0, bottom25: 2.5, unit: "x" },
-    churn_rate: { median: 0.03, top25: 0.01, bottom25: 0.06, unit: "monthly %" },
+    churn_rate: { median: 3, top25: 1, bottom25: 6, unit: "monthly %" },
     burn_multiple: { median: 1.5, top25: 0.8, bottom25: 3.0, unit: "x" },
     rule_of_40: { median: 35, top25: 60, bottom25: 10, unit: "%" },
     magic_number: { median: 0.8, top25: 1.2, bottom25: 0.4, unit: "x" },

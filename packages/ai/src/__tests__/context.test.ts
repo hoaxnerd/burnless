@@ -29,13 +29,13 @@ function makeInput(overrides: Record<string, unknown> = {}) {
       netBurnRate: [{ month: "2026-03", value: 38000 }],
       cashRunwayMonths: [{ month: "2026-03", value: 18.5 }],
       cashPosition: [{ month: "2026-03", value: 700000 }],
-      revenueGrowthRate: [{ month: "2026-03", value: 0.20 }],
-      grossMarginPercent: [{ month: "2026-03", value: 0.75 }],
+      revenueGrowthRate: [{ month: "2026-03", value: 20 }],
+      grossMarginPercent: [{ month: "2026-03", value: 75 }],
       revenuePerEmployee: [{ month: "2026-03", value: 2000 }],
       ltv: [{ month: "2026-03", value: 5000 }],
       cac: [{ month: "2026-03", value: 1200 }],
       ltvCacRatio: [{ month: "2026-03", value: 4.2 }],
-      customerChurnRate: [{ month: "2026-03", value: 0.03 }],
+      customerChurnRate: [{ month: "2026-03", value: 3 }],
     },
     totalRevenue: series({ "2026-01": 8000, "2026-02": 10000, "2026-03": 12000 }),
     totalExpenses: series({ "2026-01": 45000, "2026-02": 48000, "2026-03": 50000 }),
@@ -234,5 +234,18 @@ describe("formatContextForPrompt", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
     expect(text).toContain("Monthly Cash Position");
+  });
+
+  it("formats percentage-point metrics without double-multiplication", () => {
+    // Engine returns percentage points: 20 means 20%, 75 means 75%, 3 means 3%
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Revenue Growth: 20.0%");
+    expect(text).toContain("Gross Margin: 75.0%");
+    expect(text).toContain("Churn Rate: 3.0%");
+    // Must NOT contain double-multiplied values
+    expect(text).not.toContain("2000.0%");
+    expect(text).not.toContain("7500.0%");
+    expect(text).not.toContain("300.0%");
   });
 });
