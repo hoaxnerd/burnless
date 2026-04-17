@@ -3,9 +3,9 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Contact Us — Burnless",
+  title: "Contact Us — burnless",
   description:
-    "Get in touch with the Burnless team. We're here to help with questions, feedback, and support.",
+    "Get in touch with the burnless team. We're here to help with questions, feedback, and support.",
 };
 
 export default function ContactPage() {
@@ -153,7 +153,7 @@ export default function ContactPage() {
             Company
           </h2>
           <p className="text-sm text-surface-600">
-            Burnless, Inc.
+            burnless, Inc.
             <br />
             Delaware, United States
           </p>

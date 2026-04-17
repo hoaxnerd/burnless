@@ -12,7 +12,7 @@ test.describe("Login page UI", () => {
   test("login page renders correctly", async ({ page }) => {
     await page.goto("/login");
 
-    await expect(page.getByText("Welcome to Burnless")).toBeVisible();
+    await expect(page.getByText("Welcome to burnless")).toBeVisible();
     await expect(page.getByPlaceholder("you@startup.com")).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Google" })).toBeVisible();
@@ -102,6 +102,6 @@ test.describe("Auth flow (requires DB)", () => {
     });
 
     await page.getByText("Use a different email").click();
-    await expect(page.getByText("Welcome to Burnless")).toBeVisible();
+    await expect(page.getByText("Welcome to burnless")).toBeVisible();
   });
 });

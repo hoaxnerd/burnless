@@ -2,7 +2,7 @@ import { db, aiConversations, aiInsightCache } from "@burnless/db";
 import { lt, inArray, and } from "drizzle-orm";
 
 /**
- * Data retention policies for Burnless.
+ * Data retention policies for burnless.
  *
  * AI conversation history: 90 days (configurable)
  * AI insight cache: respects expiresAt field, fallback 30 days

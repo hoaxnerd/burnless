@@ -8,7 +8,7 @@ export function SetupPrompt() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
         </svg>
       </div>
-      <h3 className="text-xl font-bold text-surface-900 mb-2">Welcome to Burnless</h3>
+      <h3 className="text-xl font-bold text-surface-900 mb-2">Welcome to burnless</h3>
       <p className="text-sm text-surface-500 mb-8 max-w-sm mx-auto">
         Your financial companion. Complete onboarding to set up your company.
       </p>

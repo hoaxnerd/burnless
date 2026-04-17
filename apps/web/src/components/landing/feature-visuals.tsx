@@ -32,7 +32,7 @@ export function AIChatMockup({ visible }: { visible: boolean }) {
         <div className="w-6 h-6 rounded-full bg-accent-500/20 flex items-center justify-center">
           <Bot className="w-3 h-3 text-accent-400" />
         </div>
-        <span className="text-xs font-semibold text-surface-900">Burnless AI</span>
+        <span className="text-xs font-semibold text-surface-900">burnless AI</span>
         <span className="ml-auto flex items-center gap-1 text-[10px] text-success-500">
           <span className="w-1 h-1 rounded-full bg-success-500" />
           Online

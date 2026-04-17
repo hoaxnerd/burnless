@@ -3,9 +3,9 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Burnless",
+  title: "Privacy Policy — burnless",
   description:
-    "Privacy Policy for Burnless. Learn how we collect, use, and protect your data.",
+    "Privacy Policy for burnless. Learn how we collect, use, and protect your data.",
 };
 
 export default function PrivacyPage() {
@@ -26,10 +26,10 @@ export default function PrivacyPage() {
               1. Introduction
             </h2>
             <p>
-              Burnless, Inc. (&quot;we&quot;, &quot;us&quot;, or
+              burnless, Inc. (&quot;we&quot;, &quot;us&quot;, or
               &quot;our&quot;) is committed to protecting your privacy. This
               Privacy Policy explains how we collect, use, disclose, and
-              safeguard your information when you use Burnless (&quot;the
+              safeguard your information when you use burnless (&quot;the
               Service&quot;). By using the Service, you consent to the practices
               described in this policy.
             </p>
@@ -357,7 +357,7 @@ export default function PrivacyPage() {
               exercise your rights, contact us at:
             </p>
             <div className="mt-3 p-4 rounded-lg bg-surface-50 border border-surface-200/50">
-              <p className="font-medium text-surface-900">Burnless, Inc.</p>
+              <p className="font-medium text-surface-900">burnless, Inc.</p>
               <p className="mt-1">
                 Email:{" "}
                 <a

@@ -18,7 +18,7 @@ test.describe("Onboarding flow", () => {
   test("onboarding page shows website entry step", async ({ page }) => {
     await page.goto("/onboarding");
 
-    await expect(page.getByText("Welcome to Burnless")).toBeVisible();
+    await expect(page.getByText("Welcome to burnless")).toBeVisible();
     await expect(page.getByPlaceholder("yourcompany.com")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Set Up My Company" })

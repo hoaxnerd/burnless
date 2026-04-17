@@ -24,10 +24,10 @@ export function LandingNav() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 min-h-[44px] group">
+          <Link href="/" className="flex items-center gap-1.5 min-h-[44px] group">
             <BrandLogo className="h-8 w-8 transition-transform duration-300 group-hover:scale-110" />
-            <span className="text-xl font-semibold text-surface-900 tracking-tight">
-              Burnless
+            <span className="text-xl font-semibold tracking-tight bg-gradient-to-r from-blue-700 to-blue-400 bg-clip-text text-transparent">
+              burnless
             </span>
           </Link>
 

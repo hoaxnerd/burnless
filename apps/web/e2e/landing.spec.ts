@@ -38,7 +38,7 @@ test.describe("Landing page", () => {
 
   test.describe("Navigation", () => {
     test("displays brand name", async ({ page }) => {
-      await expect(page.getByText("Burnless").first()).toBeVisible();
+      await expect(page.getByText("burnless").first()).toBeVisible();
     });
 
     test("has Features nav link", async ({ page }) => {

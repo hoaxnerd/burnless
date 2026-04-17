@@ -1,7 +1,7 @@
 /**
  * ScenarioBadge — small status badge for override states and scenario metadata.
  *
- * Uses the Burnless semantic color tokens (warning, success, danger, accent, surface)
+ * Uses the burnless semantic color tokens (warning, success, danger, accent, surface)
  * defined in globals.css. All dark-mode variants rely on the CSS-variable overrides
  * that the design system already provides.
  */

@@ -76,7 +76,7 @@ describe("PageEmptyState", () => {
 describe("SetupPrompt", () => {
   it("renders welcome message", () => {
     render(<SetupPrompt />);
-    expect(screen.getByText("Welcome to Burnless")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to burnless")).toBeInTheDocument();
     expect(screen.getByText("Get started")).toBeInTheDocument();
   });
 

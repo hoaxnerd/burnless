@@ -45,7 +45,7 @@ export function WebsiteStep({
 
         <BrandLogo className="h-14 w-14 mx-auto mb-6" />
         <h1 className="text-3xl font-bold text-surface-900 dark:text-surface-50">
-          Welcome to Burnless
+          Welcome to burnless
         </h1>
         <p className="mt-3 text-surface-500 dark:text-surface-400 max-w-sm mx-auto">
           Enter your company website and we&apos;ll set everything up for you.

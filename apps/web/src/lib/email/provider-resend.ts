@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import type { EmailProvider, EmailMessage, SendResult } from "./types";
 
 const FROM_ADDRESS =
-  process.env.EMAIL_FROM ?? "Burnless <noreply@burnless.app>";
+  process.env.EMAIL_FROM ?? "burnless <noreply@burnless.app>";
 
 export class ResendProvider implements EmailProvider {
   private client: Resend;

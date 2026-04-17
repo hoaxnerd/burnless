@@ -85,7 +85,7 @@ const pageContextMap: Record<string, PageContext> = {
     description: "data import and integrations",
     suggestedPrompts: [
       "What data should I import to get the most value?",
-      "Help me map my CSV columns to Burnless fields",
+      "Help me map my CSV columns to burnless fields",
       "What integrations would save me the most time?",
       "Review my imported data for potential issues",
     ],
@@ -125,7 +125,7 @@ export function getPageContext(pathname: string): PageContext {
   }
 
   return {
-    pageName: "Burnless",
+    pageName: "burnless",
     description: "financial planning",
     suggestedPrompts: [
       "Give me a quick financial health check",

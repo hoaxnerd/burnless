@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Burnless Color System ─────────────────────────────────────────────── */
+  /* ── burnless Color System ─────────────────────────────────────────────── */
 
   /* Brand — Electric Blue (our signature) */
   --color-brand-50: #eff6ff;

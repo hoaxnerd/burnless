@@ -46,7 +46,7 @@ export function DashboardEmptyState({
           Here&apos;s what your dashboard will look like:
         </p>
         <h2 className="text-lg sm:text-xl font-bold text-surface-900 mb-6">
-          Welcome to Burnless, {companyName}
+          Welcome to burnless, {companyName}
         </h2>
 
         {/* Progress steps */}

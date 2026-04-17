@@ -74,7 +74,7 @@ setup("authenticate test user", async ({ page }) => {
 
   // Sign in via the login UI (allow extra time for dev server compilation)
   await page.goto("/login", { waitUntil: "networkidle", timeout: 30_000 });
-  await expect(page.getByText("Welcome to Burnless")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Welcome to burnless")).toBeVisible({ timeout: 15_000 });
 
   await page.getByPlaceholder("you@startup.com").fill(DEMO_USER.email);
   await page.getByRole("button", { name: "Continue" }).click();

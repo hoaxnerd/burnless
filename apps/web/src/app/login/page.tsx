@@ -190,7 +190,7 @@ function LoginContent() {
 
   const heading =
     step === "email"
-      ? "Welcome to Burnless"
+      ? "Welcome to burnless"
       : step === "2fa"
         ? "Two-factor authentication"
         : step === "signin"
@@ -225,7 +225,7 @@ function LoginContent() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8 group">
             <BrandLogo className="h-11 w-11" />
-            <span className="text-lg font-bold text-surface-900">Burnless</span>
+            <span className="text-lg font-bold text-surface-900">burnless</span>
           </Link>
           <div
             className="transition-all duration-300 ease-out"

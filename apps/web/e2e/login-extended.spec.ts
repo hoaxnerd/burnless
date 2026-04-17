@@ -7,8 +7,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Login page extended tests", () => {
   test("renders the logo and branding", async ({ page }) => {
     await page.goto("/login");
-    // Page title or heading should reference Burnless
-    await expect(page.getByText("Welcome to Burnless")).toBeVisible();
+    // Page title or heading should reference burnless
+    await expect(page.getByText("Welcome to burnless")).toBeVisible();
   });
 
   test("email input accepts valid email format", async ({ page }) => {

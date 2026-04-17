@@ -231,7 +231,7 @@ describe("GET /api/auth/two-factor/setup", () => {
     mockGetAuthUser.mockResolvedValue({ id: "u1", email: "a@b.com" });
     mockLimit.mockResolvedValue([{ twoFactorEnabled: false, email: "a@b.com" }]);
     mockGenerateTotpSecret.mockReturnValue("JBSWY3DPEHPK3PXP");
-    mockBuildTotpUri.mockReturnValue("otpauth://totp/Burnless:a@b.com?secret=JBSWY3DPEHPK3PXP");
+    mockBuildTotpUri.mockReturnValue("otpauth://totp/burnless:a@b.com?secret=JBSWY3DPEHPK3PXP");
 
     const res = await setupGET(getRequest("http://localhost/api/auth/two-factor/setup"));
     const body = await res.json();

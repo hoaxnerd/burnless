@@ -105,7 +105,7 @@ function ResetPasswordContent() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-8 group">
             <BrandLogo className="h-11 w-11" />
-            <span className="text-lg font-bold text-surface-900">Burnless</span>
+            <span className="text-lg font-bold text-surface-900">burnless</span>
           </Link>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">
             {step === "request" && "Reset your password"}

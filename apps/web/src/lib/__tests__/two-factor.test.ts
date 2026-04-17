@@ -31,7 +31,7 @@ describe("buildTotpUri", () => {
     const uri = buildTotpUri("JBSWY3DPEHPK3PXP", "user@example.com");
     expect(uri).toContain("otpauth://totp/");
     expect(uri).toContain("secret=JBSWY3DPEHPK3PXP");
-    expect(uri).toContain("issuer=Burnless");
+    expect(uri).toContain("issuer=burnless");
     expect(uri).toContain("algorithm=SHA1");
     expect(uri).toContain("digits=6");
     expect(uri).toContain("period=30");
@@ -39,7 +39,7 @@ describe("buildTotpUri", () => {
 
   it("encodes email in the label", () => {
     const uri = buildTotpUri("SECRET", "user@example.com");
-    expect(uri).toContain("Burnless%3Auser%40example.com");
+    expect(uri).toContain("burnless%3Auser%40example.com");
   });
 });
 

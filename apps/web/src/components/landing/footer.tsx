@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CookieSettingsButton } from "@/components/cookie-consent";
+import { BrandLogo } from "@/components/brand-logo";
 
 const footerLinks = {
   Product: [
@@ -27,19 +28,9 @@ export function LandingFooter() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <svg viewBox="0 0 32 32" fill="none" className="h-7 w-7" aria-hidden="true">
-                <defs>
-                  <linearGradient id="footer-logo-grad" x1="8" y1="28" x2="24" y2="4" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#2563eb" />
-                    <stop offset="1" stopColor="#60a5fa" />
-                  </linearGradient>
-                </defs>
-                <path d="M16 2C16 2 10 10 10 16C10 19.3 12.7 22 16 22C19.3 22 22 19.3 22 16C22 10 16 2 16 2Z" fill="url(#footer-logo-grad)" />
-                <path d="M16 12C16 12 13 16 13 18.5C13 20.2 14.3 21.5 16 21.5C17.7 21.5 19 20.2 19 18.5C19 16 16 12 16 12Z" fill="#0f1729" />
-                <circle cx="16" cy="28" r="2" fill="url(#footer-logo-grad)" opacity="0.6" />
-              </svg>
-              <span className="text-lg font-semibold text-surface-900">Burnless</span>
+            <div className="flex items-center gap-1 mb-4">
+              <BrandLogo className="h-7 w-7" />
+              <span className="text-lg font-semibold bg-gradient-to-r from-blue-700 to-blue-400 bg-clip-text text-transparent">burnless</span>
             </div>
             <p className="text-sm text-surface-500 leading-relaxed">
               AI-powered financial planning for startups. Know your runway, plan your future.
@@ -99,7 +90,7 @@ export function LandingFooter() {
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-surface-200/15">
           <p className="text-xs text-surface-500 text-center">
-            &copy; {new Date().getFullYear()} Burnless, Inc. All rights reserved.
+            &copy; {new Date().getFullYear()} burnless, Inc. All rights reserved.
           </p>
         </div>
       </div>

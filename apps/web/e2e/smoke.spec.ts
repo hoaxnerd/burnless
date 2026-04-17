@@ -14,7 +14,7 @@ test.describe("Page smoke tests", () => {
   test("login page loads without error", async ({ page }) => {
     const response = await page.goto("/login");
     expect(response?.status()).toBeLessThan(500);
-    await expect(page.getByText("Welcome to Burnless")).toBeVisible();
+    await expect(page.getByText("Welcome to burnless")).toBeVisible();
   });
 
   test("onboarding page loads without error", async ({ page }) => {

@@ -9,13 +9,13 @@ function layout(content: string): string {
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:560px;margin:0 auto;padding:40px 24px;">
   <div style="text-align:center;margin-bottom:32px;">
-    <span style="font-size:24px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Burnless</span>
+    <span style="font-size:24px;font-weight:700;color:#fff;letter-spacing:-0.5px;">burnless</span>
   </div>
   <div style="background:#111;border:1px solid #222;border-radius:12px;padding:32px;">
     ${content}
   </div>
   <div style="text-align:center;margin-top:24px;color:#666;font-size:12px;">
-    <p>&copy; ${new Date().getFullYear()} Burnless. AI-powered financial planning for startups.</p>
+    <p>&copy; ${new Date().getFullYear()} burnless. AI-powered financial planning for startups.</p>
   </div>
 </div>
 </body>
@@ -26,11 +26,11 @@ export function verificationEmail(
   verifyUrl: string
 ): { subject: string; html: string; text: string } {
   return {
-    subject: "Verify your Burnless email",
+    subject: "Verify your burnless email",
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Verify your email</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
-        Click below to verify your email and get started with Burnless.
+        Click below to verify your email and get started with burnless.
         This link expires in 24 hours.
       </p>
       <a href="${verifyUrl}"
@@ -39,20 +39,20 @@ export function verificationEmail(
         Verify email &rarr;
       </a>
       <p style="color:#666;font-size:13px;margin:24px 0 0;">
-        If you didn't create a Burnless account, ignore this email.
+        If you didn't create a burnless account, ignore this email.
       </p>
     `),
-    text: `Verify your Burnless email:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this email.`,
+    text: `Verify your burnless email:\n\n${verifyUrl}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this email.`,
   };
 }
 
 export function welcomeEmail(name: string): { subject: string; html: string; text: string } {
   return {
-    subject: "Welcome to Burnless",
+    subject: "Welcome to burnless",
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Welcome, ${name}!</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
-        You're in. Burnless gives you AI-powered financial clarity — runway projections,
+        You're in. burnless gives you AI-powered financial clarity — runway projections,
         burn rate tracking, and scenario planning built for founders.
       </p>
       <a href="${BASE_URL}/onboarding"
@@ -64,7 +64,7 @@ export function welcomeEmail(name: string): { subject: string; html: string; tex
         Questions? Reply to this email — we read everything.
       </p>
     `),
-    text: `Welcome to Burnless, ${name}!\n\nStart your setup: ${BASE_URL}/onboarding\n\nQuestions? Reply to this email.`,
+    text: `Welcome to burnless, ${name}!\n\nStart your setup: ${BASE_URL}/onboarding\n\nQuestions? Reply to this email.`,
   };
 }
 
@@ -72,11 +72,11 @@ export function passwordResetEmail(
   resetUrl: string
 ): { subject: string; html: string; text: string } {
   return {
-    subject: "Reset your Burnless password",
+    subject: "Reset your burnless password",
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Reset your password</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
-        Someone requested a password reset for your Burnless account.
+        Someone requested a password reset for your burnless account.
         Click below to choose a new password. This link expires in 1 hour.
       </p>
       <a href="${resetUrl}"
@@ -88,7 +88,7 @@ export function passwordResetEmail(
         If you didn't request this, ignore this email. Your password won't change.
       </p>
     `),
-    text: `Reset your Burnless password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`,
+    text: `Reset your burnless password:\n\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`,
   };
 }
 
@@ -140,11 +140,11 @@ export function subscriptionConfirmedEmail(
 ): { subject: string; html: string; text: string } {
   const planName = PLAN_DISPLAY[plan] ?? plan;
   return {
-    subject: `You're on Burnless ${planName}`,
+    subject: `You're on burnless ${planName}`,
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Subscription confirmed</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
-        Your Burnless <strong style="color:#fff;">${planName}</strong> plan is now active.
+        Your burnless <strong style="color:#fff;">${planName}</strong> plan is now active.
         You have full access to all ${planName} features.
       </p>
       <a href="${BASE_URL}/settings?tab=billing"
@@ -156,13 +156,13 @@ export function subscriptionConfirmedEmail(
         You can manage your subscription, update payment methods, or download invoices from the billing settings page.
       </p>
     `),
-    text: `Subscription confirmed — Burnless ${planName}\n\nYour ${planName} plan is now active. Manage billing: ${BASE_URL}/settings?tab=billing`,
+    text: `Subscription confirmed — burnless ${planName}\n\nYour ${planName} plan is now active. Manage billing: ${BASE_URL}/settings?tab=billing`,
   };
 }
 
 export function paymentFailedEmail(): { subject: string; html: string; text: string } {
   return {
-    subject: "Burnless — payment failed",
+    subject: "burnless — payment failed",
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Payment failed</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
@@ -179,7 +179,7 @@ export function paymentFailedEmail(): { subject: string; html: string; text: str
         Questions? Reply to this email.
       </p>
     `),
-    text: `Payment failed — Burnless\n\nPlease update your payment method: ${BASE_URL}/settings?tab=billing`,
+    text: `Payment failed — burnless\n\nPlease update your payment method: ${BASE_URL}/settings?tab=billing`,
   };
 }
 
@@ -192,7 +192,7 @@ export function subscriptionCanceledEmail(
     year: "numeric",
   });
   return {
-    subject: "Burnless — subscription cancellation scheduled",
+    subject: "burnless — subscription cancellation scheduled",
     html: layout(`
       <h1 style="color:#fff;font-size:20px;margin:0 0 16px;">Cancellation scheduled</h1>
       <p style="color:#ccc;line-height:1.6;margin:0 0 24px;">
@@ -208,7 +208,7 @@ export function subscriptionCanceledEmail(
         Manage subscription &rarr;
       </a>
     `),
-    text: `Cancellation scheduled — Burnless\n\nYour plan stays active until ${endStr}. Reactivate: ${BASE_URL}/settings?tab=billing`,
+    text: `Cancellation scheduled — burnless\n\nYour plan stays active until ${endStr}. Reactivate: ${BASE_URL}/settings?tab=billing`,
   };
 }
 

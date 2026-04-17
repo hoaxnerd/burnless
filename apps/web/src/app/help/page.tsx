@@ -4,16 +4,16 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Help & FAQ — Burnless",
+  title: "Help & FAQ — burnless",
   description:
-    "Find answers to common questions about Burnless, your AI-powered financial planning platform.",
+    "Find answers to common questions about burnless, your AI-powered financial planning platform.",
 };
 
 const faqs = [
   {
-    question: "What is Burnless?",
+    question: "What is burnless?",
     answer:
-      "Burnless is an AI-powered financial planning platform built for startups. It helps you track expenses, monitor your burn rate, forecast runway, model scenarios, and generate investor-ready reports — all in one place.",
+      "burnless is an AI-powered financial planning platform built for startups. It helps you track expenses, monitor your burn rate, forecast runway, model scenarios, and generate investor-ready reports — all in one place.",
   },
   {
     question: "How does the companion work?",
@@ -28,7 +28,7 @@ const faqs = [
   {
     question: "Can I import data from spreadsheets?",
     answer:
-      "Yes. Burnless supports CSV import for expenses, revenue, and other financial data. We also support direct integrations with popular accounting and banking tools.",
+      "Yes. burnless supports CSV import for expenses, revenue, and other financial data. We also support direct integrations with popular accounting and banking tools.",
   },
   {
     question: "What reports can I generate?",
@@ -43,10 +43,10 @@ const faqs = [
   {
     question: "Is there a free plan?",
     answer:
-      "Yes. Burnless offers a free tier with core financial tracking features. Paid plans unlock advanced AI features, more integrations, and team collaboration. See our Pricing page for details.",
+      "Yes. burnless offers a free tier with core financial tracking features. Paid plans unlock advanced AI features, more integrations, and team collaboration. See our Pricing page for details.",
   },
   {
-    question: "Can my whole team use Burnless?",
+    question: "Can my whole team use burnless?",
     answer:
       "Yes. Team plans allow multiple users with role-based access. Founders, finance leads, and team members can each see what they need.",
   },

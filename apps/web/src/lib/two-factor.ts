@@ -4,7 +4,7 @@
  */
 import { createHmac, randomBytes } from "crypto";
 
-const APP_NAME = "Burnless";
+const APP_NAME = "burnless";
 const BACKUP_CODE_COUNT = 10;
 const BACKUP_CODE_LENGTH = 8;
 const TOTP_PERIOD = 30;

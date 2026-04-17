@@ -19,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://burnless.com"),
-  title: "Burnless — AI Financial Planning for Startups",
+  title: "burnless — AI Financial Planning for Startups",
   description:
     "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
   manifest: "/manifest.json",
@@ -33,15 +33,15 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   openGraph: {
-    title: "Burnless — AI Financial Planning for Startups",
+    title: "burnless — AI Financial Planning for Startups",
     description:
       "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
-    siteName: "Burnless",
+    siteName: "burnless",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Burnless — AI Financial Planning for Startups",
+    title: "burnless — AI Financial Planning for Startups",
     description:
       "Manage revenue, funding, and expenses with a companion that helps you make smarter financial decisions.",
   },

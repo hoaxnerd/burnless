@@ -30,8 +30,8 @@ test.describe("Floating sidebar — authenticated", () => {
     const sidebar = page.getByLabel("Main navigation").first();
     await expect(sidebar).toBeVisible({ timeout: 10_000 });
 
-    // Should contain the Burnless brand logo
-    await expect(sidebar.locator("text=Burnless").first()).toBeVisible();
+    // Should contain the burnless brand logo
+    await expect(sidebar.locator("text=burnless").first()).toBeVisible();
   });
 
   test("sidebar shows all core navigation links", async ({ page }) => {
@@ -396,12 +396,12 @@ test.describe("Floating sidebar — mobile viewport", () => {
     await expect(page.getByLabel("Close navigation")).not.toBeVisible({ timeout: 3_000 });
   });
 
-  test("mobile header shows Burnless branding", async ({ page }) => {
+  test("mobile header shows burnless branding", async ({ page }) => {
     await page.goto("/dashboard");
 
     // Mobile header should show brand logo and text
     await expect(
-      page.locator("header, div").filter({ hasText: "Burnless" }).first()
+      page.locator("header, div").filter({ hasText: "burnless" }).first()
     ).toBeVisible({ timeout: 10_000 });
   });
 });

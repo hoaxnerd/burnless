@@ -24,20 +24,24 @@ export function generateOGImage() {
           style={{ marginBottom: 32 }}
         >
           <defs>
-            <linearGradient id="og-grad" x1="8" y1="28" x2="24" y2="4" gradientUnits="userSpaceOnUse">
+            <linearGradient id="og-grad" x1="16" y1="30" x2="16" y2="2" gradientUnits="userSpaceOnUse">
               <stop stopColor="#60a5fa" />
               <stop offset="1" stopColor="#93c5fd" />
             </linearGradient>
           </defs>
           <path
-            d="M16 2C16 2 10 10 10 16C10 19.3 12.7 22 16 22C19.3 22 22 19.3 22 16C22 10 16 2 16 2Z"
+            d="M16 2L19 10L22 5L25 14C26.5 20 24 28 16 30C8 28 5.5 20 7 14L10 6L13 10Z"
             fill="url(#og-grad)"
           />
           <path
-            d="M16 12C16 12 13 16 13 18.5C13 20.2 14.3 21.5 16 21.5C17.7 21.5 19 20.2 19 18.5C19 16 16 12 16 12Z"
-            fill="#1e3a8a"
+            d="M12 16L16 19.5L20 16M13 20L16 23L19 20"
+            stroke="white"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            opacity="0.4"
           />
-          <circle cx="16" cy="28" r="2" fill="url(#og-grad)" opacity="0.6" />
         </svg>
 
         <div
@@ -49,7 +53,7 @@ export function generateOGImage() {
             marginBottom: 16,
           }}
         >
-          Burnless
+          burnless
         </div>
 
         <div

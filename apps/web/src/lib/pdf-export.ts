@@ -88,7 +88,7 @@ function addPDFFooter(doc: jsPDFType) {
     const pageHeight = doc.internal.pageSize.getHeight();
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text("Burnless Financial Report", 20, pageHeight - 10);
+    doc.text("burnless Financial Report", 20, pageHeight - 10);
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - 20, pageHeight - 10, { align: "right" });
   }
 }

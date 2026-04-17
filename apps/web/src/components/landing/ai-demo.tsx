@@ -110,7 +110,7 @@ export function AIDemoSection() {
                 <Bot className="w-4 h-4 text-brand-400" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-surface-900">Burnless AI</div>
+                <div className="text-sm font-semibold text-surface-900">burnless AI</div>
                 <div className="text-xs text-success-500 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-success-500" aria-hidden="true" />
                   Online

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright E2E test configuration for Burnless web app.
+ * Playwright E2E test configuration for burnless web app.
  *
  * Runs against the local dev server by default.
  * Set BASE_URL env var to test against a deployed instance.

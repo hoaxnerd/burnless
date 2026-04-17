@@ -88,11 +88,11 @@ export function SidebarInner({
     <>
       {/* Logo header */}
       <div className={`p-4 flex ${collapsed ? "flex-col items-center gap-2" : "items-center justify-between"}`}>
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+        <Link href="/dashboard" className="flex items-center gap-1 min-w-0">
           <BrandLogo className="h-8 w-8 flex-shrink-0" />
           {!collapsed && (
-            <span className="text-lg font-semibold text-surface-900 truncate">
-              Burnless
+            <span className="text-lg font-semibold truncate bg-gradient-to-r from-blue-700 to-blue-400 bg-clip-text text-transparent">
+              burnless
             </span>
           )}
         </Link>

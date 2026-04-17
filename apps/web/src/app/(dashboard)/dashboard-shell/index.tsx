@@ -293,9 +293,9 @@ function DashboardContent({
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-1">
           <BrandLogo className="h-7 w-7" />
-          <span className="text-base font-semibold text-surface-900">Burnless</span>
+          <span className="text-base font-semibold bg-gradient-to-r from-blue-700 to-blue-400 bg-clip-text text-transparent">burnless</span>
         </Link>
         <div className="w-9" />
       </div>

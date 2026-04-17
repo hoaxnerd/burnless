@@ -3,9 +3,9 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "About — Burnless",
+  title: "About — burnless",
   description:
-    "Burnless is an AI-powered financial planning platform built for startups. Learn about our mission.",
+    "burnless is an AI-powered financial planning platform built for startups. Learn about our mission.",
 };
 
 export default function AboutPage() {
@@ -14,7 +14,7 @@ export default function AboutPage() {
       <LandingNav />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <h1 className="text-3xl sm:text-4xl font-bold text-surface-900 mb-2">
-          About Burnless
+          About burnless
         </h1>
         <p className="text-lg text-surface-500 mb-12 max-w-xl">
           Financial clarity for every startup, powered by AI.
@@ -27,7 +27,7 @@ export default function AboutPage() {
             </h2>
             <p>
               Startups fail when they run out of money — often without seeing it
-              coming. Burnless exists to change that. We give founders
+              coming. burnless exists to change that. We give founders
               real-time financial visibility, AI-powered forecasting, and the
               tools to make confident decisions about their runway, revenue,
               and growth.
@@ -52,7 +52,7 @@ export default function AboutPage() {
               Our Approach
             </h2>
             <p>
-              Burnless is built specifically for startup founders and finance
+              burnless is built specifically for startup founders and finance
               leads. We combine intuitive design with a companion that
               understands startup financial patterns — from burn rate
               optimization to fundraising runway modeling to scenario planning.

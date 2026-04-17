@@ -3,9 +3,9 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Security — Burnless",
+  title: "Security — burnless",
   description:
-    "Learn about Burnless security practices, data protection, and compliance commitments.",
+    "Learn about burnless security practices, data protection, and compliance commitments.",
 };
 
 export default function SecurityPage() {

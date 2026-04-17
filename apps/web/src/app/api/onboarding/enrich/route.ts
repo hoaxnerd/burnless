@@ -84,7 +84,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         try {
           const res = await fetch(body.websiteUrl, {
             headers: {
-              "User-Agent": "Burnless/1.0 (Financial Planning Tool)",
+              "User-Agent": "burnless/1.0 (Financial Planning Tool)",
             },
             signal: AbortSignal.timeout(10000),
           });

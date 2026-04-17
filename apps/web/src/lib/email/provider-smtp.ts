@@ -1,7 +1,7 @@
 import type { EmailProvider, EmailMessage, SendResult } from "./types";
 
 const FROM_ADDRESS =
-  process.env.EMAIL_FROM ?? "Burnless <noreply@burnless.app>";
+  process.env.EMAIL_FROM ?? "burnless <noreply@burnless.app>";
 
 /**
  * SMTP email provider — sends via raw SMTP (works with Mailpit, MailHog, etc.).
@@ -33,7 +33,7 @@ export class SmtpProvider implements EmailProvider {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          From: { Email: FROM_ADDRESS.match(/<(.+)>/)?.[1] ?? FROM_ADDRESS, Name: "Burnless" },
+          From: { Email: FROM_ADDRESS.match(/<(.+)>/)?.[1] ?? FROM_ADDRESS, Name: "burnless" },
           To: [{ Email: message.to }],
           Subject: message.subject,
           HTML: message.html,

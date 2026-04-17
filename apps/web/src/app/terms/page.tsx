@@ -3,9 +3,9 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Burnless",
+  title: "Terms of Service — burnless",
   description:
-    "Terms of Service for Burnless, the AI-powered financial planning platform for startups.",
+    "Terms of Service for burnless, the AI-powered financial planning platform for startups.",
 };
 
 export default function TermsPage() {
@@ -26,8 +26,8 @@ export default function TermsPage() {
               1. Acceptance of Terms
             </h2>
             <p>
-              By accessing or using Burnless (&quot;the Service&quot;), operated
-              by Burnless, Inc. (&quot;we&quot;, &quot;us&quot;, or
+              By accessing or using burnless (&quot;the Service&quot;), operated
+              by burnless, Inc. (&quot;we&quot;, &quot;us&quot;, or
               &quot;our&quot;), you agree to be bound by these Terms of Service.
               If you do not agree, do not use the Service.
             </p>
@@ -38,11 +38,11 @@ export default function TermsPage() {
               2. Description of Service
             </h2>
             <p>
-              Burnless provides AI-powered financial planning tools for
+              burnless provides AI-powered financial planning tools for
               startups, including expense tracking, runway forecasting, revenue
               management, and AI-driven financial insights. The Service is
               provided &quot;as is&quot; and is intended for informational
-              purposes. Burnless does not provide financial, tax, legal, or
+              purposes. burnless does not provide financial, tax, legal, or
               investment advice.
             </p>
           </section>
@@ -105,7 +105,7 @@ export default function TermsPage() {
             <p>
               All content, features, and functionality of the Service —
               including text, graphics, logos, software, and AI models — are
-              owned by Burnless, Inc. and are protected by intellectual property
+              owned by burnless, Inc. and are protected by intellectual property
               laws. You retain ownership of any data you upload to the Service.
             </p>
           </section>
@@ -134,7 +134,7 @@ export default function TermsPage() {
               7. AI Features
             </h2>
             <p>
-              Burnless uses artificial intelligence to provide financial
+              burnless uses artificial intelligence to provide financial
               insights, categorization, and forecasting. AI-generated outputs
               are estimates and suggestions only. They are not a substitute for
               professional financial advice. We do not guarantee the accuracy,
@@ -160,7 +160,7 @@ export default function TermsPage() {
               9. Limitation of Liability
             </h2>
             <p>
-              To the maximum extent permitted by law, Burnless, Inc. shall not
+              To the maximum extent permitted by law, burnless, Inc. shall not
               be liable for any indirect, incidental, special, consequential, or
               punitive damages, including loss of profits, data, or business
               opportunities, arising from your use of the Service. Our total

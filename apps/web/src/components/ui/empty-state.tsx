@@ -65,7 +65,7 @@ export function SetupPrompt({ context, companionName = "Companion" }: { context?
   return (
     <PageEmptyState
       icon={Sparkles}
-      title="Welcome to Burnless"
+      title="Welcome to burnless"
       description={`Complete onboarding to set up your company${context ? ` and start ${context}` : ""}.`}
       ctaLabel="Get started"
       ctaHref="/onboarding"

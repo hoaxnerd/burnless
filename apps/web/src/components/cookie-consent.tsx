@@ -29,7 +29,7 @@ const COOKIE_INVENTORY: Record<"essential" | "analytics" | "marketing", { descri
     ],
   },
   analytics: {
-    description: "Help us understand how you use Burnless to improve the product.",
+    description: "Help us understand how you use burnless to improve the product.",
     cookies: [
       { name: "_ga", purpose: "Distinguishes unique users for Google Analytics", duration: "2 years" },
       { name: "_ga_*", purpose: "Maintains session state for Google Analytics", duration: "2 years" },
