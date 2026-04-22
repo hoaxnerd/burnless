@@ -169,6 +169,81 @@ describe("scenarioUpdate", () => {
     expect(data.name).toBe("Second Edit");
   });
 
+  it("partial parameters update preserves unmodified JSONB keys", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "update-params-merge@test.burnless.app" },
+      company: { name: "Params Merge Co" },
+    });
+    const stream = await createRevenueStream(ctx.company.id, {
+      name: "SaaS",
+      type: "subscription",
+      parameters: {
+        monthlyPrice: 50,
+        startingCustomers: 100,
+        newCustomersPerMonth: 10,
+        monthlyChurnRate: 0.05,
+      },
+    });
+
+    // AI-style partial update: change only one field inside parameters
+    const result = await scenarioUpdate(
+      "revenue_stream",
+      revenueStreams,
+      stream.id,
+      { parameters: { expansionRate: 0.02 } },
+      ctx.scenario.id,
+    );
+
+    const resultParams = (result as { parameters: Record<string, number> }).parameters;
+    expect(resultParams.expansionRate).toBe(0.02);
+    expect(resultParams.monthlyPrice).toBe(50);
+    expect(resultParams.startingCustomers).toBe(100);
+    expect(resultParams.newCustomersPerMonth).toBe(10);
+    expect(resultParams.monthlyChurnRate).toBe(0.05);
+
+    const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
+    const stored = (overrides[0]!.data as { parameters: Record<string, number> }).parameters;
+    expect(stored.expansionRate).toBe(0.02);
+    expect(stored.monthlyPrice).toBe(50);
+    expect(stored.monthlyChurnRate).toBe(0.05);
+  });
+
+  it("partial parameters update on existing override preserves prior partial edits", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "update-params-merge2@test.burnless.app" },
+      company: { name: "Params Merge Two Co" },
+    });
+    const stream = await createRevenueStream(ctx.company.id, {
+      name: "SaaS",
+      type: "subscription",
+      parameters: { monthlyPrice: 50, startingCustomers: 100 },
+    });
+
+    // First partial update
+    await scenarioUpdate(
+      "revenue_stream",
+      revenueStreams,
+      stream.id,
+      { parameters: { expansionRate: 0.02 } },
+      ctx.scenario.id,
+    );
+
+    // Second partial update: different field inside parameters
+    const result = await scenarioUpdate(
+      "revenue_stream",
+      revenueStreams,
+      stream.id,
+      { parameters: { priceGrowthRate: 0.01 } },
+      ctx.scenario.id,
+    );
+
+    const resultParams = (result as { parameters: Record<string, number> }).parameters;
+    expect(resultParams.expansionRate).toBe(0.02);
+    expect(resultParams.priceGrowthRate).toBe(0.01);
+    expect(resultParams.monthlyPrice).toBe(50);
+    expect(resultParams.startingCustomers).toBe(100);
+  });
+
   it("isSystem financial account throws error", async () => {
     const ctx = await createCompanyContext({
       user: { email: "update-system@test.burnless.app" },

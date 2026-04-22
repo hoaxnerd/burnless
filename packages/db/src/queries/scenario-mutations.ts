@@ -4,6 +4,38 @@ import { scenarioOverrides, departments } from "../schema";
 import { upsertOverride } from "./scenario-overrides";
 
 /**
+ * Keys whose values are plain JSONB objects that should merge (not replace)
+ * when a scenario update supplies a partial version. An AI tool (or any
+ * partial-update caller) should be able to set one field inside `parameters`
+ * without wiping the other fields.
+ */
+const MERGABLE_JSONB_KEYS = new Set(["parameters"]);
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+function mergeChanges(
+  base: Record<string, unknown>,
+  changes: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...base, ...changes };
+  for (const key of MERGABLE_JSONB_KEYS) {
+    const baseVal = base[key];
+    const changeVal = changes[key];
+    if (isPlainObject(baseVal) && isPlainObject(changeVal)) {
+      merged[key] = { ...baseVal, ...changeVal };
+    }
+  }
+  return merged;
+}
+
+/**
  * Validation: isSystem financial accounts cannot be overridden in scenarios.
  */
 function validateOverridable(entityType: string, baseEntity: any) {
@@ -73,11 +105,12 @@ export async function scenarioUpdate(
     .then((r) => r[0]);
 
   if (existing) {
-    // Update existing override's data
-    const updatedData = {
-      ...(existing.data as Record<string, any>),
-      ...changes,
-    };
+    // Update existing override's data — merge nested JSONB (parameters)
+    // so partial updates don't clobber untouched keys.
+    const updatedData = mergeChanges(
+      existing.data as Record<string, unknown>,
+      changes as Record<string, unknown>,
+    );
     await upsertOverride(
       scenarioId,
       entityType,
@@ -96,7 +129,10 @@ export async function scenarioUpdate(
     .where(eq(table.id, entityId));
   if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
   validateOverridable(entityType, baseEntity);
-  const overrideData = { ...baseEntity, ...changes } as Record<string, unknown>;
+  const overrideData = mergeChanges(
+    baseEntity as Record<string, unknown>,
+    changes as Record<string, unknown>,
+  );
   await upsertOverride(
     scenarioId,
     entityType,
