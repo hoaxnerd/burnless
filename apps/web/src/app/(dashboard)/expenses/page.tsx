@@ -8,6 +8,7 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { aggregateBudgetTimeline } from "@/lib/budget-timeline";
 import { formatCurrency } from "@burnless/types";
 import { ExpensesView } from "./expenses-view";
 import { AddExpenseForm } from "./add-expense-form";
@@ -82,8 +83,11 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
   const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
 
-  // Budget vs actuals — the overlay model has no separate "budget" scenario
-  const budgetTimeline: { month: string; value: number }[] | null = null;
+  // Budget = sum of forecasted line items (the "plan"); actuals come from
+  // totalExpenses. A null timeline tells the view to hide the overlay; we
+  // emit null only when there are no forecasted line items to aggregate.
+  const aggregated = aggregateBudgetTimeline(expenseDetails.lineItems);
+  const budgetTimeline = aggregated.length > 0 ? aggregated : null;
 
   // Summary metrics
   const { anomalyCount, recurringCount } = expenseDetails;
