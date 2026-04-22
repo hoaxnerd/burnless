@@ -329,4 +329,42 @@ describe("getResolvedData", () => {
     expect(created!.name).toBe("New Stream");
     expect(created!._override).toBe("created");
   });
+
+  it("resolves funding_round modify and create overrides", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "resolved-funding@test.burnless.app" },
+      company: { name: "Resolved Funding Co" },
+    });
+
+    const round = await createFundingRound(ctx.company.id, {
+      name: "Seed Round",
+    });
+
+    await createScenarioOverride(
+      ctx.scenario.id,
+      "funding_round",
+      round.id,
+      "modify",
+      { ...round, name: "Seed Round (Projected)" },
+      { ...round },
+    );
+    await createScenarioOverride(
+      ctx.scenario.id,
+      "funding_round",
+      "scenario-only-round",
+      "create",
+      { id: "scenario-only-round", name: "Series A (Projected)", companyId: ctx.company.id },
+    );
+
+    const data = await getResolvedData(ctx.company.id, ctx.scenario.id);
+    expect(data.fundingRounds).toHaveLength(2);
+
+    const modified = data.fundingRounds.find((r) => r.id === round.id);
+    expect(modified!.name).toBe("Seed Round (Projected)");
+    expect(modified!._override).toBe("modified");
+
+    const created = data.fundingRounds.find((r) => r.id === "scenario-only-round");
+    expect(created!.name).toBe("Series A (Projected)");
+    expect(created!._override).toBe("created");
+  });
 });
