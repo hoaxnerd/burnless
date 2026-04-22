@@ -210,7 +210,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         parameters: {
           type: "object",
-          description: "Type-specific parameters. For 'subscription': { startingCustomers, monthlyPrice, growthRate, churnRate }. For 'one_time': { amount, frequency }. For 'usage_based': { usersCount, usagePerUser, pricePerUnit }. For 'services': { monthlyRevenue, growthRate }.",
+          description: "Type-specific parameters matching the engine contract. For 'subscription': { startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate (decimal, e.g. 0.05 for 5%) }. For 'one_time': { unitsPerMonth, pricePerUnit }. For 'usage_based': { activeUsers, avgUsagePerUser, pricePerUnit }. For 'services': { hoursPerMonth, hourlyRate }.",
         },
       },
       required: ["name", "type", "parameters"],

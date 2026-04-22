@@ -13,6 +13,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
+import { buildRevenueStreamParams } from "@/lib/revenue-stream-params";
 
 interface QuickActionsProps {
   scenarioId: string;
@@ -96,13 +97,16 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
     try {
       const params: Record<string, unknown> =
         revType === "subscription"
-          ? {
-              monthlyPrice: Number(revPrice),
-              startingCustomers: Number(revCustomers || "0"),
-              newCustomersPerMonth: 5,
-              monthlyChurnRate: 0.03,
-            }
-          : { unitPrice: Number(revPrice), monthlyUnits: Number(revCustomers || "1") };
+          ? buildRevenueStreamParams("subscription", {
+              monthlyPrice: revPrice,
+              startingCustomers: revCustomers || "0",
+              newCustomersPerMonth: "5",
+              monthlyChurnRate: "3",
+            })
+          : buildRevenueStreamParams("one_time", {
+              unitPrice: revPrice,
+              monthlyUnits: revCustomers || "1",
+            });
 
       const res = await apiFetch("/api/revenue-streams", {
         method: "POST",

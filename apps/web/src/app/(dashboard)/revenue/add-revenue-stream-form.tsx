@@ -15,6 +15,10 @@ import {
   oneTimeParamsSchema,
   usageBasedParamsSchema,
 } from "@/lib/form-validation";
+import {
+  buildRevenueStreamParams,
+  type RevenueStreamType,
+} from "@/lib/revenue-stream-params";
 
 const STREAM_TYPES = [
   { value: "subscription", label: "Subscription (SaaS)" },
@@ -101,15 +105,15 @@ export function AddRevenueStreamForm({ scenarioId, editStream, open: controlledO
           break;
         case "services":
           setHourlyRate(String(p.hourlyRate ?? ""));
-          setMonthlyHours(String(p.monthlyHours ?? ""));
+          setMonthlyHours(String(p.hoursPerMonth ?? ""));
           break;
         case "one_time":
-          setUnitPrice(String(p.unitPrice ?? ""));
-          setMonthlyUnits(String(p.monthlyUnits ?? ""));
+          setUnitPrice(String(p.pricePerUnit ?? ""));
+          setMonthlyUnits(String(p.unitsPerMonth ?? ""));
           break;
         case "usage_based":
           setPricePerUnit(String(p.pricePerUnit ?? ""));
-          setExpectedUnits(String(p.expectedUnits ?? ""));
+          setExpectedUnits(String(p.activeUsers ?? ""));
           break;
       }
 
@@ -183,32 +187,18 @@ export function AddRevenueStreamForm({ scenarioId, editStream, open: controlledO
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
 
   function buildParams(): Record<string, unknown> {
-    switch (type) {
-      case "subscription":
-        return {
-          monthlyPrice: Number(monthlyPrice),
-          startingCustomers: Number(startingCustomers),
-          newCustomersPerMonth: Number(newCustomersPerMonth),
-          monthlyChurnRate: Number(monthlyChurnRate) / 100,
-        };
-      case "services":
-        return {
-          hourlyRate: Number(hourlyRate),
-          monthlyHours: Number(monthlyHours),
-        };
-      case "one_time":
-        return {
-          unitPrice: Number(unitPrice),
-          monthlyUnits: Number(monthlyUnits),
-        };
-      case "usage_based":
-        return {
-          pricePerUnit: Number(pricePerUnit),
-          expectedUnits: Number(expectedUnits),
-        };
-      default:
-        return {};
-    }
+    return buildRevenueStreamParams(type as RevenueStreamType, {
+      monthlyPrice,
+      startingCustomers,
+      newCustomersPerMonth,
+      monthlyChurnRate,
+      hourlyRate,
+      monthlyHours,
+      unitPrice,
+      monthlyUnits,
+      pricePerUnit,
+      expectedUnits,
+    });
   }
 
   function resetForm() {

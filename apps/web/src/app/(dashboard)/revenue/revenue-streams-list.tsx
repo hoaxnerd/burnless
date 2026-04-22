@@ -129,9 +129,9 @@ export function RevenueStreamsList({
 
 function StreamParams({ type, params }: { type: string; params: Record<string, unknown> }) {
   if (type === "subscription") {
-    const price = params.monthlyPrice ?? params.price ?? 0;
-    const customers = params.startingCustomers ?? params.customers ?? 0;
-    const churn = params.monthlyChurnRate ?? params.churn ?? 0;
+    const price = params.monthlyPrice ?? 0;
+    const customers = params.startingCustomers ?? 0;
+    const churn = params.monthlyChurnRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
         ${Number(price)}/mo &middot; {Number(customers)} customers &middot; {(Number(churn) * 100).toFixed(1)}% churn
@@ -139,8 +139,8 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     );
   }
   if (type === "services") {
-    const rate = params.hourlyRate ?? params.rate ?? 0;
-    const hours = params.monthlyHours ?? params.hours ?? 0;
+    const rate = params.hourlyRate ?? 0;
+    const hours = params.hoursPerMonth ?? 0;
     return (
       <span className="text-xs text-surface-600">
         ${Number(rate)}/hr &middot; {Number(hours)} hrs/mo
@@ -148,11 +148,20 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     );
   }
   if (type === "one_time") {
-    const price = params.unitPrice ?? params.price ?? 0;
-    const units = params.monthlyUnits ?? params.units ?? 0;
+    const price = params.pricePerUnit ?? 0;
+    const units = params.unitsPerMonth ?? 0;
     return (
       <span className="text-xs text-surface-600">
         ${Number(price)}/unit &middot; {Number(units)} units/mo
+      </span>
+    );
+  }
+  if (type === "usage_based") {
+    const price = params.pricePerUnit ?? 0;
+    const users = params.activeUsers ?? 0;
+    return (
+      <span className="text-xs text-surface-600">
+        ${Number(price)}/unit &middot; {Number(users)} units/mo
       </span>
     );
   }

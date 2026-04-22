@@ -14,6 +14,10 @@ import {
   oneTimeParamsSchema,
   usageBasedParamsSchema,
 } from "@/lib/form-validation";
+import {
+  buildRevenueStreamParams,
+  type RevenueStreamType,
+} from "@/lib/revenue-stream-params";
 
 const STREAM_TYPES = [
   { value: "subscription", label: "Subscription (SaaS)" },
@@ -53,17 +57,17 @@ export function EditRevenueStreamForm({ stream, open, onClose }: EditRevenueStre
     stream.parameters.monthlyChurnRate != null ? String(Number(stream.parameters.monthlyChurnRate) * 100) : ""
   );
 
-  // Services params
+  // Services params (engine: hoursPerMonth; UI label: "Monthly Hours")
   const [hourlyRate, setHourlyRate] = useState(String(stream.parameters.hourlyRate ?? ""));
-  const [monthlyHours, setMonthlyHours] = useState(String(stream.parameters.monthlyHours ?? ""));
+  const [monthlyHours, setMonthlyHours] = useState(String(stream.parameters.hoursPerMonth ?? ""));
 
-  // One-time params
-  const [unitPrice, setUnitPrice] = useState(String(stream.parameters.unitPrice ?? ""));
-  const [monthlyUnits, setMonthlyUnits] = useState(String(stream.parameters.monthlyUnits ?? ""));
+  // One-time params (engine: pricePerUnit + unitsPerMonth; UI labels: "Unit Price" + "Monthly Units")
+  const [unitPrice, setUnitPrice] = useState(String(stream.parameters.pricePerUnit ?? ""));
+  const [monthlyUnits, setMonthlyUnits] = useState(String(stream.parameters.unitsPerMonth ?? ""));
 
-  // Usage-based params
+  // Usage-based params (engine: pricePerUnit + activeUsers; UI labels: "Price per Unit" + "Expected Units/Mo")
   const [pricePerUnit, setPricePerUnit] = useState(String(stream.parameters.pricePerUnit ?? ""));
-  const [expectedUnits, setExpectedUnits] = useState(String(stream.parameters.expectedUnits ?? ""));
+  const [expectedUnits, setExpectedUnits] = useState(String(stream.parameters.activeUsers ?? ""));
 
   function getParamsSchema(streamType: string): z.AnyZodObject {
     switch (streamType) {
@@ -104,23 +108,18 @@ export function EditRevenueStreamForm({ stream, open, onClose }: EditRevenueStre
   }
 
   function buildParams(): Record<string, unknown> {
-    switch (type) {
-      case "subscription":
-        return {
-          monthlyPrice: Number(monthlyPrice),
-          startingCustomers: Number(startingCustomers),
-          newCustomersPerMonth: Number(newCustomersPerMonth),
-          monthlyChurnRate: Number(monthlyChurnRate) / 100,
-        };
-      case "services":
-        return { hourlyRate: Number(hourlyRate), monthlyHours: Number(monthlyHours) };
-      case "one_time":
-        return { unitPrice: Number(unitPrice), monthlyUnits: Number(monthlyUnits) };
-      case "usage_based":
-        return { pricePerUnit: Number(pricePerUnit), expectedUnits: Number(expectedUnits) };
-      default:
-        return {};
-    }
+    return buildRevenueStreamParams(type as RevenueStreamType, {
+      monthlyPrice,
+      startingCustomers,
+      newCustomersPerMonth,
+      monthlyChurnRate,
+      hourlyRate,
+      monthlyHours,
+      unitPrice,
+      monthlyUnits,
+      pricePerUnit,
+      expectedUnits,
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
