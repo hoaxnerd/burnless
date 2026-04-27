@@ -11,6 +11,7 @@ import { IntegrationsTab } from "./integrations-tab";
 import { BillingTab } from "./billing-tab";
 import { InviteCodesTab } from "./invite-codes-tab";
 import { SecurityTab } from "./security-tab";
+import { Modal } from "@/components/ui/modal";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
@@ -35,6 +36,13 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Track the currency as loaded from the server (used to revert on cancel)
+  const [loadedCurrency, setLoadedCurrency] = useState<string>("USD");
+
+  // Confirm dialog state — generic: holds whatever message the API returns
+  type ConfirmState = { open: false } | { open: true; message: string };
+  const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false });
+
   // Integrations state
   const [connectedIntegrations, setConnectedIntegrations] = useState<ConnectedIntegration[]>([]);
   const [_integrationsLoaded, setIntegrationsLoaded] = useState(false);
@@ -46,10 +54,11 @@ export default function SettingsPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
+          const currency = data.currency || "USD";
           setCompany({
             name: data.name || "",
             stage: data.stage || "pre_seed",
-            currency: data.currency || "USD",
+            currency,
             locale: data.locale || "en-US",
             timezone: data.timezone || "America/New_York",
             region: data.region || "us-east",
@@ -57,6 +66,7 @@ export default function SettingsPage() {
             businessModel: data.businessModel || "saas",
             fiscalYearEnd: data.fiscalYearEnd ?? 12,
           });
+          setLoadedCurrency(currency);
         }
         setCompanyLoaded(true);
       })
@@ -78,23 +88,35 @@ export default function SettingsPage() {
     loadIntegrations();
   }, [loadIntegrations]);
 
-  // Save company profile
-  const saveCompany = async () => {
+  // Save company profile — accepts an optional confirm flag for the 409 retry path
+  const saveCompany = async (confirm = false) => {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await apiFetch("/api/company", {
+      const url = confirm ? "/api/company?confirm=true" : "/api/company";
+      const res = await apiFetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(company),
       });
-      if (res.ok) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 2000);
-      } else {
-        const data = await res.json();
-        setSaveError(data.error || "Failed to save");
+      const data = await res.json();
+
+      if (res.status === 409 && data.requiresConfirmation) {
+        // API is asking for explicit confirmation — show the generic confirm dialog
+        setConfirmState({ open: true, message: data.error });
+        return;
       }
+      if (!res.ok) {
+        setSaveError(data.error || "Failed to save");
+        return;
+      }
+      // Success
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+      if (data.currency) {
+        setLoadedCurrency(data.currency);
+      }
+      setConfirmState({ open: false });
     } catch {
       setSaveError("Failed to save");
     } finally {
@@ -189,6 +211,42 @@ export default function SettingsPage() {
       {activeTab === "billing" && (
         <BillingTab />
       )}
+
+      {/* Generic confirmable-error dialog — renders whatever message the API returns */}
+      <Modal
+        open={confirmState.open}
+        onClose={() => {
+          setCompany((prev) => ({ ...prev, currency: loadedCurrency }));
+          setConfirmState({ open: false });
+        }}
+        title="Confirm change"
+        size="md"
+      >
+        {confirmState.open && (
+          <>
+            <p className="text-sm text-surface-700 mb-6">{confirmState.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompany((prev) => ({ ...prev, currency: loadedCurrency }));
+                  setConfirmState({ open: false });
+                }}
+                className="rounded-xl border border-surface-300 bg-surface-0 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => saveCompany(true)}
+                className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
