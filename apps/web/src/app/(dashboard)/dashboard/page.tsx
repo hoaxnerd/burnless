@@ -38,7 +38,7 @@ import { FormulaViewer } from "./formula-viewer";
 import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
-import { type CurrencyCode } from "@burnless/types";
+import { type CurrencyCode, isValidCurrency } from "@burnless/types";
 import type { PageWidgetLayout } from "@/components/ui/page-grid";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
@@ -110,8 +110,9 @@ export default async function DashboardPage() {
     mrr: hasRevenue,
   };
 
-  const heroCards = buildHeroCards(heroSlugs, metrics, currentMonth, prevMonth, slugHasData, company.currency as CurrencyCode, company.locale);
-  const heroSwapCards = buildHeroSwapCards(heroSlugs, heroCards, metrics, currentMonth, prevMonth, company.currency as CurrencyCode, company.locale);
+  const safeCurrency: CurrencyCode = isValidCurrency(company.currency) ? company.currency : "USD";
+  const heroCards = buildHeroCards(heroSlugs, metrics, currentMonth, prevMonth, slugHasData, safeCurrency, company.locale);
+  const heroSwapCards = buildHeroSwapCards(heroSlugs, heroCards, metrics, currentMonth, prevMonth, safeCurrency, company.locale);
 
   /* ── Pinned secondary metrics ───────────────────────────────────── */
 
