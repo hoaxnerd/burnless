@@ -1125,9 +1125,10 @@ export function extractMetricValue(
 export function formatMetricValue(value: number, format: MetricFormat): string {
   switch (format) {
     case "currency":
-      if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-      if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-      return `$${value.toFixed(0)}`;
+      // Currency-format metrics intentionally return raw numbers here; callers in
+      // the web app route through formatCurrency(...) from @burnless/types. Engine
+      // must stay currency-agnostic (umbrella §1.6).
+      return value.toString();
     case "percent":
       return `${value.toFixed(1)}%`;
     case "months":

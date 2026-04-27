@@ -22,6 +22,7 @@ import { useDashboardLayout } from "./dashboard-layout-context";
 import { DataTable } from "@/components/ui/data-table";
 import { Sparkline } from "@/components/ui/hero-kpi-card";
 import { sparkline } from "./dashboard-helpers";
+import { useLocale } from "@/components/locale/locale-context";
 
 // ── Row data type for the DataTable ─────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export function CustomizableMetrics({
 }: CustomizableMetricsProps) {
   const { setCatalogOpen, openFormulaViewer } = useMetrics();
   const { secondaryMetrics } = useDashboardLayout();
+  const { fmtCurrency } = useLocale();
 
   const activeMetrics = secondaryMetrics.length > 0 ? secondaryMetrics : DEFAULT_SECONDARY_METRICS;
 
@@ -116,7 +118,9 @@ export function CustomizableMetrics({
 
         if (!Number.isFinite(currentVal)) return null;
 
-        const formattedValue = formatMetricValue(currentVal, def.format);
+        const formattedValue = def.format === "currency"
+          ? fmtCurrency(currentVal, { compact: true })
+          : formatMetricValue(currentVal, def.format);
 
         // Calculate change
         let change: string | null = null;

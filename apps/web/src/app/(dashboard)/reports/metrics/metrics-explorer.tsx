@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
-import { AreaChartWidget, chartColors, formatCompactCurrency, formatPercent, formatNumber } from "@/components/charts";
+import { AreaChartWidget, chartColors, formatPercent, formatNumber } from "@/components/charts";
+import { useLocale } from "@/components/locale/locale-context";
 
 type MetricCategory = "revenue" | "saas" | "cash" | "profitability" | "growth" | "efficiency";
 
@@ -81,18 +82,17 @@ const categoryColors: Record<MetricCategory, string> = {
   efficiency: "#ec4899",
 };
 
-function formatMetricValue(value: number, format: MetricDefinition["format"]): string {
+function makeMetricFormatter(
+  format: MetricDefinition["format"],
+  fmtCurrency: (amount: number, options?: { compact?: boolean }) => string,
+): (value: number) => string {
   switch (format) {
-    case "currency": return formatCompactCurrency(value);
-    case "percent": return formatPercent(value);
-    case "months": return value >= 999 ? "\u221e" : `${Math.round(value)}mo`;
-    case "ratio": return `${value.toFixed(1)}x`;
-    case "number": return formatNumber(value);
+    case "currency": return (v) => fmtCurrency(v, { compact: true });
+    case "percent": return (v) => formatPercent(v);
+    case "months": return (v) => v >= 999 ? "\u221e" : `${Math.round(v)}mo`;
+    case "ratio": return (v) => `${v.toFixed(1)}x`;
+    case "number": return (v) => formatNumber(v);
   }
-}
-
-function getFormatter(format: MetricDefinition["format"]): (v: number) => string {
-  return (v: number) => formatMetricValue(v, format);
 }
 
 export function MetricsExplorer({
@@ -104,6 +104,7 @@ export function MetricsExplorer({
 }) {
   const [activeCategory, setActiveCategory] = useState<MetricCategory | "all">("all");
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
+  const { fmtCurrency } = useLocale();
 
   const filteredMetrics = activeCategory === "all"
     ? metricDefinitions
@@ -167,7 +168,7 @@ export function MetricsExplorer({
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-surface-900 tabular-nums">
-                      {formatMetricValue(current, def.format)}
+                      {makeMetricFormatter(def.format, fmtCurrency)(current)}
                     </p>
                     {resolvedIdx > 0 && (
                       <TrendIndicator current={current} previous={previous} />
@@ -182,7 +183,7 @@ export function MetricsExplorer({
                     data={data}
                     color={categoryColors[def.category]}
                     height={200}
-                    formatValue={getFormatter(def.format)}
+                    formatValue={makeMetricFormatter(def.format, fmtCurrency)}
                   />
                 </div>
               )}

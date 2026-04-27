@@ -13,6 +13,7 @@ import {
   type ComputedMetrics,
   type ResolvedSlotData,
 } from "@burnless/engine";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 
 /** Extract last N values from a metric series for sparklines.
  *  When upToMonth is provided, only includes data up to that month (inclusive)
@@ -32,6 +33,8 @@ export function buildSlotMetricCard(
   currentMonth: string,
   prevMonth: string,
   slotId?: string,
+  currency: CurrencyCode = "USD",
+  locale?: string,
 ): ResolvedSlotData {
   // 1. Get metric definition from registry
   const def = getMetricDef(slug);
@@ -48,16 +51,12 @@ export function buildSlotMetricCard(
   if (!hasData) {
     value = def?.format === "months" ? "-- mo" : "$---";
   } else if (def) {
-    value = formatMetricValue(currentVal, def.format);
+    value = def.format === "currency"
+      ? formatCurrency(currentVal, currency, locale, { compact: true })
+      : formatMetricValue(currentVal, def.format);
   } else {
     // Unknown slug — fall back to currency compact
-    if (Math.abs(currentVal) >= 1_000_000) {
-      value = `$${(currentVal / 1_000_000).toFixed(1)}M`;
-    } else if (Math.abs(currentVal) >= 1_000) {
-      value = `$${(currentVal / 1_000).toFixed(0)}k`;
-    } else {
-      value = `$${currentVal.toFixed(0)}`;
-    }
+    value = formatCurrency(currentVal, currency, locale, { compact: true });
   }
 
   // 5. Calculate MoM change
@@ -117,11 +116,13 @@ export function resolveSlotMetrics(
   metrics: ComputedMetrics,
   currentMonth: string,
   prevMonth: string,
+  currency: CurrencyCode = "USD",
+  locale?: string,
 ): ResolvedSlotData[] {
   return slots.map((slot) => {
     const overrideKey = `${pageId}:${slot.id}`;
     const override = slotOverrides[overrideKey];
     const effectiveSlug = override?.type === "metric" ? override.slug : slot.defaultSlug;
-    return buildSlotMetricCard(effectiveSlug, metrics, currentMonth, prevMonth, slot.id);
+    return buildSlotMetricCard(effectiveSlug, metrics, currentMonth, prevMonth, slot.id, currency, locale);
   });
 }
