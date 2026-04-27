@@ -5,6 +5,7 @@ import {
   ShieldAlert,
   Zap,
 } from "lucide-react";
+import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -56,19 +57,16 @@ export const severityStyles = {
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
-export function formatCompact(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${value.toFixed(0)}`;
-}
-
 export function generateInsights(
   runway: number,
   burnRate: number,
   mrr: number,
   mrrGrowth: number,
   cash: number,
+  currency: CurrencyCode = "USD",
+  locale?: string,
 ): InsightItem[] {
+  const fmt = (v: number) => formatCompactAmount(v, currency, locale);
   const insights: InsightItem[] = [];
 
   if (runway > 0 && runway <= 6) {
@@ -88,7 +86,7 @@ export function generateInsights(
   } else if (runway >= 999 && cash > 0) {
     insights.push({
       title: "Cash-Flow Positive",
-      message: `${formatCompact(cash)} in the bank with positive cash flow.`,
+      message: `${fmt(cash)} in the bank with positive cash flow.`,
       severity: "success",
       icon: TrendingUp,
     });
@@ -127,7 +125,7 @@ export function generateInsights(
   if (burnRate > 0 && insights.length < 2) {
     insights.push({
       title: "Burn Rate",
-      message: `Monthly burn is ${formatCompact(burnRate)} with ${formatCompact(cash)} cash on hand.`,
+      message: `Monthly burn is ${fmt(burnRate)} with ${fmt(cash)} cash on hand.`,
       severity: "info",
       icon: Zap,
     });
@@ -136,7 +134,7 @@ export function generateInsights(
   if (insights.length === 0) {
     insights.push({
       title: "Financial Snapshot",
-      message: `${formatCompact(cash)} in cash with ${formatCompact(burnRate)}/mo burn.`,
+      message: `${fmt(cash)} in cash with ${fmt(burnRate)}/mo burn.`,
       severity: "info",
       icon: TrendingUp,
     });

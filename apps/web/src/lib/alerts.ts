@@ -3,6 +3,8 @@
  * Analyzes metric data and surfaces actionable insights without user prompting.
  */
 
+import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
+
 export type AlertSeverity = "critical" | "warning" | "info" | "celebration";
 
 export interface FinancialAlert {
@@ -25,6 +27,8 @@ interface AlertInput {
   mrr: MetricPoint[];
   cashPosition: MetricPoint[];
   currentMonth: string;
+  currency?: CurrencyCode;
+  locale?: string;
 }
 
 /**
@@ -33,6 +37,9 @@ interface AlertInput {
  */
 export function generateAlerts(data: AlertInput): FinancialAlert[] {
   const alerts: FinancialAlert[] = [];
+  const currency = data.currency ?? "USD";
+  const locale = data.locale;
+  const fmt = (v: number) => formatCompactAmount(v, currency, locale);
   const current = (series: MetricPoint[]) =>
     series.find((m) => m.month === data.currentMonth)?.value ?? 0;
   const previous = (series: MetricPoint[]) => {
@@ -79,7 +86,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
         id: "burn-accelerating",
         severity: "warning",
         title: "Burn rate accelerating",
-        message: `Burn rate increased ${burnChange.toFixed(0)}% month-over-month ($${(prevBurn / 1000).toFixed(0)}k → $${(burn / 1000).toFixed(0)}k). Review recent expenses for unexpected increases.`,
+        message: `Burn rate increased ${burnChange.toFixed(0)}% month-over-month (${fmt(prevBurn)} → ${fmt(burn)}). Review recent expenses for unexpected increases.`,
         metric: "burn_rate",
         value: burnChange,
       });
@@ -94,7 +101,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
         id: "mrr-declining",
         severity: "warning",
         title: "Revenue declining",
-        message: `MRR dropped ${mrrDecline.toFixed(0)}% ($${(prevMrr / 1000).toFixed(0)}k → $${(mrr / 1000).toFixed(0)}k). Investigate churn and review your retention strategy.`,
+        message: `MRR dropped ${mrrDecline.toFixed(0)}% (${fmt(prevMrr)} → ${fmt(mrr)}). Investigate churn and review your retention strategy.`,
         metric: "mrr",
         value: -mrrDecline,
       });
@@ -117,9 +124,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
   const mrrMilestones = [10_000, 50_000, 100_000, 500_000, 1_000_000];
   for (const milestone of mrrMilestones) {
     if (mrr >= milestone && prevMrr < milestone) {
-      const label = milestone >= 1_000_000
-        ? `$${(milestone / 1_000_000).toFixed(0)}M`
-        : `$${(milestone / 1_000).toFixed(0)}k`;
+      const label = fmt(milestone);
       alerts.push({
         id: `mrr-milestone-${milestone}`,
         severity: "celebration",

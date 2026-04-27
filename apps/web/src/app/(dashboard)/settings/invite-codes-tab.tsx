@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 
+import { useLocale } from "@/components/locale/locale-context";
 import type { InviteCode, CodeFormData } from "./invite-codes-types";
 import {
   getCodeStatus,
@@ -35,6 +36,7 @@ export function InviteCodesTab() {
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { currency, locale } = useLocale();
 
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
@@ -251,7 +253,7 @@ export function InviteCodesTab() {
           </span>
           <span className="inline-flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
-            {formatCredits(row.aiCreditsCents)} AI
+            {formatCredits(row.aiCreditsCents, currency, locale)} AI
           </span>
         </div>
       ),

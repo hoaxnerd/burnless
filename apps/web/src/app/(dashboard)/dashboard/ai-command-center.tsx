@@ -16,6 +16,7 @@ import { useAiFeature, useAiFlags } from "@/components/ai/ai-feature-context";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
+import { useLocale } from "@/components/locale/locale-context";
 import {
   type AiCommandCenterProps,
   type AlertData,
@@ -40,6 +41,7 @@ export function AiCommandCenter({
   const { enabled, loaded } = useAiFeature("insights");
   const { companionName } = useAiFlags();
   const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
+  const { currency, locale } = useLocale();
 
   // Report readiness: only ready when AI feature is loaded AND enabled
   const isReady = loaded && enabled;
@@ -82,7 +84,7 @@ export function AiCommandCenter({
     return () => controller.abort();
   }, []);
 
-  const insights = generateInsights(runway, burnRate, mrr, mrrGrowth, cash);
+  const insights = generateInsights(runway, burnRate, mrr, mrrGrowth, cash, currency, locale);
   const placeholder = getPlaceholder(runway, mrr, burnRate);
 
   const handleSubmit = useCallback(async () => {

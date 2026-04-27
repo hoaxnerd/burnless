@@ -9,6 +9,7 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
 import { BoardUpdateView } from "./board-update-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -21,14 +22,16 @@ export default async function BoardUpdatePage() {
   const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <ScenarioPrompt context="generate reports" />;
 
+  const safeCurrency: CurrencyCode = isValidCurrency(company.currency) ? company.currency : "USD";
+
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <BoardUpdateContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+      <BoardUpdateContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={safeCurrency} locale={company.locale} />
     </Suspense>
   );
 }
 
-async function BoardUpdateContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+async function BoardUpdateContent({ companyId, scenarioId, companyName, scenarioName, currency, locale }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: CurrencyCode; locale?: string | null }) {
   const [data, revenueDetails, expenseDetails, funding] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),
@@ -117,13 +120,15 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
   const revTimeline = seriesToArray(totalRevenue);
   const cashTl = seriesToArray(cashPosition);
 
+  const safeLocale = locale ?? undefined;
+
   // Build page-specific default KPI cards as ResolvedSlotData
   const pageDefaultSlots: ResolvedSlotData[] = [
     {
       slotId: "metric-0",
       content: { type: "metric", slug: "revenue" },
       label: "Revenue",
-      value: `$${currentRev >= 1_000_000 ? `${(currentRev / 1_000_000).toFixed(1)}M` : currentRev >= 1_000 ? `${(currentRev / 1_000).toFixed(0)}k` : currentRev.toFixed(0)}`,
+      value: formatCurrency(currentRev, currency, safeLocale, { compact: true }),
       change: `${revGrowth > 0 ? "+" : ""}${revGrowth.toFixed(1)}%`,
       changeLabel: "MoM",
       hasData: currentRev > 0,
@@ -134,7 +139,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       slotId: "metric-1",
       content: { type: "metric", slug: "netBurn" },
       label: "Net Burn",
-      value: `$${burnRate >= 1_000_000 ? `${(burnRate / 1_000_000).toFixed(1)}M` : burnRate >= 1_000 ? `${(burnRate / 1_000).toFixed(0)}k` : burnRate.toFixed(0)}`,
+      value: formatCurrency(burnRate, currency, safeLocale, { compact: true }),
       description: "/month",
       hasData: burnRate > 0,
       sparkData: spark(metrics.netBurnRate),
@@ -144,7 +149,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       slotId: "metric-2",
       content: { type: "metric", slug: "cash" },
       label: "Cash",
-      value: `$${currentCash >= 1_000_000 ? `${(currentCash / 1_000_000).toFixed(1)}M` : currentCash >= 1_000 ? `${(currentCash / 1_000).toFixed(0)}k` : currentCash.toFixed(0)}`,
+      value: formatCurrency(currentCash, currency, safeLocale, { compact: true }),
       description: runway > 36 ? "36+ mo runway" : `${Math.round(runway)} mo runway`,
       hasData: currentCash > 0,
       sparkData: spark(cashTl),

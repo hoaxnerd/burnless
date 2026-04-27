@@ -17,6 +17,7 @@ import {
 } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { computeDashboardData } from "@/lib/compute-dashboard";
+import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { BudgetVsActualsView } from "./budget-vs-actuals-view";
@@ -32,6 +33,8 @@ export default async function BudgetVsActualsPage() {
     return <ScenarioPrompt context="compare budget vs actuals" />;
   }
 
+  const safeCurrency: CurrencyCode = isValidCurrency(company.currency) ? company.currency : "USD";
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
@@ -45,13 +48,13 @@ export default async function BudgetVsActualsPage() {
         </p>
       </div>
       <Suspense fallback={<ReportContentSkeleton />}>
-        <BudgetVsActualsContent companyId={company.id} scenarioId={scenario.id} />
+        <BudgetVsActualsContent companyId={company.id} scenarioId={scenario.id} currency={safeCurrency} locale={company.locale} />
       </Suspense>
     </div>
   );
 }
 
-async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
+async function BudgetVsActualsContent({ companyId, scenarioId, currency, locale }: { companyId: string; scenarioId: string; currency: CurrencyCode; locale?: string | null }) {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), 0, 1);
   const periodEnd = new Date(now.getFullYear(), 11, 1);
@@ -113,11 +116,8 @@ async function BudgetVsActualsContent({ companyId, scenarioId }: { companyId: st
   const totalBudgetSum = bva.totalBudget.reduce((s, v) => s + v.value, 0);
   const totalActualSum = bva.totalActual.reduce((s, v) => s + v.value, 0);
   const totalVarianceSum = bva.totalVariance.reduce((s, v) => s + v.value, 0);
-  const fc = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-    if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-    return `$${v.toFixed(0)}`;
-  };
+  const safeLocale = locale ?? undefined;
+  const fc = (v: number) => formatCurrency(v, currency, safeLocale, { compact: true });
 
   const pageDefaultSlots: ResolvedSlotData[] = [
     {

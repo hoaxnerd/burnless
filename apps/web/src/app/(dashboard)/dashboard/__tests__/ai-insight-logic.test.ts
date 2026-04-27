@@ -6,10 +6,14 @@
  * This catches regressions if thresholds are accidentally changed.
  */
 import { describe, it, expect } from "vitest";
+import { formatCompactAmount } from "@burnless/types";
 
 // Reimplementation of the insight generation rules from ai-insight-banner.tsx
 // to verify correctness of the priority/threshold logic.
 type Severity = "critical" | "warning" | "info" | "neutral";
+
+// USD compact formatter matching the default used in production
+const fmtUSD = (v: number) => formatCompactAmount(v, "USD", "en-US");
 
 function generateInsight(
   runway: number,
@@ -17,10 +21,11 @@ function generateInsight(
   mrrGrowth: number,
   cash: number,
 ): { title: string; message: string; severity: Severity } | null {
+  const fmtCompact = fmtUSD;
   if (runway <= 3 && runway > 0) {
     return {
       title: `${Math.round(runway)} months of runway remaining`,
-      message: `At $${(burnRate / 1000).toFixed(0)}k/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
+      message: `At ${fmtCompact(burnRate)}/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
       severity: "critical",
     };
   }
@@ -48,13 +53,13 @@ function generateInsight(
   if (burnRate > 0 && cash > 0 && runway >= 12) {
     return {
       title: `${Math.round(runway)} months of runway — solid position`,
-      message: `With $${(cash / 1000).toFixed(0)}k in the bank at $${(burnRate / 1000).toFixed(0)}k/mo burn, you have room to focus on growth.`,
+      message: `With ${fmtCompact(cash)} in the bank at ${fmtCompact(burnRate)}/mo burn, you have room to focus on growth.`,
       severity: "neutral",
     };
   }
   if (burnRate > 0 && cash > 0) {
     return {
-      title: `${Math.round(runway)} months runway at $${(burnRate / 1000).toFixed(0)}k/mo burn`,
+      title: `${Math.round(runway)} months runway at ${fmtCompact(burnRate)}/mo burn`,
       message: `Your financial position is stable. Focus on growth and efficiency.`,
       severity: "neutral",
     };
@@ -192,7 +197,8 @@ describe("AI insight generation", () => {
 
     it("includes cash and burn in long-runway message", () => {
       const insight = generateInsight(24, 50000, 0, 1200000);
-      expect(insight?.message).toContain("$1200k in the bank");
+      // formatCompactAmount(1200000) → "$1.2M"; formatCompactAmount(50000) → "$50k"
+      expect(insight?.message).toContain("$1.2M in the bank");
       expect(insight?.message).toContain("$50k/mo burn");
     });
   });

@@ -10,11 +10,13 @@ vi.mock("@/lib/api-helpers", () => ({
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-const { mockGetDefaultScenario } = vi.hoisted(() => ({
+const { mockGetDefaultScenario, mockGetCompany } = vi.hoisted(() => ({
   mockGetDefaultScenario: vi.fn(),
+  mockGetCompany: vi.fn().mockResolvedValue({ currency: "USD", locale: "en-US" }),
 }));
 vi.mock("@/lib/data", () => ({
   getDefaultScenario: mockGetDefaultScenario,
+  getCompany: mockGetCompany,
 }));
 
 const { mockComputeDashboardData } = vi.hoisted(() => ({
@@ -41,6 +43,7 @@ describe("GET /api/alerts", () => {
       companyId: "c1",
       role: "owner",
     });
+    mockGetCompany.mockResolvedValue({ currency: "USD", locale: "en-US" });
   });
 
   it("returns empty alerts when no scenario exists", async () => {

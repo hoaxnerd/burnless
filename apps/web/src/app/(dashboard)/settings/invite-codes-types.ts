@@ -1,4 +1,5 @@
 /* ── Invite Codes – types, helpers & constants ────────────────── */
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 
 export interface Redemption {
   id: string;
@@ -59,8 +60,8 @@ export function formatDate(iso: string) {
   });
 }
 
-export function formatCredits(cents: number) {
-  return `$${(cents / 100).toFixed(0)}`;
+export function formatCredits(cents: number, currency: CurrencyCode = "USD", locale?: string) {
+  return formatCurrency(cents / 100, currency, locale);
 }
 
 export const defaultForm: CodeFormData = {

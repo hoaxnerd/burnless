@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAiDashboard } from "@/lib/swr";
+import { useLocale } from "@/components/locale/locale-context";
 import {
   Activity,
   BarChart3,
@@ -73,6 +74,7 @@ interface DashboardData {
 export function AiDashboardTab() {
   const [days, setDays] = useState(30);
   const { data, isLoading: loading } = useAiDashboard<DashboardData>(days);
+  const { fmtCurrency } = useLocale();
 
   if (loading) {
     return (
@@ -117,7 +119,7 @@ export function AiDashboardTab() {
         <SummaryCard
           icon={<DollarSign className="h-4 w-4" />}
           label="Total Cost"
-          value={`$${data.summary.totalCostUSD.toFixed(2)}`}
+          value={fmtCurrency(data.summary.totalCostUSD, { decimals: 2 })}
           color="brand"
         />
         <SummaryCard
