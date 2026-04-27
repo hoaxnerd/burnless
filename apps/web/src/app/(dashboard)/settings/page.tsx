@@ -238,7 +238,11 @@ export default function SettingsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => saveCompany(true)}
+                disabled={saving}
+                onClick={() => {
+                  setConfirmState({ open: false });
+                  saveCompany(true);
+                }}
                 className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
               >
                 Confirm
