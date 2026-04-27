@@ -121,6 +121,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.4.2
+        version: 0.4.2
       '@next/bundle-analyzer':
         specifier: ^16.2.0
         version: 16.2.0
