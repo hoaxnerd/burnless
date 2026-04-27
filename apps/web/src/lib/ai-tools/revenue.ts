@@ -3,9 +3,10 @@
  */
 
 import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
-import { revenueStreams, fundingRounds } from "@burnless/db";
+import { revenueStreams, fundingRounds, companies } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { formatCurrency, isValidCurrency } from "@burnless/types";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   nameString,
@@ -99,6 +100,14 @@ async function addFundingRound(
 ): Promise<string> {
   const data = input as z.infer<typeof addFundingRoundSchema>;
 
+  const [company] = await db
+    .select({ currency: companies.currency, locale: companies.locale })
+    .from(companies)
+    .where(eq(companies.id, context.companyId))
+    .limit(1);
+  const currency = company?.currency && isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company?.locale ?? undefined;
+
   const row = await scenarioInsert("funding_round", fundingRounds, {
     companyId: context.companyId,
     name: data.name,
@@ -113,19 +122,27 @@ async function addFundingRound(
   return JSON.stringify({
     success: true,
     fundingRoundId: row!.id,
-    message: `Added ${data.name} funding round: $${data.amount.toLocaleString()} on ${data.date}.`,
+    message: `Added ${data.name} funding round: ${formatCurrency(data.amount, currency, locale)} on ${data.date}.`,
   });
 }
 
 async function modelDilution(
   input: Record<string, unknown>,
-  _context: ToolContext
+  context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof modelDilutionSchema>;
   const roundAmount = data.roundAmount;
   const preMoneyValuation = data.preMoneyValuation;
   const existingOwnership = data.existingOwnershipPercent;
   const optionPool = data.optionPoolPercent;
+
+  const [company] = await db
+    .select({ currency: companies.currency, locale: companies.locale })
+    .from(companies)
+    .where(eq(companies.id, context.companyId))
+    .limit(1);
+  const currency = company?.currency && isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company?.locale ?? undefined;
 
   const postMoneyValuation = preMoneyValuation + roundAmount;
   const newInvestorOwnership = roundAmount / postMoneyValuation;
@@ -165,7 +182,7 @@ async function modelDilution(
     },
     capTable,
     existingRounds,
-    message: `Modeled dilution for $${roundAmount.toLocaleString()} round at $${preMoneyValuation.toLocaleString()} pre-money. Founders diluted from ${(existingOwnership * 100).toFixed(1)}% to ${(founderPostRound * 100).toFixed(1)}%.`,
+    message: `Modeled dilution for ${formatCurrency(roundAmount, currency, locale)} round at ${formatCurrency(preMoneyValuation, currency, locale)} pre-money. Founders diluted from ${(existingOwnership * 100).toFixed(1)}% to ${(founderPostRound * 100).toFixed(1)}%.`,
   });
 }
 

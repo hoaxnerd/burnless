@@ -3,6 +3,7 @@
  * without requiring user prompts.
  */
 
+import { formatCurrency, isValidCurrency } from "@burnless/types";
 import type { FinancialSnapshot, Insight } from "./types";
 
 /** Generate all applicable insights from the current financial snapshot. */
@@ -36,12 +37,15 @@ function checkRunway(snapshot: FinancialSnapshot): Insight | null {
   const { runway } = snapshot.keyMetrics;
   if (runway === null) return null;
 
+  const currency = isValidCurrency(snapshot.company.currency) ? snapshot.company.currency : "USD";
+  const locale = snapshot.company.locale;
+
   if (runway <= 3) {
     return {
       type: "runway_alert",
       title: "Critical: Runway Below 3 Months",
       summary: `Your current runway is ${runway.toFixed(1)} months. Immediate action needed — you must either cut burn or secure funding.`,
-      details: `At the current burn rate of ${snapshot.company.currency} ${snapshot.keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month with ${snapshot.company.currency} ${snapshot.keyMetrics.cashPosition?.toLocaleString() ?? "N/A"} in cash, you have approximately ${runway.toFixed(1)} months of runway remaining.\n\n**Recommended actions:**\n- Begin fundraising immediately (allow 3-6 months lead time)\n- Identify non-critical expenses that can be cut or deferred\n- Consider bridge financing or revenue acceleration`,
+      details: `At the current burn rate of ${snapshot.keyMetrics.burnRate != null ? formatCurrency(snapshot.keyMetrics.burnRate, currency, locale) : "N/A"}/month with ${snapshot.keyMetrics.cashPosition != null ? formatCurrency(snapshot.keyMetrics.cashPosition, currency, locale) : "N/A"} in cash, you have approximately ${runway.toFixed(1)} months of runway remaining.\n\n**Recommended actions:**\n- Begin fundraising immediately (allow 3-6 months lead time)\n- Identify non-critical expenses that can be cut or deferred\n- Consider bridge financing or revenue acceleration`,
       severity: "critical",
       relatedMetrics: ["runway", "burnRate", "cashPosition"],
     };
@@ -83,11 +87,14 @@ function checkBurnTrend(snapshot: FinancialSnapshot): Insight | null {
   if (firstMonth === 0) return null;
   const growthRate = (lastMonth - firstMonth) / firstMonth;
 
+  const currency = isValidCurrency(snapshot.company.currency) ? snapshot.company.currency : "USD";
+  const locale = snapshot.company.locale;
+
   if (growthRate > 0.2) {
     return {
       type: "variance_analysis",
       title: "Expenses Growing Rapidly",
-      summary: `Expenses increased ${(growthRate * 100).toFixed(0)}% over the last 3 months (${snapshot.company.currency} ${firstMonth.toLocaleString()} → ${snapshot.company.currency} ${lastMonth.toLocaleString()}).`,
+      summary: `Expenses increased ${(growthRate * 100).toFixed(0)}% over the last 3 months (${formatCurrency(firstMonth, currency, locale)} → ${formatCurrency(lastMonth, currency, locale)}).`,
       details: `Your expenses are growing faster than typical. Review whether this is planned (e.g., hiring ramp) or if there are areas of unexpected cost increase. Consider whether revenue growth is keeping pace.`,
       severity: growthRate > 0.5 ? "warning" : "info",
       relatedMetrics: ["burnRate", "netBurn"],
@@ -105,11 +112,14 @@ function checkRevenueGrowth(snapshot: FinancialSnapshot): Insight | null {
   const lastMonth = recent[recent.length - 1]!.amount;
   const prevMonth = recent.length >= 2 ? recent[recent.length - 2]!.amount : 0;
 
+  const currency = isValidCurrency(snapshot.company.currency) ? snapshot.company.currency : "USD";
+  const locale = snapshot.company.locale;
+
   if (prevMonth === 0 && lastMonth > 0) {
     return {
       type: "financial_narrative",
       title: "Revenue Started",
-      summary: `You've begun generating revenue at ${snapshot.company.currency} ${lastMonth.toLocaleString()}/month.`,
+      summary: `You've begun generating revenue at ${formatCurrency(lastMonth, currency, locale)}/month.`,
       details: `Congratulations on generating your first revenue! Focus on understanding your unit economics — what does it cost to acquire a customer, and what's their lifetime value?`,
       severity: "info",
       relatedMetrics: ["mrr", "revenueGrowthPercent"],
@@ -122,7 +132,7 @@ function checkRevenueGrowth(snapshot: FinancialSnapshot): Insight | null {
       return {
         type: "variance_analysis",
         title: "Revenue Declining",
-        summary: `Revenue dropped ${(Math.abs(growth) * 100).toFixed(0)}% month-over-month (${snapshot.company.currency} ${prevMonth.toLocaleString()} → ${snapshot.company.currency} ${lastMonth.toLocaleString()}).`,
+        summary: `Revenue dropped ${(Math.abs(growth) * 100).toFixed(0)}% month-over-month (${formatCurrency(prevMonth, currency, locale)} → ${formatCurrency(lastMonth, currency, locale)}).`,
         details: `Investigate the cause — is this churn, seasonal effects, or lost deals? Check churn rate and customer retention metrics. If this is a trend, model what it means for your runway.`,
         severity: growth < -0.2 ? "warning" : "info",
         relatedMetrics: ["mrr", "revenueGrowthPercent", "churnRate"],
@@ -137,11 +147,14 @@ function checkUnitEconomics(snapshot: FinancialSnapshot): Insight | null {
   const { ltvCacRatio, ltv, cac } = snapshot.keyMetrics;
 
   if (ltvCacRatio !== null && ltvCacRatio < 3 && ltvCacRatio > 0) {
+    const currency = isValidCurrency(snapshot.company.currency) ? snapshot.company.currency : "USD";
+    const locale = snapshot.company.locale;
+
     return {
       type: "benchmark",
       title: "LTV:CAC Ratio Below Benchmark",
       summary: `Your LTV:CAC ratio is ${ltvCacRatio.toFixed(1)}x. The benchmark for healthy SaaS is 3x or higher.`,
-      details: `With an LTV of ${snapshot.company.currency} ${ltv?.toLocaleString() ?? "N/A"} and CAC of ${snapshot.company.currency} ${cac?.toLocaleString() ?? "N/A"}, each customer isn't generating enough lifetime value relative to acquisition cost.\n\n**Options to improve:**\n- Increase retention (reduces churn, increases LTV)\n- Raise prices (directly increases LTV)\n- Optimize acquisition channels (reduces CAC)\n- Increase expansion revenue (upsells/cross-sells increase LTV)`,
+      details: `With an LTV of ${ltv != null ? formatCurrency(ltv, currency, locale) : "N/A"} and CAC of ${cac != null ? formatCurrency(cac, currency, locale) : "N/A"}, each customer isn't generating enough lifetime value relative to acquisition cost.\n\n**Options to improve:**\n- Increase retention (reduces churn, increases LTV)\n- Raise prices (directly increases LTV)\n- Optimize acquisition channels (reduces CAC)\n- Increase expansion revenue (upsells/cross-sells increase LTV)`,
       severity: ltvCacRatio < 1 ? "critical" : "warning",
       relatedMetrics: ["ltv", "cac", "ltvCacRatio", "churnRate"],
     };
@@ -156,10 +169,13 @@ function checkCashPosition(snapshot: FinancialSnapshot): Insight | null {
 
   const lastMonth = cash[cash.length - 1]!.amount;
   if (lastMonth < 0) {
+    const currency = isValidCurrency(snapshot.company.currency) ? snapshot.company.currency : "USD";
+    const locale = snapshot.company.locale;
+
     return {
       type: "runway_alert",
       title: "Negative Cash Position Projected",
-      summary: `Your model projects a negative cash position of ${snapshot.company.currency} ${lastMonth.toLocaleString()} — you'll run out of money before this date.`,
+      summary: `Your model projects a negative cash position of ${formatCurrency(lastMonth, currency, locale)} — you'll run out of money before this date.`,
       details: `Your financial model shows cash going negative. This is a critical finding. You need to either secure additional funding or reduce expenses before this date.`,
       severity: "critical",
       relatedMetrics: ["cashPosition", "runway"],

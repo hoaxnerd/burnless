@@ -3,9 +3,10 @@
  */
 
 import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
-import { headcountPlans, departments } from "@burnless/db";
+import { headcountPlans, departments, companies } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { formatCurrency, isValidCurrency } from "@burnless/types";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   nameString,
@@ -65,6 +66,14 @@ async function addHeadcount(
 ): Promise<string> {
   const data = input as z.infer<typeof addHeadcountSchema>;
 
+  const [company] = await db
+    .select({ currency: companies.currency, locale: companies.locale })
+    .from(companies)
+    .where(eq(companies.id, context.companyId))
+    .limit(1);
+  const currency = company?.currency && isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company?.locale ?? undefined;
+
   const row = await scenarioInsert("headcount_plan", headcountPlans, {
     companyId: context.companyId,
     departmentId: data.departmentId,
@@ -81,7 +90,7 @@ async function addHeadcount(
   return JSON.stringify({
     success: true,
     headcountPlanId: row!.id,
-    message: `Added ${data.count}x ${data.title} at $${data.salary.toLocaleString()}/year each. Total annual cost: $${totalCost.toLocaleString()} (including benefits).`,
+    message: `Added ${data.count}x ${data.title} at ${formatCurrency(data.salary, currency, locale)}/year each. Total annual cost: ${formatCurrency(totalCost, currency, locale)} (including benefits).`,
   });
 }
 
