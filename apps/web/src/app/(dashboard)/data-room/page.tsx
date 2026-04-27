@@ -8,6 +8,7 @@ import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
 import { getCompanyPlan } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { computeDashboardData } from "@/lib/compute-dashboard";
+import { formatCompactAmount } from "@burnless/types";
 import { DataRoomView } from "./data-room-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -64,11 +65,10 @@ async function DataRoomContent({ companyId, scenarioId, companyName, scenarioNam
   const latestMrr = data.metrics.mrr[data.metrics.mrr.length - 1];
   const latestCustomers = data.metrics.totalCustomers[data.metrics.totalCustomers.length - 1];
 
-  const fmtCurrency = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-    if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-    return `$${v.toFixed(0)}`;
-  };
+  // Compact formatter: falls back to USD when no company-level locale is
+  // available (server component; locale preference resolved at runtime via
+  // the locale provider on the client).
+  const fmtCurrency = (v: number) => formatCompactAmount(v, "USD");
 
   const keyMetrics = [
     { label: "Monthly Revenue", value: fmtCurrency(latestRevenue?.value ?? 0), category: "Revenue" },
