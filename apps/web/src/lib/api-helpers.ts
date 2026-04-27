@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { canPerformAction, type GatedAction, type Plan } from "./feature-gate";
 import { ScenarioSafetyError } from "./scenario-middleware";
+import { ConfirmableError, serializeConfirmable } from "./confirmable-error";
 
 /** Standard JSON error response. */
 export function errorResponse(message: string, status: number) {
@@ -117,6 +118,11 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
           { error: error.message, code: "SCENARIO_SAFETY" },
           { status: 409 }
         );
+      }
+
+      // Return 409 when a mutation requires explicit confirmation from the client
+      if (error instanceof ConfirmableError) {
+        return NextResponse.json(serializeConfirmable(error), { status: 409 });
       }
 
       log.error(
