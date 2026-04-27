@@ -25,7 +25,7 @@ describe("hasFinancialData", () => {
   let companyId: string;
 
   beforeEach(async () => {
-    const user = await createUser({ email: `hfd-${Date.now()}@test.burnless.app` });
+    const user = await createUser();
     const company = await createCompany(user.id);
     companyId = company.id;
   });
