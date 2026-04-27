@@ -84,6 +84,21 @@ export interface MetricDefinition {
   href: string;
   /** Whether this metric requires SaaS/subscription data */
   requiresSaaS?: boolean;
+  /**
+   * Parent metric slug for drill-down hierarchies (umbrella §1.4).
+   * When set, this metric is a component of `parentMetricId`.
+   * Parent metrics have no `parentMetricId`. Drill-down UI queries
+   * children via `getMetricChildren(parentSlug)`.
+   */
+  parentMetricId?: string;
+  /**
+   * AI context inclusion hint (umbrella §1.4). Lets prompt builders pick
+   * parent-only, components-only, or both when serializing a metric family
+   * to AI context. Defaults to 'both' when omitted.
+   */
+  aiContext?: {
+    include: "parent_only" | "components_only" | "both";
+  };
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -917,6 +932,28 @@ for (const m of METRIC_REGISTRY) {
 /** Look up a metric definition by its slug (key in ComputedMetrics). */
 export function getMetricDef(slug: string): MetricDefinition | undefined {
   return _bySlug.get(slug);
+}
+
+/**
+ * Return all metrics whose `parentMetricId` equals the given slug.
+ * Accepts an optional explicit list for testability — defaults to
+ * the global METRIC_REGISTRY.
+ */
+export function getMetricChildren(
+  parentSlug: string,
+  registry: MetricDefinition[] = METRIC_REGISTRY
+): MetricDefinition[] {
+  return registry.filter((m) => m.parentMetricId === parentSlug);
+}
+
+/**
+ * Resolve the AI-context inclusion policy for a metric. Defaults to 'both'
+ * when the metric does not explicitly declare `aiContext`.
+ */
+export function getMetricAiInclude(
+  slug: string
+): "parent_only" | "components_only" | "both" {
+  return getMetricDef(slug)?.aiContext?.include ?? "both";
 }
 
 /** Get all metrics in a category. */
