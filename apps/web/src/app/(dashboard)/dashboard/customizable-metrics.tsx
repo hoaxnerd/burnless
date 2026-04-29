@@ -169,7 +169,7 @@ export function CustomizableMetrics({
         };
       })
       .filter((r) => r !== null) as MetricRow[];
-  }, [activeMetrics, metrics, currentMonth, prevMonth]);
+  }, [activeMetrics, metrics, currentMonth, prevMonth, fmtCurrency]);
 
   const columns = useMemo(
     () => [
