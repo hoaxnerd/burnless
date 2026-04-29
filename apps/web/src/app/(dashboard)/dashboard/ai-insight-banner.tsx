@@ -3,6 +3,7 @@
 import { AlertTriangle, TrendingUp, ArrowRight, Sparkles, ShieldAlert, Info } from "lucide-react";
 import Link from "next/link";
 import { AiGate } from "@/components/ai/ai-gate";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface AiInsightBannerProps {
   runway: number;
@@ -12,7 +13,8 @@ interface AiInsightBannerProps {
 }
 
 export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsightBannerProps) {
-  const insight = generateInsight(runway, burnRate, mrrGrowth, cash);
+  const { fmtCompact } = useLocale();
+  const insight = generateInsight(runway, burnRate, mrrGrowth, cash, fmtCompact);
   if (!insight) return null;
 
   const styles = severityStyles[insight.severity];
@@ -130,11 +132,12 @@ function generateInsight(
   burnRate: number,
   mrrGrowth: number,
   cash: number,
+  fmtCompact: (v: number) => string,
 ): { title: string; message: string; severity: Severity } | null {
   if (runway <= 3 && runway > 0) {
     return {
       title: `${Math.round(runway)} months of runway remaining`,
-      message: `At $${(burnRate / 1000).toFixed(0)}k/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
+      message: `At ${fmtCompact(burnRate)}/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
       severity: "critical",
     };
   }
@@ -162,13 +165,13 @@ function generateInsight(
   if (burnRate > 0 && cash > 0 && runway >= 12) {
     return {
       title: `${Math.round(runway)} months of runway — solid position`,
-      message: `With $${(cash / 1000).toFixed(0)}k in the bank at $${(burnRate / 1000).toFixed(0)}k/mo burn, you have room to focus on growth.`,
+      message: `With ${fmtCompact(cash)} in the bank at ${fmtCompact(burnRate)}/mo burn, you have room to focus on growth.`,
       severity: "neutral",
     };
   }
   if (burnRate > 0 && cash > 0) {
     return {
-      title: `${Math.round(runway)} months runway at $${(burnRate / 1000).toFixed(0)}k/mo burn`,
+      title: `${Math.round(runway)} months runway at ${fmtCompact(burnRate)}/mo burn`,
       message: `Your financial position is stable. Focus on growth and efficiency.`,
       severity: "neutral",
     };

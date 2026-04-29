@@ -65,6 +65,9 @@ vi.mock("@burnless/db", () => ({
     region: "region",
     fiscalYearEnd: "fiscalYearEnd",
   },
+  // Stub hasFinancialData — company.test.ts doesn't test financial-data gating;
+  // always return false so PATCH tests aren't blocked by the confirm gate.
+  hasFinancialData: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -164,6 +167,14 @@ describe("PATCH /api/company", () => {
     mockWhere.mockReturnValue({ limit: mockLimit, returning: mockReturning });
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });
+
+    // PATCH now SELECTs the existing company before updating (for currency-change
+    // detection). Return a stub company so the handler doesn't return 404.
+    mockLimit.mockResolvedValue([{
+      id: "comp-1",
+      name: "Existing Co",
+      currency: "USD",
+    }]);
   });
 
   it("updates company fields", async () => {

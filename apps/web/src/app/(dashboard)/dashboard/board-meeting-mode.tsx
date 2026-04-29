@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, Copy, Check, Presentation } from "lucide-react";
 import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
+import { useLocale } from "@/components/locale/locale-context";
 
 /* ── Types ──────────────────────────────────────────────────────────────────── */
 
@@ -75,15 +76,7 @@ function getHeadcountSignal(delta: number): { signal: Signal; note: string } {
 
 /* ── Formatting ─────────────────────────────────────────────────────────────── */
 
-function fmtCurrency(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
-  return `${sign}$${abs.toFixed(0)}`;
-}
-
-function buildMetrics(data: BoardMeetingData): MetricDisplay[] {
+function buildMetrics(data: BoardMeetingData, fmtCompact: (v: number) => string): MetricDisplay[] {
   const cashSig = getCashSignal(data.cash, data.runway);
   const burnSig = getBurnSignal(data.burn, data.runway);
   const runwaySig = getRunwaySignal(data.runway);
@@ -92,14 +85,14 @@ function buildMetrics(data: BoardMeetingData): MetricDisplay[] {
   const hcSig = getHeadcountSignal(data.headcountDelta);
 
   return [
-    { label: "Cash", value: fmtCurrency(data.cash), ...cashSig },
-    { label: "Burn", value: `${fmtCurrency(data.burn)}/mo`, ...burnSig },
+    { label: "Cash", value: fmtCompact(data.cash), ...cashSig },
+    { label: "Burn", value: `${fmtCompact(data.burn)}/mo`, ...burnSig },
     {
       label: "Runway",
       value: data.runway >= 999 ? "\u221e" : `${data.runway.toFixed(1)} mo`,
       ...runwaySig,
     },
-    { label: "MRR", value: fmtCurrency(data.mrr), ...mrrSig },
+    { label: "MRR", value: fmtCompact(data.mrr), ...mrrSig },
     {
       label: "Growth",
       value: `${data.mrrGrowth >= 0 ? "+" : ""}${data.mrrGrowth.toFixed(1)}%`,
@@ -231,6 +224,7 @@ export function BoardMeetingOverlay({
   const [exporting, setExporting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const { fmtCompact } = useLocale();
 
   // Safely build metrics with fallback defaults
   const safeData: BoardMeetingData = useMemo(() => ({
@@ -244,7 +238,7 @@ export function BoardMeetingOverlay({
     headcount: Number.isFinite(data?.headcount) ? data.headcount : 0,
     headcountDelta: Number.isFinite(data?.headcountDelta) ? data.headcountDelta : 0,
   }), [data]);
-  const metrics = buildMetrics(safeData);
+  const metrics = buildMetrics(safeData, fmtCompact);
 
   // Wait for client-side mount before rendering portal (avoids SSR/hydration mismatch)
   useEffect(() => { setMounted(true); }, []);

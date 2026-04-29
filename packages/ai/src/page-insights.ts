@@ -6,6 +6,7 @@
  * Insights are short-form, data-driven, and actionable.
  */
 
+import { formatCurrency, isValidCurrency } from "@burnless/types";
 import type { FinancialSnapshot, Insight, InsightType } from "./types";
 import { getProviderForFeature } from "./routing";
 import { createProvider, type CreateProviderOptions } from "./providers";
@@ -40,11 +41,12 @@ const FEATURE_KEY = "page_insights";
 
 function buildExpensesPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
   const { keyMetrics, expensesByMonth, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   const recentExpenses = expensesByMonth.slice(-3);
   const expenseLines = recentExpenses
-    .map((e) => `  ${e.month}: ${currency} ${e.amount.toLocaleString()}`)
+    .map((e) => `  ${e.month}: ${formatCurrency(e.amount, currency, locale)}`)
     .join("\n");
 
   const subcategories = pageData?.subcategoryBreakdown as Array<{
@@ -56,7 +58,7 @@ function buildExpensesPrompt(snapshot: FinancialSnapshot, pageData?: Record<stri
 
   const subcatLines = subcategories
     ?.slice(0, 8)
-    .map((s) => `  ${s.subcategory}: ${currency} ${s.amount.toLocaleString()} (${s.changePercent >= 0 ? "+" : ""}${(s.changePercent * 100).toFixed(0)}% MoM)${s.isAnomaly ? " [ANOMALY]" : ""}`)
+    .map((s) => `  ${s.subcategory}: ${formatCurrency(s.amount, currency, locale)} (${s.changePercent >= 0 ? "+" : ""}${(s.changePercent * 100).toFixed(0)}% MoM)${s.isAnomaly ? " [ANOMALY]" : ""}`)
     .join("\n") ?? "  No subcategory data available";
 
   const anomalyCount = pageData?.anomalyCount ?? 0;
@@ -66,7 +68,7 @@ function buildExpensesPrompt(snapshot: FinancialSnapshot, pageData?: Record<stri
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
 
 Recent Monthly Expenses:
@@ -91,11 +93,12 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildRevenuePrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
   const { keyMetrics, revenueByMonth, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   const recentRevenue = revenueByMonth.slice(-3);
   const revLines = recentRevenue
-    .map((r) => `  ${r.month}: ${currency} ${r.amount.toLocaleString()}`)
+    .map((r) => `  ${r.month}: ${formatCurrency(r.amount, currency, locale)}`)
     .join("\n");
 
   const growthMetrics = pageData?.growthMetrics as {
@@ -119,18 +122,22 @@ function buildRevenuePrompt(snapshot: FinancialSnapshot, pageData?: Record<strin
 
   const streamLines = streams
     ?.slice(0, 5)
-    .map((s) => `  ${s.name} (${s.type}): ${currency} ${s.currentRevenue.toLocaleString()} (${(s.percentage).toFixed(0)}% of total, ${s.changePercent >= 0 ? "+" : ""}${(s.changePercent * 100).toFixed(0)}% MoM)`)
+    .map((s) => `  ${s.name} (${s.type}): ${formatCurrency(s.currentRevenue, currency, locale)} (${(s.percentage).toFixed(0)}% of total, ${s.changePercent >= 0 ? "+" : ""}${(s.changePercent * 100).toFixed(0)}% MoM)`)
     .join("\n") ?? "  No stream data";
+
+  const mrrValue = growthMetrics?.currentMrr ?? keyMetrics.mrr;
+  const arrValue = growthMetrics?.arr ?? keyMetrics.arr;
+  const ltvValue = growthMetrics?.ltv ?? keyMetrics.ltv;
 
   return `You are a senior financial advisor analyzing a startup's revenue. Be direct and data-driven.
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-MRR: ${currency} ${growthMetrics?.currentMrr?.toLocaleString() ?? keyMetrics.mrr?.toLocaleString() ?? "N/A"}
-ARR: ${currency} ${growthMetrics?.arr?.toLocaleString() ?? keyMetrics.arr?.toLocaleString() ?? "N/A"}
+MRR: ${mrrValue != null ? formatCurrency(mrrValue, currency, locale) : "N/A"}
+ARR: ${arrValue != null ? formatCurrency(arrValue, currency, locale) : "N/A"}
 MRR Growth: ${growthMetrics?.mrrGrowthPercent?.toFixed(1) ?? keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
 Churn Rate: ${growthMetrics?.churnRate?.toFixed(1) ?? keyMetrics.churnRate?.toFixed(1) ?? "N/A"}%
-LTV: ${currency} ${growthMetrics?.ltv?.toLocaleString() ?? keyMetrics.ltv?.toLocaleString() ?? "N/A"}
+LTV: ${ltvValue != null ? formatCurrency(ltvValue, currency, locale) : "N/A"}
 Customers: ${growthMetrics?.totalCustomers ?? "N/A"}
 Quick Ratio: ${growthMetrics?.quickRatio?.toFixed(1) ?? "N/A"}
 Doubling Time: ${growthMetrics?.doublingTimeMonths?.toFixed(0) ?? "N/A"} months
@@ -154,7 +161,8 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildScenariosPrompt(snapshot: FinancialSnapshot): string {
   const { keyMetrics, scenarios, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   const scenarioLines = scenarios
     .map((s) => `  ${s.name} (${s.source})${s.status !== "active" ? ` [${s.status}]` : ""}`)
@@ -164,10 +172,10 @@ function buildScenariosPrompt(snapshot: FinancialSnapshot): string {
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-Current Cash: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Current Cash: ${keyMetrics.cashPosition != null ? formatCurrency(keyMetrics.cashPosition, currency, locale) : "N/A"}
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
-MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
+MRR: ${keyMetrics.mrr != null ? formatCurrency(keyMetrics.mrr, currency, locale) : "N/A"}
 Headcount: ${keyMetrics.headcount ?? "N/A"}
 
 Available Scenarios:
@@ -186,7 +194,8 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildFundingPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
   const { keyMetrics, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   const fundingRounds = pageData?.fundingRounds as Array<{
     name: string;
@@ -197,17 +206,17 @@ function buildFundingPrompt(snapshot: FinancialSnapshot, pageData?: Record<strin
   }> | undefined;
 
   const roundLines = fundingRounds
-    ?.map((r) => `  ${r.name} (${r.type}): ${currency} ${r.amount.toLocaleString()} — ${r.date}${r.isProjected ? " [projected]" : ""}`)
+    ?.map((r) => `  ${r.name} (${r.type}): ${formatCurrency(r.amount, currency, locale)} — ${r.date}${r.isProjected ? " [projected]" : ""}`)
     .join("\n") ?? "  No funding rounds recorded";
 
   return `You are a senior financial advisor analyzing a startup's fundraising position. Be direct and data-driven.
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Cash Position: ${keyMetrics.cashPosition != null ? formatCurrency(keyMetrics.cashPosition, currency, locale) : "N/A"}
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
-MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
+MRR: ${keyMetrics.mrr != null ? formatCurrency(keyMetrics.mrr, currency, locale) : "N/A"}
 Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
 
 Funding History:
@@ -226,7 +235,8 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
   const { keyMetrics, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   const departments = pageData?.departments as Array<{
     name: string;
@@ -235,7 +245,7 @@ function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, 
   }> | undefined;
 
   const deptLines = departments
-    ?.map((d) => `  ${d.name}: ${d.headcount} people, ${currency} ${d.monthlyCost.toLocaleString()}/mo`)
+    ?.map((d) => `  ${d.name}: ${d.headcount} people, ${formatCurrency(d.monthlyCost, currency, locale)}/mo`)
     .join("\n") ?? "  No department data";
 
   const plannedHires = pageData?.plannedHires as number | undefined;
@@ -244,10 +254,10 @@ function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, 
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
 Headcount: ${keyMetrics.headcount ?? "N/A"}
-Revenue per Employee: ${keyMetrics.mrr && keyMetrics.headcount ? `${currency} ${Math.round(keyMetrics.mrr / keyMetrics.headcount).toLocaleString()}/mo` : "N/A"}
+Revenue per Employee: ${keyMetrics.mrr && keyMetrics.headcount ? `${formatCurrency(Math.round(keyMetrics.mrr / keyMetrics.headcount), currency, locale)}/mo` : "N/A"}
 Planned Hires: ${plannedHires ?? 0}
 
 Departments:
@@ -266,18 +276,19 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildReportsPrompt(snapshot: FinancialSnapshot): string {
   const { keyMetrics, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   return `You are a senior financial advisor preparing executive-level insights for a board report. Be direct and data-driven.
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
-ARR: ${currency} ${keyMetrics.arr?.toLocaleString() ?? "N/A"}
+MRR: ${keyMetrics.mrr != null ? formatCurrency(keyMetrics.mrr, currency, locale) : "N/A"}
+ARR: ${keyMetrics.arr != null ? formatCurrency(keyMetrics.arr, currency, locale) : "N/A"}
 Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
-Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
+Cash Position: ${keyMetrics.cashPosition != null ? formatCurrency(keyMetrics.cashPosition, currency, locale) : "N/A"}
 Gross Margin: ${keyMetrics.grossMargin?.toFixed(1) ?? "N/A"}%
 Headcount: ${keyMetrics.headcount ?? "N/A"}
 
@@ -294,18 +305,19 @@ Return ONLY the JSON array, no markdown fences.`;
 
 function buildDashboardPrompt(snapshot: FinancialSnapshot): string {
   const { keyMetrics, company } = snapshot;
-  const currency = company.currency;
+  const currency = isValidCurrency(company.currency) ? company.currency : "USD";
+  const locale = company.locale;
 
   return `You are a senior financial advisor giving a startup founder a quick daily briefing. Be direct and data-driven.
 
 Company: ${company.name} (${company.stage}, ${company.businessModel})
 Currency: ${currency}
-MRR: ${currency} ${keyMetrics.mrr?.toLocaleString() ?? "N/A"}
-ARR: ${currency} ${keyMetrics.arr?.toLocaleString() ?? "N/A"}
+MRR: ${keyMetrics.mrr != null ? formatCurrency(keyMetrics.mrr, currency, locale) : "N/A"}
+ARR: ${keyMetrics.arr != null ? formatCurrency(keyMetrics.arr, currency, locale) : "N/A"}
 Revenue Growth: ${keyMetrics.revenueGrowth?.toFixed(1) ?? "N/A"}% MoM
-Burn Rate: ${currency} ${keyMetrics.burnRate?.toLocaleString() ?? "N/A"}/month
+Burn Rate: ${keyMetrics.burnRate != null ? formatCurrency(keyMetrics.burnRate, currency, locale) : "N/A"}/month
 Runway: ${keyMetrics.runway?.toFixed(1) ?? "N/A"} months
-Cash Position: ${currency} ${keyMetrics.cashPosition?.toLocaleString() ?? "N/A"}
+Cash Position: ${keyMetrics.cashPosition != null ? formatCurrency(keyMetrics.cashPosition, currency, locale) : "N/A"}
 Headcount: ${keyMetrics.headcount ?? "N/A"}
 
 Generate exactly 3 insights as JSON array. Each insight must have: type (one of "financial_narrative", "benchmark", "coaching"), title (max 60 chars), summary (1-2 sentences, lead with the number), severity ("info", "warning", or "critical"), continuationPrompt (a natural follow-up question the user could ask an AI financial advisor to dive deeper into this insight, max 120 chars).

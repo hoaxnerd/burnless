@@ -10,6 +10,7 @@ import {
 } from "@burnless/engine";
 import { type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
 import { formatCurrency, pctChange, sparkline } from "./dashboard-helpers";
+import { type CurrencyCode } from "@burnless/types";
 
 const DEFAULT_METRIC_STYLES: Record<string, { icon: string; color: string; href: string }> = {
   cashPosition: { icon: "Wallet", color: "emerald", href: "/funding" },
@@ -24,6 +25,8 @@ export function buildHeroCards(
   currentMonth: string,
   prevMonth: string,
   slugHasData: Record<string, boolean>,
+  currency: CurrencyCode = "USD",
+  locale?: string,
 ): HeroCardDatum[] {
   return heroSlugs.map((slug, i) => {
     const def = getMetricDef(slug);
@@ -39,9 +42,11 @@ export function buildHeroCards(
     if (!hasData) {
       formattedValue = def?.format === "months" ? "-- mo" : "$---";
     } else if (def) {
-      formattedValue = formatMetricValue(currentVal, def.format);
+      formattedValue = def.format === "currency"
+        ? formatCurrency(currentVal, currency, locale, { compact: true })
+        : formatMetricValue(currentVal, def.format);
     } else {
-      formattedValue = formatCurrency(currentVal, "USD", undefined, { compact: true });
+      formattedValue = formatCurrency(currentVal, currency, locale, { compact: true });
     }
 
     // MoM change
@@ -94,6 +99,8 @@ export function buildHeroSwapCards(
   metrics: ComputedMetrics,
   currentMonth: string,
   prevMonth: string,
+  currency: CurrencyCode = "USD",
+  locale?: string,
 ): SwapCardDatum[] {
   const heroSwaps = getHeroSwaps(DEFAULT_HERO_CARDS, metrics, currentMonth);
   const heroSwapCards: SwapCardDatum[] = [];
@@ -108,7 +115,9 @@ export function buildHeroSwapCards(
 
     const swapCurrentVal = extractMetricValue(metrics, swap.displaySlug, currentMonth) ?? 0;
     const swapPrevVal = extractMetricValue(metrics, swap.displaySlug, prevMonth) ?? 0;
-    const formattedSwapValue = formatMetricValue(swapCurrentVal, swap.displayDef.format);
+    const formattedSwapValue = swap.displayDef.format === "currency"
+      ? formatCurrency(swapCurrentVal, currency, locale, { compact: true })
+      : formatMetricValue(swapCurrentVal, swap.displayDef.format);
 
     let swapChange: string | undefined;
     if (swap.displayDef.format === "percent") {

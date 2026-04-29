@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useToast } from "@/components/ui/toast";
 import { usePlanLimit } from "@/hooks/use-plan-limit";
+import { useLocale } from "@/components/locale/locale-context";
+import { formatCompactAmount } from "@burnless/types";
 import type { DataRoomViewProps } from "./data-room-config";
 import { exportItems, reportSections } from "./data-room-config";
 
@@ -22,6 +24,12 @@ export function useDataRoomExports(props: DataRoomViewProps) {
     companyName, scenarioName, profitAndLoss, cashFlow, balanceSheet,
     keyMetrics, fundingRounds, startingCash, netBurnRate, runwayMonths,
   } = props;
+
+  const { currency, locale } = useLocale();
+  const fmtAmount = useCallback(
+    (value: number) => formatCompactAmount(value, currency, locale),
+    [currency, locale],
+  );
 
   const { success: toastSuccess, error: toastError } = useToast();
   const { planLimit, checkErrorBody, clearLimit } = usePlanLimit();
@@ -164,11 +172,6 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           break;
         }
         case "funding-csv": {
-          const fmtAmount = (v: number) => {
-            if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-            if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-            return `$${v.toFixed(0)}`;
-          };
           const lines: string[] = [];
           lines.push(`Funding History`);
           lines.push(`Company: ${companyName}`);

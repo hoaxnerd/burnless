@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, Check, Loader2, Zap } from "lucide-react";
+import { useLocale } from "@/components/locale/locale-context";
 import type { DataRoomViewProps, ExportItem } from "./data-room-config";
 import { reportSections } from "./data-room-config";
 
@@ -29,6 +30,8 @@ export function ExportsTab({
   onBuildReport,
   scenarioName,
 }: ExportsTabProps) {
+  const { fmtCurrency } = useLocale();
+
   return (
     <div className="space-y-6">
       {/* TODO: Financial Snapshot — future release */}
@@ -161,12 +164,12 @@ export function ExportsTab({
                   <tr key={i} className="border-b border-surface-100 dark:border-surface-700/50">
                     <td className="py-2.5 capitalize text-surface-900 dark:text-surface-50 font-medium">{r.round.replace(/_/g, " ")}</td>
                     <td className="py-2.5 text-right text-surface-700 dark:text-surface-300">
-                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(r.amount)}
+                      {fmtCurrency(r.amount, { decimals: 0 })}
                     </td>
                     <td className="py-2.5 text-right text-surface-500 dark:text-surface-400">{r.date}</td>
                     <td className="py-2.5 text-right text-surface-500 dark:text-surface-400">
                       {r.valuation
-                        ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(r.valuation)
+                        ? fmtCurrency(r.valuation, { decimals: 0 })
                         : "N/A"}
                     </td>
                   </tr>

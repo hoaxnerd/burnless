@@ -35,7 +35,6 @@ export function InviteCodesTab() {
   const [codes, setCodes] = useState<InviteCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -251,6 +250,8 @@ export function InviteCodesTab() {
           </span>
           <span className="inline-flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
+            {/* AI credits are platform-priced in USD (we pay AI providers in USD). */}
+            {/* Don't use the company's currency. */}
             {formatCredits(row.aiCreditsCents)} AI
           </span>
         </div>

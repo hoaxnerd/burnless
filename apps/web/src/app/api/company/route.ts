@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, companies } from "@burnless/db";
+import { db, companies, hasFinancialData } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { CURRENCY_CODES } from "@burnless/types";
+import { ConfirmableError } from "@/lib/confirmable-error";
 
 // ── GET /api/company — Get company profile ──────────────────────────────────
 
@@ -32,7 +34,7 @@ const updateSchema = z.object({
     .enum(["saas", "marketplace", "ecommerce", "services", "hardware", "other"])
     .optional(),
   industry: z.string().max(200).nullable().optional(),
-  currency: z.string().min(3).max(3).optional(),
+  currency: z.enum(CURRENCY_CODES).optional(),
   locale: z.string().min(2).max(10).optional(),
   timezone: z.string().min(1).max(100).optional(),
   region: z.enum(["us-east", "eu-west", "ap-south"]).optional(),
@@ -47,6 +49,27 @@ export const PATCH = withErrorHandler(async (request: Request) => {
 
   const parsed = await parseBody(request, updateSchema);
   if ("error" in parsed) return parsed.error;
+
+  // Load existing company once — needed for currency-change detection.
+  const [existing] = await db
+    .select()
+    .from(companies)
+    .where(eq(companies.id, ctx.companyId))
+    .limit(1);
+  if (!existing) return errorResponse("Company not found", 404);
+
+  // Currency-change confirm gate (umbrella §1.6 mutability rule).
+  if (parsed.data.currency && parsed.data.currency !== (existing.currency as string)) {
+    const url = new URL(request.url);
+    const confirmed = url.searchParams.get("confirm") === "true";
+    if (!confirmed && (await hasFinancialData(ctx.companyId))) {
+      throw new ConfirmableError(
+        `Changing currency from ${existing.currency} to ${parsed.data.currency} will not convert existing financial data. Symbols on historic amounts will change even though the numbers do not. Confirm to proceed.`,
+        "CURRENCY_CHANGE_REQUIRES_CONFIRMATION",
+        { from: existing.currency, to: parsed.data.currency }
+      );
+    }
+  }
 
   const updates: Record<string, unknown> = {};
   const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd } = parsed.data;

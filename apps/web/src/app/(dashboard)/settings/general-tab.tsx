@@ -46,7 +46,7 @@ export function GeneralTab({
             size="sm"
             icon={saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saveSuccess ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
             disabled={saving || !companyLoaded}
-            onClick={saveCompany}
+            onClick={() => saveCompany()}
           >
             {saveSuccess ? "Saved" : "Save Changes"}
           </Button>

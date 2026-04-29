@@ -33,6 +33,11 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyConfig> = {
   BRL: { code: "BRL", symbol: "R$", name: "Brazilian Real", decimals: 2, defaultLocale: "pt-BR" },
 };
 
+/** Runtime tuple of supported currency codes — use for Zod enum / iteration. */
+export const CURRENCY_CODES = [
+  "USD", "EUR", "GBP", "INR", "CAD", "AUD", "SGD", "AED", "JPY", "BRL",
+] as const satisfies ReadonlyArray<CurrencyCode>;
+
 /** Supported data residency regions. */
 export type DataRegion = "us-east" | "eu-west" | "ap-south";
 

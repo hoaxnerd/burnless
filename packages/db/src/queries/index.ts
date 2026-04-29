@@ -40,3 +40,5 @@ export {
 } from "./scenario-mutations";
 
 export { promoteScenario } from "./scenario-promotion";
+
+export { hasFinancialData } from "./company-financial-data";

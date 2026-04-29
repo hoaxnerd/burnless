@@ -5,10 +5,22 @@ import {
   BoardMeetingOverlay,
   type BoardMeetingData,
 } from "../board-meeting-mode";
+import { formatCompactAmount } from "@burnless/types";
 
 // Mock keyboard shortcuts hook
 vi.mock("@/components/ui/keyboard-shortcuts", () => ({
   usePageShortcuts: vi.fn(),
+}));
+
+// Mock locale context — provide USD compact formatter
+vi.mock("@/components/locale/locale-context", () => ({
+  useLocale: () => ({
+    fmtCompact: (v: number) => formatCompactAmount(v, "USD", "en-US"),
+    fmtCurrency: (v: number) => formatCompactAmount(v, "USD", "en-US"),
+    currency: "USD",
+    locale: "en-US",
+    loaded: true,
+  }),
 }));
 
 const sampleData: BoardMeetingData = {
@@ -66,7 +78,8 @@ describe("BoardMeetingOverlay", () => {
 
   it("renders formatted cash value", () => {
     render(<BoardMeetingOverlay data={sampleData} onClose={vi.fn()} />);
-    expect(screen.getByText("$750K")).toBeInTheDocument();
+    // formatCompactAmount(750000) → "$750k" (lowercase k from centralized formatter)
+    expect(screen.getByText("$750k")).toBeInTheDocument();
   });
 
   it("renders runway value", () => {
