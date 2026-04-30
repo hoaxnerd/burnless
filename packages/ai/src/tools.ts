@@ -32,7 +32,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "create_expense",
     description:
-      "Add an expense to the current scenario — defines how a specific expense account is projected over time. Use when the user says 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyRate }; 'per_unit' { driver, unitPrice }; 'percentage_of' { ofAccountId, percentage }; 'custom_formula' { formula }.",
+      "Add an expense to the current scenario — defines how a specific expense account is projected over time. Use when the user says 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -486,7 +486,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "update_expense",
     description:
-      "Update an existing expense's method, parameters, dates, or metadata (vendor, notes, frequency, department, one-time/recurring flags). Use when the user says 'edit my Slack expense' or 'change the cloud spend growth rate'. Only fields supplied are patched. Method param shapes: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyRate }; 'per_unit' { driver, unitPrice }; 'percentage_of' { ofAccountId, percentage }; 'custom_formula' { formula }.",
+      "Update an existing expense's method, parameters, dates, or metadata (vendor, notes, frequency, department, one-time/recurring flags). Use when the user says 'edit my Slack expense' or 'change the cloud spend growth rate'. Only fields supplied are patched. Method param shapes: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
