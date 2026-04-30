@@ -43,6 +43,13 @@ interface ExpensesViewProps {
    * every line item.
    */
   accounts?: { id: string; name: string }[];
+  /** Department list — passed to the edit form for the optional dropdown. */
+  departments?: { id: string; name: string }[];
+  /**
+   * Light-weight `{ id, name }` projection of the current line items.
+   * Reused by the edit form to populate the `percentage_of` source dropdown.
+   */
+  forecastLines?: { id: string; name: string }[];
   timeline: MetricPoint[];
   opexTimeline: MetricPoint[];
   cogsTimeline: MetricPoint[];
@@ -55,6 +62,8 @@ export function ExpensesView({
   resolvedSlotData,
   expenseDetails,
   accounts,
+  departments,
+  forecastLines,
   timeline,
   opexTimeline: _opexTimeline,
   cogsTimeline: _cogsTimeline,
@@ -294,9 +303,11 @@ export function ExpensesView({
         lineItems={expenseDetails.lineItems}
         subcategories={expenseDetails.subcategories}
         accountMap={accountMap}
+        departments={departments}
+        forecastLines={forecastLines}
       />
     ),
-  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, accountMap, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, accountMap, departments, forecastLines, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
     <PageLayoutProvider pageId="expenses">

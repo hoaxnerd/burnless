@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { formatCompactCurrency } from "@/components/charts";
 import { Modal } from "@/components/ui";
-import { EditExpenseForm } from "./edit-expense-form";
+import { ExpenseFormModal } from "./expense-form-modal";
+import type { ExpenseRow } from "./expense-form";
+import type { ForecastMethod } from "@/lib/expense-params";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
@@ -24,6 +26,10 @@ interface ExpenseTableProps {
    * threaded it yet).
    */
   accountMap?: ReadonlyMap<string, { id: string; name: string }>;
+  /** Departments — forwarded to the edit form's optional department dropdown. */
+  departments?: Array<{ id: string; name: string }>;
+  /** Other forecast lines — used by the edit form's `percentage_of` source dropdown. */
+  forecastLines?: Array<{ id: string; name: string }>;
   onDelete?: (ids: string[]) => void;
   onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
@@ -31,7 +37,7 @@ interface ExpenseTableProps {
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, onCategoryOverride }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete, onCategoryOverride }: ExpenseTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -613,10 +619,14 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
 
       {/* Edit expense modal */}
       {editingItem && (
-        <EditExpenseForm
-          item={editingItem}
+        <ExpenseFormModal
+          mode="edit"
           open={!!editingItem}
           onClose={() => setEditingItem(null)}
+          accounts={accountOptions}
+          departments={departments}
+          forecastLines={(forecastLines ?? []).filter((l) => l.id !== editingItem.id)}
+          initialValue={lineItemToExpenseRow(editingItem)}
         />
       )}
 
@@ -706,4 +716,34 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
       )}
     </div>
   );
+}
+
+/**
+ * Map a compute-layer `ExpenseLineItem` to the `<ExpenseForm>`'s
+ * `ExpenseRow` shape. The compute layer surfaces a derived boolean
+ * `isRecurring`; we restore the tri-state by checking `recurringSource` —
+ * `"user"` means the DB column was non-null and reflects an explicit user
+ * choice; otherwise, expose `null` so the form's "Auto-detect" option is
+ * preselected.
+ *
+ * Note: `vendor`, `notes`, and `departmentId` are not currently surfaced by
+ * the compute layer, so they default to `null`. When the user edits those
+ * fields, the patch flows through cleanly because the form only ships
+ * fields the user touched.
+ */
+function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
+  return {
+    id: item.id,
+    accountId: item.accountId,
+    method: item.method as ForecastMethod,
+    parameters: item.parameters,
+    startDate: item.startDate,
+    endDate: item.endDate,
+    frequency: item.frequency,
+    isOneTime: item.isOneTime,
+    isRecurring: item.recurringSource === "user" ? item.isRecurring : null,
+    vendor: null,
+    notes: null,
+    departmentId: null,
+  };
 }

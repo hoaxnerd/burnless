@@ -136,6 +136,39 @@ describe("POST /api/forecast-lines", () => {
     );
   });
 
+  it("persists Phase-1 fields (vendor/notes/frequency/isOneTime/isRecurring/departmentId)", async () => {
+    mockScenarioInsert.mockResolvedValue({ ...sampleLine, vendor: "AWS", notes: "Q1 hosting", frequency: "annual", isOneTime: true, isRecurring: false, departmentId: "dept-1" });
+    const res = await POST(jsonRequest("http://localhost/api/forecast-lines", "POST", {
+      accountId: "a1",
+      method: "fixed",
+      parameters: { amount: 5000 },
+      startDate: "2026-01-01",
+      endDate: null,
+      vendor: "AWS",
+      notes: "Q1 hosting",
+      frequency: "annual",
+      isOneTime: true,
+      isRecurring: false,
+      departmentId: "dept-1",
+    }));
+    expect(res.status).toBe(201);
+    expect(mockScenarioInsert).toHaveBeenCalledWith(
+      "forecast_line",
+      expect.anything(),
+      expect.objectContaining({
+        accountId: "a1",
+        companyId: "c1",
+        vendor: "AWS",
+        notes: "Q1 hosting",
+        frequency: "annual",
+        isOneTime: true,
+        isRecurring: false,
+        departmentId: "dept-1",
+      }),
+      null,
+    );
+  });
+
   it("returns 403 when user lacks editor role", async () => {
     mockRequireRole.mockReturnValue(NextResponse.json({ error: "Insufficient permissions" }, { status: 403 }));
     const res = await POST(jsonRequest("http://localhost/api/forecast-lines", "POST", {
