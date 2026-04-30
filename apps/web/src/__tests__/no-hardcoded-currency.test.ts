@@ -133,6 +133,11 @@ const ALLOWED = [
   "packages/ai/src/__tests__/",
   "packages/engine/src/__tests__/",
 
+  // ── Revenue stream form tests ─────────────────────────────────────────────
+  // revenue-stream-form.test.tsx uses `$${n.toFixed(2)}` inside a vi.mock()
+  // fmtCurrency/fmtCompact stub — fixture values in a test, not display code.
+  "apps/web/src/app/(dashboard)/revenue/__tests__/",
+
   // ── E2E (Playwright) tests ────────────────────────────────────────────────
   // E2E tests assert text visible in the browser, which includes formatted
   // currency output from formatters and AI responses. Dollar amounts here are
