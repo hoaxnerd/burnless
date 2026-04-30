@@ -34,6 +34,9 @@ const typeLabels: Record<string, string> = {
   one_time: "One-Time",
   usage_based: "Usage",
   services: "Services",
+  marketplace: "Marketplace",
+  ecommerce: "E-commerce",
+  hardware: "Hardware",
 };
 
 const typeColors: Record<string, string> = {
@@ -41,6 +44,9 @@ const typeColors: Record<string, string> = {
   one_time: "#10b981",
   usage_based: "#7c3aed",
   services: "#f59e0b",
+  marketplace: "#059669",
+  ecommerce: "#e11d48",
+  hardware: "#64748b",
 };
 
 export function RevenueStreamBreakdown({
