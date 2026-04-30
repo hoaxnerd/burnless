@@ -578,6 +578,38 @@ export const headcountPlans = pgTable(
   ]
 );
 
+// ── Salary Changes ────────────────────────────────────────────────────────────
+
+export const salaryChanges = pgTable(
+  "salary_changes",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    effectiveDate: timestamp("effective_date", { mode: "date" }).notNull(),
+    newSalary: numeric("new_salary", { precision: 12, scale: 2 }).notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("salary_changes_company_idx").on(table.companyId),
+    index("salary_changes_headcount_date_idx").on(
+      table.headcountId,
+      table.effectiveDate
+    ),
+  ]
+);
+
 // ── Revenue Streams ───────────────────────────────────────────────────────────
 
 export const revenueStreams = pgTable(
@@ -1105,7 +1137,7 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
   headcountPlans: many(headcountPlans),
 }));
 
-export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
+export const headcountPlansRelations = relations(headcountPlans, ({ one, many }) => ({
   company: one(companies, {
     fields: [headcountPlans.companyId],
     references: [companies.id],
@@ -1113,6 +1145,18 @@ export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
   department: one(departments, {
     fields: [headcountPlans.departmentId],
     references: [departments.id],
+  }),
+  salaryChanges: many(salaryChanges),
+}));
+
+export const salaryChangesRelations = relations(salaryChanges, ({ one }) => ({
+  company: one(companies, {
+    fields: [salaryChanges.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [salaryChanges.headcountId],
+    references: [headcountPlans.id],
   }),
 }));
 
