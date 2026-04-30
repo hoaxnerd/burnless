@@ -46,7 +46,7 @@ export function CurrencyInput({
             const raw = parseFloat(e.target.value);
             onChange(Number.isNaN(raw) ? 0 : raw);
           }}
-          className="block w-full rounded-md border-surface-300 dark:bg-surface-800 pl-7"
+          className="block w-full rounded-md border border-surface-300 dark:bg-surface-800 pl-7"
         />
       </div>
       <p

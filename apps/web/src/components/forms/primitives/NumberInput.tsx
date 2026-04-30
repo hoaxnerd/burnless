@@ -56,7 +56,7 @@ export function NumberInput({
           if (max !== undefined && max !== null) parsed = Math.min(max, parsed);
           onChange(parsed);
         }}
-        className="mt-1 block w-full rounded-md border-surface-300 dark:bg-surface-800"
+        className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
       />
       {hint && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
     </label>

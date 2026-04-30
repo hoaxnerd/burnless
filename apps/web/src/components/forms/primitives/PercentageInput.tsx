@@ -45,7 +45,7 @@ export function PercentageInput({
     <div>
       <label className="block text-sm font-medium text-surface-700 mb-1">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-danger-500"> *</span>}
       </label>
       <div className="relative">
         <input
