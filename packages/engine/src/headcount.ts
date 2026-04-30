@@ -23,12 +23,14 @@ import { D, dRound2 } from "./decimal";
 // ── Headcount calculation results ────────────────────────────────────────────
 
 export interface HeadcountCostBreakdown {
-  /** Total personnel cost per month (salary + benefits) */
+  /** Total personnel cost per month (salary + benefits + bonus) */
   totalCost: MonthlySeries;
   /** Salary-only cost per month */
   salaryCost: MonthlySeries;
   /** Benefits-only cost per month */
   benefitsCost: MonthlySeries;
+  /** Bonus-only cost per month (paid in the bonus's payoutMonth) */
+  bonusCost: MonthlySeries;
   /** Total headcount per month */
   headcount: MonthlySeries;
   /** Cost by department: dept ID -> monthly series */
@@ -59,11 +61,25 @@ export interface HeadcountPlanInput {
     otherBenefitsCost: number;
   }>;
   salaryChanges?: SalaryChange[];
+  bonuses?: BonusInput[];
 }
 
 export interface SalaryChange {
   effectiveDate: Date;
   newSalary: number; // annual
+}
+
+export interface BonusInput {
+  payoutMonth: Date;
+  amount: number;
+}
+
+/** Sum any bonus amounts whose payoutMonth falls in the given month. */
+export function emitBonuses(bonuses: BonusInput[], month: Date): number {
+  const target = monthKey(month);
+  return bonuses
+    .filter((b) => monthKey(b.payoutMonth) === target)
+    .reduce((sum, b) => sum + b.amount, 0);
 }
 
 /** Resolve the active annual salary for a given month, applying any salary changes whose effective date is on or before the month-end. */
@@ -125,10 +141,11 @@ export function computeHeadcountPlanCost(
   plan: HeadcountPlanInput,
   periodStart: Date,
   periodEnd: Date
-): { salary: MonthlySeries; benefits: MonthlySeries; headcount: MonthlySeries } {
+): { salary: MonthlySeries; benefits: MonthlySeries; bonus: MonthlySeries; headcount: MonthlySeries } {
   const months = monthRange(periodStart, periodEnd);
   const salary: MonthlySeries = new Map();
   const benefits: MonthlySeries = new Map();
+  const bonus: MonthlySeries = new Map();
   const headcount: MonthlySeries = new Map();
 
   // Use cumulative rounding to prevent penny drift over the year.
@@ -142,9 +159,13 @@ export function computeHeadcountPlanCost(
   for (const month of months) {
     const key = monthKey(month);
 
+    // Bonuses are independent of activity gates — they emit in the configured payoutMonth.
+    const bonusAmount = round2(emitBonuses(plan.bonuses ?? [], month));
+
     if (!isActiveInMonth(month, plan.startDate, plan.endDate)) {
       salary.set(key, 0);
       benefits.set(key, 0);
+      bonus.set(key, bonusAmount);
       headcount.set(key, 0);
       continue;
     }
@@ -166,10 +187,11 @@ export function computeHeadcountPlanCost(
 
     salary.set(key, salaryAmount);
     benefits.set(key, benefitsAmount);
+    bonus.set(key, bonusAmount);
     headcount.set(key, dRound2(D(plan.count).mul(proration)));
   }
 
-  return { salary, benefits, headcount };
+  return { salary, benefits, bonus, headcount };
 }
 
 /** Calculate total headcount costs across all plans. */
@@ -180,12 +202,13 @@ export function computeAllHeadcountCosts(
 ): HeadcountCostBreakdown {
   let totalSalary: MonthlySeries = new Map();
   let totalBenefits: MonthlySeries = new Map();
+  let totalBonus: MonthlySeries = new Map();
   let totalHeadcount: MonthlySeries = new Map();
   const byDepartment = new Map<string, MonthlySeries>();
   const headcountByDepartment = new Map<string, MonthlySeries>();
 
   for (const plan of plans) {
-    const { salary, benefits, headcount } = computeHeadcountPlanCost(
+    const { salary, benefits, bonus, headcount } = computeHeadcountPlanCost(
       plan,
       periodStart,
       periodEnd
@@ -193,10 +216,11 @@ export function computeAllHeadcountCosts(
 
     totalSalary = addSeries(totalSalary, salary);
     totalBenefits = addSeries(totalBenefits, benefits);
+    totalBonus = addSeries(totalBonus, bonus);
     totalHeadcount = addSeries(totalHeadcount, headcount);
 
-    // Aggregate by department
-    const deptTotal = addSeries(salary, benefits);
+    // Aggregate by department (salary + benefits + bonus)
+    const deptTotal = addSeries(addSeries(salary, benefits), bonus);
     const existing = byDepartment.get(plan.departmentId);
     if (existing) {
       byDepartment.set(plan.departmentId, addSeries(existing, deptTotal));
@@ -213,9 +237,10 @@ export function computeAllHeadcountCosts(
   }
 
   return {
-    totalCost: addSeries(totalSalary, totalBenefits),
+    totalCost: addSeries(addSeries(totalSalary, totalBenefits), totalBonus),
     salaryCost: totalSalary,
     benefitsCost: totalBenefits,
+    bonusCost: totalBonus,
     headcount: totalHeadcount,
     byDepartment,
     headcountByDepartment,
