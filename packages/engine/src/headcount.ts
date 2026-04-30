@@ -37,18 +37,50 @@ export interface HeadcountCostBreakdown {
   headcountByDepartment: Map<string, MonthlySeries>;
 }
 
+export type HeadcountEmployeeType = "full_time" | "part_time" | "contractor";
+
 export interface HeadcountPlanInput {
   id: string;
   departmentId: string;
   title: string;
+  name?: string | null;
+  employeeType: HeadcountEmployeeType;
   count: number;
   salary: number; // annual
+  hourlyRate: number | null;
+  hoursPerWeek: number | null;
   startDate: Date;
   endDate: Date | null;
   benefitsRate: number; // e.g. 0.20 = 20%
+  benefitsBreakdown?: Partial<{
+    statutoryEmployerContributionsCost: number;
+    insuranceBenefitsCost: number;
+    retirementContributionsCost: number;
+    otherBenefitsCost: number;
+  }>;
 }
 
 // ── Core headcount functions ─────────────────────────────────────────────────
+
+const FULL_TIME_BASELINE_HPW = 40;
+const WEEKS_PER_MONTH = 4.33;
+
+/** Compute the per-month salary cost for a single FTE on this plan, given a resolved annual salary. */
+function monthlySalaryFor(plan: HeadcountPlanInput, resolvedAnnualSalary: number) {
+  switch (plan.employeeType) {
+    case "full_time":
+      return D(resolvedAnnualSalary).div(12);
+    case "part_time": {
+      const hpw = plan.hoursPerWeek ?? FULL_TIME_BASELINE_HPW;
+      return D(resolvedAnnualSalary).div(12).mul(hpw).div(FULL_TIME_BASELINE_HPW);
+    }
+    case "contractor": {
+      const rate = plan.hourlyRate ?? 0;
+      const hpw = plan.hoursPerWeek ?? 0;
+      return D(hpw).mul(WEEKS_PER_MONTH).mul(rate);
+    }
+  }
+}
 
 /** Calculate monthly cost for a single headcount plan entry. */
 export function computeHeadcountPlanCost(
@@ -60,8 +92,6 @@ export function computeHeadcountPlanCost(
   const salary: MonthlySeries = new Map();
   const benefits: MonthlySeries = new Map();
   const headcount: MonthlySeries = new Map();
-
-  const monthlySalary = D(plan.salary).div(12);
 
   // Use cumulative rounding to prevent penny drift over the year.
   // Each month gets the difference between cumulative rounded targets,
@@ -82,6 +112,8 @@ export function computeHeadcountPlanCost(
     }
 
     const proration = proratedFraction(month, plan.startDate, plan.endDate);
+
+    const monthlySalary = monthlySalaryFor(plan, plan.salary);
 
     cumulativeExactSalary = cumulativeExactSalary.plus(monthlySalary.mul(plan.count).mul(proration));
     const newRoundedSalary = dRound2(cumulativeExactSalary);
