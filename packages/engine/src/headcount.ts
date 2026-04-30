@@ -65,6 +65,20 @@ export interface HeadcountPlanInput {
 const FULL_TIME_BASELINE_HPW = 40;
 const WEEKS_PER_MONTH = 4.33;
 
+/** Resolve the effective benefits rate. Sum benefitsBreakdown if present, else fall back to flat benefitsRate. */
+function effectiveBenefitsRate(plan: HeadcountPlanInput): number {
+  const b = plan.benefitsBreakdown;
+  if (b) {
+    return (
+      (b.statutoryEmployerContributionsCost ?? 0) +
+      (b.insuranceBenefitsCost ?? 0) +
+      (b.retirementContributionsCost ?? 0) +
+      (b.otherBenefitsCost ?? 0)
+    );
+  }
+  return plan.benefitsRate ?? 0;
+}
+
 /** Compute the per-month salary cost for a single FTE on this plan, given a resolved annual salary. */
 function monthlySalaryFor(plan: HeadcountPlanInput, resolvedAnnualSalary: number) {
   switch (plan.employeeType) {
@@ -120,7 +134,7 @@ export function computeHeadcountPlanCost(
     const salaryAmount = dRound2(D(newRoundedSalary).minus(cumulativeRoundedSalary));
     cumulativeRoundedSalary = D(newRoundedSalary);
 
-    cumulativeExactBenefits = cumulativeExactBenefits.plus(monthlySalary.mul(plan.count).mul(proration).mul(plan.benefitsRate));
+    cumulativeExactBenefits = cumulativeExactBenefits.plus(monthlySalary.mul(plan.count).mul(proration).mul(effectiveBenefitsRate(plan)));
     const newRoundedBenefits = dRound2(cumulativeExactBenefits);
     const benefitsAmount = dRound2(D(newRoundedBenefits).minus(cumulativeRoundedBenefits));
     cumulativeRoundedBenefits = D(newRoundedBenefits);
