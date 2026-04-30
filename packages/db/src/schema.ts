@@ -578,6 +578,43 @@ export const headcountPlans = pgTable(
   ]
 );
 
+// ── Equity Grants ─────────────────────────────────────────────────────────────
+
+export const equityGrantTypeEnum = pgEnum("equity_grant_type", [
+  "iso",
+  "nso",
+  "rsu",
+]);
+
+export const equityGrants = pgTable(
+  "equity_grants",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    grantDate: timestamp("grant_date", { mode: "date" }).notNull(),
+    shares: numeric("shares", { precision: 18, scale: 4 }).notNull(),
+    strikePrice: numeric("strike_price", { precision: 18, scale: 4 }),
+    grantType: equityGrantTypeEnum("grant_type").notNull().default("iso"),
+    parameters: jsonb("parameters").notNull().default({}),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("equity_grants_company_idx").on(table.companyId),
+    index("equity_grants_headcount_idx").on(table.headcountId),
+  ]
+);
+
 // ── Bonuses ───────────────────────────────────────────────────────────────────
 
 export const bonusTypeEnum = pgEnum("bonus_type", [
@@ -1188,6 +1225,7 @@ export const headcountPlansRelations = relations(headcountPlans, ({ one, many })
   }),
   salaryChanges: many(salaryChanges),
   bonuses: many(bonuses),
+  equityGrants: many(equityGrants),
 }));
 
 export const salaryChangesRelations = relations(salaryChanges, ({ one }) => ({
@@ -1208,6 +1246,17 @@ export const bonusesRelations = relations(bonuses, ({ one }) => ({
   }),
   headcount: one(headcountPlans, {
     fields: [bonuses.headcountId],
+    references: [headcountPlans.id],
+  }),
+}));
+
+export const equityGrantsRelations = relations(equityGrants, ({ one }) => ({
+  company: one(companies, {
+    fields: [equityGrants.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [equityGrants.headcountId],
     references: [headcountPlans.id],
   }),
 }));
