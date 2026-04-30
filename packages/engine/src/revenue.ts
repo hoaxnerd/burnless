@@ -71,6 +71,37 @@ export interface ServicesParams {
   rateIncreaseRate?: number;
 }
 
+export interface MarketplaceParams {
+  /** Starting GMV (gross merchandise volume) per month */
+  startingGmv: number;
+  /** Take rate as fraction (e.g. 0.15 = 15% of GMV) */
+  takeRate: number;
+  /** Monthly GMV growth rate (e.g. 0.10 = 10%) */
+  gmvGrowthRate?: number;
+}
+
+export interface EcommerceParams {
+  /** Starting orders per month */
+  ordersPerMonth: number;
+  /** Average order value */
+  averageOrderValue: number;
+  /** Monthly order growth rate */
+  orderGrowthRate?: number;
+  /** Monthly AOV growth rate */
+  aovGrowthRate?: number;
+}
+
+export interface HardwareParams {
+  /** Units sold per month (starting) */
+  unitsPerMonth: number;
+  /** Price per unit */
+  pricePerUnit: number;
+  /** Monthly unit-volume growth rate */
+  unitGrowthRate?: number;
+  /** Monthly price-decay rate (negative for declining prices) */
+  priceGrowthRate?: number;
+}
+
 // ── Revenue stream input ─────────────────────────────────────────────────────
 
 export interface RevenueStreamInput {
@@ -148,19 +179,19 @@ export function computeRevenueStream(
         );
       case "marketplace":
         return computeMarketplaceRevenue(
-          stream.parameters,
+          stream.parameters as unknown as MarketplaceParams,
           periodStart,
           periodEnd,
         );
       case "ecommerce":
         return computeEcommerceRevenue(
-          stream.parameters,
+          stream.parameters as unknown as EcommerceParams,
           periodStart,
           periodEnd,
         );
       case "hardware":
         return computeHardwareRevenue(
-          stream.parameters,
+          stream.parameters as unknown as HardwareParams,
           periodStart,
           periodEnd,
         );
@@ -363,12 +394,66 @@ function computeServicesRevenue(
   return series;
 }
 
-// ── Stub handlers for new stream types (Task 3 replaces these) ───────────────
+// ── Marketplace / Ecommerce / Hardware revenue handlers ──────────────────────
 
-// TODO Task 3: replace stubs with typed implementations + param interfaces
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeMarketplaceRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeEcommerceRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeHardwareRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }
+function computeMarketplaceRevenue(
+  params: MarketplaceParams,
+  periodStart: Date,
+  periodEnd: Date,
+): MonthlySeries {
+  const months = monthRange(periodStart, periodEnd);
+  const series: MonthlySeries = new Map();
+  const startingGmv = params.startingGmv ?? 0;
+  const takeRate = params.takeRate ?? 0;
+  if (startingGmv === 0 || takeRate === 0) {
+    for (const m of months) series.set(monthKey(m), 0);
+    return series;
+  }
+  for (let i = 0; i < months.length; i++) {
+    const gmv = D(startingGmv).mul(dPow(D(1).plus(params.gmvGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(gmv.mul(takeRate)));
+  }
+  return series;
+}
+
+function computeEcommerceRevenue(
+  params: EcommerceParams,
+  periodStart: Date,
+  periodEnd: Date,
+): MonthlySeries {
+  const months = monthRange(periodStart, periodEnd);
+  const series: MonthlySeries = new Map();
+  const orders0 = params.ordersPerMonth ?? 0;
+  const aov0 = params.averageOrderValue ?? 0;
+  if (orders0 === 0 || aov0 === 0) {
+    for (const m of months) series.set(monthKey(m), 0);
+    return series;
+  }
+  for (let i = 0; i < months.length; i++) {
+    const orders = D(orders0).mul(dPow(D(1).plus(params.orderGrowthRate ?? 0), i));
+    const aov = D(aov0).mul(dPow(D(1).plus(params.aovGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(orders.mul(aov)));
+  }
+  return series;
+}
+
+function computeHardwareRevenue(
+  params: HardwareParams,
+  periodStart: Date,
+  periodEnd: Date,
+): MonthlySeries {
+  const months = monthRange(periodStart, periodEnd);
+  const series: MonthlySeries = new Map();
+  const units0 = params.unitsPerMonth ?? 0;
+  const price0 = params.pricePerUnit ?? 0;
+  if (units0 === 0 || price0 === 0) {
+    for (const m of months) series.set(monthKey(m), 0);
+    return series;
+  }
+  for (let i = 0; i < months.length; i++) {
+    const units = D(units0).mul(dPow(D(1).plus(params.unitGrowthRate ?? 0), i));
+    const price = D(price0).mul(dPow(D(1).plus(params.priceGrowthRate ?? 0), i));
+    series.set(monthKey(months[i]!), dRound2(units.mul(price)));
+  }
+  return series;
+}
