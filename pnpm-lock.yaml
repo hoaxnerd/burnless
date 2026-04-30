@@ -202,6 +202,9 @@ importers:
       openai:
         specifier: ^4.104.0
         version: 4.104.0(ws@8.19.0)(zod@3.25.76)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.19.15
