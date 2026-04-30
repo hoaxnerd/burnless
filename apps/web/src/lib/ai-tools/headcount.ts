@@ -109,7 +109,7 @@ export const addBonusSchema = z.object({
       (v) => /^\d{4}-\d{2}(-\d{2})?$/.test(v) && !isNaN(Date.parse(v.length === 7 ? `${v}-01` : v)),
       "payoutMonth must be YYYY-MM or YYYY-MM-DD"
     ),
-  amount: z.number().positive("Bonus amount must be > 0").max(100_000_000, "Bonus exceeds $100M limit"),
+  amount: z.number().positive("Bonus amount must be > 0").max(100_000_000, "Bonus amount exceeds 100,000,000 limit"),
   type: z.enum(["signing", "performance", "retention", "other"]).default("performance"),
   notes: z.string().max(2000).nullable().optional(),
 });

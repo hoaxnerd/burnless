@@ -9,7 +9,8 @@ import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
 import { TeamView } from "./team-view";
-import { AddHireForm } from "./add-hire-form";
+import { HeadcountForm } from "./headcount-form";
+import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 export default async function TeamPage() {
@@ -17,14 +18,21 @@ export default async function TeamPage() {
   const company = await getCompany();
   const scenario = company ? await getActiveScenario(company.id, scenarioId) : null;
 
+  const companyBenefitsRates = (company?.benefitsRates as BenefitsBreakdown | null) ?? {};
+
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <TeamContent companyId={company?.id} scenarioId={scenario?.id} scenarioName={scenario?.name} />
+      <TeamContent
+        companyId={company?.id}
+        scenarioId={scenario?.id}
+        scenarioName={scenario?.name}
+        companyBenefitsRates={companyBenefitsRates}
+      />
     </Suspense>
   );
 }
 
-async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?: string; scenarioId?: string; scenarioName?: string }) {
+async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefitsRates }: { companyId?: string; scenarioId?: string; scenarioName?: string; companyBenefitsRates: BenefitsBreakdown }) {
   if (!companyId || !scenarioId) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
@@ -158,9 +166,10 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
             {scenarioName && <span className="ml-2 text-surface-400">&mdash; {scenarioName}</span>}
           </p>
         </div>
-        <AddHireForm
+        <HeadcountForm
           scenarioId={scenarioId}
           departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+          companyBenefitsRates={companyBenefitsRates}
         />
       </div>
 
@@ -177,6 +186,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
         resolvedSlotData={resolvedSlotData}
         scenarioId={scenarioId}
         departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+        companyBenefitsRates={companyBenefitsRates}
       />
     </div>
   );

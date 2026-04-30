@@ -12,6 +12,7 @@ import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
+import type { BenefitsBreakdown } from "@/lib/headcount-params";
 
 interface TeamViewProps {
   totalHeadcount: number;
@@ -50,6 +51,7 @@ interface TeamViewProps {
   resolvedSlotData: ResolvedSlotData[];
   scenarioId: string;
   departments: Array<{ id: string; name: string }>;
+  companyBenefitsRates: BenefitsBreakdown;
 }
 
 export function TeamView({
@@ -65,6 +67,7 @@ export function TeamView({
   resolvedSlotData,
   scenarioId,
   departments,
+  companyBenefitsRates,
 }: TeamViewProps) {
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
@@ -147,6 +150,7 @@ export function TeamView({
         totalMonthlyCost={totalMonthlyCost}
         scenarioId={scenarioId}
         departments={departments}
+        companyBenefitsRates={companyBenefitsRates}
       />
     ),
     "planned-hires": (
@@ -154,6 +158,7 @@ export function TeamView({
         plannedHires={plannedHires}
         scenarioId={scenarioId}
         departments={departments}
+        companyBenefitsRates={companyBenefitsRates}
       />
     ),
     "hiring-insight": (
@@ -169,7 +174,7 @@ export function TeamView({
         }}
       />
     ),
-  }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments]);
+  }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments, companyBenefitsRates]);
 
   return (
     <PageLayoutProvider pageId="team">
