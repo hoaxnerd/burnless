@@ -119,6 +119,59 @@ describe("buildFinancialSnapshot", () => {
     expect(snapshot.scenario.name).toBe("Base Case");
   });
 
+  it("defaults expenses to empty array when expenseLines absent", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    expect(snapshot.expenses).toEqual([]);
+  });
+
+  it("maps expenseLines into per-row expenses", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-1",
+          accountId: "a1",
+          accountName: "AWS Hosting",
+          vendor: "Amazon Web Services",
+          notes: "Production cluster",
+          frequency: "monthly",
+          departmentId: "d1",
+          isOneTime: false,
+          isRecurring: true,
+          method: "fixed",
+          currentAmount: 4200,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.expenses).toHaveLength(1);
+    expect(snapshot.expenses[0]!.vendor).toBe("Amazon Web Services");
+    expect(snapshot.expenses[0]!.frequency).toBe("monthly");
+    expect(snapshot.expenses[0]!.method).toBe("fixed");
+    expect(snapshot.expenses[0]!.currentAmount).toBe(4200);
+    expect(snapshot.expenses[0]!.isRecurring).toBe(true);
+  });
+
+  it("applies sensible defaults for optional expenseLine fields", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-2",
+          accountId: "a1",
+          accountName: "Misc",
+          method: "fixed",
+          currentAmount: 100,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.expenses[0]!.vendor).toBeNull();
+    expect(snapshot.expenses[0]!.notes).toBeNull();
+    expect(snapshot.expenses[0]!.frequency).toBe("monthly");
+    expect(snapshot.expenses[0]!.departmentId).toBeNull();
+    expect(snapshot.expenses[0]!.isOneTime).toBe(false);
+    expect(snapshot.expenses[0]!.isRecurring).toBeNull();
+  });
+
   it("handles empty series maps", () => {
     const input = makeInput({
       totalRevenue: series({}),
@@ -234,6 +287,52 @@ describe("formatContextForPrompt", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
     expect(text).toContain("Monthly Cash Position");
+  });
+
+  it("omits Active expense lines section when expenses is empty", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).not.toContain("Active expense lines");
+  });
+
+  it("renders Active expense lines section sorted by currentAmount desc with annotations", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-small",
+          accountId: "a1",
+          accountName: "Coffee",
+          vendor: null,
+          frequency: "monthly",
+          isRecurring: false,
+          method: "fixed",
+          currentAmount: 50,
+        },
+        {
+          id: "exp-big",
+          accountId: "a1",
+          accountName: "AWS",
+          vendor: "Amazon",
+          frequency: "monthly",
+          isRecurring: true,
+          method: "fixed",
+          currentAmount: 9000,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Active expense lines");
+    // bigger one rendered first
+    const awsIdx = text.indexOf("AWS (fixed, monthly, recurring — Amazon): 9000");
+    const coffeeIdx = text.indexOf("Coffee (fixed, monthly, non-recurring): 50");
+    expect(awsIdx).toBeGreaterThan(-1);
+    expect(coffeeIdx).toBeGreaterThan(-1);
+    expect(awsIdx).toBeLessThan(coffeeIdx);
+    // The expense-line rows themselves emit raw numeric amounts (no currency symbol).
+    // Other sections (funding, P&L) intentionally use formatCurrency at the boundary.
+    expect(text).toContain(": 9000");
+    expect(text).toContain(": 50");
   });
 
   it("formats percentage-point metrics without double-multiplication", () => {
