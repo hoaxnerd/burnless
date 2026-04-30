@@ -22,6 +22,19 @@ import { D, dRound2 } from "./decimal";
 
 // ── Headcount calculation results ────────────────────────────────────────────
 
+export type BenefitsComponentKey =
+  | "statutoryEmployerContributionsCost"
+  | "insuranceBenefitsCost"
+  | "retirementContributionsCost"
+  | "otherBenefitsCost";
+
+export const BENEFITS_COMPONENT_KEYS: BenefitsComponentKey[] = [
+  "statutoryEmployerContributionsCost",
+  "insuranceBenefitsCost",
+  "retirementContributionsCost",
+  "otherBenefitsCost",
+];
+
 export interface HeadcountCostBreakdown {
   /** Total personnel cost per month (salary + benefits + bonus) */
   totalCost: MonthlySeries;
@@ -37,6 +50,13 @@ export interface HeadcountCostBreakdown {
   byDepartment: Map<string, MonthlySeries>;
   /** Headcount by department: dept ID -> monthly series */
   headcountByDepartment: Map<string, MonthlySeries>;
+  /**
+   * Benefits decomposed by the four generic components (umbrella §1.4).
+   * Components only sum to `benefitsCost` for plans that supply
+   * `benefitsBreakdown`; legacy `benefitsRate`-only plans contribute zeros
+   * across all four components and the total via the flat rate path.
+   */
+  benefitsByComponent: Map<BenefitsComponentKey, MonthlySeries>;
 }
 
 export type HeadcountEmployeeType = "full_time" | "part_time" | "contractor";
@@ -141,12 +161,20 @@ export function computeHeadcountPlanCost(
   plan: HeadcountPlanInput,
   periodStart: Date,
   periodEnd: Date
-): { salary: MonthlySeries; benefits: MonthlySeries; bonus: MonthlySeries; headcount: MonthlySeries } {
+): {
+  salary: MonthlySeries;
+  benefits: MonthlySeries;
+  bonus: MonthlySeries;
+  headcount: MonthlySeries;
+  benefitsByComponent: Map<BenefitsComponentKey, MonthlySeries>;
+} {
   const months = monthRange(periodStart, periodEnd);
   const salary: MonthlySeries = new Map();
   const benefits: MonthlySeries = new Map();
   const bonus: MonthlySeries = new Map();
   const headcount: MonthlySeries = new Map();
+  const benefitsByComponent = new Map<BenefitsComponentKey, MonthlySeries>();
+  for (const k of BENEFITS_COMPONENT_KEYS) benefitsByComponent.set(k, new Map());
 
   // Use cumulative rounding to prevent penny drift over the year.
   // Each month gets the difference between cumulative rounded targets,
@@ -155,6 +183,15 @@ export function computeHeadcountPlanCost(
   let cumulativeRoundedSalary = D(0);
   let cumulativeExactBenefits = D(0);
   let cumulativeRoundedBenefits = D(0);
+
+  // Per-component cumulative trackers (only populated when benefitsBreakdown is present).
+  const cumulativeExactByComponent = new Map<BenefitsComponentKey, ReturnType<typeof D>>();
+  const cumulativeRoundedByComponent = new Map<BenefitsComponentKey, ReturnType<typeof D>>();
+  for (const k of BENEFITS_COMPONENT_KEYS) {
+    cumulativeExactByComponent.set(k, D(0));
+    cumulativeRoundedByComponent.set(k, D(0));
+  }
+  const breakdown = plan.benefitsBreakdown;
 
   for (const month of months) {
     const key = monthKey(month);
@@ -167,6 +204,9 @@ export function computeHeadcountPlanCost(
       benefits.set(key, 0);
       bonus.set(key, bonusAmount);
       headcount.set(key, 0);
+      for (const k of BENEFITS_COMPONENT_KEYS) {
+        benefitsByComponent.get(k)!.set(key, 0);
+      }
       continue;
     }
 
@@ -189,9 +229,21 @@ export function computeHeadcountPlanCost(
     benefits.set(key, benefitsAmount);
     bonus.set(key, bonusAmount);
     headcount.set(key, dRound2(D(plan.count).mul(proration)));
+
+    // Per-component breakdown — only populated when an explicit breakdown is set.
+    for (const k of BENEFITS_COMPONENT_KEYS) {
+      const fraction = breakdown ? (breakdown[k] ?? 0) : 0;
+      const exactPrev = cumulativeExactByComponent.get(k)!;
+      const exactNext = exactPrev.plus(monthlySalary.mul(plan.count).mul(proration).mul(fraction));
+      cumulativeExactByComponent.set(k, exactNext);
+      const newRounded = dRound2(exactNext);
+      const amount = dRound2(D(newRounded).minus(cumulativeRoundedByComponent.get(k)!));
+      cumulativeRoundedByComponent.set(k, D(newRounded));
+      benefitsByComponent.get(k)!.set(key, amount);
+    }
   }
 
-  return { salary, benefits, bonus, headcount };
+  return { salary, benefits, bonus, headcount, benefitsByComponent };
 }
 
 /** Calculate total headcount costs across all plans. */
@@ -206,18 +258,22 @@ export function computeAllHeadcountCosts(
   let totalHeadcount: MonthlySeries = new Map();
   const byDepartment = new Map<string, MonthlySeries>();
   const headcountByDepartment = new Map<string, MonthlySeries>();
+  const totalBenefitsByComponent = new Map<BenefitsComponentKey, MonthlySeries>();
+  for (const k of BENEFITS_COMPONENT_KEYS) totalBenefitsByComponent.set(k, new Map());
 
   for (const plan of plans) {
-    const { salary, benefits, bonus, headcount } = computeHeadcountPlanCost(
-      plan,
-      periodStart,
-      periodEnd
-    );
+    const { salary, benefits, bonus, headcount, benefitsByComponent } =
+      computeHeadcountPlanCost(plan, periodStart, periodEnd);
 
     totalSalary = addSeries(totalSalary, salary);
     totalBenefits = addSeries(totalBenefits, benefits);
     totalBonus = addSeries(totalBonus, bonus);
     totalHeadcount = addSeries(totalHeadcount, headcount);
+
+    for (const k of BENEFITS_COMPONENT_KEYS) {
+      const acc = totalBenefitsByComponent.get(k)!;
+      totalBenefitsByComponent.set(k, addSeries(acc, benefitsByComponent.get(k)!));
+    }
 
     // Aggregate by department (salary + benefits + bonus)
     const deptTotal = addSeries(addSeries(salary, benefits), bonus);
@@ -244,6 +300,7 @@ export function computeAllHeadcountCosts(
     headcount: totalHeadcount,
     byDepartment,
     headcountByDepartment,
+    benefitsByComponent: totalBenefitsByComponent,
   };
 }
 

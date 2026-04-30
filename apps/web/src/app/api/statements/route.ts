@@ -164,7 +164,9 @@ export const GET = withErrorHandler(async (request: Request) => {
   }
 
   // Generate statements
-  const pnl = generateProfitAndLoss(accountDataList);
+  const pnl = generateProfitAndLoss(accountDataList, {
+    personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
+  });
   const cashFlow = generateCashFlow(accountDataList, 0, fundingInflows);
   const balanceSheet = generateBalanceSheet(accountDataList);
 

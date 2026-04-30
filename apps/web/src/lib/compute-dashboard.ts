@@ -280,7 +280,9 @@ export const computeDashboardData = cache(async function computeDashboardData(
     }
   }
 
-  const profitAndLoss = generateProfitAndLoss(accountDataList);
+  const profitAndLoss = generateProfitAndLoss(accountDataList, {
+    personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
+  });
   const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows);
 
   // Add derived balance sheet accounts so generateBalanceSheet has data.
