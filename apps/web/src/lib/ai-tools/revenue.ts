@@ -7,6 +7,10 @@ import { revenueStreams, fundingRounds, companies } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { formatCurrency, isValidCurrency } from "@burnless/types";
+import {
+  AddRevenueStreamSchema,
+  UpdateRevenueStreamSchema,
+} from "@burnless/ai";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   nameString,
@@ -18,11 +22,9 @@ import {
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-export const addRevenueStreamSchema = z.object({
-  name: nameString,
-  type: z.enum(["subscription", "one_time", "usage_based", "services"]),
-  parameters: z.record(z.unknown()).default({}),
-});
+// Canonical schemas — sourced from @burnless/ai (single source of truth)
+export const addRevenueStreamSchema = AddRevenueStreamSchema;
+export const updateRevenueStreamSchema = UpdateRevenueStreamSchema;
 
 export const addFundingRoundSchema = z.object({
   name: nameString,
@@ -32,13 +34,6 @@ export const addFundingRoundSchema = z.object({
   preMoneyValuation: financialAmount.optional().nullable(),
   dilutionPercent: percentFraction.optional().nullable(),
   isProjected: z.boolean().default(true),
-});
-
-export const updateRevenueStreamSchema = z.object({
-  id: idString,
-  name: nameString.optional(),
-  type: z.enum(["subscription", "one_time", "usage_based", "services"]).optional(),
-  parameters: z.record(z.unknown()).optional(),
 });
 
 export const deleteRevenueStreamSchema = z.object({
@@ -78,12 +73,18 @@ async function addRevenueStream(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const data = input as z.infer<typeof addRevenueStreamSchema>;
+  const parsed = addRevenueStreamSchema.safeParse(input);
+  if (!parsed.success) {
+    return JSON.stringify({ success: false, error: parsed.error.message });
+  }
+  const data = parsed.data;
 
   const row = await scenarioInsert("revenue_stream", revenueStreams, {
     companyId: context.companyId,
     name: data.name,
     type: data.type,
+    startDate: new Date(data.startDate),
+    endDate: data.endDate ? new Date(data.endDate) : null,
     parameters: data.parameters,
   }, context.scenarioId);
 
@@ -190,7 +191,11 @@ async function updateRevenueStream(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const data = input as z.infer<typeof updateRevenueStreamSchema>;
+  const parsed = updateRevenueStreamSchema.safeParse(input);
+  if (!parsed.success) {
+    return JSON.stringify({ success: false, error: parsed.error.message });
+  }
+  const data = parsed.data;
 
   // Verify ownership
   const [existing] = await db
@@ -204,6 +209,11 @@ async function updateRevenueStream(
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;
   if (data.type !== undefined) updates.type = data.type;
+  if (data.startDate !== undefined) updates.startDate = new Date(data.startDate);
+  // endDate is explicitly nullable — include it even when null (to allow clearing)
+  if ("endDate" in data && data.endDate !== undefined) {
+    updates.endDate = data.endDate ? new Date(data.endDate) : null;
+  }
   if (data.parameters !== undefined) updates.parameters = data.parameters;
 
   if (Object.keys(updates).length === 0) {

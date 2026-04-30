@@ -115,3 +115,18 @@ export type {
   InsightType,
   Insight,
 } from "./types";
+
+// Revenue tool schemas (canonical, single source of truth)
+export {
+  PricingTierSchema,
+  SubscriptionParamsSchema,
+  OneTimeParamsSchema,
+  UsageBasedParamsSchema,
+  ServicesParamsSchema,
+  MarketplaceParamsSchema,
+  EcommerceParamsSchema,
+  HardwareParamsSchema,
+  RevenueStreamTypeSchema,
+  AddRevenueStreamSchema,
+  UpdateRevenueStreamSchema,
+} from "./schemas/revenue";
