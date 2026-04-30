@@ -51,6 +51,8 @@ export interface PreviewTransaction {
   description: string | null;
   accountId: string;
   externalId: string;
+  vendor?: string | null;
+  notes?: string | null;
   isDuplicate?: boolean;
   suggestedCategory?: string;
   categoryConfidence?: number;
@@ -176,15 +178,46 @@ export const COLUMN_PATTERNS: Record<string, { patterns: RegExp[] }> = {
 
 /**
  * Returns the single amount column name when `mapping.amount` is a string;
- * returns `null` for the polymorphic `{ debit, credit }` shape (callers that
- * have not yet been migrated to handle the pair should treat null as
- * "amount not yet wired up" and fall through accordingly).
- *
- * TODO(Task 14): UI surfaces should render the debit/credit pair explicitly
- * instead of relying on this single-column shim.
+ * returns `null` for the polymorphic `{ debit, credit }` shape. UI surfaces
+ * that need to render a single column fall back to null; callers that need
+ * a numeric amount should use {@link resolveAmount} instead.
  */
 export function getAmountColumn(mapping: ColumnMapping): string | null {
   return typeof mapping.amount === "string" ? mapping.amount : null;
+}
+
+/**
+ * Parse a possibly-formatted money string into a number. Strips common
+ * currency glyphs / commas; treats parenthesized values as negative.
+ * Returns 0 for missing / unparseable input.
+ */
+export function parseAmountCell(raw: string | undefined | null): number {
+  if (!raw) return 0;
+  // Apply paren-as-negative BEFORE stripping parens out of other glyph removal.
+  const trimmed = raw.trim();
+  const negated = trimmed.replace(/^\((.+)\)$/, "-$1");
+  const cleaned = negated.replace(/[$,€£()]/g, "");
+  if (!cleaned) return 0;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Resolve a row's amount given the polymorphic `mapping.amount`:
+ *  - `string` → parse `row[col]`
+ *  - `{ debit, credit }` → parse both, return `credit - debit`
+ * Missing values yield 0.
+ */
+export function resolveAmount(
+  row: Record<string, string>,
+  amount: ColumnMapping["amount"],
+): number {
+  if (typeof amount === "string") {
+    return parseAmountCell(row[amount]);
+  }
+  const debit = parseAmountCell(row[amount.debit]);
+  const credit = parseAmountCell(row[amount.credit]);
+  return credit - debit;
 }
 
 /**
