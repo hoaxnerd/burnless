@@ -1,11 +1,15 @@
 /**
  * Revenue modeling engine — generates monthly revenue projections from revenue stream definitions.
  *
- * Supports 4 revenue types:
- * - subscription: recurring SaaS revenue with customer growth and churn
+ * Supports 7 revenue types:
+ * - subscription: recurring SaaS revenue with customer growth and churn; supports flat, per_seat,
+ *   and tiered pricing via PricingTier[]
  * - one_time: non-recurring revenue (product sales, setup fees)
- * - usage_based: consumption-based pricing
+ * - usage_based: consumption-based pricing; supports flat and tiered pricing via PricingTier[]
  * - services: time-based billing (consulting, professional services)
+ * - marketplace: GMV take-rate revenue
+ * - ecommerce: order-based retail revenue
+ * - hardware: unit-based product revenue with optional price decay
  *
  * All intermediate arithmetic uses Decimal.js for precision.
  */
@@ -26,7 +30,7 @@ import { D, dMul, dPow, dRound2 } from "./decimal";
 export interface SubscriptionParams {
   /** Starting number of customers */
   startingCustomers: number;
-  /** Monthly price per customer */
+  /** Monthly price per customer (used for flat pricing; overridden by tiers for per_seat/tiered) */
   monthlyPrice: number;
   /** New customers acquired per month */
   newCustomersPerMonth: number;
@@ -36,6 +40,12 @@ export interface SubscriptionParams {
   expansionRate?: number;
   /** Monthly price increase rate (e.g. 0.01 = 1%) */
   priceGrowthRate?: number;
+  /** Pricing model: flat (default), per_seat (tier lookup × seats), tiered (tier lookup by customers) */
+  pricingModel?: "flat" | "per_seat" | "tiered";
+  /** Number of seats per customer — required when pricingModel is "per_seat" */
+  seatsPerCustomer?: number;
+  /** Ordered tiers (ascending minUnits) — used by per_seat and tiered models */
+  tiers?: PricingTier[];
 }
 
 export interface OneTimeParams {
@@ -52,12 +62,23 @@ export interface UsageBasedParams {
   activeUsers: number;
   /** Average usage units per user per month */
   avgUsagePerUser: number;
-  /** Price per usage unit */
+  /** Price per usage unit (used for flat pricing; overridden by tiers for tiered model) */
   pricePerUnit: number;
   /** Monthly user growth rate */
   userGrowthRate?: number;
   /** Monthly usage growth rate per user */
   usageGrowthRate?: number;
+  /** Pricing model: flat (default) or tiered (tier lookup by total usage units) */
+  pricingModel?: "flat" | "tiered";
+  /** Ordered tiers (ascending minUnits) — used by tiered model */
+  tiers?: PricingTier[];
+}
+
+export interface PricingTier {
+  name: string;
+  minUnits: number;
+  maxUnits: number | null;
+  pricePerUnit: number;
 }
 
 export interface ServicesParams {
@@ -100,6 +121,18 @@ export interface HardwareParams {
   unitGrowthRate?: number;
   /** Monthly price-decay rate (negative for declining prices) */
   priceGrowthRate?: number;
+}
+
+// ── Tier helpers ─────────────────────────────────────────────────────────────
+
+/** Find the tier matching a given unit count. Tiers must be ascending by minUnits. */
+export function selectTier(tiers: PricingTier[], units: number): PricingTier | null {
+  for (const t of tiers) {
+    if (units >= t.minUnits && (t.maxUnits === null || units <= t.maxUnits)) {
+      return t;
+    }
+  }
+  return null;
 }
 
 // ── Revenue stream input ─────────────────────────────────────────────────────
@@ -260,8 +293,20 @@ export function computeSubscriptionDetail(
   let customers = D(startingCustomers);
   let pricePerCustomer = D(monthlyPrice);
 
+  // Per-seat mode: override pricePerCustomer each iteration via tier lookup × seats
+  const isPerSeat =
+    params.pricingModel === "per_seat" &&
+    Array.isArray(params.tiers) &&
+    params.seatsPerCustomer != null;
+
   for (let i = 0; i < months.length; i++) {
     const key = monthKey(months[i]!);
+
+    // Per-seat: resolve price from tier before this period's MRR math
+    if (isPerSeat) {
+      const tier = selectTier(params.tiers!, params.seatsPerCustomer!);
+      pricePerCustomer = D(tier?.pricePerUnit ?? 0).mul(params.seatsPerCustomer!);
+    }
 
     // Churn happens on existing customers
     const churnedCustomers = customers.mul(monthlyChurnRate);
@@ -363,7 +408,12 @@ function computeUsageRevenue(
   for (let i = 0; i < months.length; i++) {
     const users = D(activeUsers).mul(dPow(D(1).plus(params.userGrowthRate ?? 0), i));
     const usage = D(avgUsagePerUser).mul(dPow(D(1).plus(params.usageGrowthRate ?? 0), i));
-    series.set(monthKey(months[i]!), dRound2(users.mul(usage).mul(pricePerUnit)));
+    const totalUsage = dRound2(users.mul(usage));
+    const effectivePrice =
+      params.pricingModel === "tiered" && Array.isArray(params.tiers)
+        ? selectTier(params.tiers, totalUsage)?.pricePerUnit ?? 0
+        : pricePerUnit;
+    series.set(monthKey(months[i]!), dRound2(D(totalUsage).mul(effectivePrice)));
   }
 
   return series;
