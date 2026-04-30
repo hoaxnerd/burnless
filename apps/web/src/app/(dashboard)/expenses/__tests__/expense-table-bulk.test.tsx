@@ -55,6 +55,9 @@ const item = (id: string, accountId: string, name: string): ExpenseLineItem => (
   isOneTime: false,
   frequency: "monthly",
   monthlySeries: [{ month: "2026-04", value: 100 }],
+  vendor: null,
+  notes: null,
+  departmentId: null,
 });
 
 const lineItems = [

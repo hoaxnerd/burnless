@@ -726,10 +726,10 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
  * choice; otherwise, expose `null` so the form's "Auto-detect" option is
  * preselected.
  *
- * Note: `vendor`, `notes`, and `departmentId` are not currently surfaced by
- * the compute layer, so they default to `null`. When the user edits those
- * fields, the patch flows through cleanly because the form only ships
- * fields the user touched.
+ * `vendor`, `notes`, and `departmentId` are threaded through from the
+ * underlying forecast-line row so an edit that doesn't touch them re-PATCHes
+ * the same persisted values rather than nulling them out (Phase 1 §2.C
+ * data-loss guard).
  */
 function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
   return {
@@ -742,8 +742,8 @@ function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
     frequency: item.frequency,
     isOneTime: item.isOneTime,
     isRecurring: item.recurringSource === "user" ? item.isRecurring : null,
-    vendor: null,
-    notes: null,
-    departmentId: null,
+    vendor: item.vendor,
+    notes: item.notes,
+    departmentId: item.departmentId,
   };
 }

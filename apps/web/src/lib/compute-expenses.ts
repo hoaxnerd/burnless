@@ -58,6 +58,15 @@ export interface ExpenseLineItem {
   isOneTime: boolean;
   frequency: ExpenseFrequency;
   monthlySeries: { month: string; value: number }[];
+  /**
+   * Persisted descriptive fields surfaced from the underlying forecast-line row.
+   * Threaded through so the edit modal can prefill them — without this, an edit
+   * that didn't touch these fields would PATCH `null` and overwrite the stored
+   * values (Phase 1 §2.C data-loss guard).
+   */
+  vendor: string | null;
+  notes: string | null;
+  departmentId: string | null;
 }
 
 export interface SubcategoryBreakdown {
@@ -214,6 +223,12 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     // Anomaly: endDate-aware + frequency-aware (helpers honor both rules).
     const isAnomaly = shouldFlagAnomaly(ctx, currentMonth, prevAmount, currentAmount);
 
+    const fLineRow = fLine as {
+      vendor?: string | null;
+      notes?: string | null;
+      departmentId?: string | null;
+    };
+
     lineItems.push({
       id: fLine.id,
       accountId: account.id,
@@ -235,6 +250,9 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       isOneTime,
       frequency,
       monthlySeries: series,
+      vendor: fLineRow.vendor ?? null,
+      notes: fLineRow.notes ?? null,
+      departmentId: fLineRow.departmentId ?? null,
     });
   }
 
@@ -270,6 +288,10 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       isOneTime: false,
       frequency: "monthly",
       monthlySeries: seriesToArray(headcountCosts.totalCost),
+      // Synthetic personnel-cost row has no underlying forecast_lines record.
+      vendor: null,
+      notes: null,
+      departmentId: null,
     });
   }
 
