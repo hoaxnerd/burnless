@@ -84,6 +84,11 @@ export async function buildAiContext(
       date: new Date(f.date).toISOString().slice(0, 10),
       isProjected: f.isProjected,
     })),
+    // Phase 1 §1.5: per-headcount detail (Team Detail section in the prompt).
+    // Wire-up to the salary-changes / bonuses / equity-grants resolvers will
+    // land alongside the team UI; until then, pass an empty array so the
+    // contract is honoured but the section is suppressed.
+    headcountDetails: [],
   });
 
   const contextText = formatContextForPrompt(snapshot);

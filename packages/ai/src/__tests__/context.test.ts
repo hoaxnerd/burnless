@@ -51,6 +51,7 @@ function makeInput(overrides: Record<string, unknown> = {}) {
     fundingRounds: [
       { name: "Seed", type: "equity", amount: 1000000, date: "2025-06-01", isProjected: false },
     ],
+    headcountDetails: [],
     ...overrides,
   };
 }
@@ -110,6 +111,49 @@ describe("buildFinancialSnapshot", () => {
     expect(snapshot.fundingRounds).toHaveLength(1);
     expect(snapshot.fundingRounds[0]!.name).toBe("Seed");
     expect(snapshot.fundingRounds[0]!.amount).toBe(1000000);
+  });
+
+  it("includes headcountDetails field with empty default", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    expect(snapshot.headcountDetails).toEqual([]);
+  });
+
+  it("round-trips populated headcountDetails (Phase 1 §1.5)", () => {
+    const input = makeInput({
+      headcountDetails: [
+        {
+          id: "hc-1",
+          title: "Senior Engineer",
+          name: "Alice",
+          employeeType: "full_time",
+          count: 1,
+          salary: 150000,
+          salaryChanges: [
+            { effectiveDate: "2026-07-01", newSalary: 165000, reason: "annual review" },
+          ],
+          bonuses: [{ payoutMonth: "2026-12", amount: 10000, type: "performance" }],
+          equityGrants: [
+            {
+              grantDate: "2026-01-01",
+              shares: 10000,
+              grantType: "iso",
+              vestingSchedule: [
+                { type: "cliff", date: "2027-01-01", sharesVested: 2500 },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.headcountDetails).toHaveLength(1);
+    const hc = snapshot.headcountDetails[0]!;
+    expect(hc.title).toBe("Senior Engineer");
+    expect(hc.name).toBe("Alice");
+    expect(hc.salaryChanges).toHaveLength(1);
+    expect(hc.bonuses[0]!.amount).toBe(10000);
+    expect(hc.equityGrants[0]!.shares).toBe(10000);
+    expect(hc.equityGrants[0]!.vestingSchedule).toHaveLength(1);
   });
 
   it("passes through company metadata", () => {
@@ -194,6 +238,47 @@ describe("formatContextForPrompt", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
     expect(text).toContain("Base Case");
+  });
+
+  it("includes Team Detail section when headcountDetails populated", () => {
+    const input = makeInput({
+      headcountDetails: [
+        {
+          id: "hc-1",
+          title: "Senior Engineer",
+          name: "Alice",
+          employeeType: "full_time",
+          count: 1,
+          salary: 150000,
+          salaryChanges: [
+            { effectiveDate: "2026-07-01", newSalary: 165000, reason: "annual review" },
+          ],
+          bonuses: [{ payoutMonth: "2026-12", amount: 10000, type: "performance" }],
+          equityGrants: [
+            {
+              grantDate: "2026-01-01",
+              shares: 10000,
+              grantType: "iso",
+              vestingSchedule: [{ type: "cliff", date: "2027-01-01", sharesVested: 2500 }],
+            },
+          ],
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Team Detail");
+    expect(text).toContain("Senior Engineer");
+    expect(text).toContain("Alice");
+    expect(text).toContain("annual review");
+    expect(text).toContain("performance");
+    expect(text).toContain("ISO");
+  });
+
+  it("omits Team Detail section when headcountDetails empty", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).not.toContain("Team Detail");
   });
 
   it("includes departments", () => {
