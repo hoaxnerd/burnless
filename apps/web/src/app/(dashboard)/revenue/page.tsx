@@ -10,7 +10,7 @@ import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
 import { RevenueView } from "./revenue-view";
-import { AddRevenueStreamForm } from "./add-revenue-stream-form";
+import { AddRevenueStreamButton } from "./add-revenue-stream-button";
 import { SetupPrompt, ScenarioPrompt, RevenueEmptyState } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
@@ -46,7 +46,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
               Your growth story &mdash; MRR, streams, waterfall, and AI projections
             </p>
           </div>
-          <AddRevenueStreamForm scenarioId={scenarioId} />
+          <AddRevenueStreamButton scenarioId={scenarioId} />
         </div>
         <RevenueEmptyState />
       </div>
@@ -168,7 +168,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
             Your growth story &mdash; MRR, streams, waterfall, and AI projections
           </p>
         </div>
-        <AddRevenueStreamForm scenarioId={scenarioId} />
+        <AddRevenueStreamButton scenarioId={scenarioId} />
       </div>
 
       <RevenueView

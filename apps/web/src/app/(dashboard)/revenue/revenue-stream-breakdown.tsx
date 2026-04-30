@@ -5,12 +5,21 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard } from "@/components/ui";
+import { ChartCard, Modal } from "@/components/ui";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
-import { AddRevenueStreamForm, type EditRevenueStream } from "./add-revenue-stream-form";
+import { RevenueStreamForm, type RevenueStreamFormValues } from "./revenue-stream-form";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
+
+interface EditRevenueStream {
+  id: string;
+  name: string;
+  type: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  parameters: Record<string, unknown>;
+}
 
 interface RevenueStreamBreakdownProps {
   streams: StreamBreakdown[];
@@ -53,7 +62,29 @@ export function RevenueStreamBreakdown({
     handleRestore,
   } = useScenarioOverrides("revenue_stream");
 
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   if (streams.length === 0 && deletedEntities.length === 0) return null;
+
+  async function handleEditSubmit(values: RevenueStreamFormValues) {
+    if (!editingStream) return;
+    setEditSubmitting(true);
+    try {
+      const res = await apiFetch(`/api/revenue-streams/${editingStream.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to update revenue stream");
+      }
+      setEditingStream(null);
+      router.refresh();
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
 
   // Build stacked chart bars (max 6 streams, rest grouped)
   const topStreams = streamNames.slice(0, 6);
@@ -193,12 +224,25 @@ export function RevenueStreamBreakdown({
 
       {/* Edit modal (controlled) */}
       {editingStream && (
-        <AddRevenueStreamForm
-          scenarioId={scenarioId}
-          editStream={editingStream}
+        <Modal
           open={!!editingStream}
           onClose={() => setEditingStream(null)}
-        />
+          title={`Edit: ${editingStream.name}`}
+        >
+          <RevenueStreamForm
+            mode="edit"
+            initial={{
+              name: editingStream.name,
+              type: editingStream.type as RevenueStreamFormValues["type"],
+              startDate: editingStream.startDate ?? new Date().toISOString().slice(0, 10),
+              endDate: editingStream.endDate ?? null,
+              parameters: editingStream.parameters,
+            }}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setEditingStream(null)}
+            submitting={editSubmitting}
+          />
+        </Modal>
       )}
     </div>
   );
