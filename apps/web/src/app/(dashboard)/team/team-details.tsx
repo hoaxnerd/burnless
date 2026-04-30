@@ -25,11 +25,19 @@ interface TeamMember {
   id: string;
   departmentId: string;
   title: string;
+  name?: string | null;
+  employeeType?: "full_time" | "part_time" | "contractor";
   count: number;
   salary: number;
+  hourlyRate?: number | null;
+  hoursPerWeek?: number | null;
   benefitsRate: number;
   startDate: string;
   endDate?: string | null;
+  parameters?: { benefitsBreakdown?: BenefitsBreakdown } | null;
+  salaryChanges: SalaryChange[];
+  bonuses: Bonus[];
+  equityGrants: EquityGrant[];
 }
 
 interface DepartmentGroup {
@@ -43,12 +51,20 @@ interface PlannedHire {
   id: string;
   departmentId: string;
   title: string;
+  name?: string | null;
+  employeeType?: "full_time" | "part_time" | "contractor";
   department: string;
   salary: number;
+  hourlyRate?: number | null;
+  hoursPerWeek?: number | null;
   benefitsRate: number;
   startDate: string;
   endDate?: string | null;
   count: number;
+  parameters?: { benefitsBreakdown?: BenefitsBreakdown } | null;
+  salaryChanges: SalaryChange[];
+  bonuses: Bonus[];
+  equityGrants: EquityGrant[];
 }
 
 const deptColors = [
@@ -111,14 +127,16 @@ export function TeamRoster({
       id: member.id,
       departmentId: member.departmentId,
       title: member.title,
-      employeeType: "full_time",
+      name: member.name ?? null,
+      employeeType: member.employeeType ?? "full_time",
       count: member.count,
       salary: member.salary,
-      hourlyRate: null,
-      hoursPerWeek: null,
+      hourlyRate: member.hourlyRate ?? null,
+      hoursPerWeek: member.hoursPerWeek ?? null,
       startDate: member.startDate,
       endDate: member.endDate,
       benefitsRate: member.benefitsRate,
+      parameters: member.parameters ?? null,
     });
   }
 
@@ -296,24 +314,21 @@ export function TeamRoster({
                                 </div>
                               </div>
                               {isDetailsOpen && (
-                                // TODO(Phase 1 §2.E follow-up): fetch real salary/bonus/equity rows server-side
-                                // (see /api/headcount/[id]/{salary-changes,bonuses,equity-grants}). For now lists
-                                // start empty and let the user populate them via the inline forms below.
                                 <div className="px-3 pb-3 space-y-3 border-t border-surface-100 pt-3 mt-1">
                                   <SalaryChangesList
                                     headcountId={member.id}
                                     scenarioId={scenarioId}
-                                    changes={[] as SalaryChange[]}
+                                    changes={member.salaryChanges}
                                   />
                                   <BonusesList
                                     headcountId={member.id}
                                     scenarioId={scenarioId}
-                                    bonuses={[] as Bonus[]}
+                                    bonuses={member.bonuses}
                                   />
                                   <EquityGrantsList
                                     headcountId={member.id}
                                     scenarioId={scenarioId}
-                                    grants={[] as EquityGrant[]}
+                                    grants={member.equityGrants}
                                   />
                                 </div>
                               )}
@@ -389,14 +404,16 @@ export function PlannedHiresSection({
       id: hire.id,
       departmentId: hire.departmentId,
       title: hire.title,
-      employeeType: "full_time",
+      name: hire.name ?? null,
+      employeeType: hire.employeeType ?? "full_time",
       count: hire.count,
       salary: hire.salary,
-      hourlyRate: null,
-      hoursPerWeek: null,
+      hourlyRate: hire.hourlyRate ?? null,
+      hoursPerWeek: hire.hoursPerWeek ?? null,
       startDate: hire.startDate,
       endDate: hire.endDate,
       benefitsRate: hire.benefitsRate,
+      parameters: hire.parameters ?? null,
     });
   }
 

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getServerScenarioId, getHeadcountPlans, getDepartments } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getHeadcountPlans, getDepartments, getTeamChildEntitiesByHeadcount } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
@@ -11,6 +11,7 @@ import { formatCurrency } from "@burnless/types";
 import { TeamView } from "./team-view";
 import { HeadcountForm } from "./headcount-form";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
+import type { VestingMilestone } from "./vesting-schedule-editor";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 export default async function TeamPage() {
@@ -48,6 +49,12 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
     computeDashboardData(companyId, scenarioId),
   ]);
 
+  const childEntities = await getTeamChildEntitiesByHeadcount(
+    companyId,
+    scenarioId,
+    plans.map((p) => p.id),
+  );
+
   const deptMap = new Map(departments.map((d) => [d.id, d.name]));
 
   const now = new Date();
@@ -82,29 +89,87 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
       (sum, m) => sum + (Number(m.salary) * Number(m.count) * (1 + Number(m.benefitsRate))) / 12,
       0
     ),
-    members: members.map((m) => ({
-      id: m.id,
-      departmentId: m.departmentId,
-      title: m.title,
-      count: Number(m.count),
-      salary: Number(m.salary),
-      benefitsRate: Number(m.benefitsRate),
-      startDate: m.startDate.toISOString(),
-      endDate: m.endDate ? m.endDate.toISOString() : null,
-    })),
+    members: members.map((m) => {
+      const child = childEntities.get(m.id);
+      return {
+        id: m.id,
+        departmentId: m.departmentId,
+        title: m.title,
+        name: m.name ?? null,
+        employeeType: m.employeeType,
+        count: Number(m.count),
+        salary: Number(m.salary),
+        hourlyRate: m.hourlyRate == null ? null : Number(m.hourlyRate),
+        hoursPerWeek: m.hoursPerWeek == null ? null : Number(m.hoursPerWeek),
+        benefitsRate: Number(m.benefitsRate),
+        startDate: m.startDate.toISOString(),
+        endDate: m.endDate ? m.endDate.toISOString() : null,
+        parameters: (m.parameters ?? null) as { benefitsBreakdown?: BenefitsBreakdown } | null,
+        salaryChanges: (child?.salaryChanges ?? []).map((c) => ({
+          id: c.id,
+          effectiveDate: c.effectiveDate instanceof Date ? c.effectiveDate.toISOString() : String(c.effectiveDate),
+          newSalary: Number(c.newSalary),
+          reason: c.reason ?? null,
+        })),
+        bonuses: (child?.bonuses ?? []).map((b) => ({
+          id: b.id,
+          payoutMonth: b.payoutMonth instanceof Date ? b.payoutMonth.toISOString() : String(b.payoutMonth),
+          amount: Number(b.amount),
+          type: b.type,
+          notes: b.notes ?? null,
+        })),
+        equityGrants: (child?.equityGrants ?? []).map((g) => ({
+          id: g.id,
+          grantDate: g.grantDate instanceof Date ? g.grantDate.toISOString() : String(g.grantDate),
+          shares: Number(g.shares),
+          strikePrice: g.strikePrice == null ? null : Number(g.strikePrice),
+          grantType: g.grantType,
+          parameters: (g.parameters ?? null) as { vestingSchedule?: VestingMilestone[] } | null,
+        })),
+      };
+    }),
   }));
 
-  const plannedHiresData = plannedHires.map((h) => ({
-    id: h.id,
-    departmentId: h.departmentId,
-    title: h.title,
-    department: deptMap.get(h.departmentId) ?? "Other",
-    salary: Number(h.salary),
-    benefitsRate: Number(h.benefitsRate),
-    startDate: h.startDate.toISOString(),
-    endDate: h.endDate ? h.endDate.toISOString() : null,
-    count: Number(h.count),
-  }));
+  const plannedHiresData = plannedHires.map((h) => {
+    const child = childEntities.get(h.id);
+    return {
+      id: h.id,
+      departmentId: h.departmentId,
+      title: h.title,
+      name: h.name ?? null,
+      employeeType: h.employeeType,
+      department: deptMap.get(h.departmentId) ?? "Other",
+      salary: Number(h.salary),
+      hourlyRate: h.hourlyRate == null ? null : Number(h.hourlyRate),
+      hoursPerWeek: h.hoursPerWeek == null ? null : Number(h.hoursPerWeek),
+      benefitsRate: Number(h.benefitsRate),
+      startDate: h.startDate.toISOString(),
+      endDate: h.endDate ? h.endDate.toISOString() : null,
+      count: Number(h.count),
+      parameters: (h.parameters ?? null) as { benefitsBreakdown?: BenefitsBreakdown } | null,
+      salaryChanges: (child?.salaryChanges ?? []).map((c) => ({
+        id: c.id,
+        effectiveDate: c.effectiveDate instanceof Date ? c.effectiveDate.toISOString() : String(c.effectiveDate),
+        newSalary: Number(c.newSalary),
+        reason: c.reason ?? null,
+      })),
+      bonuses: (child?.bonuses ?? []).map((b) => ({
+        id: b.id,
+        payoutMonth: b.payoutMonth instanceof Date ? b.payoutMonth.toISOString() : String(b.payoutMonth),
+        amount: Number(b.amount),
+        type: b.type,
+        notes: b.notes ?? null,
+      })),
+      equityGrants: (child?.equityGrants ?? []).map((g) => ({
+        id: g.id,
+        grantDate: g.grantDate instanceof Date ? g.grantDate.toISOString() : String(g.grantDate),
+        shares: Number(g.shares),
+        strikePrice: g.strikePrice == null ? null : Number(g.strikePrice),
+        grantType: g.grantType,
+        parameters: (g.parameters ?? null) as { vestingSchedule?: VestingMilestone[] } | null,
+      })),
+    };
+  });
 
   const now2 = new Date();
   const prevMonth = monthKey(new Date(now2.getFullYear(), now2.getMonth() - 1, 1));
