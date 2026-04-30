@@ -1474,6 +1474,9 @@ export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
   "import_batch",
   "department",
   "metric",
+  "salary_change",
+  "bonus",
+  "equity_grant",
 ]);
 
 export const financialAuditLogs = pgTable(

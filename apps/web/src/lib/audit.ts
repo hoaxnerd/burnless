@@ -22,7 +22,10 @@ export type AuditEntityType =
   | "funding_round"
   | "import_batch"
   | "department"
-  | "metric";
+  | "metric"
+  | "salary_change"
+  | "bonus"
+  | "equity_grant";
 
 export type AuditAction = "create" | "update" | "delete" | "import" | "rollback";
 

@@ -380,7 +380,7 @@ async function seedTestAccounts() {
     companyId: PRO.company,
     departmentId: PRO.deptEngineering,
     title: "Software Engineer",
-    count: 3,
+    count: "3.00",
     salary: "120000.00",
     startDate: monthDate(2025, 6),
     benefitsRate: "0.2000",
@@ -600,8 +600,8 @@ async function seedTestAccounts() {
 
   console.log("    → Headcount plans");
   for (const hc of [
-    { id: TEAM.hcEngineers, companyId: TEAM.company, departmentId: TEAM.deptEngineering, title: "Software Engineer", count: 8, salary: "140000.00", startDate: monthDate(2025, 1), benefitsRate: "0.2200" },
-    { id: TEAM.hcSales, companyId: TEAM.company, departmentId: TEAM.deptSales, title: "Account Executive", count: 3, salary: "100000.00", startDate: monthDate(2025, 6), benefitsRate: "0.2000" },
+    { id: TEAM.hcEngineers, companyId: TEAM.company, departmentId: TEAM.deptEngineering, title: "Software Engineer", count: "8.00", salary: "140000.00", startDate: monthDate(2025, 1), benefitsRate: "0.2200" },
+    { id: TEAM.hcSales, companyId: TEAM.company, departmentId: TEAM.deptSales, title: "Account Executive", count: "3.00", salary: "100000.00", startDate: monthDate(2025, 6), benefitsRate: "0.2000" },
   ]) {
     await db.insert(schema.headcountPlans).values(hc).onConflictDoNothing();
   }

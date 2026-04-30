@@ -129,14 +129,16 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     id: hp.id,
     departmentId: hp.departmentId,
     title: hp.title,
-    employeeType: "full_time",
-    count: hp.count,
+    name: hp.name ?? null,
+    employeeType: hp.employeeType,
+    count: Number(hp.count),
     salary: Number(hp.salary),
-    hourlyRate: null,
-    hoursPerWeek: null,
+    hourlyRate: hp.hourlyRate == null ? null : Number(hp.hourlyRate),
+    hoursPerWeek: hp.hoursPerWeek == null ? null : Number(hp.hoursPerWeek),
     startDate: new Date(hp.startDate),
     endDate: hp.endDate ? new Date(hp.endDate) : null,
     benefitsRate: Number(hp.benefitsRate),
+    benefitsBreakdown: (hp.parameters as { benefitsBreakdown?: HeadcountPlanInput["benefitsBreakdown"] } | null)?.benefitsBreakdown,
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 

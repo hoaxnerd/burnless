@@ -49,9 +49,9 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
   const currentTeam = plans.filter((p) => p.startDate <= now);
   const plannedHires = plans.filter((p) => p.startDate > now);
 
-  const totalHeadcount = currentTeam.reduce((sum, p) => sum + p.count, 0);
+  const totalHeadcount = currentTeam.reduce((sum, p) => sum + Number(p.count), 0);
   const totalMonthlyCost = currentTeam.reduce(
-    (sum, p) => sum + (Number(p.salary) * p.count * (1 + Number(p.benefitsRate))) / 12,
+    (sum, p) => sum + (Number(p.salary) * Number(p.count) * (1 + Number(p.benefitsRate))) / 12,
     0
   );
 
@@ -69,16 +69,16 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
 
   const departmentBreakdown = Array.from(deptGroups.entries()).map(([dept, members]) => ({
     department: dept,
-    headcount: members.reduce((sum, m) => sum + m.count, 0),
+    headcount: members.reduce((sum, m) => sum + Number(m.count), 0),
     monthlyCost: members.reduce(
-      (sum, m) => sum + (Number(m.salary) * m.count * (1 + Number(m.benefitsRate))) / 12,
+      (sum, m) => sum + (Number(m.salary) * Number(m.count) * (1 + Number(m.benefitsRate))) / 12,
       0
     ),
     members: members.map((m) => ({
       id: m.id,
       departmentId: m.departmentId,
       title: m.title,
-      count: m.count,
+      count: Number(m.count),
       salary: Number(m.salary),
       benefitsRate: Number(m.benefitsRate),
       startDate: m.startDate.toISOString(),
@@ -95,7 +95,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
     benefitsRate: Number(h.benefitsRate),
     startDate: h.startDate.toISOString(),
     endDate: h.endDate ? h.endDate.toISOString() : null,
-    count: h.count,
+    count: Number(h.count),
   }));
 
   const now2 = new Date();
@@ -113,7 +113,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
       content: { type: "metric", slug: "totalHeadcount" },
       label: "Total Headcount",
       value: String(totalHeadcount),
-      description: plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + h.count, 0)} planned` : undefined,
+      description: plannedHires.length > 0 ? `+${plannedHires.reduce((s, h) => s + Number(h.count), 0)} planned` : undefined,
       hasData: totalHeadcount > 0,
       metricStyle: { icon: "Users", color: "blue", href: "/team" },
     },
@@ -166,7 +166,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName }: { companyId?
 
       <TeamView
         totalHeadcount={totalHeadcount}
-        plannedCount={plannedHires.reduce((s, h) => s + h.count, 0)}
+        plannedCount={plannedHires.reduce((s, h) => s + Number(h.count), 0)}
         totalMonthlyCost={totalMonthlyCost}
         costPercentOfBurn={costPercentOfBurn}
         revPerEmployee={revPerEmployee}
