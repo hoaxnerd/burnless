@@ -193,6 +193,32 @@ export const computeDashboardData = cache(async function computeDashboardData(
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
   const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
+  // Expense-mix component series (Phase 1 §1.5 MANDATE) — per-month sums of
+  // forecast-line values bucketed by method / isOneTime. These feed the
+  // dashboard slugs `fixedExpenses` / `variableExpenses` /
+  // `percentageDrivenExpenses` / `oneTimeExpenses` via extractMetricValue.
+  let fixedExpensesSeries: MonthlySeries = new Map();
+  let variableExpensesSeries: MonthlySeries = new Map();
+  let percentageDrivenExpensesSeries: MonthlySeries = new Map();
+  let oneTimeExpensesSeries: MonthlySeries = new Map();
+  for (const fLine of fLines) {
+    const account = accountMap.get(fLine.accountId);
+    if (!account) continue;
+    if (account.category !== "operating_expense" && account.category !== "cogs") continue;
+    const values = forecastResults.get(fLine.id);
+    if (!values) continue;
+    if (fLine.method === "fixed") {
+      fixedExpensesSeries = addSeries(fixedExpensesSeries, values);
+    } else if (fLine.method === "growth_rate" || fLine.method === "per_unit") {
+      variableExpensesSeries = addSeries(variableExpensesSeries, values);
+    } else if (fLine.method === "percentage_of" || fLine.method === "custom_formula") {
+      percentageDrivenExpensesSeries = addSeries(percentageDrivenExpensesSeries, values);
+    }
+    if ((fLine as { isOneTime?: boolean }).isOneTime) {
+      oneTimeExpensesSeries = addSeries(oneTimeExpensesSeries, values);
+    }
+  }
+
   // Cash position — only include funding received on or before period start;
   // future/projected rounds are added when their month arrives
   const startingCash = funding
@@ -225,6 +251,23 @@ export const computeDashboardData = cache(async function computeDashboardData(
     headcount: headcountCosts.headcount,
   };
   const metrics = computeAllMetrics(metricsInput);
+
+  // Surface non-ComputedMetrics series via slug so build-slot-metrics /
+  // extractMetricValue can resolve them. The four expense-mix component slugs
+  // come from forecast-line bucketing above; totalOpex is the sum series we
+  // computed for the dashboard. Attached as Array<{month, value}> to match the
+  // shape extractMetricValue expects (see metric-registry.ts).
+  const attach = (slug: string, series: MonthlySeries) => {
+    (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug] =
+      Array.from(series.entries())
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([month, value]) => ({ month, value }));
+  };
+  attach("totalOpex", totalOpex);
+  attach("fixedExpenses", fixedExpensesSeries);
+  attach("variableExpenses", variableExpensesSeries);
+  attach("percentageDrivenExpenses", percentageDrivenExpensesSeries);
+  attach("oneTimeExpenses", oneTimeExpensesSeries);
 
   // Financial statements — forecasts for accounts with forecast lines, actuals for the rest
   const accountDataList: AccountData[] = [];
