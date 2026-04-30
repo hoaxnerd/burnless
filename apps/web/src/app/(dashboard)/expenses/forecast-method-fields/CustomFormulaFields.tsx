@@ -8,7 +8,7 @@
  * user type free-form JSON and parse on blur, surfacing the error inline.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface CustomFormulaParams {
   expression: string;
@@ -38,14 +38,11 @@ export function CustomFormulaFields({
   onChange,
   disabled = false,
 }: CustomFormulaFieldsProps) {
+  // Edit buffer for the variables JSON; committed to parent on blur.
+  // Method-switch in the parent form unmounts this component, so we don't
+  // need a resync effect — initial state captures whatever params arrive.
   const [varsText, setVarsText] = useState<string>(() => stringifyVars(params.variables));
   const [varsError, setVarsError] = useState<string | null>(null);
-
-  // Re-sync when params change externally (e.g., method-switch reset).
-  useEffect(() => {
-    setVarsText(stringifyVars(params.variables));
-    setVarsError(null);
-  }, [params.variables]);
 
   function commitVars(text: string) {
     if (text.trim() === "") {
