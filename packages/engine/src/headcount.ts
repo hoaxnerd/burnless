@@ -58,6 +58,30 @@ export interface HeadcountPlanInput {
     retirementContributionsCost: number;
     otherBenefitsCost: number;
   }>;
+  salaryChanges?: SalaryChange[];
+}
+
+export interface SalaryChange {
+  effectiveDate: Date;
+  newSalary: number; // annual
+}
+
+/** Resolve the active annual salary for a given month, applying any salary changes whose effective date is on or before the month-end. */
+export function applySalaryChanges(
+  baseSalary: number,
+  changes: SalaryChange[],
+  month: Date,
+): number {
+  const sorted = [...changes].sort(
+    (a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime(),
+  );
+  let salary = baseSalary;
+  const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  for (const c of sorted) {
+    if (c.effectiveDate <= monthEnd) salary = c.newSalary;
+    else break;
+  }
+  return salary;
 }
 
 // ── Core headcount functions ─────────────────────────────────────────────────
@@ -127,7 +151,8 @@ export function computeHeadcountPlanCost(
 
     const proration = proratedFraction(month, plan.startDate, plan.endDate);
 
-    const monthlySalary = monthlySalaryFor(plan, plan.salary);
+    const resolvedSalary = applySalaryChanges(plan.salary, plan.salaryChanges ?? [], month);
+    const monthlySalary = monthlySalaryFor(plan, resolvedSalary);
 
     cumulativeExactSalary = cumulativeExactSalary.plus(monthlySalary.mul(plan.count).mul(proration));
     const newRoundedSalary = dRound2(cumulativeExactSalary);
