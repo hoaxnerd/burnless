@@ -153,6 +153,12 @@ export const aiWriteModeEnum = pgEnum("ai_write_mode", [
   "read_only",
 ]);
 
+export const headcountEmployeeTypeEnum = pgEnum("headcount_employee_type", [
+  "full_time",
+  "part_time",
+  "contractor",
+]);
+
 // ── Auth Tables (Auth.js compatible) ──────────────────────────────────────────
 
 export const users = pgTable("users", {
@@ -252,6 +258,7 @@ export const companies = pgTable("companies", {
   billingCustomerId: text("billing_customer_id"),
   billingSubscriptionId: text("billing_subscription_id"),
   billingPlan: text("billing_plan").default("free"),
+  benefitsRates: jsonb("benefits_rates").notNull().default({}),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()
@@ -543,13 +550,22 @@ export const headcountPlans = pgTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    count: integer("count").notNull().default(1),
+    name: text("name"),
+    employeeType: headcountEmployeeTypeEnum("employee_type")
+      .notNull()
+      .default("full_time"),
+    count: numeric("count", { precision: 5, scale: 2 })
+      .notNull()
+      .default("1.00"),
     salary: numeric("salary", { precision: 12, scale: 2 }).notNull(),
+    hourlyRate: numeric("hourly_rate", { precision: 12, scale: 2 }),
+    hoursPerWeek: numeric("hours_per_week", { precision: 5, scale: 2 }),
     startDate: timestamp("start_date", { mode: "date" }).notNull(),
     endDate: timestamp("end_date", { mode: "date" }),
     benefitsRate: numeric("benefits_rate", { precision: 5, scale: 4 })
       .notNull()
       .default("0.20"),
+    parameters: jsonb("parameters").notNull().default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
