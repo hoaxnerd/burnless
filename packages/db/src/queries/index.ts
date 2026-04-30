@@ -42,3 +42,6 @@ export {
 export { promoteScenario } from "./scenario-promotion";
 
 export { hasFinancialData } from "./company-financial-data";
+
+export { SCENARIO_ENTITY_TYPES } from "./entity-types";
+export type { ScenarioEntityType } from "./entity-types";

@@ -10,6 +10,9 @@ import {
   fundingRounds,
   departments,
   financialAccounts,
+  salaryChanges,
+  bonuses,
+  equityGrants,
 } from "../schema";
 
 // Map entity_type strings to Drizzle table references
@@ -21,6 +24,9 @@ function getTableForEntityType(entityType: string) {
     funding_round: fundingRounds,
     department: departments,
     financial_account: financialAccounts,
+    salary_change: salaryChanges,
+    bonus: bonuses,
+    equity_grant: equityGrants,
   };
   const table = map[entityType];
   if (!table) throw new Error(`Unknown entity type: ${entityType}`);
