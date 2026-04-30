@@ -45,3 +45,30 @@ export { hasFinancialData } from "./company-financial-data";
 
 export { SCENARIO_ENTITY_TYPES } from "./entity-types";
 export type { ScenarioEntityType } from "./entity-types";
+
+export {
+  listSalaryChanges,
+  listResolvedSalaryChanges,
+  createSalaryChange,
+  updateSalaryChange,
+  removeSalaryChange,
+} from "./salary-changes";
+export type { SalaryChange, NewSalaryChange } from "./salary-changes";
+
+export {
+  listBonuses,
+  listResolvedBonuses,
+  createBonus,
+  updateBonus,
+  removeBonus,
+} from "./bonuses";
+export type { Bonus, NewBonus } from "./bonuses";
+
+export {
+  listEquityGrants,
+  listResolvedEquityGrants,
+  createEquityGrant,
+  updateEquityGrant,
+  removeEquityGrant,
+} from "./equity-grants";
+export type { EquityGrant, NewEquityGrant } from "./equity-grants";
