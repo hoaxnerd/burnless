@@ -122,6 +122,8 @@ export const computeDashboardData = cache(async function computeDashboardData(
     name: rs.name,
     type: rs.type,
     parameters: (rs.parameters ?? {}) as Record<string, unknown>,
+    startDate: rs.startDate,
+    endDate: rs.endDate,
   }));
   const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
 

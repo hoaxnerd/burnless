@@ -27,7 +27,7 @@ describe("buildRevenueStreamParams → computeRevenueStream", () => {
       monthlyChurnRate: "5", // UI enters percentage
     });
     const series = computeRevenueStream(
-      { id: "s", name: "s", type: "subscription", parameters: params },
+      { id: "s", name: "s", type: "subscription", parameters: params, startDate: new Date("2026-01-01"), endDate: null },
       start,
       end,
     );
@@ -50,7 +50,7 @@ describe("buildRevenueStreamParams → computeRevenueStream", () => {
       monthlyHours: "160",
     });
     const series = computeRevenueStream(
-      { id: "s", name: "s", type: "services", parameters: params },
+      { id: "s", name: "s", type: "services", parameters: params, startDate: new Date("2026-01-01"), endDate: null },
       start,
       end,
     );
@@ -73,7 +73,7 @@ describe("buildRevenueStreamParams → computeRevenueStream", () => {
       monthlyUnits: "50",
     });
     const series = computeRevenueStream(
-      { id: "s", name: "s", type: "one_time", parameters: params },
+      { id: "s", name: "s", type: "one_time", parameters: params, startDate: new Date("2026-01-01"), endDate: null },
       start,
       end,
     );
@@ -101,7 +101,7 @@ describe("buildRevenueStreamParams → computeRevenueStream", () => {
       expectedUnits: "100000",
     });
     const series = computeRevenueStream(
-      { id: "s", name: "s", type: "usage_based", parameters: params },
+      { id: "s", name: "s", type: "usage_based", parameters: params, startDate: new Date("2026-01-01"), endDate: null },
       start,
       end,
     );
