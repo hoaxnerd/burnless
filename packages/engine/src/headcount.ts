@@ -246,3 +246,44 @@ export function computeAllHeadcountCosts(
     headcountByDepartment,
   };
 }
+
+// ── Equity grant vesting ────────────────────────────────────────────────────
+
+export type VestingMilestone = {
+  type: "cliff" | "monthly" | "quarterly" | "annual" | "milestone";
+  date: Date;
+  sharesVested: number;
+};
+
+export interface EquityGrantInput {
+  id: string;
+  headcountId: string;
+  grantDate: Date;
+  shares: number;
+  vestingSchedule: VestingMilestone[];
+}
+
+/** Cumulative-shares-vested time series for a single equity grant.
+ *
+ *  For each month in [periodStart, periodEnd], returns the cumulative number
+ *  of shares vested as of that month-end. Milestones are summed in date order
+ *  with no proration — a milestone vests fully on/after its date. */
+export function computeVestedSharesSeries(
+  grant: EquityGrantInput,
+  periodStart: Date,
+  periodEnd: Date,
+): MonthlySeries {
+  const months = monthRange(periodStart, periodEnd);
+  const series: MonthlySeries = new Map();
+  const sorted = [...grant.vestingSchedule].sort(
+    (a, b) => a.date.getTime() - b.date.getTime(),
+  );
+  for (const m of months) {
+    const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    const cumulative = sorted
+      .filter((v) => v.date <= monthEnd)
+      .reduce((s, v) => s + v.sharesVested, 0);
+    series.set(monthKey(m), cumulative);
+  }
+  return series;
+}
