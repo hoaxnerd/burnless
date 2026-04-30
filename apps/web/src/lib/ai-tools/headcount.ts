@@ -12,7 +12,11 @@ import {
   nameString,
   idString,
   headcount,
+  headcountFte,
   salaryAmount,
+  hourlyRate,
+  hoursPerWeek,
+  employeeType,
   dateString,
   optionalDate,
   benefitsRate,
@@ -20,24 +24,47 @@ import {
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
+const benefitsBreakdownSchema = z.object({
+  statutoryEmployerContributionsCost: z.number().min(0).max(1).optional(),
+  insuranceBenefitsCost: z.number().min(0).max(1).optional(),
+  retirementContributionsCost: z.number().min(0).max(1).optional(),
+  otherBenefitsCost: z.number().min(0).max(1).optional(),
+});
+
+const headcountParametersSchema = z
+  .object({
+    benefitsBreakdown: benefitsBreakdownSchema.optional(),
+  })
+  .passthrough();
+
 export const addHeadcountSchema = z.object({
   departmentId: idString,
   title: nameString,
-  count: headcount,
+  name: z.string().nullable().optional(),
+  employeeType: employeeType.optional(),
+  count: headcountFte.optional().default(1),
   salary: salaryAmount,
+  hourlyRate: hourlyRate,
+  hoursPerWeek: hoursPerWeek,
   startDate: dateString,
   endDate: optionalDate,
   benefitsRate: benefitsRate,
+  parameters: headcountParametersSchema.optional(),
 });
 
 export const updateHeadcountSchema = z.object({
   id: idString,
   title: nameString.optional(),
-  count: headcount.optional(),
+  name: z.string().nullable().optional(),
+  employeeType: employeeType.optional(),
+  count: headcountFte.optional(),
   salary: salaryAmount.optional(),
+  hourlyRate: hourlyRate,
+  hoursPerWeek: hoursPerWeek,
   startDate: dateString.optional(),
   endDate: optionalDate,
   benefitsRate: benefitsRate.optional(),
+  parameters: headcountParametersSchema.optional(),
   departmentId: idString.optional(),
 });
 
@@ -60,6 +87,13 @@ export const deleteDepartmentSchema = z.object({
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
+/** Convert a numeric Zod-validated value to the string Drizzle expects for `numeric` columns. */
+function num(v: number | null | undefined, decimals = 2): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  return v.toFixed(decimals);
+}
+
 async function addHeadcount(
   input: Record<string, unknown>,
   context: ToolContext
@@ -74,23 +108,37 @@ async function addHeadcount(
   const currency = company?.currency && isValidCurrency(company.currency) ? company.currency : "USD";
   const locale = company?.locale ?? undefined;
 
-  const row = await scenarioInsert("headcount_plan", headcountPlans, {
+  const insertValues: Record<string, unknown> = {
     companyId: context.companyId,
     departmentId: data.departmentId,
     title: data.title,
-    count: data.count,
-    salary: String(data.salary),
+    salary: num(data.salary)!,
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
-    benefitsRate: String(data.benefitsRate),
-  }, context.scenarioId);
+    benefitsRate: num(data.benefitsRate)!,
+  };
 
-  const totalCost = data.count * data.salary * (1 + data.benefitsRate);
+  if (data.name !== undefined) insertValues.name = data.name;
+  if (data.employeeType !== undefined) insertValues.employeeType = data.employeeType;
+  if (data.count !== undefined) insertValues.count = num(data.count)!;
+  if (data.hourlyRate !== undefined) insertValues.hourlyRate = num(data.hourlyRate);
+  if (data.hoursPerWeek !== undefined) insertValues.hoursPerWeek = num(data.hoursPerWeek);
+  if (data.parameters !== undefined) insertValues.parameters = data.parameters;
+
+  const row = await scenarioInsert(
+    "headcount_plan",
+    headcountPlans,
+    insertValues,
+    context.scenarioId
+  );
+
+  const fteCount = data.count ?? 1;
+  const totalCost = fteCount * data.salary * (1 + data.benefitsRate);
 
   return JSON.stringify({
     success: true,
     headcountPlanId: row!.id,
-    message: `Added ${data.count}x ${data.title} at ${formatCurrency(data.salary, currency, locale)}/year each. Total annual cost: ${formatCurrency(totalCost, currency, locale)} (including benefits).`,
+    message: `Added ${fteCount}x ${data.title} at ${formatCurrency(data.salary, currency, locale)}/year each. Total annual cost: ${formatCurrency(totalCost, currency, locale)} (including benefits).`,
   });
 }
 
@@ -120,7 +168,12 @@ async function updateHeadcount(
 
   // Verify ownership
   const [existing] = await db
-    .select({ id: headcountPlans.id, title: headcountPlans.title, companyId: headcountPlans.companyId })
+    .select({
+      id: headcountPlans.id,
+      title: headcountPlans.title,
+      companyId: headcountPlans.companyId,
+      parameters: headcountPlans.parameters,
+    })
     .from(headcountPlans)
     .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, context.companyId)));
   if (!existing) {
@@ -129,12 +182,33 @@ async function updateHeadcount(
 
   const updates: Record<string, unknown> = {};
   if (data.title !== undefined) updates.title = data.title;
-  if (data.count !== undefined) updates.count = data.count;
-  if (data.salary !== undefined) updates.salary = String(data.salary);
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.employeeType !== undefined) updates.employeeType = data.employeeType;
+  if (data.count !== undefined) updates.count = num(data.count);
+  if (data.salary !== undefined) updates.salary = num(data.salary);
+  if (data.hourlyRate !== undefined) updates.hourlyRate = num(data.hourlyRate);
+  if (data.hoursPerWeek !== undefined) updates.hoursPerWeek = num(data.hoursPerWeek);
   if (data.startDate !== undefined) updates.startDate = new Date(data.startDate);
   if (data.endDate !== undefined) updates.endDate = data.endDate ? new Date(data.endDate) : null;
-  if (data.benefitsRate !== undefined) updates.benefitsRate = String(data.benefitsRate);
+  if (data.benefitsRate !== undefined) updates.benefitsRate = num(data.benefitsRate);
   if (data.departmentId !== undefined) updates.departmentId = data.departmentId;
+
+  if (data.parameters !== undefined) {
+    // Deep-merge benefitsBreakdown manually; scenarioUpdate's mergeChanges only
+    // does shallow-merge of `parameters` keys, which would clobber sibling keys
+    // inside benefitsBreakdown (e.g. setting only insuranceBenefitsCost would
+    // wipe statutoryEmployerContributionsCost).
+    const current = (existing.parameters ?? {}) as Record<string, unknown>;
+    const next: Record<string, unknown> = { ...current };
+    if (data.parameters.benefitsBreakdown) {
+      const currentBreakdown = (current.benefitsBreakdown ?? {}) as Record<string, unknown>;
+      next.benefitsBreakdown = { ...currentBreakdown, ...data.parameters.benefitsBreakdown };
+    }
+    for (const [k, v] of Object.entries(data.parameters)) {
+      if (k !== "benefitsBreakdown") next[k] = v;
+    }
+    updates.parameters = next;
+  }
 
   if (Object.keys(updates).length === 0) {
     return JSON.stringify({ success: false, error: "No fields to update" });
@@ -238,3 +312,6 @@ export const headcountHandlers: Record<string, ToolHandler> = {
   update_department: updateDepartment,
   delete_department: deleteDepartment,
 };
+
+// `headcount` is exported for back-compat; not used here directly.
+void headcount;

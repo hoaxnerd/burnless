@@ -64,81 +64,113 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "add_headcount",
     description:
-      "Add a headcount plan entry to the current scenario — plan to hire a role with salary and start date. Automatically creates personnel cost forecasts.",
+      "Add a headcount plan entry to the current scenario. Canonical engine fields: title, name (individual hire name), employeeType (full_time | part_time | contractor), count (FTE — supports fractions like 0.5), salary (annual), hourlyRate (for contractors / part-time hourly), hoursPerWeek (40 = full-time baseline), startDate, endDate, departmentId, benefitsRate (legacy fallback), and parameters.benefitsBreakdown with the four fractions { statutoryEmployerContributionsCost, insuranceBenefitsCost, retirementContributionsCost, otherBenefitsCost }.",
     inputSchema: {
       type: "object",
       properties: {
-        departmentId: {
+        departmentId: { type: "string", description: "Department ID (from context)" },
+        title: { type: "string", description: "Job title (e.g., 'Senior Engineer', 'Product Designer')" },
+        name: { type: ["string", "null"], description: "Individual hire name (null to clear)" },
+        employeeType: {
           type: "string",
-          description: "Department ID (from context)",
-        },
-        title: {
-          type: "string",
-          description: "Job title (e.g., 'Senior Engineer', 'Product Designer')",
+          enum: ["full_time", "part_time", "contractor"],
+          description: "Employee type. Defaults to full_time.",
         },
         count: {
           type: "number",
-          description: "Number of people to hire for this role",
+          description: "FTE count, supports fractions (0.5 = half-time). Defaults to 1.",
         },
-        salary: {
-          type: "number",
-          description: "Annual salary per person",
+        salary: { type: "number", description: "Annual salary per person" },
+        hourlyRate: {
+          type: ["number", "null"],
+          description: "Hourly rate for contractors or hourly part-time",
         },
-        startDate: {
-          type: "string",
-          description: "Hire start date (YYYY-MM-DD)",
+        hoursPerWeek: {
+          type: ["number", "null"],
+          description: "Hours per week (40 = full-time baseline)",
         },
+        startDate: { type: "string", description: "Hire start date (YYYY-MM-DD)" },
         endDate: {
           type: "string",
           description: "Optional end date for contract roles (YYYY-MM-DD)",
         },
         benefitsRate: {
           type: "number",
-          description: "Benefits as a fraction of salary (e.g., 0.25 for 25%). Defaults to 0.2.",
+          description: "Legacy flat benefits rate as a fraction of salary (0-2). Defaults to 0.2.",
+        },
+        parameters: {
+          type: "object",
+          description:
+            "Deep-merged into existing parameters. Use parameters.benefitsBreakdown to set the 4 component fractions.",
+          properties: {
+            benefitsBreakdown: {
+              type: "object",
+              properties: {
+                statutoryEmployerContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                insuranceBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+                retirementContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                otherBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+          },
         },
       },
-      required: ["departmentId", "title", "count", "salary", "startDate"],
+      required: ["departmentId", "title", "salary", "startDate"],
     },
   },
   {
     name: "update_headcount",
     description:
-      "Update an existing headcount plan entry — change title, count, salary, dates, department, or benefits rate.",
+      "Update an existing headcount plan entry. Canonical engine fields: title, name (individual hire name), employeeType (full_time | part_time | contractor), count (FTE — supports fractions like 0.5), salary (annual), hourlyRate (for contractors / part-time hourly), hoursPerWeek (40 = full-time baseline), startDate, endDate, departmentId, benefitsRate (legacy fallback), and parameters.benefitsBreakdown with the four fractions { statutoryEmployerContributionsCost, insuranceBenefitsCost, retirementContributionsCost, otherBenefitsCost }. parameters is deep-merged.",
     inputSchema: {
       type: "object",
       properties: {
-        id: {
-          type: "string",
-          description: "The headcount plan ID to update",
+        id: { type: "string", description: "The headcount plan ID to update" },
+        title: { type: "string", description: "New job title" },
+        name: {
+          type: ["string", "null"],
+          description: "Individual hire name (null to clear)",
         },
-        title: {
+        employeeType: {
           type: "string",
-          description: "New job title",
+          enum: ["full_time", "part_time", "contractor"],
         },
         count: {
           type: "number",
-          description: "New number of people",
+          description: "FTE count, supports fractions (0.5 = half-time)",
         },
-        salary: {
-          type: "number",
-          description: "New annual salary per person",
+        salary: { type: "number", description: "New annual salary per person" },
+        hourlyRate: {
+          type: ["number", "null"],
+          description: "Hourly rate for contractors or hourly part-time",
         },
-        startDate: {
-          type: "string",
-          description: "New start date (YYYY-MM-DD)",
+        hoursPerWeek: {
+          type: ["number", "null"],
+          description: "Hours per week (40 = full-time baseline)",
         },
+        startDate: { type: "string", description: "New start date (YYYY-MM-DD)" },
         endDate: {
           type: "string",
           description: "New end date (YYYY-MM-DD) or null to remove",
         },
-        benefitsRate: {
-          type: "number",
-          description: "New benefits rate (0-2)",
+        benefitsRate: { type: "number", description: "Legacy flat benefits rate (0-2)" },
+        parameters: {
+          type: "object",
+          description:
+            "Deep-merged into existing parameters. Use parameters.benefitsBreakdown to set the 4 component fractions.",
+          properties: {
+            benefitsBreakdown: {
+              type: "object",
+              properties: {
+                statutoryEmployerContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                insuranceBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+                retirementContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                otherBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+          },
         },
-        departmentId: {
-          type: "string",
-          description: "New department ID",
-        },
+        departmentId: { type: "string", description: "New department ID" },
       },
       required: ["id"],
     },
