@@ -65,6 +65,22 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Bulk delete confirmation state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+
+  // Bulk categorize state — accountId selected from the reassign dropdown
+  const [bulkAccountId, setBulkAccountId] = useState<string>("");
+  const [bulkCategorizing, setBulkCategorizing] = useState(false);
+  const [bulkCategorizeError, setBulkCategorizeError] = useState<string | null>(null);
+
+  // List of accounts available to the reassign dropdown — derived from accountMap.
+  const accountOptions = useMemo(() => {
+    if (!accountMap) return [] as Array<{ id: string; name: string }>;
+    return Array.from(accountMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [accountMap]);
+
   // Filter and sort
   const filtered = useMemo(() => {
     let items = lineItems;
@@ -152,6 +168,68 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
     }
   }
 
+  async function handleBulkDeleteConfirm() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    setBulkDeleteError(null);
+
+    try {
+      const res = await apiFetch("/api/forecast-lines/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete expenses");
+      }
+      // Notify parent (legacy onDelete prop) and clear local state.
+      onDelete?.(ids);
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+      router.refresh();
+    } catch (err) {
+      setBulkDeleteError(
+        err instanceof Error ? err.message : "Something went wrong",
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleBulkCategorize(newAccountId: string) {
+    const ids = Array.from(selected);
+    if (ids.length === 0 || !newAccountId) return;
+    setBulkCategorizing(true);
+    setBulkCategorizeError(null);
+
+    try {
+      const res = await apiFetch("/api/forecast-lines/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "categorize",
+          ids,
+          accountId: newAccountId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to reassign expenses");
+      }
+      setSelected(new Set());
+      setBulkAccountId("");
+      router.refresh();
+    } catch (err) {
+      setBulkCategorizeError(
+        err instanceof Error ? err.message : "Something went wrong",
+      );
+    } finally {
+      setBulkCategorizing(false);
+    }
+  }
+
   return (
     <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
       {/* Header with search and filters */}
@@ -214,25 +292,53 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
 
       {/* Bulk actions bar */}
       {selected.size > 0 && (
-        <div className="px-6 py-2 bg-brand-50 border-b border-brand-100 flex items-center gap-3 animate-slide-up">
+        <div className="px-6 py-2 bg-brand-50 border-b border-brand-100 flex flex-wrap items-center gap-3 animate-slide-up">
           <span className="text-xs font-medium text-brand-700">
             {selected.size} selected
           </span>
-          <button
-            disabled
-            title="Bulk categorization coming soon"
-            className="inline-flex items-center gap-1 rounded-md bg-surface-100 px-2.5 py-1 text-[10px] font-medium text-surface-400 cursor-not-allowed"
-          >
-            <Tag className="h-3 w-3" /> Categorize
-          </button>
-          {onDelete && (
-            <button
-              onClick={() => { onDelete(Array.from(selected)); setSelected(new Set()); }}
-              className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-100 transition-colors"
-            >
-              <Trash2 className="h-3 w-3" /> Delete
-            </button>
+
+          {/* Bulk reassign — pool comes from the same accountMap threaded
+              into the table by the parent view. */}
+          {accountOptions.length > 0 && (
+            <label className="inline-flex items-center gap-1.5">
+              <Tag className="h-3 w-3 text-brand-700" aria-hidden />
+              <span className="sr-only">Reassign to account</span>
+              <select
+                aria-label="Reassign selected expenses to account"
+                value={bulkAccountId}
+                disabled={bulkCategorizing}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setBulkAccountId(next);
+                  if (next) void handleBulkCategorize(next);
+                }}
+                className="appearance-none rounded-md border border-brand-200 bg-white px-2 py-1 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 cursor-pointer disabled:opacity-50"
+              >
+                <option value="">Reassign to...</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </label>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setBulkDeleteError(null);
+              setBulkDeleteOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-100 transition-colors"
+          >
+            <Trash2 className="h-3 w-3" /> Delete {selected.size} selected
+          </button>
+
+          {bulkCategorizeError && (
+            <span className="text-[10px] text-danger-600">
+              {bulkCategorizeError}
+            </span>
+          )}
+
           <button
             onClick={() => setSelected(new Set())}
             className="ml-auto text-[10px] text-surface-500 hover:text-surface-700"
@@ -547,6 +653,44 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, o
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
             >
               {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk delete confirmation modal */}
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => { setBulkDeleteOpen(false); setBulkDeleteError(null); }}
+        title="Delete selected expenses"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {bulkDeleteError && (
+            <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
+              {bulkDeleteError}
+            </div>
+          )}
+          <p className="text-sm text-surface-700">
+            Delete{" "}
+            <span className="font-semibold text-surface-900">{selected.size}</span>{" "}
+            forecast {selected.size === 1 ? "line" : "lines"}? This action removes them permanently.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => { setBulkDeleteOpen(false); setBulkDeleteError(null); }}
+              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDeleteConfirm}
+              disabled={bulkDeleting}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? "Deleting..." : `Delete ${selected.size}`}
             </button>
           </div>
         </div>
