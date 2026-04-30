@@ -284,17 +284,17 @@ async function deleteForecastLine(
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const forecastingSchemas: Record<string, z.ZodType> = {
-  create_forecast_line: createForecastLineSchema,
-  update_forecast_line: updateForecastLineSchema,
-  delete_forecast_line: deleteForecastLineSchema,
+  create_expense: createForecastLineSchema,
+  update_expense: updateForecastLineSchema,
+  delete_expense: deleteForecastLineSchema,
   generate_financial_statements: generateStatementsSchema,
   forecast_revenue: forecastRevenueSchema,
 };
 
 export const forecastingHandlers: Record<string, ToolHandler> = {
-  create_forecast_line: createForecastLine,
-  update_forecast_line: updateForecastLine,
-  delete_forecast_line: deleteForecastLine,
+  create_expense: createForecastLine,
+  update_expense: updateForecastLine,
+  delete_expense: deleteForecastLine,
   generate_financial_statements: generateStatements,
   forecast_revenue: forecastRevenue,
 };

@@ -30,9 +30,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "create_forecast_line",
+    name: "create_expense",
     description:
-      "Add a forecast line to the current scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account). Always operates on the active scenario from context.",
+      "Add an expense to the current scenario — defines how a specific expense account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account). Use this when the user says things like 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context.",
     inputSchema: {
       type: "object",
       properties: {
@@ -459,9 +459,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "update_forecast_line",
+    name: "update_expense",
     description:
-      "Update an existing forecast line's method, parameters, or date range.",
+      "Update an existing expense's method, parameters, or date range. Use this when the user says things like 'edit my Slack expense' or 'change the cloud spend growth rate'.",
     inputSchema: {
       type: "object",
       properties: {
@@ -491,9 +491,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "delete_forecast_line",
+    name: "delete_expense",
     description:
-      "Delete a forecast line and all its associated forecast values.",
+      "Delete an expense and all its associated forecast values. Use this when the user says things like 'remove my Slack expense'.",
     inputSchema: {
       type: "object",
       properties: {
