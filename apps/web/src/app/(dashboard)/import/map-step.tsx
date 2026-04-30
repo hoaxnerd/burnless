@@ -2,7 +2,7 @@
 
 import { Sparkles, Check, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui";
-import { confidenceColor, confidenceLabel } from "./import-utils";
+import { confidenceColor, confidenceLabel, getAmountColumn } from "./import-utils";
 import type { ParsedRow, ColumnMapping, MappingConfidence, AccountOption } from "./import-utils";
 
 interface MapStepProps {
@@ -36,6 +36,9 @@ export function MapStep({
   reset,
   generatePreview,
 }: MapStepProps) {
+  // TODO(Task 14): wire up debit/credit polymorphic amount in this UI.
+  // For now narrow to the single-column case so the existing flow keeps working.
+  const amountCol = getAmountColumn(mapping);
   return (
     <div className="max-w-3xl space-y-6 animate-slide-up">
       <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
@@ -79,7 +82,8 @@ export function MapStep({
                 )}
               </div>
               <select
-                value={mapping[key]}
+                // TODO(Task 14): handle debit/credit polymorphic amount in map UI.
+                value={typeof mapping[key] === "string" ? (mapping[key] as string) : ""}
                 onChange={(e) => {
                   setMapping((m) => ({ ...m, [key]: e.target.value }));
                   setMappingConfidence((c) => ({ ...c, [key]: e.target.value ? 1 : 0 }));
@@ -120,7 +124,7 @@ export function MapStep({
       </div>
 
       {/* Sample data preview */}
-      {mapping.date && mapping.amount && (
+      {mapping.date && amountCol && (
         <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
           <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-50 mb-3">
             Sample data (first 5 rows)
@@ -141,7 +145,7 @@ export function MapStep({
                 {rows.slice(0, 5).map((row, i) => (
                   <tr key={i} className="border-b border-surface-100 dark:border-surface-700/50">
                     <td className="py-2 px-3 text-surface-900 dark:text-surface-50">{row[mapping.date] || "\u2014"}</td>
-                    <td className="py-2 px-3 text-right font-mono text-surface-900 dark:text-surface-50">{row[mapping.amount] || "\u2014"}</td>
+                    <td className="py-2 px-3 text-right font-mono text-surface-900 dark:text-surface-50">{(amountCol && row[amountCol]) || "\u2014"}</td>
                     <td className="py-2 px-3 text-surface-600 dark:text-surface-400 max-w-xs truncate">
                       {mapping.description ? row[mapping.description] || "\u2014" : "\u2014"}
                     </td>
@@ -166,7 +170,7 @@ export function MapStep({
           icon={<ArrowRight className="h-4 w-4" />}
           iconPosition="right"
           state={loading ? "loading" : "idle"}
-          disabled={!mapping.date || !mapping.amount || !targetAccountId}
+          disabled={!mapping.date || !amountCol || !targetAccountId}
           onClick={generatePreview}
         >
           Preview Import

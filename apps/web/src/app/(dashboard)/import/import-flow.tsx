@@ -28,7 +28,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({ date: "", amount: "", description: "", category: "" });
-  const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0 });
+  const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
   const [targetAccountId, setTargetAccountId] = useState("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [preview, setPreview] = useState<PreviewTransaction[]>([]);
@@ -118,7 +118,12 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   const handleDragLeave = useCallback(() => { setDragActive(false); }, []);
 
   const generatePreview = async () => {
-    if (!mapping.date || !mapping.amount || !targetAccountId) {
+    // TODO(Task 14): handle debit/credit polymorphic mapping.amount.
+    // Phase 1 Task 12 widens the type; UI still only supports the
+    // single-column layout. Treat the polymorphic shape as "not mapped"
+    // here so existing single-column flows keep working.
+    const amountCol = typeof mapping.amount === "string" ? mapping.amount : "";
+    if (!mapping.date || !amountCol || !targetAccountId) {
       setError("Please map the Date and Amount columns and select a target account");
       return;
     }
@@ -128,7 +133,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
       const mapped = rows
         .map((row) => {
           const dateStr = row[mapping.date]?.trim();
-          const amountStr = row[mapping.amount]?.trim();
+          const amountStr = row[amountCol]?.trim();
           const desc = mapping.description ? row[mapping.description]?.trim() || null : null;
           if (!dateStr || !amountStr) return null;
           const amount = parseFloat(amountStr.replace(/[$,\u20AC\u00A3()]/g, "").replace(/^\((.+)\)$/, "-$1"));
@@ -225,7 +230,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
     setHeaders([]);
     setRows([]);
     setMapping({ date: "", amount: "", description: "", category: "" });
-    setMappingConfidence({ date: 0, amount: 0, description: 0, category: 0 });
+    setMappingConfidence({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
     setPreview([]);
     setResult(null);
     setError(null);
