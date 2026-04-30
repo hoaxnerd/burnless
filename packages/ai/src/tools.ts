@@ -788,6 +788,83 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "add_salary_change",
+    description:
+      "Add a salary change record for an existing headcount entry. The change takes effect on `effectiveDate` and persists until superseded by a later change. Use this for raises, promotions, or compensation revisions instead of mutating headcount.salary directly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        effectiveDate: { type: "string", description: "ISO YYYY-MM-DD" },
+        newSalary: { type: "number", description: "New annual salary" },
+        reason: {
+          type: "string",
+          description: "Optional reason (raise, promotion, market adjustment)",
+        },
+      },
+      required: ["headcountId", "effectiveDate", "newSalary"],
+    },
+  },
+  {
+    name: "add_bonus",
+    description:
+      "Add a one-time bonus payout for an existing headcount entry. Bonuses emit in the `payoutMonth` exactly — not prorated, not recurring. Multiple bonuses in the same month sum.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        payoutMonth: { type: "string", description: "YYYY-MM (month of payout)" },
+        amount: { type: "number", description: "Bonus amount in company currency" },
+        type: {
+          type: "string",
+          enum: ["signing", "performance", "retention", "other"],
+          description: "Bonus type (default performance)",
+        },
+        notes: { type: "string", description: "Optional notes" },
+      },
+      required: ["headcountId", "payoutMonth", "amount"],
+    },
+  },
+  {
+    name: "add_equity_grant",
+    description:
+      "Add an equity grant for an existing headcount entry. Vesting schedule is a list of milestones (cliff, monthly, quarterly, annual, or milestone) with date and shares vested. Sum of vested shares should not exceed total shares granted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        grantDate: { type: "string", description: "ISO YYYY-MM-DD" },
+        shares: { type: "number", description: "Total shares granted (must be positive)" },
+        strikePrice: {
+          type: "number",
+          description: "Strike price per share (null for RSUs)",
+        },
+        grantType: {
+          type: "string",
+          enum: ["iso", "nso", "rsu"],
+          description: "Grant type (default iso)",
+        },
+        vestingSchedule: {
+          type: "array",
+          description: "List of vesting milestones",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["cliff", "monthly", "quarterly", "annual", "milestone"],
+              },
+              date: { type: "string", description: "ISO YYYY-MM-DD" },
+              sharesVested: { type: "number", minimum: 0 },
+            },
+            required: ["type", "date", "sharesVested"],
+          },
+        },
+      },
+      required: ["headcountId", "grantDate", "shares"],
+    },
+  },
+  {
     name: "forecast_revenue",
     description:
       "Project future revenue for the active scenario based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",

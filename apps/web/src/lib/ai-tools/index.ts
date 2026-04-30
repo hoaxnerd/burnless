@@ -43,6 +43,7 @@ const MUTATION_TOOLS = new Set([
   // Create
   "create_scenario", "add_headcount", "create_department", "add_revenue_stream",
   "add_funding_round", "create_forecast_line", "create_account",
+  "add_salary_change", "add_bonus", "add_equity_grant",
   // Update
   "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
   "update_funding_round", "update_forecast_line", "update_account",
@@ -65,6 +66,9 @@ const MUTATION_CACHE_TAGS: Record<string, string[]> = {
   add_headcount: ["headcount-plans", "scenario-overrides"],
   update_headcount: ["headcount-plans", "scenario-overrides"],
   delete_headcount: ["headcount-plans", "scenario-overrides"],
+  add_salary_change: ["headcount-plans", "scenario-overrides"],
+  add_bonus: ["headcount-plans", "scenario-overrides"],
+  add_equity_grant: ["headcount-plans", "scenario-overrides"],
   create_department: ["departments", "scenario-overrides"],
   update_department: ["departments", "scenario-overrides"],
   delete_department: ["departments", "headcount-plans", "scenario-overrides"],

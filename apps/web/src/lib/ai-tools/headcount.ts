@@ -2,7 +2,15 @@
  * Headcount planning and department tools — CRUD operations.
  */
 
-import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import {
+  db,
+  scenarioInsert,
+  scenarioUpdate,
+  scenarioDelete,
+  createSalaryChange,
+  createBonus,
+  createEquityGrant,
+} from "@burnless/db";
 import { headcountPlans, departments, companies } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -84,6 +92,53 @@ export const updateDepartmentSchema = z.object({
 export const deleteDepartmentSchema = z.object({
   id: idString,
 });
+
+export const addSalaryChangeSchema = z.object({
+  headcountId: idString,
+  effectiveDate: dateString,
+  newSalary: salaryAmount,
+  reason: z.string().max(500).nullable().optional(),
+});
+
+export const addBonusSchema = z.object({
+  headcountId: idString,
+  payoutMonth: z
+    .string()
+    .min(1, "payoutMonth is required")
+    .refine(
+      (v) => /^\d{4}-\d{2}(-\d{2})?$/.test(v) && !isNaN(Date.parse(v.length === 7 ? `${v}-01` : v)),
+      "payoutMonth must be YYYY-MM or YYYY-MM-DD"
+    ),
+  amount: z.number().positive("Bonus amount must be > 0").max(100_000_000, "Bonus exceeds $100M limit"),
+  type: z.enum(["signing", "performance", "retention", "other"]).default("performance"),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+const vestingMilestoneSchema = z.object({
+  type: z.enum(["cliff", "monthly", "quarterly", "annual", "milestone"]),
+  date: dateString,
+  sharesVested: z.number().nonnegative(),
+});
+
+export const addEquityGrantSchema = z
+  .object({
+    headcountId: idString,
+    grantDate: dateString,
+    shares: z.number().positive("Shares must be > 0"),
+    strikePrice: z.number().nonnegative().nullable().optional(),
+    grantType: z.enum(["iso", "nso", "rsu"]).default("iso"),
+    vestingSchedule: z.array(vestingMilestoneSchema).default([]),
+  })
+  .superRefine((data, ctx) => {
+    const total = data.vestingSchedule.reduce((s, v) => s + v.sharesVested, 0);
+    if (total > data.shares) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["vestingSchedule"],
+        message: `Vested shares total (${total}) exceeds grant shares (${data.shares})`,
+      });
+    }
+  });
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -293,6 +348,113 @@ async function deleteDepartment(
   });
 }
 
+async function verifyHeadcountOwnership(
+  headcountId: string,
+  companyId: string
+): Promise<{ id: string } | null> {
+  const [parent] = await db
+    .select({ id: headcountPlans.id })
+    .from(headcountPlans)
+    .where(and(eq(headcountPlans.id, headcountId), eq(headcountPlans.companyId, companyId)));
+  return parent ?? null;
+}
+
+async function addSalaryChange(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof addSalaryChangeSchema>;
+
+  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  if (!parent) {
+    return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
+  }
+
+  const row = await createSalaryChange(
+    {
+      companyId: context.companyId,
+      headcountId: data.headcountId,
+      effectiveDate: new Date(data.effectiveDate),
+      newSalary: num(data.newSalary)!,
+      reason: data.reason ?? null,
+    },
+    context.scenarioId
+  );
+
+  return JSON.stringify({
+    success: true,
+    salaryChangeId: row!.id,
+    message: `Added salary change effective ${data.effectiveDate}.`,
+  });
+}
+
+async function addBonus(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof addBonusSchema>;
+
+  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  if (!parent) {
+    return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
+  }
+
+  // Normalize YYYY-MM to a Date at the first of the month.
+  const monthStr = data.payoutMonth.length === 7 ? `${data.payoutMonth}-01` : data.payoutMonth;
+
+  const row = await createBonus(
+    {
+      companyId: context.companyId,
+      headcountId: data.headcountId,
+      payoutMonth: new Date(monthStr),
+      amount: num(data.amount)!,
+      type: data.type,
+      notes: data.notes ?? null,
+    },
+    context.scenarioId
+  );
+
+  return JSON.stringify({
+    success: true,
+    bonusId: row!.id,
+    message: `Added ${data.type} bonus for ${data.payoutMonth}.`,
+  });
+}
+
+async function addEquityGrant(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof addEquityGrantSchema>;
+
+  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  if (!parent) {
+    return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
+  }
+
+  const row = await createEquityGrant(
+    {
+      companyId: context.companyId,
+      headcountId: data.headcountId,
+      grantDate: new Date(data.grantDate),
+      shares: data.shares.toFixed(4),
+      strikePrice:
+        data.strikePrice === undefined || data.strikePrice === null
+          ? null
+          : data.strikePrice.toFixed(4),
+      grantType: data.grantType,
+      parameters: { vestingSchedule: data.vestingSchedule },
+    },
+    context.scenarioId
+  );
+
+  return JSON.stringify({
+    success: true,
+    equityGrantId: row!.id,
+    message: `Added ${data.grantType.toUpperCase()} grant of ${data.shares} shares on ${data.grantDate}.`,
+  });
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const headcountSchemas: Record<string, z.ZodType> = {
@@ -302,6 +464,9 @@ export const headcountSchemas: Record<string, z.ZodType> = {
   create_department: createDepartmentSchema,
   update_department: updateDepartmentSchema,
   delete_department: deleteDepartmentSchema,
+  add_salary_change: addSalaryChangeSchema,
+  add_bonus: addBonusSchema,
+  add_equity_grant: addEquityGrantSchema,
 };
 
 export const headcountHandlers: Record<string, ToolHandler> = {
@@ -311,6 +476,9 @@ export const headcountHandlers: Record<string, ToolHandler> = {
   create_department: createDepartment,
   update_department: updateDepartment,
   delete_department: deleteDepartment,
+  add_salary_change: addSalaryChange,
+  add_bonus: addBonus,
+  add_equity_grant: addEquityGrant,
 };
 
 // `headcount` is exported for back-compat; not used here directly.
