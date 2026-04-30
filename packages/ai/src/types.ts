@@ -8,6 +8,24 @@ import type { Company, Scenario, Account, FundingRound } from "@burnless/types";
 
 // ── Financial context passed to the AI ──────────────────────────────────────
 
+/** Single revenue stream snapshot (currency-agnostic — raw numbers only). */
+export interface RevenueStreamSnapshotRow {
+  id: string;
+  name: string;
+  type: "subscription" | "one_time" | "usage_based" | "services" | "marketplace" | "ecommerce" | "hardware";
+  /** ISO YYYY-MM-DD */
+  startDate: string;
+  /** ISO YYYY-MM-DD or null if open-ended */
+  endDate: string | null;
+  parameters: Record<string, unknown>;
+  /** Most-recent month's resolved revenue in raw number units. */
+  currentAmount: number;
+  /** "flat" | "per_seat" | "tiered". Only meaningful for subscription/usage_based. */
+  pricingModel?: "flat" | "per_seat" | "tiered";
+  /** Number of tiers configured (per_seat or tiered pricing only). */
+  tierCount?: number;
+}
+
 export interface FinancialSnapshot {
   company: {
     name: string;
@@ -43,6 +61,7 @@ export interface FinancialSnapshot {
     churnRate: number | null;
   };
   revenueByMonth: Array<{ month: string; amount: number }>;
+  revenueStreams: RevenueStreamSnapshotRow[];
   expensesByMonth: Array<{ month: string; amount: number }>;
   cashByMonth: Array<{ month: string; amount: number }>;
   headcountByMonth: Array<{ month: string; count: number }>;
