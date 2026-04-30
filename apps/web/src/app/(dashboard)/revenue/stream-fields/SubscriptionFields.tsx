@@ -1,6 +1,8 @@
 "use client";
 
 import { CurrencyInput, NumberInput, PercentageInput } from "@/components/forms/primitives";
+import { TieredPricingEditor } from "./TieredPricingEditor";
+import type { PricingTier } from "@burnless/engine";
 
 export interface FieldsProps {
   params: Record<string, unknown>;
@@ -12,6 +14,8 @@ const get = <T,>(p: Record<string, unknown>, k: string, fb: T): T =>
 
 export function SubscriptionFields({ params, setParams }: FieldsProps) {
   const set = (k: string, v: unknown) => setParams((p) => ({ ...p, [k]: v }));
+
+  const pricingModel = (params.pricingModel as "flat" | "per_seat" | "tiered" | undefined) ?? "flat";
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -57,9 +61,34 @@ export function SubscriptionFields({ params, setParams }: FieldsProps) {
         min={-1}
         max={1}
       />
-      <p className="col-span-full text-xs text-surface-500">
-        Tiered / per-seat pricing editor lands in Task 15.
-      </p>
+      <label className="col-span-full block text-sm">
+        <span className="text-surface-700 dark:text-surface-300">Pricing model</span>
+        <select
+          value={pricingModel}
+          onChange={(e) => set("pricingModel", e.target.value)}
+          className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
+          aria-label="Subscription pricing model"
+        >
+          <option value="flat">Flat (monthlyPrice per customer)</option>
+          <option value="per_seat">Per seat (seats &times; tier price)</option>
+          <option value="tiered">Tiered (reserved)</option>
+        </select>
+      </label>
+      {pricingModel === "per_seat" && (
+        <NumberInput
+          label="Seats per customer"
+          integerOnly
+          min={1}
+          value={get<number>(params, "seatsPerCustomer", 25)}
+          onChange={(n) => set("seatsPerCustomer", n ?? 1)}
+        />
+      )}
+      {pricingModel !== "flat" && (
+        <TieredPricingEditor
+          tiers={(params.tiers as PricingTier[] | undefined) ?? []}
+          onChange={(next) => set("tiers", next)}
+        />
+      )}
     </div>
   );
 }
