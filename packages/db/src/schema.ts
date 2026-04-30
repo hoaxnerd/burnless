@@ -578,6 +578,46 @@ export const headcountPlans = pgTable(
   ]
 );
 
+// ── Bonuses ───────────────────────────────────────────────────────────────────
+
+export const bonusTypeEnum = pgEnum("bonus_type", [
+  "signing",
+  "performance",
+  "retention",
+  "other",
+]);
+
+export const bonuses = pgTable(
+  "bonuses",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    payoutMonth: timestamp("payout_month", { mode: "date" }).notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    type: bonusTypeEnum("type").notNull().default("performance"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("bonuses_company_idx").on(table.companyId),
+    index("bonuses_headcount_month_idx").on(
+      table.headcountId,
+      table.payoutMonth
+    ),
+  ]
+);
+
 // ── Salary Changes ────────────────────────────────────────────────────────────
 
 export const salaryChanges = pgTable(
@@ -1147,6 +1187,7 @@ export const headcountPlansRelations = relations(headcountPlans, ({ one, many })
     references: [departments.id],
   }),
   salaryChanges: many(salaryChanges),
+  bonuses: many(bonuses),
 }));
 
 export const salaryChangesRelations = relations(salaryChanges, ({ one }) => ({
@@ -1156,6 +1197,17 @@ export const salaryChangesRelations = relations(salaryChanges, ({ one }) => ({
   }),
   headcount: one(headcountPlans, {
     fields: [salaryChanges.headcountId],
+    references: [headcountPlans.id],
+  }),
+}));
+
+export const bonusesRelations = relations(bonuses, ({ one }) => ({
+  company: one(companies, {
+    fields: [bonuses.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [bonuses.headcountId],
     references: [headcountPlans.id],
   }),
 }));
