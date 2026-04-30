@@ -16,6 +16,8 @@ import {
   monthKey,
   round2,
   addSeries,
+  isActiveInMonth,
+  proratedFraction,
 } from "./utils";
 import { D, dMul, dPow, dRound2 } from "./decimal";
 
@@ -74,8 +76,17 @@ export interface ServicesParams {
 export interface RevenueStreamInput {
   id: string;
   name: string;
-  type: "subscription" | "one_time" | "usage_based" | "services";
+  type:
+    | "subscription"
+    | "one_time"
+    | "usage_based"
+    | "services"
+    | "marketplace"
+    | "ecommerce"
+    | "hardware";
   parameters: Record<string, unknown>;
+  startDate: Date;
+  endDate: Date | null;
 }
 
 // ── Subscription revenue detail (for SaaS metrics) ──────────────────────────
@@ -107,36 +118,71 @@ export interface SubscriptionDetail {
 export function computeRevenueStream(
   stream: RevenueStreamInput,
   periodStart: Date,
-  periodEnd: Date
+  periodEnd: Date,
 ): MonthlySeries {
-  switch (stream.type) {
-    case "subscription":
-      return computeSubscriptionRevenue(
-        stream.parameters as unknown as SubscriptionParams,
-        periodStart,
-        periodEnd
-      );
-    case "one_time":
-      return computeOneTimeRevenue(
-        stream.parameters as unknown as OneTimeParams,
-        periodStart,
-        periodEnd
-      );
-    case "usage_based":
-      return computeUsageRevenue(
-        stream.parameters as unknown as UsageBasedParams,
-        periodStart,
-        periodEnd
-      );
-    case "services":
-      return computeServicesRevenue(
-        stream.parameters as unknown as ServicesParams,
-        periodStart,
-        periodEnd
-      );
-    default:
-      return new Map();
+  const inner = (() => {
+    switch (stream.type) {
+      case "subscription":
+        return computeSubscriptionRevenue(
+          stream.parameters as unknown as SubscriptionParams,
+          periodStart,
+          periodEnd,
+        );
+      case "one_time":
+        return computeOneTimeRevenue(
+          stream.parameters as unknown as OneTimeParams,
+          periodStart,
+          periodEnd,
+        );
+      case "usage_based":
+        return computeUsageRevenue(
+          stream.parameters as unknown as UsageBasedParams,
+          periodStart,
+          periodEnd,
+        );
+      case "services":
+        return computeServicesRevenue(
+          stream.parameters as unknown as ServicesParams,
+          periodStart,
+          periodEnd,
+        );
+      case "marketplace":
+        return computeMarketplaceRevenue(
+          stream.parameters,
+          periodStart,
+          periodEnd,
+        );
+      case "ecommerce":
+        return computeEcommerceRevenue(
+          stream.parameters,
+          periodStart,
+          periodEnd,
+        );
+      case "hardware":
+        return computeHardwareRevenue(
+          stream.parameters,
+          periodStart,
+          periodEnd,
+        );
+      default:
+        return new Map<string, number>();
+    }
+  })();
+
+  // Apply activity gate + proration on the inner series.
+  const months = monthRange(periodStart, periodEnd);
+  const gated: MonthlySeries = new Map();
+  for (const m of months) {
+    const key = monthKey(m);
+    const raw = inner.get(key) ?? 0;
+    if (!isActiveInMonth(m, stream.startDate, stream.endDate)) {
+      gated.set(key, 0);
+      continue;
+    }
+    const fraction = proratedFraction(m, stream.startDate, stream.endDate);
+    gated.set(key, round2(raw * fraction));
   }
+  return gated;
 }
 
 /** Compute total revenue across all streams. */
@@ -316,3 +362,13 @@ function computeServicesRevenue(
 
   return series;
 }
+
+// ── Stub handlers for new stream types (Task 3 replaces these) ───────────────
+
+// TODO Task 3: replace stubs with typed implementations + param interfaces
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeMarketplaceRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeEcommerceRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeHardwareRevenue(_p: any, _s: Date, _e: Date): MonthlySeries { return new Map(); }

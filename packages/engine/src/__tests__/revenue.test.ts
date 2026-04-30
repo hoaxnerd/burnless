@@ -55,6 +55,8 @@ describe("revenue", () => {
         name: "Widget Sales",
         type: "one_time",
         parameters: { unitsPerMonth: 50, pricePerUnit: 100 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       expect(result.get("2026-01")).toBe(5000);
@@ -67,6 +69,8 @@ describe("revenue", () => {
         name: "Widget Sales",
         type: "one_time",
         parameters: { unitsPerMonth: 100, pricePerUnit: 10, unitGrowthRate: 0.10 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       expect(result.get("2026-01")).toBe(1000);
@@ -81,6 +85,8 @@ describe("revenue", () => {
         name: "API Calls",
         type: "usage_based",
         parameters: { activeUsers: 1000, avgUsagePerUser: 100, pricePerUnit: 0.01 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       expect(result.get("2026-01")).toBe(1000); // 1000 * 100 * 0.01
@@ -94,6 +100,8 @@ describe("revenue", () => {
         name: "Consulting",
         type: "services",
         parameters: { hoursPerMonth: 160, hourlyRate: 200 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       expect(result.get("2026-01")).toBe(32000);
@@ -103,8 +111,8 @@ describe("revenue", () => {
   describe("computeTotalRevenue", () => {
     it("sums multiple streams", () => {
       const streams: RevenueStreamInput[] = [
-        { id: "s1", name: "SaaS", type: "subscription", parameters: { startingCustomers: 100, monthlyPrice: 100, newCustomersPerMonth: 0, monthlyChurnRate: 0 } },
-        { id: "s2", name: "Services", type: "services", parameters: { hoursPerMonth: 10, hourlyRate: 100 } },
+        { id: "s1", name: "SaaS", type: "subscription", parameters: { startingCustomers: 100, monthlyPrice: 100, newCustomersPerMonth: 0, monthlyChurnRate: 0 }, startDate: start, endDate: null },
+        { id: "s2", name: "Services", type: "services", parameters: { hoursPerMonth: 10, hourlyRate: 100 }, startDate: start, endDate: null },
       ];
       const total = computeTotalRevenue(streams, start, end);
       expect(total.get("2026-01")).toBe(11000); // 10000 + 1000

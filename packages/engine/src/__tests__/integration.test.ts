@@ -72,6 +72,8 @@ describe("Integration: Full SaaS startup scenario", () => {
     name: "Consulting",
     type: "services",
     parameters: { hoursPerMonth: 40, hourlyRate: 150 },
+    startDate: START,
+    endDate: null,
   };
   const servicesRevenue = computeRevenueStream(servicesStream, START, END);
 

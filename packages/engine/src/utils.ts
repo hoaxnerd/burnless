@@ -76,13 +76,16 @@ export function proratedFraction(
   endDate: Date | string | null
 ): number {
   const m = toDate(month);
-  const sd = toDate(startDate);
+  const sdRaw = toDate(startDate);
+  // Normalize to local midnight to avoid UTC-vs-local skew when comparing
+  const sd = new Date(sdRaw.getFullYear(), sdRaw.getMonth(), sdRaw.getDate());
   const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
   const daysInMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
   const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
 
   const effectiveStart = sd > monthStart ? sd : monthStart;
-  const ed = endDate ? toDate(endDate) : null;
+  const edRaw = endDate ? toDate(endDate) : null;
+  const ed = edRaw ? new Date(edRaw.getFullYear(), edRaw.getMonth(), edRaw.getDate()) : null;
   const effectiveEnd = ed && ed < monthEnd ? ed : monthEnd;
 
   if (effectiveStart > effectiveEnd) return 0;
