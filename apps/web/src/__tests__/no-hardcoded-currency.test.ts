@@ -123,6 +123,10 @@ const ALLOWED = [
   "apps/web/src/app/api/chat/__tests__/",
   "apps/web/src/app/api/import/__tests__/",
   "apps/web/src/app/api/onboarding/__tests__/",
+  // ── Form primitive tests ──────────────────────────────────────────────────
+  // CurrencyInput.test.tsx uses `$${n}` inside a vi.mock() fmtCompact stub —
+  // a fixture value in a test, not display code.
+  "apps/web/src/components/forms/primitives/__tests__/",
   "apps/web/src/components/providers/__tests__/",
   "apps/web/src/components/ui/__tests__/",
   "apps/web/src/lib/__tests__/",
