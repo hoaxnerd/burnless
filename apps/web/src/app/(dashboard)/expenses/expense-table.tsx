@@ -15,6 +15,15 @@ import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overri
 interface ExpenseTableProps {
   lineItems: ExpenseLineItem[];
   subcategories: string[];
+  /**
+   * Live account lookup. When provided, the table renders names via
+   * `accountMap.get(item.accountId)?.name` so that renames flow through
+   * without needing the upstream compute to bake a fresh `accountName`
+   * into every line item. Falls back to the cached `item.accountName`
+   * when the map is omitted (back-compat with callers that haven't
+   * threaded it yet).
+   */
+  accountMap?: ReadonlyMap<string, { id: string; name: string }>;
   onDelete?: (ids: string[]) => void;
   onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
@@ -22,7 +31,7 @@ interface ExpenseTableProps {
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOverride }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, accountMap, onDelete, onCategoryOverride }: ExpenseTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -41,6 +50,13 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     handleRestore: handleScenarioRestore,
   } = useScenarioOverrides("forecast_line");
 
+  // Live account-name lookup. Always prefer the live `accountMap` value
+  // so a rename ("Slack" → "Notion") propagates without rebuilding line
+  // items. Falls back to the cached field for callers that haven't
+  // threaded the map yet.
+  const resolveName = (item: ExpenseLineItem): string =>
+    accountMap?.get(item.accountId)?.name ?? item.accountName;
+
   // Edit state
   const [editingItem, setEditingItem] = useState<ExpenseLineItem | null>(null);
 
@@ -57,7 +73,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     if (search) {
       const q = search.toLowerCase();
       items = items.filter(
-        (i) => i.accountName.toLowerCase().includes(q) || i.subcategory.toLowerCase().includes(q),
+        (i) => resolveName(i).toLowerCase().includes(q) || i.subcategory.toLowerCase().includes(q),
       );
     }
 
@@ -73,7 +89,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     // Sort
     items = [...items].sort((a, b) => {
       let cmp = 0;
-      if (sortKey === "accountName") cmp = a.accountName.localeCompare(b.accountName);
+      if (sortKey === "accountName") cmp = resolveName(a).localeCompare(resolveName(b));
       else if (sortKey === "subcategory") cmp = a.subcategory.localeCompare(b.subcategory);
       else if (sortKey === "currentAmount") cmp = a.currentAmount - b.currentAmount;
       else if (sortKey === "changePercent") cmp = a.changePercent - b.changePercent;
@@ -81,7 +97,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     });
 
     return items;
-  }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir]);
+  }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir, accountMap]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -305,6 +321,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
             ) : (
               filtered.map((item) => {
                 const isSelected = selected.has(item.id);
+                const displayName = resolveName(item);
                 const changeIcon = item.changePercent > 0.01 ? "\u2191" : item.changePercent < -0.01 ? "\u2193" : "\u2192";
                 const changeLabel = item.changePercent > 0.01 ? "Increasing" : item.changePercent < -0.01 ? "Decreasing" : "Stable";
                 const changeColor = item.changePercent > 0.01 ? "text-red-600" : item.changePercent < -0.01 ? "text-green-600" : "text-surface-500";
@@ -319,7 +336,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""} ${rowBorderClass}`}
                   >
                     <td className="w-10 px-4 py-3">
-                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${item.accountName}`} className="flex items-center justify-center">
+                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
                         <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
                           isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
                         }`}>
@@ -329,7 +346,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-surface-900">{item.accountName}</span>
+                        <span className="text-sm font-medium text-surface-900">{displayName}</span>
                         <span className="ml-1 text-[10px] text-surface-400 uppercase">{item.method}</span>
                         {overrideTag && <ScenarioBadge variant={overrideTag} />}
                       </div>
@@ -350,7 +367,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
-                                  description: item.accountName,
+                                  description: displayName,
                                   accountId: item.accountId,
                                   category: item.accountCategory,
                                   subcategory: newCat,
@@ -428,7 +445,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                             onClick={() => handleScenarioRevert(item.id)}
                             className="rounded-md p-1.5 text-warning-500 hover:text-warning-700 hover:bg-warning-50 transition-colors"
                             title="Revert to base"
-                            aria-label={`Revert ${item.accountName}`}
+                            aria-label={`Revert ${displayName}`}
                           >
                             <RotateCw className="h-3.5 w-3.5" />
                           </button>
@@ -438,7 +455,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                             onClick={() => handleScenarioRemove(item.id)}
                             className="rounded-md p-1.5 text-danger-500 hover:text-danger-700 hover:bg-danger-50 transition-colors"
                             title="Remove scenario entity"
-                            aria-label={`Remove ${item.accountName}`}
+                            aria-label={`Remove ${displayName}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -449,7 +466,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               onClick={() => setEditingItem(item)}
                               className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit expense"
-                              aria-label={`Edit ${item.accountName}`}
+                              aria-label={`Edit ${displayName}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -460,7 +477,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               }}
                               className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                               title="Delete expense"
-                              aria-label={`Delete ${item.accountName}`}
+                              aria-label={`Delete ${displayName}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -472,7 +489,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               onClick={() => setEditingItem(item)}
                               className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit expense"
-                              aria-label={`Edit ${item.accountName}`}
+                              aria-label={`Edit ${displayName}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -512,7 +529,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
           )}
           <p className="text-sm text-surface-700">
             Are you sure you want to delete{" "}
-            <span className="font-semibold text-surface-900">{deletingItem?.accountName}</span>?
+            <span className="font-semibold text-surface-900">{deletingItem ? resolveName(deletingItem) : ""}</span>?
             This will remove the forecast line permanently.
           </p>
           <div className="flex justify-end gap-3 pt-2">

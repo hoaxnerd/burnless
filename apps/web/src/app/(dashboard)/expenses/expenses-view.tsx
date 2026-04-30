@@ -37,6 +37,12 @@ interface ExpensesViewProps {
   summaryMetrics: SummaryMetrics;
   resolvedSlotData: ResolvedSlotData[];
   expenseDetails: ExpenseDetails;
+  /**
+   * Live account list. Threaded into <ExpenseTable> as `accountMap` so that
+   * renames flow through without rebuilding cached `accountName` fields on
+   * every line item.
+   */
+  accounts?: { id: string; name: string }[];
   timeline: MetricPoint[];
   opexTimeline: MetricPoint[];
   cogsTimeline: MetricPoint[];
@@ -48,6 +54,7 @@ export function ExpensesView({
   summaryMetrics,
   resolvedSlotData,
   expenseDetails,
+  accounts,
   timeline,
   opexTimeline: _opexTimeline,
   cogsTimeline: _cogsTimeline,
@@ -97,6 +104,15 @@ export function ExpensesView({
         value: (budgetTimeline[i]?.value ?? 0) - t.value,
       }))
     : null;
+
+  // Live id→account lookup for the table; ensures rename flows through
+  // without depending on the cached `accountName` baked into each line item
+  // at compute time.
+  const accountMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const a of accounts ?? []) map.set(a.id, a);
+    return map;
+  }, [accounts]);
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
@@ -277,9 +293,10 @@ export function ExpensesView({
       <ExpenseTable
         lineItems={expenseDetails.lineItems}
         subcategories={expenseDetails.subcategories}
+        accountMap={accountMap}
       />
     ),
-  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, accountMap, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
     <PageLayoutProvider pageId="expenses">

@@ -183,6 +183,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
         summaryMetrics={summaryMetrics}
         resolvedSlotData={resolvedSlotData}
         expenseDetails={expenseDetails}
+        accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
         timeline={timeline}
         opexTimeline={opexTimeline}
         cogsTimeline={cogsTimeline}
