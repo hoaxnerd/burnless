@@ -253,6 +253,11 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (dryRun) {
     const preview = prepared.map(({ index: _index, suggestedCategory, categoryConfidence, categorySource, importBatchId: _importBatchId, ...rest }) => ({
       ...rest,
+      // `prepared.amount` is a string (Drizzle numeric column shape).
+      // The client round-trips this preview back to POST /api/import on
+      // confirm; the importTransactionSchema expects amount as a number,
+      // so coerce here to keep the round-trip consistent.
+      amount: Number(rest.amount),
       isDuplicate: existingDuplicates.has(rest.externalId) || false,
       suggestedCategory,
       categoryConfidence,
