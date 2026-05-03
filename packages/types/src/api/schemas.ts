@@ -81,28 +81,117 @@ export type UpdateScenarioInput = z.infer<typeof updateScenarioSchema>;
 
 // ── Headcount Plans ─────────────────────────────────────────────────────────
 
+export const headcountEmployeeTypeEnum = z.enum(["full_time", "part_time", "contractor"]);
+
 export const createHeadcountSchema = z.object({
   departmentId: z.string(),
   title: z.string().min(1),
-  count: z.number().int().min(1).default(1),
+  name: z.string().nullable().optional(),
+  employeeType: headcountEmployeeTypeEnum.default("full_time"),
+  count: z.number().min(0).max(99.99).default(1),
   salary: positiveAmount(),
+  hourlyRate: z.number().nonnegative().nullable().optional(),
+  hoursPerWeek: z.number().min(0).max(168).nullable().optional(),
   startDate: dateString(),
   endDate: nullableDateString(),
   benefitsRate: ratio().default(0.20),
+  parameters: z.record(z.unknown()).optional(),
 });
 
 export const updateHeadcountSchema = z.object({
   departmentId: z.string().optional(),
   title: z.string().min(1).optional(),
-  count: z.number().int().min(1).optional(),
+  name: z.string().nullable().optional(),
+  employeeType: headcountEmployeeTypeEnum.optional(),
+  count: z.number().min(0).max(99.99).optional(),
   salary: positiveAmount().optional(),
+  hourlyRate: z.number().nonnegative().nullable().optional(),
+  hoursPerWeek: z.number().min(0).max(168).nullable().optional(),
   startDate: dateString().optional(),
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
   benefitsRate: ratio().optional(),
+  parameters: z.record(z.unknown()).optional(),
 });
 
 export type CreateHeadcountInput = z.infer<typeof createHeadcountSchema>;
 export type UpdateHeadcountInput = z.infer<typeof updateHeadcountSchema>;
+
+// ── Salary Changes ──────────────────────────────────────────────────────────
+
+export const createSalaryChangeSchema = z.object({
+  effectiveDate: dateString(),
+  newSalary: positiveAmount(),
+  reason: z.string().nullable().optional(),
+});
+
+export const updateSalaryChangeSchema = z.object({
+  effectiveDate: dateString().optional(),
+  newSalary: positiveAmount().optional(),
+  reason: z.string().nullable().optional(),
+});
+
+export type CreateSalaryChangeInput = z.infer<typeof createSalaryChangeSchema>;
+export type UpdateSalaryChangeInput = z.infer<typeof updateSalaryChangeSchema>;
+
+// ── Bonuses ─────────────────────────────────────────────────────────────────
+
+export const bonusTypeEnumZ = z.enum(["signing", "performance", "retention", "other"]);
+
+export const createBonusSchema = z.object({
+  payoutMonth: dateString(),
+  amount: positiveAmount(),
+  type: bonusTypeEnumZ.default("performance"),
+  notes: z.string().nullable().optional(),
+});
+
+export const updateBonusSchema = z.object({
+  payoutMonth: dateString().optional(),
+  amount: positiveAmount().optional(),
+  type: bonusTypeEnumZ.optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type CreateBonusInput = z.infer<typeof createBonusSchema>;
+export type UpdateBonusInput = z.infer<typeof updateBonusSchema>;
+
+// ── Equity Grants ───────────────────────────────────────────────────────────
+
+export const equityGrantTypeEnumZ = z.enum(["iso", "nso", "rsu"]);
+
+const vestingMilestoneSchema = z.object({
+  type: z.enum(["cliff", "monthly", "quarterly", "annual", "milestone"]),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  sharesVested: z.number().nonnegative(),
+});
+
+export const createEquityGrantSchema = z.object({
+  grantDate: dateString(),
+  shares: z.number().positive(),
+  strikePrice: z.number().nonnegative().nullable().optional(),
+  grantType: equityGrantTypeEnumZ.default("iso"),
+  parameters: z
+    .object({
+      vestingSchedule: z.array(vestingMilestoneSchema).default([]),
+    })
+    .passthrough()
+    .optional(),
+});
+
+export const updateEquityGrantSchema = z.object({
+  grantDate: dateString().optional(),
+  shares: z.number().positive().optional(),
+  strikePrice: z.number().nonnegative().nullable().optional(),
+  grantType: equityGrantTypeEnumZ.optional(),
+  parameters: z
+    .object({
+      vestingSchedule: z.array(vestingMilestoneSchema).optional(),
+    })
+    .passthrough()
+    .optional(),
+});
+
+export type CreateEquityGrantInput = z.infer<typeof createEquityGrantSchema>;
+export type UpdateEquityGrantInput = z.infer<typeof updateEquityGrantSchema>;
 
 // ── Revenue Streams ─────────────────────────────────────────────────────────
 

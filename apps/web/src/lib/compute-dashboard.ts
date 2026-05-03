@@ -140,11 +140,16 @@ export const computeDashboardData = cache(async function computeDashboardData(
     id: hp.id,
     departmentId: hp.departmentId,
     title: hp.title,
-    count: hp.count,
+    name: hp.name ?? null,
+    employeeType: hp.employeeType,
+    count: Number(hp.count),
     salary: Number(hp.salary),
+    hourlyRate: hp.hourlyRate == null ? null : Number(hp.hourlyRate),
+    hoursPerWeek: hp.hoursPerWeek == null ? null : Number(hp.hoursPerWeek),
     startDate: new Date(hp.startDate),
     endDate: hp.endDate ? new Date(hp.endDate) : null,
     benefitsRate: Number(hp.benefitsRate),
+    benefitsBreakdown: (hp.parameters as { benefitsBreakdown?: HeadcountPlanInput["benefitsBreakdown"] } | null)?.benefitsBreakdown,
   }));
   const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
 
@@ -320,7 +325,9 @@ export const computeDashboardData = cache(async function computeDashboardData(
     }
   }
 
-  const profitAndLoss = generateProfitAndLoss(accountDataList);
+  const profitAndLoss = generateProfitAndLoss(accountDataList, {
+    personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
+  });
   const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows);
 
   // Add derived balance sheet accounts so generateBalanceSheet has data.

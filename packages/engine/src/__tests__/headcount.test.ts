@@ -11,8 +11,11 @@ describe("headcount", () => {
         id: "h1",
         departmentId: "eng",
         title: "Senior Engineer",
+        employeeType: "full_time",
         count: 2,
         salary: 120000, // $120k annual
+        hourlyRate: null,
+        hoursPerWeek: null,
         startDate: start,
         endDate: null,
         benefitsRate: 0.20,
@@ -36,8 +39,11 @@ describe("headcount", () => {
         id: "h1",
         departmentId: "eng",
         title: "Engineer",
+        employeeType: "full_time",
         count: 1,
         salary: 120000,
+        hourlyRate: null,
+        hoursPerWeek: null,
         startDate: new Date(2026, 2, 1), // Mar 1
         endDate: null,
         benefitsRate: 0.20,
@@ -52,9 +58,9 @@ describe("headcount", () => {
 
   it("aggregates by department", () => {
     const plans: HeadcountPlanInput[] = [
-      { id: "h1", departmentId: "eng", title: "Eng 1", count: 1, salary: 120000, startDate: start, endDate: null, benefitsRate: 0.20 },
-      { id: "h2", departmentId: "eng", title: "Eng 2", count: 1, salary: 96000, startDate: start, endDate: null, benefitsRate: 0.20 },
-      { id: "h3", departmentId: "sales", title: "AE", count: 1, salary: 80000, startDate: start, endDate: null, benefitsRate: 0.20 },
+      { id: "h1", departmentId: "eng", title: "Eng 1", employeeType: "full_time", count: 1, salary: 120000, hourlyRate: null, hoursPerWeek: null, startDate: start, endDate: null, benefitsRate: 0.20 },
+      { id: "h2", departmentId: "eng", title: "Eng 2", employeeType: "full_time", count: 1, salary: 96000, hourlyRate: null, hoursPerWeek: null, startDate: start, endDate: null, benefitsRate: 0.20 },
+      { id: "h3", departmentId: "sales", title: "AE", employeeType: "full_time", count: 1, salary: 80000, hourlyRate: null, hoursPerWeek: null, startDate: start, endDate: null, benefitsRate: 0.20 },
     ];
 
     const result = computeAllHeadcountCosts(plans, start, end);

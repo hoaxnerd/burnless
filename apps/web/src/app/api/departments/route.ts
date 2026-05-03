@@ -8,6 +8,7 @@ import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import { getActiveScenario } from "@/lib/scenario-middleware";
+import { depthAtParent, DEPT_MAX_DEPTH } from "@/lib/department-depth";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -45,6 +46,14 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const parsed = await parseBody(request, createDepartmentSchema);
   if ("error" in parsed) return parsed.error;
+
+  const depth = await depthAtParent(ctx.companyId, parsed.data.parentId ?? null);
+  if (depth > DEPT_MAX_DEPTH) {
+    return NextResponse.json(
+      { error: "Department hierarchy capped at 3 levels", code: "DEPT_DEPTH_EXCEEDED" },
+      { status: 400 },
+    );
+  }
 
   const data = { companyId: ctx.companyId, ...parsed.data };
   const row = await scenarioInsert("department", departments, data, scenarioId);

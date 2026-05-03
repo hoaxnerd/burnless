@@ -25,6 +25,13 @@ export const PATCH = withErrorHandler(async (
   const changes: Record<string, unknown> = { ...parsed.data };
   if (parsed.data.salary !== undefined) changes.salary = String(parsed.data.salary);
   if (parsed.data.benefitsRate !== undefined) changes.benefitsRate = String(parsed.data.benefitsRate);
+  if (parsed.data.count !== undefined) changes.count = parsed.data.count.toFixed(2);
+  if (parsed.data.hourlyRate !== undefined) {
+    changes.hourlyRate = parsed.data.hourlyRate === null ? null : String(parsed.data.hourlyRate);
+  }
+  if (parsed.data.hoursPerWeek !== undefined) {
+    changes.hoursPerWeek = parsed.data.hoursPerWeek === null ? null : String(parsed.data.hoursPerWeek);
+  }
 
   const row = await scenarioUpdate("headcount_plan", headcountPlans, id, changes, scenarioId);
   if (!row) return errorResponse("Headcount plan not found", 404);

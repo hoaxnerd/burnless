@@ -7,7 +7,11 @@ import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { formatCurrency } from "@burnless/types";
-import { AddHireForm, type EditHire } from "./add-hire-form";
+import { HeadcountForm, type EditableHeadcount } from "./headcount-form";
+import { SalaryChangesList, type SalaryChange } from "./salary-changes-list";
+import { BonusesList, type Bonus } from "./bonuses-list";
+import { EquityGrantsList, type EquityGrant } from "./equity-grants-list";
+import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
@@ -21,11 +25,19 @@ interface TeamMember {
   id: string;
   departmentId: string;
   title: string;
+  name?: string | null;
+  employeeType?: "full_time" | "part_time" | "contractor";
   count: number;
   salary: number;
+  hourlyRate?: number | null;
+  hoursPerWeek?: number | null;
   benefitsRate: number;
   startDate: string;
   endDate?: string | null;
+  parameters?: { benefitsBreakdown?: BenefitsBreakdown } | null;
+  salaryChanges: SalaryChange[];
+  bonuses: Bonus[];
+  equityGrants: EquityGrant[];
 }
 
 interface DepartmentGroup {
@@ -39,12 +51,20 @@ interface PlannedHire {
   id: string;
   departmentId: string;
   title: string;
+  name?: string | null;
+  employeeType?: "full_time" | "part_time" | "contractor";
   department: string;
   salary: number;
+  hourlyRate?: number | null;
+  hoursPerWeek?: number | null;
   benefitsRate: number;
   startDate: string;
   endDate?: string | null;
   count: number;
+  parameters?: { benefitsBreakdown?: BenefitsBreakdown } | null;
+  salaryChanges: SalaryChange[];
+  bonuses: Bonus[];
+  equityGrants: EquityGrant[];
 }
 
 const deptColors = [
@@ -63,6 +83,7 @@ interface TeamRosterProps {
   totalMonthlyCost: number;
   scenarioId: string;
   departments: Department[];
+  companyBenefitsRates: BenefitsBreakdown;
 }
 
 export function TeamRoster({
@@ -70,10 +91,12 @@ export function TeamRoster({
   totalMonthlyCost,
   scenarioId,
   departments,
+  companyBenefitsRates,
 }: TeamRosterProps) {
   const router = useRouter();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
-  const [editingHire, setEditingHire] = useState<EditHire | null>(null);
+  const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const {
@@ -104,11 +127,16 @@ export function TeamRoster({
       id: member.id,
       departmentId: member.departmentId,
       title: member.title,
+      name: member.name ?? null,
+      employeeType: member.employeeType ?? "full_time",
       count: member.count,
       salary: member.salary,
+      hourlyRate: member.hourlyRate ?? null,
+      hoursPerWeek: member.hoursPerWeek ?? null,
       startDate: member.startDate,
       endDate: member.endDate,
       benefitsRate: member.benefitsRate,
+      parameters: member.parameters ?? null,
     });
   }
 
@@ -157,10 +185,11 @@ export function TeamRoster({
     <div className="space-y-4">
       {/* Edit modal */}
       {editingHire && (
-        <AddHireForm
+        <HeadcountForm
           scenarioId={scenarioId}
           departments={departments}
-          editHire={editingHire}
+          companyBenefitsRates={companyBenefitsRates}
+          edit={editingHire}
           open={!!editingHire}
           onClose={() => setEditingHire(null)}
         />
@@ -229,6 +258,7 @@ export function TeamRoster({
                         const memberOverride = isInScenarioMode ? overrideMap.get(member.id) : undefined;
                         const memberOverrideTag = memberOverride?.action === "modify" ? "modified" as const : memberOverride?.action === "create" ? "created" as const : null;
 
+                        const isDetailsOpen = detailsId === member.id;
                         return (
                           <OverrideIndicator
                             key={member.id}
@@ -237,47 +267,71 @@ export function TeamRoster({
                             onRevert={() => handleRevert(member.id)}
                             onRemove={() => handleRemove(member.id)}
                           >
-                            <div
-                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-50 transition-colors group/row"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <div className={`h-2 w-2 rounded-full ${color.dot}`} />
-                                <span className="text-sm text-surface-700">{member.title}</span>
-                                {member.count > 1 && (
-                                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
-                                    ×{member.count}
+                            <div className="rounded-lg hover:bg-surface-50 transition-colors group/row">
+                              <div className="flex items-center justify-between py-2 px-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailsId((cur) => (cur === member.id ? null : member.id))}
+                                  className="flex items-center gap-2.5 text-left"
+                                  title={isDetailsOpen ? "Collapse details" : "Expand details (compensation history)"}
+                                >
+                                  <div className={`h-2 w-2 rounded-full ${color.dot}`} />
+                                  <span className="text-sm text-surface-700">{member.title}</span>
+                                  {member.count > 1 && (
+                                    <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+                                      ×{member.count}
+                                    </span>
+                                  )}
+                                </button>
+                                <div className="flex items-center gap-4 text-right">
+                                  <span className="text-xs tabular-nums text-surface-400">
+                                    {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
                                   </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-4 text-right">
-                                <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
-                                </span>
-                                <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
-                                </span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
-                                    className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                                    title="Edit team member"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleInlineDelete(member.id); }}
-                                    disabled={deletingId === member.id}
-                                    className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
-                                      confirmDeleteId === member.id
-                                        ? "text-white bg-danger-600 hover:bg-danger-700"
-                                        : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
-                                    }`}
-                                    title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  <span className="text-sm tabular-nums font-medium text-surface-700">
+                                    {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
+                                  </span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
+                                      className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                                      title="Edit team member"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleInlineDelete(member.id); }}
+                                      disabled={deletingId === member.id}
+                                      className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                                        confirmDeleteId === member.id
+                                          ? "text-white bg-danger-600 hover:bg-danger-700"
+                                          : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
+                                      }`}
+                                      title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
+                              {isDetailsOpen && (
+                                <div className="px-3 pb-3 space-y-3 border-t border-surface-100 pt-3 mt-1">
+                                  <SalaryChangesList
+                                    headcountId={member.id}
+                                    scenarioId={scenarioId}
+                                    changes={member.salaryChanges}
+                                  />
+                                  <BonusesList
+                                    headcountId={member.id}
+                                    scenarioId={scenarioId}
+                                    bonuses={member.bonuses}
+                                  />
+                                  <EquityGrantsList
+                                    headcountId={member.id}
+                                    scenarioId={scenarioId}
+                                    grants={member.equityGrants}
+                                  />
+                                </div>
+                              )}
                             </div>
                           </OverrideIndicator>
                         );
@@ -308,15 +362,17 @@ interface PlannedHiresSectionProps {
   plannedHires: PlannedHire[];
   scenarioId: string;
   departments: Department[];
+  companyBenefitsRates: BenefitsBreakdown;
 }
 
 export function PlannedHiresSection({
   plannedHires,
   scenarioId,
   departments,
+  companyBenefitsRates,
 }: PlannedHiresSectionProps) {
   const router = useRouter();
-  const [editingHire, setEditingHire] = useState<EditHire | null>(null);
+  const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const {
@@ -348,11 +404,16 @@ export function PlannedHiresSection({
       id: hire.id,
       departmentId: hire.departmentId,
       title: hire.title,
+      name: hire.name ?? null,
+      employeeType: hire.employeeType ?? "full_time",
       count: hire.count,
       salary: hire.salary,
+      hourlyRate: hire.hourlyRate ?? null,
+      hoursPerWeek: hire.hoursPerWeek ?? null,
       startDate: hire.startDate,
       endDate: hire.endDate,
       benefitsRate: hire.benefitsRate,
+      parameters: hire.parameters ?? null,
     });
   }
 
@@ -398,10 +459,11 @@ export function PlannedHiresSection({
     <div className="space-y-4">
       {/* Edit modal */}
       {editingHire && (
-        <AddHireForm
+        <HeadcountForm
           scenarioId={scenarioId}
           departments={departments}
-          editHire={editingHire}
+          companyBenefitsRates={companyBenefitsRates}
+          edit={editingHire}
           open={!!editingHire}
           onClose={() => setEditingHire(null)}
         />

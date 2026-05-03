@@ -122,8 +122,22 @@ export interface WorkingCapitalAdjustments {
 
 // ── P&L Generation ───────────────────────────────────────────────────────────
 
+/** Optional inputs to enrich the P&L with synthesized sub-lines (umbrella §1.3, §1.4). */
+export interface ProfitAndLossOptions {
+  /**
+   * When provided, the operating-expenses node gains a synthesized "Benefits"
+   * sub-line whose four children are the generic employer-benefits components.
+   */
+  personnelBreakdown?: {
+    benefitsByComponent: Map<string, MonthlySeries>;
+  };
+}
+
 /** Generate a P&L statement from account-level data. */
-export function generateProfitAndLoss(accounts: AccountData[]): ProfitAndLoss {
+export function generateProfitAndLoss(
+  accounts: AccountData[],
+  options: ProfitAndLossOptions = {},
+): ProfitAndLoss {
   const revenueSeries = sumByCategory(accounts, "revenue");
   const cogsSeries = sumByCategory(accounts, "cogs");
   const opexSeries = sumByCategory(accounts, "operating_expense");
@@ -141,7 +155,7 @@ export function generateProfitAndLoss(accounts: AccountData[]): ProfitAndLoss {
   const grossMargin = computeMargin(grossProfitSeries, revenueSeries);
   const netMargin = computeMargin(netIncomeSeries, revenueSeries);
 
-  return {
+  const result: ProfitAndLoss = {
     revenue: buildLineItem("Revenue", revenueSeries, filterByCategory(accounts, "revenue")),
     cogs: buildLineItem("Cost of Goods Sold", cogsSeries, filterByCategory(accounts, "cogs")),
     grossProfit: buildLineItem("Gross Profit", grossProfitSeries),
@@ -153,6 +167,34 @@ export function generateProfitAndLoss(accounts: AccountData[]): ProfitAndLoss {
     grossMargin,
     netMargin,
   };
+
+  if (options.personnelBreakdown?.benefitsByComponent) {
+    const componentLabels: Record<string, string> = {
+      statutoryEmployerContributionsCost: "Statutory Employer Contributions",
+      insuranceBenefitsCost: "Insurance Benefits",
+      retirementContributionsCost: "Retirement Contributions",
+      otherBenefitsCost: "Other Benefits",
+    };
+    const childItems: StatementLineItem[] = [];
+    let benefitsTotal: MonthlySeries = new Map();
+    for (const [key, label] of Object.entries(componentLabels)) {
+      const series = options.personnelBreakdown.benefitsByComponent.get(key) ?? new Map<string, number>();
+      benefitsTotal = addSeries(benefitsTotal, series);
+      childItems.push({
+        name: label,
+        values: seriesToArray(series),
+      });
+    }
+    const benefitsLine: StatementLineItem = {
+      name: "Benefits",
+      values: seriesToArray(benefitsTotal),
+      children: childItems,
+    };
+    if (!result.operatingExpenses.children) result.operatingExpenses.children = [];
+    result.operatingExpenses.children.push(benefitsLine);
+  }
+
+  return result;
 }
 
 // ── Working Capital Modeling ─────────────────────────────────────────────────

@@ -159,8 +159,11 @@ describe("Decimal precision — headcount costs", () => {
       id: "eng-1",
       departmentId: "eng",
       title: "Engineer",
+      employeeType: "full_time",
       count: 1,
       salary: 100000, // $100k/year — $8333.333.../month
+      hourlyRate: null,
+      hoursPerWeek: null,
       startDate: new Date(2026, 0, 1),
       endDate: null,
       benefitsRate: 0.2,

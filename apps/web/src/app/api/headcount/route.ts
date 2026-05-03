@@ -46,12 +46,19 @@ export const POST = withErrorHandler(async (request: Request) => {
   const parsed = await parseBody(request, createHeadcountSchema);
   if ("error" in parsed) return parsed.error;
 
-  const data = {
+  const data: Record<string, unknown> = {
     ...parsed.data,
     companyId: ctx.companyId,
     salary: String(parsed.data.salary),
     benefitsRate: String(parsed.data.benefitsRate),
+    count: parsed.data.count.toFixed(2),
   };
+  if (parsed.data.hourlyRate !== undefined) {
+    data.hourlyRate = parsed.data.hourlyRate === null ? null : String(parsed.data.hourlyRate);
+  }
+  if (parsed.data.hoursPerWeek !== undefined) {
+    data.hoursPerWeek = parsed.data.hoursPerWeek === null ? null : String(parsed.data.hoursPerWeek);
+  }
   const row = await scenarioInsert("headcount_plan", headcountPlans, data, scenarioId);
 
   if (row) await logAudit(ctx, "headcount_plan", row.id, "create", { after: row });

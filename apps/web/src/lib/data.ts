@@ -11,7 +11,18 @@
  */
 
 import { cache } from "react";
-import { db, getCompanyForUser, getOverrideCount } from "@burnless/db";
+import {
+  db,
+  getCompanyForUser,
+  getOverrideCount,
+  listResolvedSalaryChanges,
+  listResolvedBonuses,
+  listResolvedEquityGrants,
+  type SalaryChange,
+  type Bonus,
+  type EquityGrant,
+} from "@burnless/db";
+import type { ResolvedEntity } from "@burnless/db";
 import {
   companies,
   scenarios,
@@ -183,6 +194,38 @@ export const getHeadcountPlans = cachedQuery(
   ["headcount-plans"],
   { revalidate: 30, tags: ["headcount-plans"] }
 );
+
+/**
+ * Get resolved salary changes / bonuses / equity grants for a list of
+ * headcount IDs in a single batched call. Returned map is keyed by
+ * headcountId. Used by the team page to show real child-row data.
+ */
+export async function getTeamChildEntitiesByHeadcount(
+  companyId: string,
+  scenarioId: string | null,
+  headcountIds: string[],
+): Promise<Map<string, {
+  salaryChanges: ResolvedEntity<SalaryChange>[];
+  bonuses: ResolvedEntity<Bonus>[];
+  equityGrants: ResolvedEntity<EquityGrant>[];
+}>> {
+  const result = new Map<string, {
+    salaryChanges: ResolvedEntity<SalaryChange>[];
+    bonuses: ResolvedEntity<Bonus>[];
+    equityGrants: ResolvedEntity<EquityGrant>[];
+  }>();
+  await Promise.all(
+    headcountIds.map(async (id) => {
+      const [salaryChanges, bonuses, equityGrants] = await Promise.all([
+        listResolvedSalaryChanges(companyId, id, scenarioId),
+        listResolvedBonuses(companyId, id, scenarioId),
+        listResolvedEquityGrants(companyId, id, scenarioId),
+      ]);
+      result.set(id, { salaryChanges, bonuses, equityGrants });
+    }),
+  );
+  return result;
+}
 
 /** Get departments for a company. */
 export const getDepartments = cachedQuery(

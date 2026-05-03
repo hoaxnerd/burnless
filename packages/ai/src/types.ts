@@ -93,6 +93,34 @@ export interface FinancialSnapshot {
     id: string;
     name: string;
   }>;
+  /**
+   * Per-headcount detail for the active scenario — enables AI tools to reason
+   * about individual hires rather than only aggregate cost. Phase 1 §1.5.
+   */
+  headcountDetails: Array<{
+    id: string;
+    title: string;
+    name: string | null;
+    employeeType: string;
+    count: number;
+    salary: number;
+    salaryChanges: Array<{
+      effectiveDate: string;
+      newSalary: number;
+      reason: string | null;
+    }>;
+    bonuses: Array<{
+      payoutMonth: string;
+      amount: number;
+      type: string;
+    }>;
+    equityGrants: Array<{
+      grantDate: string;
+      shares: number;
+      grantType: string;
+      vestingSchedule: Array<{ type: string; date: string; sharesVested: number }>;
+    }>;
+  }>;
 }
 
 // ── Chat types ──────────────────────────────────────────────────────────────
