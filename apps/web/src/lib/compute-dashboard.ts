@@ -10,6 +10,7 @@ import { cache } from "react";
 import {
   computeAllForecastLines,
   aggregateByAccount,
+  computeRevenueStream,
   computeTotalRevenue,
   computeSubscriptionDetail,
   computeAllHeadcountCosts,
@@ -44,12 +45,23 @@ import {
   getTransactions,
 } from "./data";
 
+export interface RevenueByType {
+  subscriptionRevenue: MonthlySeries;
+  oneTimeRevenue: MonthlySeries;
+  usageRevenue: MonthlySeries;
+  servicesRevenue: MonthlySeries;
+  marketplaceRevenue: MonthlySeries;
+  ecommerceRevenue: MonthlySeries;
+  hardwareRevenue: MonthlySeries;
+}
+
 export interface DashboardData {
   metrics: ComputedMetrics;
   profitAndLoss: ProfitAndLoss;
   cashFlow: CashFlowStatement;
   balanceSheet: BalanceSheet;
   totalRevenue: MonthlySeries;
+  revenueByType: RevenueByType;
   totalExpenses: MonthlySeries;
   totalCogs: MonthlySeries;
   totalOpex: MonthlySeries;
@@ -122,8 +134,35 @@ export const computeDashboardData = cache(async function computeDashboardData(
     name: rs.name,
     type: rs.type,
     parameters: (rs.parameters ?? {}) as Record<string, unknown>,
+    startDate: rs.startDate,
+    endDate: rs.endDate,
   }));
   const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
+
+  // Per-type revenue mix (component metrics — keys match slugs in metric registry Task 6).
+  const revenueByTypeRaw: Record<string, MonthlySeries> = {
+    subscription: new Map(),
+    one_time: new Map(),
+    usage_based: new Map(),
+    services: new Map(),
+    marketplace: new Map(),
+    ecommerce: new Map(),
+    hardware: new Map(),
+  };
+  for (const stream of revInputs) {
+    const series = computeRevenueStream(stream, periodStart, periodEnd);
+    const existing = revenueByTypeRaw[stream.type] ?? new Map<string, number>();
+    revenueByTypeRaw[stream.type] = addSeries(existing, series);
+  }
+  const revenueByType: RevenueByType = {
+    subscriptionRevenue: revenueByTypeRaw.subscription!,
+    oneTimeRevenue: revenueByTypeRaw.one_time!,
+    usageRevenue: revenueByTypeRaw.usage_based!,
+    servicesRevenue: revenueByTypeRaw.services!,
+    marketplaceRevenue: revenueByTypeRaw.marketplace!,
+    ecommerceRevenue: revenueByTypeRaw.ecommerce!,
+    hardwareRevenue: revenueByTypeRaw.hardware!,
+  };
 
   // Subscription details
   const subStreams = revStreams.filter((rs) => rs.type === "subscription");
@@ -371,6 +410,7 @@ export const computeDashboardData = cache(async function computeDashboardData(
     cashFlow,
     balanceSheet,
     totalRevenue,
+    revenueByType,
     totalExpenses,
     totalCogs,
     totalOpex,

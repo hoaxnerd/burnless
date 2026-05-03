@@ -11,7 +11,19 @@ import {
   seriesToArray,
 } from "@burnless/engine";
 import { formatCurrency, formatNumber, type CurrencyCode, isValidCurrency } from "@burnless/types";
-import type { FinancialSnapshot, ExpenseSnapshotRow } from "./types";
+import type { FinancialSnapshot, RevenueStreamSnapshotRow, ExpenseSnapshotRow } from "./types";
+
+/** Structural input shape for a revenue stream passed to `buildFinancialSnapshot`. */
+export interface RevenueStreamLike {
+  id: string;
+  name: string;
+  type: RevenueStreamSnapshotRow["type"];
+  startDate: Date | string;
+  endDate: Date | string | null;
+  parameters: Record<string, unknown>;
+  /** Resolved current-month revenue from the engine. */
+  currentAmount?: number;
+}
 
 /** Structural input shape for an expense line passed to `buildFinancialSnapshot`. */
 export interface ExpenseLineLike {
@@ -63,6 +75,7 @@ interface ContextInput {
     date: string;
     isProjected: boolean;
   }>;
+  revenueStreams?: RevenueStreamLike[];
   headcountDetails: Array<{
     id: string;
     title: string;
@@ -126,6 +139,26 @@ export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
       churnRate: latestMetricValue(metrics.customerChurnRate),
     },
     revenueByMonth: seriesToArray(input.totalRevenue).map((v) => ({ month: v.month, amount: v.value })),
+    revenueStreams: (input.revenueStreams ?? []).map((s) => {
+      const sd = typeof s.startDate === "string" ? s.startDate : s.startDate.toISOString().slice(0, 10);
+      const ed = s.endDate
+        ? (typeof s.endDate === "string" ? s.endDate : s.endDate.toISOString().slice(0, 10))
+        : null;
+      const params = s.parameters as Record<string, unknown>;
+      const pricingModel = params?.pricingModel as RevenueStreamSnapshotRow["pricingModel"] | undefined;
+      const tiers = Array.isArray(params?.tiers) ? (params.tiers as unknown[]) : undefined;
+      return {
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        startDate: sd,
+        endDate: ed,
+        parameters: params,
+        currentAmount: s.currentAmount ?? 0,
+        pricingModel,
+        tierCount: tiers?.length,
+      };
+    }),
     expensesByMonth: seriesToArray(input.totalExpenses).map((v) => ({ month: v.month, amount: v.value })),
     cashByMonth: seriesToArray(input.cashPosition).map((v) => ({ month: v.month, amount: v.value })),
     headcountByMonth: seriesToArray(input.headcountSeries).map((v) => ({ month: v.month, count: v.value })),
@@ -215,6 +248,22 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(`## Monthly Revenue Trend`);
     for (const { month, amount } of recentRevenue) {
       lines.push(`- ${month}: ${formatCurrency(amount, currency, locale)}`);
+    }
+  }
+
+  if (snapshot.revenueStreams.length > 0) {
+    // Cap at 20 highest-currentAmount streams to keep prompt compact.
+    const top = [...snapshot.revenueStreams]
+      .sort((a, b) => b.currentAmount - a.currentAmount)
+      .slice(0, 20);
+    lines.push(``);
+    lines.push(`## Active Revenue Streams`);
+    for (const s of top) {
+      const dateRange = s.endDate ? `${s.startDate} → ${s.endDate}` : `${s.startDate} → open`;
+      const pricing = s.pricingModel && s.pricingModel !== "flat"
+        ? ` [${s.pricingModel}${s.tierCount ? `, ${s.tierCount} tiers` : ""}]`
+        : "";
+      lines.push(`- ${s.name} (${s.type})${pricing} — ${formatCurrency(s.currentAmount, currency, locale)} (active ${dateRange})`);
     }
   }
 

@@ -131,6 +131,9 @@ export const revenueStreamTypeEnum = pgEnum("revenue_stream_type", [
   "one_time",
   "usage_based",
   "services",
+  "marketplace",
+  "ecommerce",
+  "hardware",
 ]);
 
 export const metricCategoryEnum = pgEnum("metric_category", [
@@ -728,6 +731,8 @@ export const revenueStreams = pgTable(
     name: text("name").notNull(),
     type: revenueStreamTypeEnum("type").notNull().default("subscription"),
     parameters: jsonb("parameters").notNull().default({}),
+    startDate: timestamp("start_date", { mode: "date" }).notNull().defaultNow(),
+    endDate: timestamp("end_date", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -736,6 +741,7 @@ export const revenueStreams = pgTable(
   },
   (table) => [
     index("revenue_streams_company_idx").on(table.companyId),
+    index("revenue_streams_active_idx").on(table.companyId, table.startDate, table.endDate),
   ]
 );
 

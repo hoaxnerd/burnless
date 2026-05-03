@@ -63,6 +63,16 @@ vi.mock("@/lib/scenario-middleware", () => ({
   getActiveScenario: mockGetActiveScenario,
 }));
 
+const { mockValidateTiers } = vi.hoisted(() => ({
+  mockValidateTiers: vi.fn(),
+}));
+
+vi.mock("@/lib/revenue-params", () => ({
+  validateTiers: mockValidateTiers,
+}));
+
+vi.mock("@burnless/engine", () => ({}));
+
 import { GET, POST } from "../route";
 
 function jsonRequest(url: string, method: string, body?: unknown): Request {
@@ -78,6 +88,7 @@ beforeEach(() => {
   });
   mockRequireRole.mockReturnValue(null);
   mockGetActiveScenario.mockReturnValue(null);
+  mockValidateTiers.mockReturnValue(undefined); // passes by default
 
   mockSelect.mockReturnValue({ from: mockFrom });
   mockFrom.mockReturnValue({ where: mockWhere });
@@ -132,6 +143,7 @@ describe("POST /api/revenue-streams", () => {
       jsonRequest("http://localhost/api/revenue-streams", "POST", {
         name: "SaaS Subscriptions",
         type: "subscription",
+        startDate: "2026-01-01",
         parameters: { price: 49 },
       }),
     );
@@ -155,6 +167,7 @@ describe("POST /api/revenue-streams", () => {
       jsonRequest("http://localhost/api/revenue-streams", "POST", {
         name: "Test",
         type: "subscription",
+        startDate: "2026-01-01",
       }),
     );
     expect(mockScenarioInsert).toHaveBeenCalledWith(
@@ -171,9 +184,56 @@ describe("POST /api/revenue-streams", () => {
     );
     const res = await POST(
       jsonRequest("http://localhost/api/revenue-streams", "POST", {
-        name: "Test", type: "subscription",
+        name: "Test", type: "subscription", startDate: "2026-01-01",
       }),
     );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects POST missing startDate with 400", async () => {
+    const res = await POST(
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "Test",
+        type: "subscription",
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("creates a marketplace stream with valid startDate (201)", async () => {
+    const created = { id: "rs-mp", name: "Market", type: "marketplace", companyId: "comp-1" };
+    mockScenarioInsert.mockResolvedValue(created);
+
+    const res = await POST(
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "Market",
+        type: "marketplace",
+        startDate: "2026-01-01",
+        parameters: { gmv: 50000, takeRate: 0.05 },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.id).toBe("rs-mp");
+  });
+
+  it("returns 400 for POST with invalid (overlapping) tiers", async () => {
+    mockValidateTiers.mockImplementationOnce(() => {
+      throw new Error("Tiers must be in ascending order by minUnits.");
+    });
+    const res = await POST(
+      jsonRequest("http://localhost/api/revenue-streams", "POST", {
+        name: "Tiered",
+        type: "usage_based",
+        startDate: "2026-01-01",
+        parameters: {
+          tiers: [
+            { name: "High", minUnits: 100, maxUnits: null, pricePerUnit: 0.5 },
+            { name: "Low", minUnits: 0, maxUnits: 99, pricePerUnit: 1 },
+          ],
+        },
+      }),
+    );
+    expect(res.status).toBe(400);
   });
 });

@@ -95,6 +95,7 @@ function makeTestSnapshot(): FinancialSnapshot {
       totalOpex: 127000,
       netIncome: -93850,
     },
+    revenueStreams: [],
     fundingRounds: [],
     scenarios: [
       { id: "s1", name: "Base Case", source: "blank", status: "active" },

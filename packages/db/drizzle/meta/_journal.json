@@ -253,6 +253,13 @@
       "when": 1777939200000,
       "tag": "0035_extend_audit_entity_type",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1778025600000,
+      "tag": "0036_phase1_revenue_schema",
+      "breakpoints": true
     }
   ]
 }

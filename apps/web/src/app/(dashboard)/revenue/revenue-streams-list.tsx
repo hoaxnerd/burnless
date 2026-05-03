@@ -2,6 +2,7 @@
 
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface MetricPoint {
   month: string;
@@ -13,6 +14,8 @@ interface StreamData {
   name: string;
   type: string;
   parameters: Record<string, unknown>;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
 }
 
 interface RevenueStreamsListProps {
@@ -28,6 +31,9 @@ const typeLabels: Record<string, string> = {
   one_time: "One-Time",
   usage_based: "Usage-Based",
   services: "Services",
+  marketplace: "Marketplace",
+  ecommerce: "E-commerce",
+  hardware: "Hardware",
 };
 
 const typeColors: Record<string, string> = {
@@ -35,7 +41,15 @@ const typeColors: Record<string, string> = {
   one_time: "bg-emerald-100 text-emerald-700",
   usage_based: "bg-purple-100 text-purple-700",
   services: "bg-amber-100 text-amber-700",
+  marketplace: "bg-emerald-50 text-emerald-700",
+  ecommerce: "bg-rose-50 text-rose-700",
+  hardware: "bg-slate-100 text-slate-700",
 };
+
+/** Returns an ISO-date string (YYYY-MM-DD) from a Date or string. */
+function formatDateLabel(d: string | Date): string {
+  return (typeof d === "string" ? d : d.toISOString()).slice(0, 10);
+}
 
 export function RevenueStreamsList({
   streams,
@@ -90,7 +104,21 @@ export function RevenueStreamsList({
               {streams.map((stream) => (
                 <tr key={stream.id} className="border-b border-surface-100 hover:bg-surface-50 transition-colors">
                   <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-surface-900">{stream.name}</span>
+                    <div className="flex items-center flex-wrap gap-1">
+                      <span className="text-sm font-medium text-surface-900">{stream.name}</span>
+                      {stream.startDate && (
+                        <span className="ml-2 inline-flex rounded-md px-2 py-0.5 text-xs bg-surface-100 text-surface-600">
+                          {formatDateLabel(stream.startDate)}
+                          {stream.endDate ? ` → ${formatDateLabel(stream.endDate)}` : " → open"}
+                        </span>
+                      )}
+                      {Array.isArray((stream.parameters as Record<string, unknown>).tiers) &&
+                        ((stream.parameters as Record<string, unknown> & { tiers: unknown[] }).tiers.length > 0) && (
+                        <span className="ml-2 inline-flex rounded-md px-2 py-0.5 text-xs bg-violet-50 text-violet-700">
+                          {(stream.parameters as { tiers: unknown[] }).tiers.length} tiers
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${typeColors[stream.type] ?? "bg-surface-100 text-surface-700"}`}>
@@ -128,13 +156,15 @@ export function RevenueStreamsList({
 }
 
 function StreamParams({ type, params }: { type: string; params: Record<string, unknown> }) {
+  const { fmtCurrency } = useLocale();
+
   if (type === "subscription") {
     const price = params.monthlyPrice ?? 0;
     const customers = params.startingCustomers ?? 0;
     const churn = params.monthlyChurnRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        ${Number(price)}/mo &middot; {Number(customers)} customers &middot; {(Number(churn) * 100).toFixed(1)}% churn
+        {fmtCurrency(Number(price))}/mo &middot; {Number(customers)} customers &middot; {(Number(churn) * 100).toFixed(1)}% churn
       </span>
     );
   }
@@ -143,7 +173,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const hours = params.hoursPerMonth ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        ${Number(rate)}/hr &middot; {Number(hours)} hrs/mo
+        {fmtCurrency(Number(rate))}/hr &middot; {Number(hours)} hrs/mo
       </span>
     );
   }
@@ -152,7 +182,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const units = params.unitsPerMonth ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        ${Number(price)}/unit &middot; {Number(units)} units/mo
+        {fmtCurrency(Number(price))}/unit &middot; {Number(units)} units/mo
       </span>
     );
   }
@@ -161,7 +191,34 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const users = params.activeUsers ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        ${Number(price)}/unit &middot; {Number(users)} units/mo
+        {fmtCurrency(Number(price))}/unit &middot; {Number(users)} units/mo
+      </span>
+    );
+  }
+  if (type === "marketplace") {
+    const gmv = params.startingGmv ?? 0;
+    const takeRate = params.takeRate ?? 0;
+    return (
+      <span className="text-xs text-surface-600">
+        GMV {fmtCurrency(Number(gmv))} &times; {(Number(takeRate) * 100).toFixed(1)}% take rate
+      </span>
+    );
+  }
+  if (type === "ecommerce") {
+    const orders = params.ordersPerMonth ?? 0;
+    const aov = params.averageOrderValue ?? 0;
+    return (
+      <span className="text-xs text-surface-600">
+        {Number(orders)} orders/mo &middot; {fmtCurrency(Number(aov))} AOV
+      </span>
+    );
+  }
+  if (type === "hardware") {
+    const units = params.unitsPerMonth ?? 0;
+    const price = params.pricePerUnit ?? 0;
+    return (
+      <span className="text-xs text-surface-600">
+        {Number(units)} units/mo &middot; {fmtCurrency(Number(price))}/unit
       </span>
     );
   }

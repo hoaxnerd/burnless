@@ -1,0 +1,78 @@
+"use client";
+
+import { CurrencyInput, NumberInput, PercentageInput } from "@/components/forms/primitives";
+import { TieredPricingEditor } from "./TieredPricingEditor";
+import type { PricingTier } from "@burnless/engine";
+
+export interface FieldsProps {
+  params: Record<string, unknown>;
+  setParams: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void;
+}
+
+const get = <T,>(p: Record<string, unknown>, k: string, fb: T): T =>
+  (p[k] as T) ?? fb;
+
+export function UsageFields({ params, setParams }: FieldsProps) {
+  const set = (k: string, v: unknown) => setParams((p) => ({ ...p, [k]: v }));
+
+  const pricingModel = (params.pricingModel as "flat" | "tiered" | undefined) ?? "flat";
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <NumberInput
+        label="Active users"
+        value={get(params, "activeUsers", 0)}
+        onChange={(n) => set("activeUsers", n ?? 0)}
+        required
+        integerOnly
+        min={0}
+      />
+      <NumberInput
+        label="Avg usage per user"
+        value={get(params, "avgUsagePerUser", 0)}
+        onChange={(n) => set("avgUsagePerUser", n ?? 0)}
+        required
+        min={0}
+      />
+      <CurrencyInput
+        label="Price per unit"
+        value={get(params, "pricePerUnit", 0)}
+        onChange={(n) => set("pricePerUnit", n ?? 0)}
+        required
+        min={0}
+      />
+      <PercentageInput
+        label="User growth rate"
+        value={get(params, "userGrowthRate", 0)}
+        onChange={(n) => set("userGrowthRate", n)}
+        min={-1}
+        max={1}
+      />
+      <PercentageInput
+        label="Usage growth rate"
+        value={get(params, "usageGrowthRate", 0)}
+        onChange={(n) => set("usageGrowthRate", n)}
+        min={-1}
+        max={1}
+      />
+      <label className="col-span-full block text-sm">
+        <span className="text-surface-700 dark:text-surface-300">Pricing model</span>
+        <select
+          value={pricingModel}
+          onChange={(e) => set("pricingModel", e.target.value)}
+          className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
+          aria-label="Usage pricing model"
+        >
+          <option value="flat">Flat (pricePerUnit)</option>
+          <option value="tiered">Tiered</option>
+        </select>
+      </label>
+      {pricingModel === "tiered" && (
+        <TieredPricingEditor
+          tiers={(params.tiers as PricingTier[] | undefined) ?? []}
+          onChange={(next) => set("tiers", next)}
+        />
+      )}
+    </div>
+  );
+}

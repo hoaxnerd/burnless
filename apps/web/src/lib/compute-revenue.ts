@@ -93,6 +93,8 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
       name: stream.name,
       type: stream.type,
       parameters: (stream.parameters ?? {}) as Record<string, unknown>,
+      startDate: stream.startDate,
+      endDate: stream.endDate,
     };
 
     const values = computeRevenueStream(input, periodStart, periodEnd);

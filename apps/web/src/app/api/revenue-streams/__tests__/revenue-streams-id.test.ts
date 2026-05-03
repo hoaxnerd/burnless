@@ -45,6 +45,16 @@ vi.mock("@/lib/scenario-middleware", () => ({
   getActiveScenario: mockGetActiveScenario,
 }));
 
+const { mockValidateTiers } = vi.hoisted(() => ({
+  mockValidateTiers: vi.fn(),
+}));
+
+vi.mock("@/lib/revenue-params", () => ({
+  validateTiers: mockValidateTiers,
+}));
+
+vi.mock("@burnless/engine", () => ({}));
+
 import { PATCH, DELETE } from "../[id]/route";
 
 function makeParams(id: string) { return { params: Promise.resolve({ id }) }; }
@@ -55,6 +65,7 @@ beforeEach(() => {
   mockRequireCompanyAccess.mockResolvedValue({ companyId: "c-1", userId: "u-1", role: "editor" });
   mockRequireRole.mockReturnValue(null);
   mockGetActiveScenario.mockReturnValue(null);
+  mockValidateTiers.mockReturnValue(undefined); // passes by default
 });
 
 describe("revenue-streams/[id] PATCH", () => {
@@ -98,6 +109,27 @@ describe("revenue-streams/[id] PATCH", () => {
       makeParams("rs-1"),
     );
     expect(mockScenarioUpdate).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", expect.anything(), "scen-1");
+  });
+
+  it("returns 400 for PATCH with invalid (overlapping) tiers", async () => {
+    mockValidateTiers.mockImplementationOnce(() => {
+      throw new Error("Tiers must be in ascending order by minUnits.");
+    });
+    const res = await PATCH(
+      makeRequest("http://localhost/api/revenue-streams/rs-1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          parameters: {
+            tiers: [
+              { name: "High", minUnits: 100, maxUnits: null, pricePerUnit: 0.5 },
+              { name: "Low", minUnits: 0, maxUnits: 99, pricePerUnit: 1 },
+            ],
+          },
+        }),
+      }),
+      makeParams("rs-1"),
+    );
+    expect(res.status).toBe(400);
   });
 });
 

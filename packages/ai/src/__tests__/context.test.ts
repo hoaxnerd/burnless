@@ -229,6 +229,48 @@ describe("buildFinancialSnapshot", () => {
     expect(snapshot.cashByMonth).toEqual([]);
     expect(snapshot.headcountByMonth).toEqual([]);
   });
+
+  it("defaults revenueStreams to [] when input.revenueStreams is undefined (backwards compat)", () => {
+    // makeInput does not supply revenueStreams — existing callers should still work
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    expect(snapshot.revenueStreams).toEqual([]);
+  });
+
+  it("maps revenueStreams: converts Dates to ISO strings and computes tierCount", () => {
+    const input = makeInput({
+      revenueStreams: [
+        {
+          id: "rs1",
+          name: "Pro Plan",
+          type: "subscription",
+          startDate: new Date("2025-01-15T00:00:00.000Z"),
+          endDate: null,
+          parameters: {
+            pricingModel: "per_seat",
+            tiers: [
+              { upTo: 10, price: 29 },
+              { upTo: 50, price: 24 },
+              { upTo: null, price: 19 },
+            ],
+          },
+          currentAmount: 8500,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.revenueStreams).toHaveLength(1);
+    const row = snapshot.revenueStreams[0]!;
+    expect(row.id).toBe("rs1");
+    expect(row.name).toBe("Pro Plan");
+    expect(row.type).toBe("subscription");
+    // Date → ISO YYYY-MM-DD
+    expect(row.startDate).toBe("2025-01-15");
+    expect(row.endDate).toBeNull();
+    expect(row.currentAmount).toBe(8500);
+    expect(row.pricingModel).toBe("per_seat");
+    // 3 tiers in parameters.tiers
+    expect(row.tierCount).toBe(3);
+  });
 });
 
 describe("formatContextForPrompt", () => {
@@ -372,6 +414,47 @@ describe("formatContextForPrompt", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
     expect(text).toContain("Monthly Cash Position");
+  });
+
+  it("includes Active Revenue Streams section when streams are present", () => {
+    const input = makeInput({
+      revenueStreams: [
+        {
+          id: "rs1",
+          name: "Pro Plan",
+          type: "subscription",
+          startDate: "2025-01-15",
+          endDate: null,
+          parameters: { pricingModel: "per_seat", tiers: [{ upTo: 10, price: 29 }, { upTo: 50, price: 24 }, { upTo: null, price: 19 }] },
+          currentAmount: 8500,
+        },
+        {
+          id: "rs2",
+          name: "One-off Setup",
+          type: "one_time",
+          startDate: "2025-03-01",
+          endDate: "2025-03-31",
+          parameters: {},
+          currentAmount: 1200,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Active Revenue Streams");
+    expect(text).toContain("Pro Plan (subscription)");
+    expect(text).toContain("[per_seat, 3 tiers]");
+    expect(text).toContain("One-off Setup (one_time)");
+    // open-ended stream should show "→ open"
+    expect(text).toContain("→ open");
+    // closed stream should show the end date
+    expect(text).toContain("2025-03-31");
+  });
+
+  it("omits Active Revenue Streams section when no streams are present", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).not.toContain("Active Revenue Streams");
   });
 
   it("omits Active expense lines section when expenses is empty", () => {

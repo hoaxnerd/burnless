@@ -103,6 +103,8 @@ describe("revenue — edge cases", () => {
         name: "Product Sales",
         type: "one_time",
         parameters: { unitsPerMonth: 0, pricePerUnit: 100 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       for (const [, val] of result) {
@@ -118,6 +120,8 @@ describe("revenue — edge cases", () => {
         name: "API Usage",
         type: "usage_based",
         parameters: { activeUsers: 0, avgUsagePerUser: 100, pricePerUnit: 0.01 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       for (const [, val] of result) {
@@ -133,6 +137,8 @@ describe("revenue — edge cases", () => {
         name: "Consulting",
         type: "services",
         parameters: { hoursPerMonth: 0, hourlyRate: 200 },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       for (const [, val] of result) {
@@ -161,12 +167,16 @@ describe("revenue — edge cases", () => {
             newCustomersPerMonth: 0,
             monthlyChurnRate: 0,
           },
+          startDate: start,
+          endDate: null,
         },
         {
           id: "s2",
           name: "Products",
           type: "one_time",
           parameters: { unitsPerMonth: 5, pricePerUnit: 200 },
+          startDate: start,
+          endDate: null,
         },
       ];
       const result = computeTotalRevenue(streams, start, end);
@@ -186,6 +196,8 @@ describe("revenue — edge cases", () => {
           hourlyRate: 100,
           rateIncreaseRate: 0.12, // 12% annual → 1% monthly
         },
+        startDate: start,
+        endDate: null,
       };
       const result = computeRevenueStream(stream, start, end);
       const jan = result.get("2026-01")!;

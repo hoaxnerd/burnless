@@ -58,11 +58,16 @@ export {
   computeRevenueStream,
   computeTotalRevenue,
   computeSubscriptionDetail,
+  selectTier,
   type RevenueStreamInput,
   type SubscriptionParams,
   type OneTimeParams,
   type UsageBasedParams,
   type ServicesParams,
+  type MarketplaceParams,
+  type EcommerceParams,
+  type HardwareParams,
+  type PricingTier,
   type SubscriptionDetail,
 } from "./revenue";
 

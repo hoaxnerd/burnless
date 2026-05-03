@@ -188,6 +188,8 @@ describe("12-month compound growth — precision", () => {
         userGrowthRate: 0.05,    // 5% monthly user growth
         usageGrowthRate: 0.02,   // 2% monthly usage growth per user
       },
+      startDate: new Date(2026, 0, 1),
+      endDate: null,
     };
     const start = new Date(2026, 0, 1);
     const end = new Date(2026, 11, 1);
@@ -210,6 +212,8 @@ describe("12-month compound growth — precision", () => {
       name: "Product Sales",
       type: "one_time",
       parameters: { unitsPerMonth: 100, pricePerUnit: 50, unitGrowthRate: 0.10 },
+      startDate: new Date(2026, 0, 1),
+      endDate: null,
     };
     const start = new Date(2026, 0, 1);
     const end = new Date(2026, 11, 1);
@@ -240,24 +244,32 @@ describe("Multi-stream total — precision", () => {
           monthlyChurnRate: 0.03,
           expansionRate: 0.02,
         },
+        startDate: new Date(2026, 0, 1),
+        endDate: null,
       },
       {
         id: "s2",
         name: "API Usage",
         type: "usage_based",
         parameters: { activeUsers: 500, avgUsagePerUser: 100, pricePerUnit: 0.05 },
+        startDate: new Date(2026, 0, 1),
+        endDate: null,
       },
       {
         id: "s3",
         name: "Consulting",
         type: "services",
         parameters: { hoursPerMonth: 80, hourlyRate: 150, hoursGrowthRate: 0.05 },
+        startDate: new Date(2026, 0, 1),
+        endDate: null,
       },
       {
         id: "s4",
         name: "Setup Fees",
         type: "one_time",
         parameters: { unitsPerMonth: 5, pricePerUnit: 1000, unitGrowthRate: 0.08 },
+        startDate: new Date(2026, 0, 1),
+        endDate: null,
       },
     ];
 
@@ -288,14 +300,16 @@ describe("Multi-stream total — precision", () => {
   });
 
   it("single stream total equals stream revenue", () => {
+    const start = new Date(2026, 0, 1);
+    const end = new Date(2026, 5, 1);
     const stream: RevenueStreamInput = {
       id: "solo",
       name: "Only Revenue",
       type: "services",
       parameters: { hoursPerMonth: 100, hourlyRate: 200 },
+      startDate: start,
+      endDate: null,
     };
-    const start = new Date(2026, 0, 1);
-    const end = new Date(2026, 5, 1);
 
     const total = computeTotalRevenue([stream], start, end);
     const single = computeRevenueStream(stream, start, end);

@@ -11,7 +11,15 @@ export const accountCategoryEnum = z.enum([
 /** @deprecated Use scenarioSourceEnum/scenarioStatusEnumZ instead */
 export const scenarioTypeEnum = z.enum(["base", "best", "worst", "custom"]);
 export const forecastMethodEnum = z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]);
-export const revenueStreamTypeEnum = z.enum(["subscription", "one_time", "usage_based", "services"]);
+export const revenueStreamTypeEnum = z.enum([
+  "subscription",
+  "one_time",
+  "usage_based",
+  "services",
+  "marketplace",
+  "ecommerce",
+  "hardware",
+]);
 export const fundingRoundTypeEnum = z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]);
 export const integrationTypeEnum = z.enum(["quickbooks", "xero", "freshbooks", "plaid", "mercury", "gusto", "stripe"]);
 export const aiProviderEnum = z.enum(["anthropic", "openai", "openrouter", "ollama"]);
@@ -198,12 +206,16 @@ export type UpdateEquityGrantInput = z.infer<typeof updateEquityGrantSchema>;
 export const createRevenueStreamSchema = z.object({
   name: z.string().min(1),
   type: revenueStreamTypeEnum.default("subscription"),
+  startDate: z.string().date(),                       // ISO YYYY-MM-DD, required
+  endDate: z.string().date().nullable().optional(),    // ISO YYYY-MM-DD or null
   parameters: z.record(z.unknown()).default({}),
 });
 
 export const updateRevenueStreamSchema = z.object({
   name: z.string().min(1).optional(),
   type: revenueStreamTypeEnum.optional(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().nullable().optional(),
   parameters: z.record(z.unknown()).optional(),
 });
 

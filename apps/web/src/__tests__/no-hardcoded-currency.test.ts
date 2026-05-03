@@ -129,11 +129,20 @@ const ALLOWED = [
   "apps/web/src/app/api/chat/__tests__/",
   "apps/web/src/app/api/import/__tests__/",
   "apps/web/src/app/api/onboarding/__tests__/",
+  // ── Form primitive tests ──────────────────────────────────────────────────
+  // CurrencyInput.test.tsx uses `$${n}` inside a vi.mock() fmtCompact stub —
+  // a fixture value in a test, not display code.
+  "apps/web/src/components/forms/primitives/__tests__/",
   "apps/web/src/components/providers/__tests__/",
   "apps/web/src/components/ui/__tests__/",
   "apps/web/src/lib/__tests__/",
   "packages/ai/src/__tests__/",
   "packages/engine/src/__tests__/",
+
+  // ── Revenue stream form tests ─────────────────────────────────────────────
+  // revenue-stream-form.test.tsx uses `$${n.toFixed(2)}` inside a vi.mock()
+  // fmtCurrency/fmtCompact stub — fixture values in a test, not display code.
+  "apps/web/src/app/(dashboard)/revenue/__tests__/",
 
   // ── E2E (Playwright) tests ────────────────────────────────────────────────
   // E2E tests assert text visible in the browser, which includes formatted

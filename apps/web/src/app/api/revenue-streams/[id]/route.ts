@@ -6,6 +6,8 @@ import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorH
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import { getActiveScenario } from "@/lib/scenario-middleware";
+import { validateTiers } from "@/lib/revenue-params";
+import type { PricingTier } from "@burnless/engine";
 
 export const PATCH = withErrorHandler(async (
   request: Request,
@@ -22,7 +24,22 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateRevenueStreamSchema);
   if ("error" in parsed) return parsed.error;
 
-  const row = await scenarioUpdate("revenue_stream", revenueStreams, id, parsed.data, scenarioId);
+  const streamParams = (parsed.data.parameters ?? {}) as Record<string, unknown>;
+  if (Array.isArray(streamParams.tiers)) {
+    try {
+      validateTiers(streamParams.tiers as PricingTier[]);
+    } catch (e) {
+      return errorResponse(e instanceof Error ? e.message : "Invalid tiers", 400);
+    }
+  }
+
+  const patch: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.startDate) patch.startDate = new Date(parsed.data.startDate);
+  if (parsed.data.endDate !== undefined) {
+    patch.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
+  }
+
+  const row = await scenarioUpdate("revenue_stream", revenueStreams, id, patch, scenarioId);
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");

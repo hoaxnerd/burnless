@@ -252,7 +252,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "add_revenue_stream",
     description:
-      "Add a revenue stream to the current scenario — supports subscription (SaaS MRR), one-time, usage-based, and services revenue.",
+      "Add a revenue stream to the current scenario — supports 7 types: subscription (SaaS MRR), one_time, usage_based, services, marketplace, ecommerce, hardware. Requires startDate (ISO YYYY-MM-DD). Optional endDate (ISO YYYY-MM-DD, or null for open-ended). Parameter field names match engine canonical names: subscription={startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate, expansionRate, priceGrowthRate, pricingModel, seatsPerCustomer, tiers}; one_time={unitsPerMonth, pricePerUnit, unitGrowthRate}; usage_based={activeUsers, avgUsagePerUser, pricePerUnit, userGrowthRate, usageGrowthRate, pricingModel, tiers}; services={hoursPerMonth, hourlyRate, hoursGrowthRate, rateIncreaseRate}; marketplace={startingGmv, takeRate, gmvGrowthRate}; ecommerce={ordersPerMonth, averageOrderValue, orderGrowthRate, aovGrowthRate}; hardware={unitsPerMonth, pricePerUnit, unitGrowthRate, priceGrowthRate}.",
     inputSchema: {
       type: "object",
       properties: {
@@ -262,15 +262,31 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         type: {
           type: "string",
-          enum: ["subscription", "one_time", "usage_based", "services"],
+          enum: [
+            "subscription",
+            "one_time",
+            "usage_based",
+            "services",
+            "marketplace",
+            "ecommerce",
+            "hardware",
+          ],
           description: "Revenue type",
+        },
+        startDate: {
+          type: "string",
+          description: "ISO date YYYY-MM-DD when this revenue stream starts",
+        },
+        endDate: {
+          type: ["string", "null"],
+          description: "ISO date YYYY-MM-DD when this revenue stream ends, or null for open-ended",
         },
         parameters: {
           type: "object",
-          description: "Type-specific parameters matching the engine contract. For 'subscription': { startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate (decimal, e.g. 0.05 for 5%) }. For 'one_time': { unitsPerMonth, pricePerUnit }. For 'usage_based': { activeUsers, avgUsagePerUser, pricePerUnit }. For 'services': { hoursPerMonth, hourlyRate }.",
+          description: "Type-specific parameters matching the engine contract (see tool description for field names per type).",
         },
       },
-      required: ["name", "type", "parameters"],
+      required: ["name", "type", "startDate", "parameters"],
     },
   },
   {
@@ -319,26 +335,32 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "update_revenue_stream",
     description:
-      "Update an existing revenue stream's name, type, or parameters.",
+      "Update an existing revenue stream's name, type, start/end dates, or parameters. Parameter field names match engine canonical names: subscription={startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate, expansionRate, priceGrowthRate, pricingModel, seatsPerCustomer, tiers}; one_time={unitsPerMonth, pricePerUnit, unitGrowthRate}; usage_based={activeUsers, avgUsagePerUser, pricePerUnit, userGrowthRate, usageGrowthRate, pricingModel, tiers}; services={hoursPerMonth, hourlyRate, hoursGrowthRate, rateIncreaseRate}; marketplace={startingGmv, takeRate, gmvGrowthRate}; ecommerce={ordersPerMonth, averageOrderValue, orderGrowthRate, aovGrowthRate}; hardware={unitsPerMonth, pricePerUnit, unitGrowthRate, priceGrowthRate}.",
     inputSchema: {
       type: "object",
       properties: {
-        id: {
-          type: "string",
-          description: "The revenue stream ID to update",
-        },
-        name: {
-          type: "string",
-          description: "New name",
-        },
+        id: { type: "string", description: "The revenue stream ID to update" },
+        name: { type: "string", description: "New name" },
         type: {
           type: "string",
-          enum: ["subscription", "one_time", "usage_based", "services"],
-          description: "New revenue type",
+          enum: [
+            "subscription",
+            "one_time",
+            "usage_based",
+            "services",
+            "marketplace",
+            "ecommerce",
+            "hardware",
+          ],
+        },
+        startDate: { type: "string", description: "ISO date YYYY-MM-DD" },
+        endDate: {
+          type: ["string", "null"],
+          description: "ISO date YYYY-MM-DD, or null to clear",
         },
         parameters: {
           type: "object",
-          description: "New type-specific parameters",
+          description: "Type-specific parameters; deep-merged into existing parameters",
         },
       },
       required: ["id"],
