@@ -42,14 +42,14 @@ const toolHandlers: Record<string, ToolHandler> = {
 const MUTATION_TOOLS = new Set([
   // Create
   "create_scenario", "add_headcount", "create_department", "add_revenue_stream",
-  "add_funding_round", "create_forecast_line", "create_account",
+  "add_funding_round", "create_expense", "create_account",
   "add_salary_change", "add_bonus", "add_equity_grant",
   // Update
   "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
-  "update_funding_round", "update_forecast_line", "update_account",
+  "update_funding_round", "update_expense", "update_account",
   // Delete
   "delete_scenario", "delete_headcount", "delete_department", "delete_revenue_stream",
-  "delete_funding_round", "delete_forecast_line", "delete_account",
+  "delete_funding_round", "delete_expense", "delete_account",
 ]);
 
 function isMutationTool(toolName: string): boolean {
@@ -78,9 +78,9 @@ const MUTATION_CACHE_TAGS: Record<string, string[]> = {
   add_funding_round: ["funding-rounds", "scenario-overrides"],
   update_funding_round: ["funding-rounds", "scenario-overrides"],
   delete_funding_round: ["funding-rounds", "scenario-overrides"],
-  create_forecast_line: ["forecast-lines", "scenario-overrides"],
-  update_forecast_line: ["forecast-lines", "scenario-overrides"],
-  delete_forecast_line: ["forecast-lines", "scenario-overrides"],
+  create_expense: ["forecast-lines", "scenario-overrides"],
+  update_expense: ["forecast-lines", "scenario-overrides"],
+  delete_expense: ["forecast-lines", "scenario-overrides"],
   create_account: ["accounts", "scenario-overrides"],
   update_account: ["accounts", "scenario-overrides"],
   delete_account: ["accounts", "scenario-overrides"],

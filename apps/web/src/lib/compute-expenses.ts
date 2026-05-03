@@ -21,6 +21,13 @@ import {
   getForecastLines,
   getHeadcountPlans,
 } from "./data";
+import {
+  shouldFlagAnomaly,
+  getAnomalyBaseline,
+  suggestRecurring,
+  type ExpenseFrequency,
+  type AnomalyContextLine,
+} from "./compute-expenses-helpers";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,8 +47,26 @@ export interface ExpenseLineItem {
   prevAmount: number;
   changePercent: number;
   isRecurring: boolean;
+  /**
+   * Provenance for `isRecurring`:
+   *   "user"      — explicit user choice (DB column was non-null).
+   *   "suggested" — column null, suggestRecurring() flagged likely.
+   *   "none"      — column null, suggestion didn't engage / sample too small.
+   */
+  recurringSource: "user" | "suggested" | "none";
   isAnomaly: boolean;
+  isOneTime: boolean;
+  frequency: ExpenseFrequency;
   monthlySeries: { month: string; value: number }[];
+  /**
+   * Persisted descriptive fields surfaced from the underlying forecast-line row.
+   * Threaded through so the edit modal can prefill them — without this, an edit
+   * that didn't touch these fields would PATCH `null` and overwrite the stored
+   * values (Phase 1 §2.C data-loss guard).
+   */
+  vendor: string | null;
+  notes: string | null;
+  departmentId: string | null;
 }
 
 export interface SubcategoryBreakdown {
@@ -63,11 +88,18 @@ export interface ExpenseDetails {
   totalMonthlyCost: number;
   totalPrevMonthlyCost: number;
   subcategories: string[];
+  /**
+   * Component sums of current-month opex by method/flag — feeds the
+   * fixedExpenses / variableExpenses / percentageDrivenExpenses /
+   * oneTimeExpenses dashboard slugs (Phase 1 §1.5 MANDATE).
+   */
+  expenseMix: {
+    fixedExpenses: number;
+    variableExpenses: number;
+    percentageDrivenExpenses: number;
+    oneTimeExpenses: number;
+  };
 }
-
-// ── Anomaly threshold ────────────────────────────────────────────────────────
-
-const ANOMALY_THRESHOLD = 0.20; // 20% MoM increase flags anomaly
 
 // ── Subcategory derivation ───────────────────────────────────────────────────
 
@@ -89,6 +121,11 @@ function deriveSubcategory(
   // Generic operating expense fallback
   return { subcategory: "Uncategorized", confidence: 0.3, source: "manual" };
 }
+
+// ── Date coercion ────────────────────────────────────────────────────────────
+
+const toIso = (d: Date | string | null | undefined): string | null =>
+  d == null ? null : (typeof d === "string" ? d.slice(0, 10) : d.toISOString().slice(0, 10));
 
 // ── Main computation ─────────────────────────────────────────────────────────
 
@@ -154,19 +191,48 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     if (!values) continue;
 
     const series = seriesToArray(values);
+    const startDate = toIso(fLine.startDate) ?? `${targetYear}-01-01`;
+    const endDate = toIso(fLine.endDate);
+    const frequency: ExpenseFrequency =
+      (fLine as { frequency?: ExpenseFrequency }).frequency ?? "monthly";
+    const isOneTime = Boolean((fLine as { isOneTime?: boolean }).isOneTime ?? false);
+
+    const ctx: AnomalyContextLine = {
+      method: fLine.method,
+      startDate,
+      endDate,
+      frequency,
+    };
+
+    // Frequency-aware baseline (monthly → t-1, quarterly → t-3, annual → t-12).
     const currentAmount = Number(values.get(currentMonth) ?? 0);
-    const prevAmount = Number(values.get(prevMonth) ?? 0);
+    const prevAmount = getAnomalyBaseline(ctx, currentMonth, values);
     const changePercent = prevAmount > 0 ? (currentAmount - prevAmount) / prevAmount : 0;
 
     // Derive subcategory from account name
     const { subcategory, confidence, source } = deriveSubcategory(account.name, account.category);
 
-    // Recurring detection: fixed method or very low variance across months
+    // Recurring: explicit user choice wins; otherwise fall back to the
+    // variance-based suggestion (suggestion-only when DB column is null).
     const amounts = series.map((s) => s.value).filter((v) => v > 0);
-    const isRecurring = fLine.method === "fixed" || (amounts.length >= 3 && isLowVariance(amounts));
+    const recurringSuggestion = suggestRecurring(amounts);
+    const explicit = (fLine as { isRecurring?: boolean | null }).isRecurring;
+    const hasExplicit = explicit !== null && explicit !== undefined;
+    const isRecurring = hasExplicit ? Boolean(explicit) : recurringSuggestion.likely;
+    const recurringSource: "user" | "suggested" | "none" = hasExplicit
+      ? "user"
+      : recurringSuggestion.likely
+        ? "suggested"
+        : "none";
 
-    // Anomaly detection: significant MoM increase
-    const isAnomaly = prevAmount > 0 && changePercent > ANOMALY_THRESHOLD;
+    // Anomaly: endDate-aware + frequency-aware (helpers honor both rules).
+    const isAnomaly = shouldFlagAnomaly(ctx, currentMonth, prevAmount, currentAmount);
+
+    const fLineRow = fLine as {
+      vendor?: string | null;
+      notes?: string | null;
+      departmentId?: string | null;
+    };
 
     lineItems.push({
       id: fLine.id,
@@ -178,14 +244,20 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       categorySource: source,
       method: fLine.method,
       parameters: (fLine.parameters ?? {}) as Record<string, unknown>,
-      startDate: fLine.startDate instanceof Date ? fLine.startDate.toISOString().slice(0, 10) : String(fLine.startDate),
-      endDate: fLine.endDate instanceof Date ? fLine.endDate.toISOString().slice(0, 10) : fLine.endDate ? String(fLine.endDate) : null,
+      startDate,
+      endDate,
       currentAmount,
       prevAmount,
       changePercent,
       isRecurring,
+      recurringSource,
       isAnomaly,
+      isOneTime,
+      frequency,
       monthlySeries: series,
+      vendor: fLineRow.vendor ?? null,
+      notes: fLineRow.notes ?? null,
+      departmentId: fLineRow.departmentId ?? null,
     });
   }
 
@@ -193,6 +265,12 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const hcCurrent = Number(headcountCosts.totalCost.get(currentMonth) ?? 0);
   const hcPrev = Number(headcountCosts.totalCost.get(prevMonth) ?? 0);
   if (hcCurrent > 0 || hcPrev > 0) {
+    const hcCtx: AnomalyContextLine = {
+      method: "fixed",
+      startDate: periodStart.toISOString().slice(0, 10),
+      endDate: null,
+      frequency: "monthly",
+    };
     const hcChange = hcPrev > 0 ? (hcCurrent - hcPrev) / hcPrev : 0;
     lineItems.push({
       id: "headcount-synthetic",
@@ -210,8 +288,15 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       prevAmount: hcPrev,
       changePercent: hcChange,
       isRecurring: true,
-      isAnomaly: hcPrev > 0 && hcChange > ANOMALY_THRESHOLD,
+      recurringSource: "user", // synthetic personnel costs are always treated as user-recurring
+      isAnomaly: shouldFlagAnomaly(hcCtx, currentMonth, hcPrev, hcCurrent),
+      isOneTime: false,
+      frequency: "monthly",
       monthlySeries: seriesToArray(headcountCosts.totalCost),
+      // Synthetic personnel-cost row has no underlying forecast_lines record.
+      vendor: null,
+      notes: null,
+      departmentId: null,
     });
   }
 
@@ -266,6 +351,19 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const anomalyCount = lineItems.filter((i) => i.isAnomaly).length;
   const recurringCount = lineItems.filter((i) => i.isRecurring).length;
 
+  // Component-metric emission — current-month sums per method/flag bucket
+  // (Phase 1 §1.5 MANDATE; one-time is independent of method).
+  let fixedSum = 0;
+  let variableSum = 0;
+  let percentageSum = 0;
+  let oneTimeSum = 0;
+  for (const item of lineItems) {
+    if (item.method === "fixed") fixedSum += item.currentAmount;
+    else if (item.method === "growth_rate" || item.method === "per_unit") variableSum += item.currentAmount;
+    else if (item.method === "percentage_of" || item.method === "custom_formula") percentageSum += item.currentAmount;
+    if (item.isOneTime) oneTimeSum += item.currentAmount;
+  }
+
   return {
     lineItems,
     subcategoryBreakdown,
@@ -275,16 +373,11 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     totalMonthlyCost,
     totalPrevMonthlyCost,
     subcategories,
+    expenseMix: {
+      fixedExpenses: fixedSum,
+      variableExpenses: variableSum,
+      percentageDrivenExpenses: percentageSum,
+      oneTimeExpenses: oneTimeSum,
+    },
   };
 });
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isLowVariance(values: number[]): boolean {
-  if (values.length < 2) return true;
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  if (mean === 0) return true;
-  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
-  const cv = Math.sqrt(variance) / mean; // coefficient of variation
-  return cv < 0.05; // less than 5% variation
-}

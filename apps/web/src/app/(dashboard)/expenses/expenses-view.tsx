@@ -37,6 +37,19 @@ interface ExpensesViewProps {
   summaryMetrics: SummaryMetrics;
   resolvedSlotData: ResolvedSlotData[];
   expenseDetails: ExpenseDetails;
+  /**
+   * Live account list. Threaded into <ExpenseTable> as `accountMap` so that
+   * renames flow through without rebuilding cached `accountName` fields on
+   * every line item.
+   */
+  accounts?: { id: string; name: string }[];
+  /** Department list — passed to the edit form for the optional dropdown. */
+  departments?: { id: string; name: string }[];
+  /**
+   * Light-weight `{ id, name }` projection of the current line items.
+   * Reused by the edit form to populate the `percentage_of` source dropdown.
+   */
+  forecastLines?: { id: string; name: string }[];
   timeline: MetricPoint[];
   opexTimeline: MetricPoint[];
   cogsTimeline: MetricPoint[];
@@ -48,6 +61,9 @@ export function ExpensesView({
   summaryMetrics,
   resolvedSlotData,
   expenseDetails,
+  accounts,
+  departments,
+  forecastLines,
   timeline,
   opexTimeline: _opexTimeline,
   cogsTimeline: _cogsTimeline,
@@ -97,6 +113,15 @@ export function ExpensesView({
         value: (budgetTimeline[i]?.value ?? 0) - t.value,
       }))
     : null;
+
+  // Live id→account lookup for the table; ensures rename flows through
+  // without depending on the cached `accountName` baked into each line item
+  // at compute time.
+  const accountMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const a of accounts ?? []) map.set(a.id, a);
+    return map;
+  }, [accounts]);
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
@@ -277,9 +302,12 @@ export function ExpensesView({
       <ExpenseTable
         lineItems={expenseDetails.lineItems}
         subcategories={expenseDetails.subcategories}
+        accountMap={accountMap}
+        departments={departments}
+        forecastLines={forecastLines}
       />
     ),
-  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, accountMap, departments, forecastLines, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
     <PageLayoutProvider pageId="expenses">

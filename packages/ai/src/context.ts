@@ -11,7 +11,22 @@ import {
   seriesToArray,
 } from "@burnless/engine";
 import { formatCurrency, formatNumber, type CurrencyCode, isValidCurrency } from "@burnless/types";
-import type { FinancialSnapshot } from "./types";
+import type { FinancialSnapshot, ExpenseSnapshotRow } from "./types";
+
+/** Structural input shape for an expense line passed to `buildFinancialSnapshot`. */
+export interface ExpenseLineLike {
+  id: string;
+  accountId: string;
+  accountName: string;
+  vendor?: string | null;
+  notes?: string | null;
+  frequency?: "monthly" | "quarterly" | "annual";
+  departmentId?: string | null;
+  isOneTime?: boolean;
+  isRecurring?: boolean | null;
+  method: "fixed" | "growth_rate" | "per_unit" | "percentage_of" | "custom_formula";
+  currentAmount: number;
+}
 
 interface ContextInput {
   company: {
@@ -72,6 +87,7 @@ interface ContextInput {
       vestingSchedule: Array<{ type: string; date: string; sharesVested: number }>;
     }>;
   }>;
+  expenseLines?: ExpenseLineLike[];
 }
 
 /** Get the latest value from a MetricValue array. */
@@ -125,6 +141,19 @@ export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
     accounts: input.accounts,
     departments: input.departments,
     headcountDetails: input.headcountDetails,
+    expenses: (input.expenseLines ?? []).map<ExpenseSnapshotRow>((l) => ({
+      id: l.id,
+      accountId: l.accountId,
+      accountName: l.accountName,
+      vendor: l.vendor ?? null,
+      notes: l.notes ?? null,
+      frequency: l.frequency ?? "monthly",
+      departmentId: l.departmentId ?? null,
+      isOneTime: l.isOneTime ?? false,
+      isRecurring: l.isRecurring ?? null,
+      method: l.method,
+      currentAmount: l.currentAmount,
+    })),
   };
 }
 
@@ -267,6 +296,25 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
           );
         }
       }
+    }
+  }
+
+  // Active expense lines (top 50 by currentAmount desc).
+  // Engine + AI layer never print currency symbols — emit raw numeric amounts; the
+  // web app formats currency at the boundary if/when this text is surfaced to a user.
+  if (snapshot.expenses.length > 0) {
+    const top = [...snapshot.expenses]
+      .sort((a, b) => b.currentAmount - a.currentAmount)
+      .slice(0, 50);
+    lines.push(``);
+    lines.push(`## Active expense lines`);
+    for (const e of top) {
+      const recurringAnnotation =
+        e.isRecurring === true ? ", recurring" : e.isRecurring === false ? ", non-recurring" : "";
+      const vendorAnnotation = e.vendor ? ` — ${e.vendor}` : "";
+      lines.push(
+        `- ${e.accountName} (${e.method}, ${e.frequency}${recurringAnnotation}${vendorAnnotation}): ${e.currentAmount}`,
+      );
     }
   }
 

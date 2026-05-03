@@ -102,6 +102,7 @@ function makeTestSnapshot(): FinancialSnapshot {
     accounts: [],
     departments: [],
     headcountDetails: [],
+    expenses: [],
   };
 }
 

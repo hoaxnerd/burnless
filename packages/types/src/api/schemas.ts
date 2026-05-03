@@ -237,12 +237,23 @@ export type UpdateFundingRoundInput = z.infer<typeof updateFundingRoundSchema>;
 
 // ── Forecast Lines ──────────────────────────────────────────────────────────
 
+/** Phase 1 §1.5 expense frequency enum (mirrors `expenseFrequencyEnum` in db schema). */
+export const expenseFrequencyEnum = z.enum(["monthly", "quarterly", "annual"]);
+
 export const createForecastLineSchema = z.object({
   accountId: z.string(),
   method: forecastMethodEnum.default("fixed"),
   parameters: z.record(z.unknown()).default({}),
   startDate: dateString(),
   endDate: nullableDateString(),
+  // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
+  notes: z.string().nullable().optional(),
+  vendor: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+  frequency: expenseFrequencyEnum.default("monthly"),
+  isOneTime: z.boolean().default(false),
+  // Tri-state: true | false | null (cleared) | undefined (untouched).
+  isRecurring: z.boolean().nullable().optional(),
 });
 
 export const updateForecastLineSchema = z.object({
@@ -250,6 +261,14 @@ export const updateForecastLineSchema = z.object({
   parameters: z.record(z.unknown()).optional(),
   startDate: dateString().optional(),
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
+  // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
+  notes: z.string().nullable().optional(),
+  vendor: z.string().nullable().optional(),
+  departmentId: z.string().nullable().optional(),
+  frequency: expenseFrequencyEnum.optional(),
+  isOneTime: z.boolean().optional(),
+  // Tri-state: explicit `null` clears the column back to NULL.
+  isRecurring: z.boolean().nullable().optional(),
 });
 
 export type CreateForecastLineInput = z.infer<typeof createForecastLineSchema>;

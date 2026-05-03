@@ -87,6 +87,12 @@ export const forecastMethodEnum = pgEnum("forecast_method", [
   "custom_formula",
 ]);
 
+export const expenseFrequencyEnum = pgEnum("expense_frequency", [
+  "monthly",
+  "quarterly",
+  "annual",
+]);
+
 export const memberRoleEnum = pgEnum("member_role", [
   "owner",
   "admin",
@@ -359,6 +365,8 @@ export const transactions = pgTable(
     date: timestamp("date", { mode: "date" }).notNull(),
     amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
     description: text("description"),
+    vendor: text("vendor"),
+    notes: text("notes"),
     source: transactionSourceEnum("source").notNull().default("manual"),
     externalId: text("external_id"),
     importBatchId: text("import_batch_id"),
@@ -496,6 +504,20 @@ export const forecastLines = pgTable(
     parameters: jsonb("parameters").notNull().default({}),
     startDate: timestamp("start_date", { mode: "date" }).notNull(),
     endDate: timestamp("end_date", { mode: "date" }),
+    // ── Phase 1 additions (§2.C) ─────────────────────────────────────────
+    notes: text("notes"),
+    vendor: text("vendor"),
+    departmentId: text("department_id").references(() => departments.id, {
+      onDelete: "set null",
+    }),
+    frequency: expenseFrequencyEnum("frequency").notNull().default("monthly"),
+    isOneTime: boolean("is_one_time").notNull().default(false),
+    /**
+     * Tri-state recurring flag (Phase 1 §1.5 anomaly refactor).
+     * NULL = user has not declared; UI shows suggestion based on variance.
+     * true/false = explicit user choice.
+     */
+    isRecurring: boolean("is_recurring"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -508,6 +530,11 @@ export const forecastLines = pgTable(
       table.companyId,
       table.accountId
     ),
+    index("forecast_lines_company_department_idx").on(
+      table.companyId,
+      table.departmentId
+    ),
+    index("forecast_lines_vendor_idx").on(table.companyId, table.vendor),
   ]
 );
 

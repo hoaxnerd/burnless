@@ -39,7 +39,12 @@ vi.mock("@burnless/db", () => ({
   scenarioUpdate: mockScenarioUpdate,
   scenarioDelete: mockScenarioDelete,
 }));
-vi.mock("@burnless/types", () => ({ updateForecastLineSchema: { parse: (d: unknown) => d } }));
+// Use the real Zod schema so we exercise Phase-1 field validation (vendor,
+// notes, frequency, isOneTime, isRecurring tri-state, departmentId).
+vi.mock("@burnless/types", async () => {
+  const actual = await vi.importActual<typeof import("@burnless/types")>("@burnless/types");
+  return { updateForecastLineSchema: actual.updateForecastLineSchema };
+});
 vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
 
 import { PATCH, DELETE } from "../[id]/route";
@@ -84,6 +89,63 @@ describe("forecast-lines/[id] PATCH", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.method).toBe("growth_rate");
+  });
+
+  it("threads Phase-1 frequency through to scenarioUpdate", async () => {
+    mockScenarioUpdate.mockResolvedValue({ id: "fl-1", frequency: "annual" });
+    const res = await PATCH(
+      makeRequest("http://localhost/api/forecast-lines/fl-1", {
+        method: "PATCH",
+        body: JSON.stringify({ frequency: "annual" }),
+      }),
+      makeParams("fl-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(mockScenarioUpdate).toHaveBeenCalledWith(
+      "forecast_line",
+      expect.anything(),
+      "fl-1",
+      expect.objectContaining({ frequency: "annual" }),
+      null,
+    );
+  });
+
+  it("preserves isRecurring=null (tri-state clear) through validation", async () => {
+    mockScenarioUpdate.mockResolvedValue({ id: "fl-1", isRecurring: null });
+    const res = await PATCH(
+      makeRequest("http://localhost/api/forecast-lines/fl-1", {
+        method: "PATCH",
+        body: JSON.stringify({ isRecurring: null }),
+      }),
+      makeParams("fl-1"),
+    );
+    expect(res.status).toBe(200);
+    // The validated payload must contain the explicit `null` (not stripped to
+    // undefined) so the DB column is set back to NULL.
+    const callArgs = mockScenarioUpdate.mock.calls[0];
+    expect(callArgs).toBeDefined();
+    const patch = callArgs![3] as Record<string, unknown>;
+    expect(patch).toHaveProperty("isRecurring", null);
+  });
+
+  it("forwards scenarioId to scenarioUpdate when active scenario set", async () => {
+    mockGetActiveScenario.mockReturnValue("scen-1");
+    mockScenarioUpdate.mockResolvedValue({ id: "fl-1", vendor: "Stripe" });
+    const res = await PATCH(
+      makeRequest("http://localhost/api/forecast-lines/fl-1", {
+        method: "PATCH",
+        body: JSON.stringify({ vendor: "Stripe" }),
+      }),
+      makeParams("fl-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(mockScenarioUpdate).toHaveBeenCalledWith(
+      "forecast_line",
+      expect.anything(),
+      "fl-1",
+      expect.objectContaining({ vendor: "Stripe" }),
+      "scen-1",
+    );
   });
 });
 

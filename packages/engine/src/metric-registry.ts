@@ -29,7 +29,8 @@ export type MetricCategory =
   | "retention"
   | "cash_flow"
   | "balance_sheet"
-  | "customer";
+  | "customer"
+  | "expense";
 
 export type MetricTier = "core" | "advanced" | "deep";
 
@@ -621,6 +622,83 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     href: "/expenses",
   },
 
+  // ── Expense Mix (totalOpex parent + components, umbrella §1.4) ───────────
+
+  {
+    slug: "totalOpex",
+    name: "Total Operating Expenses",
+    description: "All operating expenses combined for the month",
+    formula: "Sum of forecast lines on operating_expense and cogs accounts + personnel costs",
+    dependsOn: [],
+    category: "expense",
+    tier: "core",
+    format: "currency",
+    direction: "lower_better",
+    icon: "TrendingDown",
+    color: "rose",
+    href: "/expenses",
+  },
+  {
+    slug: "fixedExpenses",
+    name: "Fixed Expenses",
+    description: "Sum of forecast lines using the fixed method",
+    formula: "Sum where forecastLines.method = 'fixed'",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Lock",
+    color: "slate",
+    href: "/expenses",
+  },
+  {
+    slug: "variableExpenses",
+    name: "Variable Expenses",
+    description: "Sum of growth-rate and per-unit forecast lines",
+    formula: "Sum where forecastLines.method ∈ {growth_rate, per_unit}",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Activity",
+    color: "amber",
+    href: "/expenses",
+  },
+  {
+    slug: "percentageDrivenExpenses",
+    name: "Percentage-Driven Expenses",
+    description: "Sum of forecast lines tied to a percentage of another driver",
+    formula: "Sum where forecastLines.method ∈ {percentage_of, custom_formula}",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Percent",
+    color: "violet",
+    href: "/expenses",
+  },
+  {
+    slug: "oneTimeExpenses",
+    name: "One-Time Expenses",
+    description: "Sum of forecast lines flagged isOneTime",
+    formula: "Sum where forecastLines.isOneTime = true",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Zap",
+    color: "rose",
+    href: "/expenses",
+  },
+
   // ── Growth ───────────────────────────────────────────────────────────────
 
   {
@@ -1070,6 +1148,7 @@ export const CATEGORY_META: Record<MetricCategory, { label: string; description:
   cash_flow: { label: "Cash Flow", description: "Free cash flow and operating cash metrics" },
   balance_sheet: { label: "Balance Sheet", description: "Working capital and asset metrics" },
   customer: { label: "Customers", description: "Customer counts and acquisition" },
+  expense: { label: "Expenses", description: "Operating expenses by behavior (fixed, variable, percentage, one-time)" },
 };
 
 // ── Default Dashboard Layouts ────────────────────────────────────────────────

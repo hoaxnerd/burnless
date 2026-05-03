@@ -16,6 +16,12 @@ interface PreviewStepProps {
   executeImport: () => void;
   formatCurrency: (n: number) => string;
   setStep: React.Dispatch<React.SetStateAction<Step>>;
+  /**
+   * True when the amount was synthesized client-side as `credit − debit`
+   * from a polymorphic column mapping. Surfaces a hint chip on the Amount
+   * column header so the user knows the values were derived, not raw.
+   */
+  amountSynthesized?: boolean;
 }
 
 export function PreviewStep({
@@ -30,6 +36,7 @@ export function PreviewStep({
   executeImport,
   formatCurrency,
   setStep,
+  amountSynthesized = false,
 }: PreviewStepProps) {
   return (
     <div className="space-y-6 animate-slide-up">
@@ -74,7 +81,17 @@ export function PreviewStep({
                 <th scope="col" className="w-8 py-2.5 px-3"><span className="sr-only">Select</span></th>
                 <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Status</th>
                 <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Date</th>
-                <th scope="col" className="text-right py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Amount</th>
+                <th scope="col" className="text-right py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">
+                  <div className="inline-flex items-center gap-1.5">
+                    Amount
+                    {amountSynthesized && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-950 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        credit − debit
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">Description</th>
                 <th scope="col" className="text-left py-2.5 px-3 font-medium text-surface-600 dark:text-surface-400">
                   <div className="flex items-center gap-1">

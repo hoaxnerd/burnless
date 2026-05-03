@@ -53,6 +53,12 @@ const ALLOWED = [
   // import-flow.tsx line 134: /[$,€£()]/ in a regex to STRIP currency
   // characters from user-supplied CSV amounts. Not display code.
   "apps/web/src/app/(dashboard)/import/import-flow.tsx",
+  // import-utils.ts: /[$,€£()]/ regex in parseAmountCell() to STRIP currency
+  // glyphs from CSV cell input before numeric parsing. Sanitization, not display.
+  "apps/web/src/app/(dashboard)/import/import-utils.ts",
+  // Test for the strip — exercises parseAmountCell("€42") to verify glyphs are
+  // stripped. Asserts on input shape, not display output.
+  "apps/web/src/app/(dashboard)/import/__tests__/",
 
   // ── AI prompt templates ───────────────────────────────────────────────────
   // enrich/route.ts lines 144-145: "$0, $10K, $50K" are format examples inside

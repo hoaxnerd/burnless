@@ -215,36 +215,43 @@
     {
       "idx": 30,
       "version": "7",
-      "when": 1775779200000,
-      "tag": "0030_team_phase1_headcount_extensions",
+      "when": 1777507200000,
+      "tag": "0030_phase1_expenses_schema",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1775865600000,
-      "tag": "0031_team_phase1_salary_changes",
+      "when": 1777593600000,
+      "tag": "0031_team_phase1_headcount_extensions",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1775952000000,
-      "tag": "0032_team_phase1_bonuses",
+      "when": 1777680000000,
+      "tag": "0032_team_phase1_salary_changes",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1776038400000,
-      "tag": "0033_team_phase1_equity_grants",
+      "when": 1777766400000,
+      "tag": "0033_team_phase1_bonuses",
       "breakpoints": true
     },
     {
       "idx": 34,
       "version": "7",
-      "when": 1776124800000,
-      "tag": "0034_extend_audit_entity_type",
+      "when": 1777852800000,
+      "tag": "0034_team_phase1_equity_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1777939200000,
+      "tag": "0035_extend_audit_entity_type",
       "breakpoints": true
     }
   ]
