@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { CurrencyInput, NumberInput, PercentageInput } from "@/components/forms/primitives";
 import { TieredPricingEditor } from "./TieredPricingEditor";
 import type { PricingTier } from "@burnless/engine";
@@ -12,10 +13,21 @@ export interface FieldsProps {
 const get = <T,>(p: Record<string, unknown>, k: string, fb: T): T =>
   (p[k] as T) ?? fb;
 
+const PER_SEAT_DEFAULT_SEATS = 25;
+
 export function SubscriptionFields({ params, setParams }: FieldsProps) {
   const set = (k: string, v: unknown) => setParams((p) => ({ ...p, [k]: v }));
 
   const pricingModel = (params.pricingModel as "flat" | "per_seat" | "tiered" | undefined) ?? "flat";
+
+  // Engine requires seatsPerCustomer != null to enter the per-seat branch.
+  // Seed the visible default into params so save round-trips it without
+  // requiring the user to re-type the prefilled value.
+  useEffect(() => {
+    if (pricingModel === "per_seat" && params.seatsPerCustomer == null) {
+      set("seatsPerCustomer", PER_SEAT_DEFAULT_SEATS);
+    }
+  }, [pricingModel, params.seatsPerCustomer]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -25,6 +25,15 @@ export const GET = withErrorHandler(async (_request: Request) => {
 
 // ── PATCH /api/company — Update company profile ─────────────────────────────
 
+// Phase 1 §2.E: country-agnostic 4-component employer benefits breakdown
+// applied as defaults for new hires that omit a per-hire override.
+const benefitsRatesSchema = z.object({
+  statutoryEmployerContributions: z.number().min(0).max(1),
+  insuranceBenefits: z.number().min(0).max(1),
+  retirementContributions: z.number().min(0).max(1),
+  otherBenefits: z.number().min(0).max(1),
+});
+
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   stage: z
@@ -39,6 +48,7 @@ const updateSchema = z.object({
   timezone: z.string().min(1).max(100).optional(),
   region: z.enum(["us-east", "eu-west", "ap-south"]).optional(),
   fiscalYearEnd: z.number().min(1).max(12).optional(),
+  benefitsRates: benefitsRatesSchema.optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
@@ -72,7 +82,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   }
 
   const updates: Record<string, unknown> = {};
-  const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd } = parsed.data;
+  const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd, benefitsRates } = parsed.data;
 
   if (name !== undefined) updates.name = name;
   if (stage !== undefined) updates.stage = stage;
@@ -83,6 +93,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (timezone !== undefined) updates.timezone = timezone;
   if (region !== undefined) updates.region = region;
   if (fiscalYearEnd !== undefined) updates.fiscalYearEnd = fiscalYearEnd;
+  if (benefitsRates !== undefined) updates.benefitsRates = benefitsRates;
 
   if (Object.keys(updates).length === 0) {
     return errorResponse("No fields to update", 400);

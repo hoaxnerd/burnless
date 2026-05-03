@@ -529,7 +529,10 @@ export const forecastLines = pgTable(
   },
   (table) => [
     index("forecast_lines_company_idx").on(table.companyId),
-    uniqueIndex("forecast_lines_company_account_idx").on(
+    // Non-unique: Phase 1 consolidated form treats each forecast line as an
+    // independent expense (vendor / notes / department / frequency / isOneTime),
+    // so multiple lines per account are expected.
+    index("forecast_lines_company_account_idx").on(
       table.companyId,
       table.accountId
     ),

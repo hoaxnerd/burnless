@@ -260,6 +260,13 @@
       "when": 1778025600000,
       "tag": "0036_phase1_revenue_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1778198400000,
+      "tag": "0037_relax_forecast_lines_account_uniqueness",
+      "breakpoints": true
     }
   ]
 }

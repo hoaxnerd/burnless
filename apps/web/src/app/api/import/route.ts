@@ -22,11 +22,19 @@ const importTransactionSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+// columnMapping values are usually a single source-column name, but the
+// `amount` slot may be the polymorphic { debit, credit } shape when the file
+// has separate Debit and Credit columns (Phase 1 §2.C D1).
+const columnMappingValueSchema = z.union([
+  z.string(),
+  z.object({ debit: z.string(), credit: z.string() }),
+]);
+
 const importSchema = z.object({
   transactions: z.array(importTransactionSchema).min(1).max(5000),
   dryRun: z.boolean().optional().default(false),
   fileName: z.string().optional().default("import.csv"),
-  columnMapping: z.record(z.string()).optional(),
+  columnMapping: z.record(columnMappingValueSchema).optional(),
 });
 
 type ImportTransaction = z.infer<typeof importTransactionSchema>;

@@ -570,7 +570,41 @@ function indexSubscriptionDetails(
   const map = new Map<string, SubscriptionDetail>();
   if (!details) return map;
   for (const d of details) {
-    map.set(d.month, d);
+    const existing = map.get(d.month);
+    if (!existing) {
+      map.set(d.month, { ...d });
+      continue;
+    }
+    // Multiple subscription streams contributing to the same month — sum
+    // numeric fields so MRR / customer counts reflect the portfolio total
+    // rather than only the last stream processed.
+    map.set(d.month, {
+      month: d.month,
+      customers: existing.customers + d.customers,
+      newCustomers: existing.newCustomers + d.newCustomers,
+      churnedCustomers: existing.churnedCustomers + d.churnedCustomers,
+      mrr: existing.mrr + d.mrr,
+      newMrr: existing.newMrr + d.newMrr,
+      expansionMrr: existing.expansionMrr + d.expansionMrr,
+      churnedMrr: existing.churnedMrr + d.churnedMrr,
+      contractionMrr:
+        existing.contractionMrr == null && d.contractionMrr == null
+          ? undefined
+          : (existing.contractionMrr ?? 0) + (d.contractionMrr ?? 0),
+      downgradeMrr:
+        existing.downgradeMrr == null && d.downgradeMrr == null
+          ? undefined
+          : (existing.downgradeMrr ?? 0) + (d.downgradeMrr ?? 0),
+      reactivationMrr:
+        existing.reactivationMrr == null && d.reactivationMrr == null
+          ? undefined
+          : (existing.reactivationMrr ?? 0) + (d.reactivationMrr ?? 0),
+      netNewMrr: existing.netNewMrr + d.netNewMrr,
+      activeUsers:
+        existing.activeUsers == null && d.activeUsers == null
+          ? undefined
+          : (existing.activeUsers ?? 0) + (d.activeUsers ?? 0),
+    });
   }
   return map;
 }
