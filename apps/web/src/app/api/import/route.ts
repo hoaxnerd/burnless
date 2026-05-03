@@ -18,6 +18,8 @@ const importTransactionSchema = z.object({
   accountId: z.string(),
   externalId: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  vendor: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 const importSchema = z.object({
@@ -31,10 +33,40 @@ type ImportTransaction = z.infer<typeof importTransactionSchema>;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateExternalId(tx: ImportTransaction): string {
-  const raw = `${tx.date}|${tx.amount}|${tx.description ?? ""}`;
+function generateExternalId(tx: ImportTransaction, accountId: string): string {
+  const raw = `${tx.date}|${tx.amount}|${tx.description ?? ""}|${accountId}`;
   const hash = crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16);
   return `import:${hash}`;
+}
+
+const IMPORTED_ACCOUNT_NAME = "Imported";
+const IMPORTED_ACCOUNT_SENTINEL = "__imported__";
+
+async function ensureImportedAccount(companyId: string): Promise<string> {
+  const existing = await db
+    .select({ id: financialAccounts.id })
+    .from(financialAccounts)
+    .where(
+      and(
+        eq(financialAccounts.companyId, companyId),
+        eq(financialAccounts.name, IMPORTED_ACCOUNT_NAME)
+      )
+    )
+    .limit(1);
+
+  if (existing[0]) return existing[0].id;
+
+  const [created] = await db
+    .insert(financialAccounts)
+    .values({
+      companyId,
+      name: IMPORTED_ACCOUNT_NAME,
+      type: "expense",
+      category: "operating_expense",
+    })
+    .returning({ id: financialAccounts.id });
+
+  return created!.id;
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -98,6 +130,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     date: Date;
     amount: string;
     description: string | null;
+    vendor: string | null;
+    notes: string | null;
     source: "import";
     externalId: string;
     importBatchId: string | null;
@@ -107,12 +141,20 @@ export const POST = withErrorHandler(async (request: Request) => {
     categorySource?: string;
   }> = [];
 
+  let importedAccountId: string | null = null;
+
   for (let i = 0; i < txInput.length; i++) {
     const tx = txInput[i]!;
 
-    if (!validAccountIdSet.has(tx.accountId)) {
+    let resolvedAccountId: string;
+    if (tx.accountId === "" || tx.accountId === IMPORTED_ACCOUNT_SENTINEL) {
+      importedAccountId ??= await ensureImportedAccount(ctx.companyId);
+      resolvedAccountId = importedAccountId;
+    } else if (!validAccountIdSet.has(tx.accountId)) {
       errors.push({ index: i, message: `Account ${tx.accountId} not found or not accessible` });
       continue;
+    } else {
+      resolvedAccountId = tx.accountId;
     }
 
     const parsedDate = new Date(tx.date);
@@ -121,7 +163,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       continue;
     }
 
-    const externalId = tx.externalId || generateExternalId(tx);
+    const externalId = tx.externalId || generateExternalId(tx, resolvedAccountId);
 
     // AI categorization with merchant memory
     let suggestedCategory: string | undefined;
@@ -139,10 +181,12 @@ export const POST = withErrorHandler(async (request: Request) => {
     prepared.push({
       index: i,
       companyId: ctx.companyId,
-      accountId: tx.accountId,
+      accountId: resolvedAccountId,
       date: parsedDate,
       amount: String(tx.amount),
       description: tx.description ?? null,
+      vendor: tx.vendor ?? null,
+      notes: tx.notes ?? null,
       source: "import" as const,
       externalId,
       importBatchId: null,

@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { formatCompactCurrency } from "@/components/charts";
 import { Modal } from "@/components/ui";
-import { EditExpenseForm } from "./edit-expense-form";
+import { ExpenseFormModal } from "./expense-form-modal";
+import type { ExpenseRow } from "./expense-form";
+import type { ForecastMethod } from "@/lib/expense-params";
 import type { ExpenseLineItem } from "@/lib/compute-expenses";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
@@ -15,6 +17,19 @@ import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overri
 interface ExpenseTableProps {
   lineItems: ExpenseLineItem[];
   subcategories: string[];
+  /**
+   * Live account lookup. When provided, the table renders names via
+   * `accountMap.get(item.accountId)?.name` so that renames flow through
+   * without needing the upstream compute to bake a fresh `accountName`
+   * into every line item. Falls back to the cached `item.accountName`
+   * when the map is omitted (back-compat with callers that haven't
+   * threaded it yet).
+   */
+  accountMap?: ReadonlyMap<string, { id: string; name: string }>;
+  /** Departments — forwarded to the edit form's optional department dropdown. */
+  departments?: Array<{ id: string; name: string }>;
+  /** Other forecast lines — used by the edit form's `percentage_of` source dropdown. */
+  forecastLines?: Array<{ id: string; name: string }>;
   onDelete?: (ids: string[]) => void;
   onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
@@ -22,7 +37,7 @@ interface ExpenseTableProps {
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOverride }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete, onCategoryOverride }: ExpenseTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -41,6 +56,13 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     handleRestore: handleScenarioRestore,
   } = useScenarioOverrides("forecast_line");
 
+  // Live account-name lookup. Always prefer the live `accountMap` value
+  // so a rename ("Slack" → "Notion") propagates without rebuilding line
+  // items. Falls back to the cached field for callers that haven't
+  // threaded the map yet.
+  const resolveName = (item: ExpenseLineItem): string =>
+    accountMap?.get(item.accountId)?.name ?? item.accountName;
+
   // Edit state
   const [editingItem, setEditingItem] = useState<ExpenseLineItem | null>(null);
 
@@ -48,6 +70,22 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
   const [deletingItem, setDeletingItem] = useState<ExpenseLineItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Bulk delete confirmation state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+
+  // Bulk categorize state — accountId selected from the reassign dropdown
+  const [bulkAccountId, setBulkAccountId] = useState<string>("");
+  const [bulkCategorizing, setBulkCategorizing] = useState(false);
+  const [bulkCategorizeError, setBulkCategorizeError] = useState<string | null>(null);
+
+  // List of accounts available to the reassign dropdown — derived from accountMap.
+  const accountOptions = useMemo(() => {
+    if (!accountMap) return [] as Array<{ id: string; name: string }>;
+    return Array.from(accountMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [accountMap]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -57,7 +95,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     if (search) {
       const q = search.toLowerCase();
       items = items.filter(
-        (i) => i.accountName.toLowerCase().includes(q) || i.subcategory.toLowerCase().includes(q),
+        (i) => resolveName(i).toLowerCase().includes(q) || i.subcategory.toLowerCase().includes(q),
       );
     }
 
@@ -73,7 +111,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     // Sort
     items = [...items].sort((a, b) => {
       let cmp = 0;
-      if (sortKey === "accountName") cmp = a.accountName.localeCompare(b.accountName);
+      if (sortKey === "accountName") cmp = resolveName(a).localeCompare(resolveName(b));
       else if (sortKey === "subcategory") cmp = a.subcategory.localeCompare(b.subcategory);
       else if (sortKey === "currentAmount") cmp = a.currentAmount - b.currentAmount;
       else if (sortKey === "changePercent") cmp = a.changePercent - b.changePercent;
@@ -81,7 +119,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
     });
 
     return items;
-  }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir]);
+  }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir, accountMap]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -133,6 +171,68 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
       setDeleteError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleBulkDeleteConfirm() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBulkDeleting(true);
+    setBulkDeleteError(null);
+
+    try {
+      const res = await apiFetch("/api/forecast-lines/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to delete expenses");
+      }
+      // Notify parent (legacy onDelete prop) and clear local state.
+      onDelete?.(ids);
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+      router.refresh();
+    } catch (err) {
+      setBulkDeleteError(
+        err instanceof Error ? err.message : "Something went wrong",
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleBulkCategorize(newAccountId: string) {
+    const ids = Array.from(selected);
+    if (ids.length === 0 || !newAccountId) return;
+    setBulkCategorizing(true);
+    setBulkCategorizeError(null);
+
+    try {
+      const res = await apiFetch("/api/forecast-lines/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "categorize",
+          ids,
+          accountId: newAccountId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to reassign expenses");
+      }
+      setSelected(new Set());
+      setBulkAccountId("");
+      router.refresh();
+    } catch (err) {
+      setBulkCategorizeError(
+        err instanceof Error ? err.message : "Something went wrong",
+      );
+    } finally {
+      setBulkCategorizing(false);
     }
   }
 
@@ -198,25 +298,53 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
 
       {/* Bulk actions bar */}
       {selected.size > 0 && (
-        <div className="px-6 py-2 bg-brand-50 border-b border-brand-100 flex items-center gap-3 animate-slide-up">
+        <div className="px-6 py-2 bg-brand-50 border-b border-brand-100 flex flex-wrap items-center gap-3 animate-slide-up">
           <span className="text-xs font-medium text-brand-700">
             {selected.size} selected
           </span>
-          <button
-            disabled
-            title="Bulk categorization coming soon"
-            className="inline-flex items-center gap-1 rounded-md bg-surface-100 px-2.5 py-1 text-[10px] font-medium text-surface-400 cursor-not-allowed"
-          >
-            <Tag className="h-3 w-3" /> Categorize
-          </button>
-          {onDelete && (
-            <button
-              onClick={() => { onDelete(Array.from(selected)); setSelected(new Set()); }}
-              className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-100 transition-colors"
-            >
-              <Trash2 className="h-3 w-3" /> Delete
-            </button>
+
+          {/* Bulk reassign — pool comes from the same accountMap threaded
+              into the table by the parent view. */}
+          {accountOptions.length > 0 && (
+            <label className="inline-flex items-center gap-1.5">
+              <Tag className="h-3 w-3 text-brand-700" aria-hidden />
+              <span className="sr-only">Reassign to account</span>
+              <select
+                aria-label="Reassign selected expenses to account"
+                value={bulkAccountId}
+                disabled={bulkCategorizing}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setBulkAccountId(next);
+                  if (next) void handleBulkCategorize(next);
+                }}
+                className="appearance-none rounded-md border border-brand-200 bg-white px-2 py-1 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 cursor-pointer disabled:opacity-50"
+              >
+                <option value="">Reassign to...</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </label>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setBulkDeleteError(null);
+              setBulkDeleteOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-100 transition-colors"
+          >
+            <Trash2 className="h-3 w-3" /> Delete {selected.size} selected
+          </button>
+
+          {bulkCategorizeError && (
+            <span className="text-[10px] text-danger-600">
+              {bulkCategorizeError}
+            </span>
+          )}
+
           <button
             onClick={() => setSelected(new Set())}
             className="ml-auto text-[10px] text-surface-500 hover:text-surface-700"
@@ -305,6 +433,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
             ) : (
               filtered.map((item) => {
                 const isSelected = selected.has(item.id);
+                const displayName = resolveName(item);
                 const changeIcon = item.changePercent > 0.01 ? "\u2191" : item.changePercent < -0.01 ? "\u2193" : "\u2192";
                 const changeLabel = item.changePercent > 0.01 ? "Increasing" : item.changePercent < -0.01 ? "Decreasing" : "Stable";
                 const changeColor = item.changePercent > 0.01 ? "text-red-600" : item.changePercent < -0.01 ? "text-green-600" : "text-surface-500";
@@ -319,7 +448,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""} ${rowBorderClass}`}
                   >
                     <td className="w-10 px-4 py-3">
-                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${item.accountName}`} className="flex items-center justify-center">
+                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
                         <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
                           isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
                         }`}>
@@ -329,7 +458,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-surface-900">{item.accountName}</span>
+                        <span className="text-sm font-medium text-surface-900">{displayName}</span>
                         <span className="ml-1 text-[10px] text-surface-400 uppercase">{item.method}</span>
                         {overrideTag && <ScenarioBadge variant={overrideTag} />}
                       </div>
@@ -350,7 +479,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
-                                  description: item.accountName,
+                                  description: displayName,
                                   accountId: item.accountId,
                                   category: item.accountCategory,
                                   subcategory: newCat,
@@ -428,7 +557,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                             onClick={() => handleScenarioRevert(item.id)}
                             className="rounded-md p-1.5 text-warning-500 hover:text-warning-700 hover:bg-warning-50 transition-colors"
                             title="Revert to base"
-                            aria-label={`Revert ${item.accountName}`}
+                            aria-label={`Revert ${displayName}`}
                           >
                             <RotateCw className="h-3.5 w-3.5" />
                           </button>
@@ -438,7 +567,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                             onClick={() => handleScenarioRemove(item.id)}
                             className="rounded-md p-1.5 text-danger-500 hover:text-danger-700 hover:bg-danger-50 transition-colors"
                             title="Remove scenario entity"
-                            aria-label={`Remove ${item.accountName}`}
+                            aria-label={`Remove ${displayName}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -449,7 +578,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               onClick={() => setEditingItem(item)}
                               className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit expense"
-                              aria-label={`Edit ${item.accountName}`}
+                              aria-label={`Edit ${displayName}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -460,7 +589,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               }}
                               className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                               title="Delete expense"
-                              aria-label={`Delete ${item.accountName}`}
+                              aria-label={`Delete ${displayName}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -472,7 +601,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
                               onClick={() => setEditingItem(item)}
                               className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit expense"
-                              aria-label={`Edit ${item.accountName}`}
+                              aria-label={`Edit ${displayName}`}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -490,10 +619,14 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
 
       {/* Edit expense modal */}
       {editingItem && (
-        <EditExpenseForm
-          item={editingItem}
+        <ExpenseFormModal
+          mode="edit"
           open={!!editingItem}
           onClose={() => setEditingItem(null)}
+          accounts={accountOptions}
+          departments={departments}
+          forecastLines={(forecastLines ?? []).filter((l) => l.id !== editingItem.id)}
+          initialValue={lineItemToExpenseRow(editingItem)}
         />
       )}
 
@@ -512,7 +645,7 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
           )}
           <p className="text-sm text-surface-700">
             Are you sure you want to delete{" "}
-            <span className="font-semibold text-surface-900">{deletingItem?.accountName}</span>?
+            <span className="font-semibold text-surface-900">{deletingItem ? resolveName(deletingItem) : ""}</span>?
             This will remove the forecast line permanently.
           </p>
           <div className="flex justify-end gap-3 pt-2">
@@ -535,6 +668,44 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
         </div>
       </Modal>
 
+      {/* Bulk delete confirmation modal */}
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => { setBulkDeleteOpen(false); setBulkDeleteError(null); }}
+        title="Delete selected expenses"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {bulkDeleteError && (
+            <div className="rounded-lg bg-danger-50 border border-danger-500/20 px-4 py-3 text-sm text-danger-600">
+              {bulkDeleteError}
+            </div>
+          )}
+          <p className="text-sm text-surface-700">
+            Delete{" "}
+            <span className="font-semibold text-surface-900">{selected.size}</span>{" "}
+            forecast {selected.size === 1 ? "line" : "lines"}? This action removes them permanently.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => { setBulkDeleteOpen(false); setBulkDeleteError(null); }}
+              className="rounded-lg border border-surface-300 px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDeleteConfirm}
+              disabled={bulkDeleting}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? "Deleting..." : `Delete ${selected.size}`}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Hidden in scenario section */}
       {isInScenarioMode && (
         <HiddenEntitiesSection
@@ -545,4 +716,34 @@ export function ExpenseTable({ lineItems, subcategories, onDelete, onCategoryOve
       )}
     </div>
   );
+}
+
+/**
+ * Map a compute-layer `ExpenseLineItem` to the `<ExpenseForm>`'s
+ * `ExpenseRow` shape. The compute layer surfaces a derived boolean
+ * `isRecurring`; we restore the tri-state by checking `recurringSource` —
+ * `"user"` means the DB column was non-null and reflects an explicit user
+ * choice; otherwise, expose `null` so the form's "Auto-detect" option is
+ * preselected.
+ *
+ * `vendor`, `notes`, and `departmentId` are threaded through from the
+ * underlying forecast-line row so an edit that doesn't touch them re-PATCHes
+ * the same persisted values rather than nulling them out (Phase 1 §2.C
+ * data-loss guard).
+ */
+function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
+  return {
+    id: item.id,
+    accountId: item.accountId,
+    method: item.method as ForecastMethod,
+    parameters: item.parameters,
+    startDate: item.startDate,
+    endDate: item.endDate,
+    frequency: item.frequency,
+    isOneTime: item.isOneTime,
+    isRecurring: item.recurringSource === "user" ? item.isRecurring : null,
+    vendor: item.vendor,
+    notes: item.notes,
+    departmentId: item.departmentId,
+  };
 }

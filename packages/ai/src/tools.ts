@@ -30,9 +30,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "create_forecast_line",
+    name: "create_expense",
     description:
-      "Add a forecast line to the current scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account). Always operates on the active scenario from context.",
+      "Add an expense to the current scenario — defines how a specific expense account is projected over time. Use when the user says 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -47,15 +47,40 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         parameters: {
           type: "object",
-          description: "Method-specific parameters. For 'fixed': { amount: number }. For 'growth_rate': { startAmount: number, monthlyRate: number }. For 'per_unit': { units: number, pricePerUnit: number }. For 'percentage_of': { accountId: string, percentage: number }.",
+          description: "Method-specific parameters. See tool description for per-method shapes.",
         },
         startDate: {
           type: "string",
           description: "Start date in YYYY-MM-DD format",
         },
         endDate: {
+          type: ["string", "null"],
+          description: "Optional end date in YYYY-MM-DD format. Omit or null for open-ended.",
+        },
+        notes: {
+          type: ["string", "null"],
+          description: "Free-form notes for this expense (memo, vendor URL, etc.).",
+        },
+        vendor: {
+          type: ["string", "null"],
+          description: "Vendor name (e.g., 'Slack', 'AWS'). Free-form text.",
+        },
+        departmentId: {
+          type: ["string", "null"],
+          description: "Department this expense belongs to (from context). Null if unassigned.",
+        },
+        frequency: {
           type: "string",
-          description: "Optional end date in YYYY-MM-DD format. Omit for open-ended forecasts.",
+          enum: ["monthly", "quarterly", "annual"],
+          description: "Billing/recognition cadence. Defaults to 'monthly'.",
+        },
+        isOneTime: {
+          type: "boolean",
+          description: "True for one-time charges (e.g., setup fees). Defaults to false.",
+        },
+        isRecurring: {
+          type: ["boolean", "null"],
+          description: "Tri-state recurring flag. true = explicit recurring, false = explicit non-recurring, null = unset (UI infers from variance). Optional.",
         },
       },
       required: ["accountId", "method", "parameters", "startDate"],
@@ -459,9 +484,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "update_forecast_line",
+    name: "update_expense",
     description:
-      "Update an existing forecast line's method, parameters, or date range.",
+      "Update an existing expense's method, parameters, dates, or metadata (vendor, notes, frequency, department, one-time/recurring flags). Use when the user says 'edit my Slack expense' or 'change the cloud spend growth rate'. Only fields supplied are patched. Method param shapes: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -476,24 +501,49 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         parameters: {
           type: "object",
-          description: "New method-specific parameters",
+          description: "New method-specific parameters. See tool description for per-method shapes.",
         },
         startDate: {
           type: "string",
           description: "New start date (YYYY-MM-DD)",
         },
         endDate: {
+          type: ["string", "null"],
+          description: "New end date (YYYY-MM-DD) or null to clear",
+        },
+        notes: {
+          type: ["string", "null"],
+          description: "Free-form notes; null clears.",
+        },
+        vendor: {
+          type: ["string", "null"],
+          description: "Vendor name (e.g., 'Slack'); null clears.",
+        },
+        departmentId: {
+          type: ["string", "null"],
+          description: "Department ID; null clears the assignment.",
+        },
+        frequency: {
           type: "string",
-          description: "New end date (YYYY-MM-DD) or null",
+          enum: ["monthly", "quarterly", "annual"],
+          description: "Billing/recognition cadence.",
+        },
+        isOneTime: {
+          type: "boolean",
+          description: "Mark as one-time (true) or recurring/regular (false).",
+        },
+        isRecurring: {
+          type: ["boolean", "null"],
+          description: "Tri-state recurring flag. true = recurring, false = non-recurring, null = unset (UI infers).",
         },
       },
       required: ["id"],
     },
   },
   {
-    name: "delete_forecast_line",
+    name: "delete_expense",
     description:
-      "Delete a forecast line and all its associated forecast values.",
+      "Delete an expense and all its associated forecast values. Use this when the user says things like 'remove my Slack expense'.",
     inputSchema: {
       type: "object",
       properties: {

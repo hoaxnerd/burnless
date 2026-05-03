@@ -6,41 +6,31 @@ import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db
 import { forecastLines } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { CreateExpenseSchema, UpdateExpenseSchema } from "@burnless/ai";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   optionalId,
-  idString,
-  dateString,
-  optionalDate,
   monthCount,
   sumValues,
 } from "./types";
 
 // ── Update/Delete Schemas ────────────────────────────────────────────────────
 
-export const updateForecastLineSchema = z.object({
-  id: idString,
-  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]).optional(),
-  parameters: z.record(z.unknown()).optional(),
-  startDate: dateString.optional(),
-  endDate: optionalDate,
-});
+/**
+ * Re-exported from `@burnless/ai` so the canonical Phase-1 expense contract
+ * lives in a single place (mirrors the JSON Schema in `@burnless/ai/tools.ts`).
+ */
+export const updateForecastLineSchema = UpdateExpenseSchema;
 
 export const deleteForecastLineSchema = z.object({
-  id: idString,
+  id: z.string().min(1),
 });
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-export const createForecastLineSchema = z.object({
-  accountId: idString,
-  method: z.enum(["fixed", "growth_rate", "per_unit", "percentage_of", "custom_formula"]),
-  parameters: z.record(z.unknown()).default({}),
-  startDate: dateString,
-  endDate: optionalDate,
-});
+export const createForecastLineSchema = CreateExpenseSchema;
 
 export const generateStatementsSchema = z.object({
   scenarioId: optionalId,
@@ -59,7 +49,14 @@ async function createForecastLine(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const data = input as z.infer<typeof createForecastLineSchema>;
+  const parsed = createForecastLineSchema.safeParse(input);
+  if (!parsed.success) {
+    return JSON.stringify({
+      success: false,
+      error: `Invalid input: ${parsed.error.message}`,
+    });
+  }
+  const data = parsed.data;
 
   const row = await scenarioInsert("forecast_line", forecastLines, {
     companyId: context.companyId,
@@ -68,6 +65,12 @@ async function createForecastLine(
     parameters: data.parameters,
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
+    notes: data.notes ?? null,
+    vendor: data.vendor ?? null,
+    departmentId: data.departmentId ?? null,
+    frequency: data.frequency,
+    isOneTime: data.isOneTime,
+    isRecurring: data.isRecurring ?? null,
   }, context.scenarioId);
 
   return JSON.stringify({
@@ -229,7 +232,14 @@ async function updateForecastLine(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const data = input as z.infer<typeof updateForecastLineSchema>;
+  const parsed = updateForecastLineSchema.safeParse(input);
+  if (!parsed.success) {
+    return JSON.stringify({
+      success: false,
+      error: `Invalid input: ${parsed.error.message}`,
+    });
+  }
+  const data = parsed.data;
 
   // Verify ownership
   const [existing] = await db
@@ -245,6 +255,13 @@ async function updateForecastLine(
   if (data.parameters !== undefined) updates.parameters = data.parameters;
   if (data.startDate !== undefined) updates.startDate = new Date(data.startDate);
   if (data.endDate !== undefined) updates.endDate = data.endDate ? new Date(data.endDate) : null;
+  // Phase-1 metadata. `null` clears the field; `undefined` leaves it untouched.
+  if (data.notes !== undefined) updates.notes = data.notes;
+  if (data.vendor !== undefined) updates.vendor = data.vendor;
+  if (data.departmentId !== undefined) updates.departmentId = data.departmentId;
+  if (data.frequency !== undefined) updates.frequency = data.frequency;
+  if (data.isOneTime !== undefined) updates.isOneTime = data.isOneTime;
+  if (data.isRecurring !== undefined) updates.isRecurring = data.isRecurring;
 
   if (Object.keys(updates).length === 0) {
     return JSON.stringify({ success: false, error: "No fields to update" });
@@ -262,7 +279,14 @@ async function deleteForecastLine(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
-  const data = input as z.infer<typeof deleteForecastLineSchema>;
+  const parsed = deleteForecastLineSchema.safeParse(input);
+  if (!parsed.success) {
+    return JSON.stringify({
+      success: false,
+      error: `Invalid input: ${parsed.error.message}`,
+    });
+  }
+  const data = parsed.data;
 
   // Verify ownership
   const [existing] = await db
@@ -284,17 +308,17 @@ async function deleteForecastLine(
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const forecastingSchemas: Record<string, z.ZodType> = {
-  create_forecast_line: createForecastLineSchema,
-  update_forecast_line: updateForecastLineSchema,
-  delete_forecast_line: deleteForecastLineSchema,
+  create_expense: createForecastLineSchema,
+  update_expense: updateForecastLineSchema,
+  delete_expense: deleteForecastLineSchema,
   generate_financial_statements: generateStatementsSchema,
   forecast_revenue: forecastRevenueSchema,
 };
 
 export const forecastingHandlers: Record<string, ToolHandler> = {
-  create_forecast_line: createForecastLine,
-  update_forecast_line: updateForecastLine,
-  delete_forecast_line: deleteForecastLine,
+  create_expense: createForecastLine,
+  update_expense: updateForecastLine,
+  delete_expense: deleteForecastLine,
   generate_financial_statements: generateStatements,
   forecast_revenue: forecastRevenue,
 };

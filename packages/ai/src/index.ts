@@ -11,6 +11,18 @@ export { buildFinancialSnapshot, formatContextForPrompt } from "./context";
 // Tool definitions
 export { getFinancialTools, financialTools } from "./tools";
 
+// Tool input Zod schemas
+export {
+  ExpenseFrequencySchema,
+  ForecastMethodSchema,
+  UpdateExpenseSchema,
+  CreateExpenseSchema,
+} from "./schemas/expenses";
+export type {
+  UpdateExpenseInput,
+  CreateExpenseInput,
+} from "./schemas/expenses";
+
 // Insights
 export { generateInsights } from "./insights";
 export { generatePageInsights } from "./page-insights";
