@@ -37,11 +37,23 @@ export const rateValue = z.number().min(-1, "Rate cannot be below -100%").max(10
 /** Percentage 0-1 range. */
 export const percentFraction = z.number().min(0, "Percentage must be >= 0").max(1, "Percentage must be <= 100%");
 
-/** Headcount — positive integer, bounded. */
+/** Headcount — positive integer, bounded. Kept for back-compat. */
 export const headcount = z.number().int("Count must be a whole number").min(1, "Count must be >= 1").max(100_000, "Count exceeds 100,000 limit");
+
+/** Headcount FTE — fractional, bounded. Used by Phase-1 headcount fields (0.5 = half-time). */
+export const headcountFte = z.number().min(0, "Count must be >= 0").max(99.99, "Count exceeds 99.99 limit");
 
 /** Salary — positive, bounded. */
 export const salaryAmount = z.number().positive("Salary must be > 0").max(100_000_000, "Salary exceeds $100M limit");
+
+/** Hourly rate — non-negative, nullable optional. */
+export const hourlyRate = z.number().nonnegative("Hourly rate must be >= 0").max(10_000, "Hourly rate exceeds $10,000 limit").nullable().optional();
+
+/** Hours per week — 0 to 168, nullable optional. */
+export const hoursPerWeek = z.number().min(0, "Hours per week must be >= 0").max(168, "Hours per week cannot exceed 168").nullable().optional();
+
+/** Employee type — enum matching headcountEmployeeTypeEnum. */
+export const employeeType = z.enum(["full_time", "part_time", "contractor"]);
 
 /** Benefits rate — 0 to 200% (some roles have very high benefits). */
 export const benefitsRate = z.number().min(0, "Benefits rate must be >= 0").max(2, "Benefits rate cannot exceed 200%").default(0.2);

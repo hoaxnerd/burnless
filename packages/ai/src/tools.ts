@@ -30,9 +30,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "create_forecast_line",
+    name: "create_expense",
     description:
-      "Add a forecast line to the current scenario — defines how a specific account is projected over time (e.g., fixed monthly amount, growth rate, percentage of another account). Always operates on the active scenario from context.",
+      "Add an expense to the current scenario — defines how a specific expense account is projected over time. Use when the user says 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -47,15 +47,40 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         parameters: {
           type: "object",
-          description: "Method-specific parameters. For 'fixed': { amount: number }. For 'growth_rate': { startAmount: number, monthlyRate: number }. For 'per_unit': { units: number, pricePerUnit: number }. For 'percentage_of': { accountId: string, percentage: number }.",
+          description: "Method-specific parameters. See tool description for per-method shapes.",
         },
         startDate: {
           type: "string",
           description: "Start date in YYYY-MM-DD format",
         },
         endDate: {
+          type: ["string", "null"],
+          description: "Optional end date in YYYY-MM-DD format. Omit or null for open-ended.",
+        },
+        notes: {
+          type: ["string", "null"],
+          description: "Free-form notes for this expense (memo, vendor URL, etc.).",
+        },
+        vendor: {
+          type: ["string", "null"],
+          description: "Vendor name (e.g., 'Slack', 'AWS'). Free-form text.",
+        },
+        departmentId: {
+          type: ["string", "null"],
+          description: "Department this expense belongs to (from context). Null if unassigned.",
+        },
+        frequency: {
           type: "string",
-          description: "Optional end date in YYYY-MM-DD format. Omit for open-ended forecasts.",
+          enum: ["monthly", "quarterly", "annual"],
+          description: "Billing/recognition cadence. Defaults to 'monthly'.",
+        },
+        isOneTime: {
+          type: "boolean",
+          description: "True for one-time charges (e.g., setup fees). Defaults to false.",
+        },
+        isRecurring: {
+          type: ["boolean", "null"],
+          description: "Tri-state recurring flag. true = explicit recurring, false = explicit non-recurring, null = unset (UI infers from variance). Optional.",
         },
       },
       required: ["accountId", "method", "parameters", "startDate"],
@@ -64,81 +89,113 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "add_headcount",
     description:
-      "Add a headcount plan entry to the current scenario — plan to hire a role with salary and start date. Automatically creates personnel cost forecasts.",
+      "Add a headcount plan entry to the current scenario. Canonical engine fields: title, name (individual hire name), employeeType (full_time | part_time | contractor), count (FTE — supports fractions like 0.5), salary (annual), hourlyRate (for contractors / part-time hourly), hoursPerWeek (40 = full-time baseline), startDate, endDate, departmentId, benefitsRate (legacy fallback), and parameters.benefitsBreakdown with the four fractions { statutoryEmployerContributionsCost, insuranceBenefitsCost, retirementContributionsCost, otherBenefitsCost }.",
     inputSchema: {
       type: "object",
       properties: {
-        departmentId: {
+        departmentId: { type: "string", description: "Department ID (from context)" },
+        title: { type: "string", description: "Job title (e.g., 'Senior Engineer', 'Product Designer')" },
+        name: { type: ["string", "null"], description: "Individual hire name (null to clear)" },
+        employeeType: {
           type: "string",
-          description: "Department ID (from context)",
-        },
-        title: {
-          type: "string",
-          description: "Job title (e.g., 'Senior Engineer', 'Product Designer')",
+          enum: ["full_time", "part_time", "contractor"],
+          description: "Employee type. Defaults to full_time.",
         },
         count: {
           type: "number",
-          description: "Number of people to hire for this role",
+          description: "FTE count, supports fractions (0.5 = half-time). Defaults to 1.",
         },
-        salary: {
-          type: "number",
-          description: "Annual salary per person",
+        salary: { type: "number", description: "Annual salary per person" },
+        hourlyRate: {
+          type: ["number", "null"],
+          description: "Hourly rate for contractors or hourly part-time",
         },
-        startDate: {
-          type: "string",
-          description: "Hire start date (YYYY-MM-DD)",
+        hoursPerWeek: {
+          type: ["number", "null"],
+          description: "Hours per week (40 = full-time baseline)",
         },
+        startDate: { type: "string", description: "Hire start date (YYYY-MM-DD)" },
         endDate: {
           type: "string",
           description: "Optional end date for contract roles (YYYY-MM-DD)",
         },
         benefitsRate: {
           type: "number",
-          description: "Benefits as a fraction of salary (e.g., 0.25 for 25%). Defaults to 0.2.",
+          description: "Legacy flat benefits rate as a fraction of salary (0-2). Defaults to 0.2.",
+        },
+        parameters: {
+          type: "object",
+          description:
+            "Deep-merged into existing parameters. Use parameters.benefitsBreakdown to set the 4 component fractions.",
+          properties: {
+            benefitsBreakdown: {
+              type: "object",
+              properties: {
+                statutoryEmployerContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                insuranceBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+                retirementContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                otherBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+          },
         },
       },
-      required: ["departmentId", "title", "count", "salary", "startDate"],
+      required: ["departmentId", "title", "salary", "startDate"],
     },
   },
   {
     name: "update_headcount",
     description:
-      "Update an existing headcount plan entry — change title, count, salary, dates, department, or benefits rate.",
+      "Update an existing headcount plan entry. Canonical engine fields: title, name (individual hire name), employeeType (full_time | part_time | contractor), count (FTE — supports fractions like 0.5), salary (annual), hourlyRate (for contractors / part-time hourly), hoursPerWeek (40 = full-time baseline), startDate, endDate, departmentId, benefitsRate (legacy fallback), and parameters.benefitsBreakdown with the four fractions { statutoryEmployerContributionsCost, insuranceBenefitsCost, retirementContributionsCost, otherBenefitsCost }. parameters is deep-merged.",
     inputSchema: {
       type: "object",
       properties: {
-        id: {
-          type: "string",
-          description: "The headcount plan ID to update",
+        id: { type: "string", description: "The headcount plan ID to update" },
+        title: { type: "string", description: "New job title" },
+        name: {
+          type: ["string", "null"],
+          description: "Individual hire name (null to clear)",
         },
-        title: {
+        employeeType: {
           type: "string",
-          description: "New job title",
+          enum: ["full_time", "part_time", "contractor"],
         },
         count: {
           type: "number",
-          description: "New number of people",
+          description: "FTE count, supports fractions (0.5 = half-time)",
         },
-        salary: {
-          type: "number",
-          description: "New annual salary per person",
+        salary: { type: "number", description: "New annual salary per person" },
+        hourlyRate: {
+          type: ["number", "null"],
+          description: "Hourly rate for contractors or hourly part-time",
         },
-        startDate: {
-          type: "string",
-          description: "New start date (YYYY-MM-DD)",
+        hoursPerWeek: {
+          type: ["number", "null"],
+          description: "Hours per week (40 = full-time baseline)",
         },
+        startDate: { type: "string", description: "New start date (YYYY-MM-DD)" },
         endDate: {
           type: "string",
           description: "New end date (YYYY-MM-DD) or null to remove",
         },
-        benefitsRate: {
-          type: "number",
-          description: "New benefits rate (0-2)",
+        benefitsRate: { type: "number", description: "Legacy flat benefits rate (0-2)" },
+        parameters: {
+          type: "object",
+          description:
+            "Deep-merged into existing parameters. Use parameters.benefitsBreakdown to set the 4 component fractions.",
+          properties: {
+            benefitsBreakdown: {
+              type: "object",
+              properties: {
+                statutoryEmployerContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                insuranceBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+                retirementContributionsCost: { type: "number", minimum: 0, maximum: 1 },
+                otherBenefitsCost: { type: "number", minimum: 0, maximum: 1 },
+              },
+            },
+          },
         },
-        departmentId: {
-          type: "string",
-          description: "New department ID",
-        },
+        departmentId: { type: "string", description: "New department ID" },
       },
       required: ["id"],
     },
@@ -481,9 +538,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "update_forecast_line",
+    name: "update_expense",
     description:
-      "Update an existing forecast line's method, parameters, or date range.",
+      "Update an existing expense's method, parameters, dates, or metadata (vendor, notes, frequency, department, one-time/recurring flags). Use when the user says 'edit my Slack expense' or 'change the cloud spend growth rate'. Only fields supplied are patched. Method param shapes: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -498,24 +555,49 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         parameters: {
           type: "object",
-          description: "New method-specific parameters",
+          description: "New method-specific parameters. See tool description for per-method shapes.",
         },
         startDate: {
           type: "string",
           description: "New start date (YYYY-MM-DD)",
         },
         endDate: {
+          type: ["string", "null"],
+          description: "New end date (YYYY-MM-DD) or null to clear",
+        },
+        notes: {
+          type: ["string", "null"],
+          description: "Free-form notes; null clears.",
+        },
+        vendor: {
+          type: ["string", "null"],
+          description: "Vendor name (e.g., 'Slack'); null clears.",
+        },
+        departmentId: {
+          type: ["string", "null"],
+          description: "Department ID; null clears the assignment.",
+        },
+        frequency: {
           type: "string",
-          description: "New end date (YYYY-MM-DD) or null",
+          enum: ["monthly", "quarterly", "annual"],
+          description: "Billing/recognition cadence.",
+        },
+        isOneTime: {
+          type: "boolean",
+          description: "Mark as one-time (true) or recurring/regular (false).",
+        },
+        isRecurring: {
+          type: ["boolean", "null"],
+          description: "Tri-state recurring flag. true = recurring, false = non-recurring, null = unset (UI infers).",
         },
       },
       required: ["id"],
     },
   },
   {
-    name: "delete_forecast_line",
+    name: "delete_expense",
     description:
-      "Delete a forecast line and all its associated forecast values.",
+      "Delete an expense and all its associated forecast values. Use this when the user says things like 'remove my Slack expense'.",
     inputSchema: {
       type: "object",
       properties: {
@@ -775,6 +857,83 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "add_salary_change",
+    description:
+      "Add a salary change record for an existing headcount entry. The change takes effect on `effectiveDate` and persists until superseded by a later change. Use this for raises, promotions, or compensation revisions instead of mutating headcount.salary directly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        effectiveDate: { type: "string", description: "ISO YYYY-MM-DD" },
+        newSalary: { type: "number", description: "New annual salary" },
+        reason: {
+          type: "string",
+          description: "Optional reason (raise, promotion, market adjustment)",
+        },
+      },
+      required: ["headcountId", "effectiveDate", "newSalary"],
+    },
+  },
+  {
+    name: "add_bonus",
+    description:
+      "Add a one-time bonus payout for an existing headcount entry. Bonuses emit in the `payoutMonth` exactly — not prorated, not recurring. Multiple bonuses in the same month sum.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        payoutMonth: { type: "string", description: "YYYY-MM (month of payout)" },
+        amount: { type: "number", description: "Bonus amount in company currency" },
+        type: {
+          type: "string",
+          enum: ["signing", "performance", "retention", "other"],
+          description: "Bonus type (default performance)",
+        },
+        notes: { type: "string", description: "Optional notes" },
+      },
+      required: ["headcountId", "payoutMonth", "amount"],
+    },
+  },
+  {
+    name: "add_equity_grant",
+    description:
+      "Add an equity grant for an existing headcount entry. Vesting schedule is a list of milestones (cliff, monthly, quarterly, annual, or milestone) with date and shares vested. Sum of vested shares should not exceed total shares granted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        headcountId: { type: "string" },
+        grantDate: { type: "string", description: "ISO YYYY-MM-DD" },
+        shares: { type: "number", description: "Total shares granted (must be positive)" },
+        strikePrice: {
+          type: "number",
+          description: "Strike price per share (null for RSUs)",
+        },
+        grantType: {
+          type: "string",
+          enum: ["iso", "nso", "rsu"],
+          description: "Grant type (default iso)",
+        },
+        vestingSchedule: {
+          type: "array",
+          description: "List of vesting milestones",
+          items: {
+            type: "object",
+            properties: {
+              type: {
+                type: "string",
+                enum: ["cliff", "monthly", "quarterly", "annual", "milestone"],
+              },
+              date: { type: "string", description: "ISO YYYY-MM-DD" },
+              sharesVested: { type: "number", minimum: 0 },
+            },
+            required: ["type", "date", "sharesVested"],
+          },
+        },
+      },
+      required: ["headcountId", "grantDate", "shares"],
     },
   },
   {

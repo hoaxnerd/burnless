@@ -11,9 +11,10 @@ import {
   seriesToArray,
 } from "@burnless/engine";
 import { formatCurrency, formatNumber, type CurrencyCode, isValidCurrency } from "@burnless/types";
-import type { FinancialSnapshot, RevenueStreamSnapshotRow } from "./types";
+import type { FinancialSnapshot, RevenueStreamSnapshotRow, ExpenseSnapshotRow } from "./types";
 
-interface RevenueStreamLike {
+/** Structural input shape for a revenue stream passed to `buildFinancialSnapshot`. */
+export interface RevenueStreamLike {
   id: string;
   name: string;
   type: RevenueStreamSnapshotRow["type"];
@@ -22,6 +23,21 @@ interface RevenueStreamLike {
   parameters: Record<string, unknown>;
   /** Resolved current-month revenue from the engine. */
   currentAmount?: number;
+}
+
+/** Structural input shape for an expense line passed to `buildFinancialSnapshot`. */
+export interface ExpenseLineLike {
+  id: string;
+  accountId: string;
+  accountName: string;
+  vendor?: string | null;
+  notes?: string | null;
+  frequency?: "monthly" | "quarterly" | "annual";
+  departmentId?: string | null;
+  isOneTime?: boolean;
+  isRecurring?: boolean | null;
+  method: "fixed" | "growth_rate" | "per_unit" | "percentage_of" | "custom_formula";
+  currentAmount: number;
 }
 
 interface ContextInput {
@@ -60,6 +76,31 @@ interface ContextInput {
     isProjected: boolean;
   }>;
   revenueStreams?: RevenueStreamLike[];
+  headcountDetails: Array<{
+    id: string;
+    title: string;
+    name: string | null;
+    employeeType: string;
+    count: number;
+    salary: number;
+    salaryChanges: Array<{
+      effectiveDate: string;
+      newSalary: number;
+      reason: string | null;
+    }>;
+    bonuses: Array<{
+      payoutMonth: string;
+      amount: number;
+      type: string;
+    }>;
+    equityGrants: Array<{
+      grantDate: string;
+      shares: number;
+      grantType: string;
+      vestingSchedule: Array<{ type: string; date: string; sharesVested: number }>;
+    }>;
+  }>;
+  expenseLines?: ExpenseLineLike[];
 }
 
 /** Get the latest value from a MetricValue array. */
@@ -132,6 +173,20 @@ export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
     scenarios: input.scenarios,
     accounts: input.accounts,
     departments: input.departments,
+    headcountDetails: input.headcountDetails,
+    expenses: (input.expenseLines ?? []).map<ExpenseSnapshotRow>((l) => ({
+      id: l.id,
+      accountId: l.accountId,
+      accountName: l.accountName,
+      vendor: l.vendor ?? null,
+      notes: l.notes ?? null,
+      frequency: l.frequency ?? "monthly",
+      departmentId: l.departmentId ?? null,
+      isOneTime: l.isOneTime ?? false,
+      isRecurring: l.isRecurring ?? null,
+      method: l.method,
+      currentAmount: l.currentAmount,
+    })),
   };
 }
 
@@ -254,6 +309,61 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     lines.push(`## Departments`);
     for (const d of snapshot.departments) {
       lines.push(`- ${d.name} — ID: ${d.id}`);
+    }
+  }
+
+  // Per-headcount detail (Phase 1 §1.5)
+  if (snapshot.headcountDetails.length > 0) {
+    lines.push(``);
+    lines.push(`## Team Detail`);
+    for (const hc of snapshot.headcountDetails) {
+      const namePart = hc.name ? ` (${hc.name})` : "";
+      const fteSuffix = hc.count !== 1 ? ` × ${hc.count} FTE` : "";
+      lines.push(
+        `- ${hc.title}${namePart} [${hc.employeeType}]${fteSuffix} — base salary ${formatCurrency(hc.salary, currency, locale)} — ID: ${hc.id}`
+      );
+      if (hc.salaryChanges.length > 0) {
+        for (const sc of hc.salaryChanges) {
+          const reasonPart = sc.reason ? ` (${sc.reason})` : "";
+          lines.push(
+            `  - Salary change ${sc.effectiveDate}: → ${formatCurrency(sc.newSalary, currency, locale)}${reasonPart}`
+          );
+        }
+      }
+      if (hc.bonuses.length > 0) {
+        for (const b of hc.bonuses) {
+          lines.push(
+            `  - Bonus ${b.payoutMonth} [${b.type}]: ${formatCurrency(b.amount, currency, locale)}`
+          );
+        }
+      }
+      if (hc.equityGrants.length > 0) {
+        for (const g of hc.equityGrants) {
+          const vestedTotal = g.vestingSchedule.reduce((s, v) => s + v.sharesVested, 0);
+          lines.push(
+            `  - Equity ${g.grantDate} [${g.grantType.toUpperCase()}]: ${g.shares} shares (${g.vestingSchedule.length} vesting milestones, ${vestedTotal} scheduled to vest)`
+          );
+        }
+      }
+    }
+  }
+
+  // Active expense lines (top 50 by currentAmount desc).
+  // Engine + AI layer never print currency symbols — emit raw numeric amounts; the
+  // web app formats currency at the boundary if/when this text is surfaced to a user.
+  if (snapshot.expenses.length > 0) {
+    const top = [...snapshot.expenses]
+      .sort((a, b) => b.currentAmount - a.currentAmount)
+      .slice(0, 50);
+    lines.push(``);
+    lines.push(`## Active expense lines`);
+    for (const e of top) {
+      const recurringAnnotation =
+        e.isRecurring === true ? ", recurring" : e.isRecurring === false ? ", non-recurring" : "";
+      const vendorAnnotation = e.vendor ? ` — ${e.vendor}` : "";
+      lines.push(
+        `- ${e.accountName} (${e.method}, ${e.frequency}${recurringAnnotation}${vendorAnnotation}): ${e.currentAmount}`,
+      );
     }
   }
 

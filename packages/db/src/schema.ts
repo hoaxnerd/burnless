@@ -87,6 +87,12 @@ export const forecastMethodEnum = pgEnum("forecast_method", [
   "custom_formula",
 ]);
 
+export const expenseFrequencyEnum = pgEnum("expense_frequency", [
+  "monthly",
+  "quarterly",
+  "annual",
+]);
+
 export const memberRoleEnum = pgEnum("member_role", [
   "owner",
   "admin",
@@ -154,6 +160,12 @@ export const aiWriteModeEnum = pgEnum("ai_write_mode", [
   "full",
   "confirm",
   "read_only",
+]);
+
+export const headcountEmployeeTypeEnum = pgEnum("headcount_employee_type", [
+  "full_time",
+  "part_time",
+  "contractor",
 ]);
 
 // ── Auth Tables (Auth.js compatible) ──────────────────────────────────────────
@@ -255,6 +267,7 @@ export const companies = pgTable("companies", {
   billingCustomerId: text("billing_customer_id"),
   billingSubscriptionId: text("billing_subscription_id"),
   billingPlan: text("billing_plan").default("free"),
+  benefitsRates: jsonb("benefits_rates").notNull().default({}),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()
@@ -355,6 +368,8 @@ export const transactions = pgTable(
     date: timestamp("date", { mode: "date" }).notNull(),
     amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
     description: text("description"),
+    vendor: text("vendor"),
+    notes: text("notes"),
     source: transactionSourceEnum("source").notNull().default("manual"),
     externalId: text("external_id"),
     importBatchId: text("import_batch_id"),
@@ -492,6 +507,20 @@ export const forecastLines = pgTable(
     parameters: jsonb("parameters").notNull().default({}),
     startDate: timestamp("start_date", { mode: "date" }).notNull(),
     endDate: timestamp("end_date", { mode: "date" }),
+    // ── Phase 1 additions (§2.C) ─────────────────────────────────────────
+    notes: text("notes"),
+    vendor: text("vendor"),
+    departmentId: text("department_id").references(() => departments.id, {
+      onDelete: "set null",
+    }),
+    frequency: expenseFrequencyEnum("frequency").notNull().default("monthly"),
+    isOneTime: boolean("is_one_time").notNull().default(false),
+    /**
+     * Tri-state recurring flag (Phase 1 §1.5 anomaly refactor).
+     * NULL = user has not declared; UI shows suggestion based on variance.
+     * true/false = explicit user choice.
+     */
+    isRecurring: boolean("is_recurring"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -504,6 +533,11 @@ export const forecastLines = pgTable(
       table.companyId,
       table.accountId
     ),
+    index("forecast_lines_company_department_idx").on(
+      table.companyId,
+      table.departmentId
+    ),
+    index("forecast_lines_vendor_idx").on(table.companyId, table.vendor),
   ]
 );
 
@@ -546,13 +580,22 @@ export const headcountPlans = pgTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    count: integer("count").notNull().default(1),
+    name: text("name"),
+    employeeType: headcountEmployeeTypeEnum("employee_type")
+      .notNull()
+      .default("full_time"),
+    count: numeric("count", { precision: 5, scale: 2 })
+      .notNull()
+      .default("1.00"),
     salary: numeric("salary", { precision: 12, scale: 2 }).notNull(),
+    hourlyRate: numeric("hourly_rate", { precision: 12, scale: 2 }),
+    hoursPerWeek: numeric("hours_per_week", { precision: 5, scale: 2 }),
     startDate: timestamp("start_date", { mode: "date" }).notNull(),
     endDate: timestamp("end_date", { mode: "date" }),
     benefitsRate: numeric("benefits_rate", { precision: 5, scale: 4 })
       .notNull()
       .default("0.20"),
+    parameters: jsonb("parameters").notNull().default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -562,6 +605,115 @@ export const headcountPlans = pgTable(
   (table) => [
     index("headcount_plans_company_idx").on(table.companyId),
     index("headcount_plans_department_idx").on(table.departmentId),
+  ]
+);
+
+// ── Equity Grants ─────────────────────────────────────────────────────────────
+
+export const equityGrantTypeEnum = pgEnum("equity_grant_type", [
+  "iso",
+  "nso",
+  "rsu",
+]);
+
+export const equityGrants = pgTable(
+  "equity_grants",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    grantDate: timestamp("grant_date", { mode: "date" }).notNull(),
+    shares: numeric("shares", { precision: 18, scale: 4 }).notNull(),
+    strikePrice: numeric("strike_price", { precision: 18, scale: 4 }),
+    grantType: equityGrantTypeEnum("grant_type").notNull().default("iso"),
+    parameters: jsonb("parameters").notNull().default({}),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("equity_grants_company_idx").on(table.companyId),
+    index("equity_grants_headcount_idx").on(table.headcountId),
+  ]
+);
+
+// ── Bonuses ───────────────────────────────────────────────────────────────────
+
+export const bonusTypeEnum = pgEnum("bonus_type", [
+  "signing",
+  "performance",
+  "retention",
+  "other",
+]);
+
+export const bonuses = pgTable(
+  "bonuses",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    payoutMonth: timestamp("payout_month", { mode: "date" }).notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    type: bonusTypeEnum("type").notNull().default("performance"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("bonuses_company_idx").on(table.companyId),
+    index("bonuses_headcount_month_idx").on(
+      table.headcountId,
+      table.payoutMonth
+    ),
+  ]
+);
+
+// ── Salary Changes ────────────────────────────────────────────────────────────
+
+export const salaryChanges = pgTable(
+  "salary_changes",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    headcountId: text("headcount_id")
+      .notNull()
+      .references(() => headcountPlans.id, { onDelete: "cascade" }),
+    effectiveDate: timestamp("effective_date", { mode: "date" }).notNull(),
+    newSalary: numeric("new_salary", { precision: 12, scale: 2 }).notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("salary_changes_company_idx").on(table.companyId),
+    index("salary_changes_headcount_date_idx").on(
+      table.headcountId,
+      table.effectiveDate
+    ),
   ]
 );
 
@@ -1095,7 +1247,7 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
   headcountPlans: many(headcountPlans),
 }));
 
-export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
+export const headcountPlansRelations = relations(headcountPlans, ({ one, many }) => ({
   company: one(companies, {
     fields: [headcountPlans.companyId],
     references: [companies.id],
@@ -1103,6 +1255,42 @@ export const headcountPlansRelations = relations(headcountPlans, ({ one }) => ({
   department: one(departments, {
     fields: [headcountPlans.departmentId],
     references: [departments.id],
+  }),
+  salaryChanges: many(salaryChanges),
+  bonuses: many(bonuses),
+  equityGrants: many(equityGrants),
+}));
+
+export const salaryChangesRelations = relations(salaryChanges, ({ one }) => ({
+  company: one(companies, {
+    fields: [salaryChanges.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [salaryChanges.headcountId],
+    references: [headcountPlans.id],
+  }),
+}));
+
+export const bonusesRelations = relations(bonuses, ({ one }) => ({
+  company: one(companies, {
+    fields: [bonuses.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [bonuses.headcountId],
+    references: [headcountPlans.id],
+  }),
+}));
+
+export const equityGrantsRelations = relations(equityGrants, ({ one }) => ({
+  company: one(companies, {
+    fields: [equityGrants.companyId],
+    references: [companies.id],
+  }),
+  headcount: one(headcountPlans, {
+    fields: [equityGrants.headcountId],
+    references: [headcountPlans.id],
   }),
 }));
 
@@ -1319,6 +1507,9 @@ export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
   "import_batch",
   "department",
   "metric",
+  "salary_change",
+  "bonus",
+  "equity_grant",
 ]);
 
 export const financialAuditLogs = pgTable(

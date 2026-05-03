@@ -6,7 +6,7 @@ import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link
 import Papa from "papaparse";
 import { Button } from "@/components/ui";
 import { formatCurrency } from "@burnless/types";
-import { autoMapColumns } from "./import-utils";
+import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, MappingConfidence,
   AccountOption, PreviewTransaction, ImportResult, ImportBatch,
@@ -28,7 +28,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({ date: "", amount: "", description: "", category: "" });
-  const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0 });
+  const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
   const [targetAccountId, setTargetAccountId] = useState("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [preview, setPreview] = useState<PreviewTransaction[]>([]);
@@ -118,7 +118,13 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   const handleDragLeave = useCallback(() => { setDragActive(false); }, []);
 
   const generatePreview = async () => {
-    if (!mapping.date || !mapping.amount || !targetAccountId) {
+    // Validate that amount is fully mapped \u2014 single-column needs a header,
+    // polymorphic needs both debit and credit headers.
+    const amountReady =
+      typeof mapping.amount === "string"
+        ? mapping.amount !== ""
+        : mapping.amount.debit !== "" && mapping.amount.credit !== "";
+    if (!mapping.date || !amountReady || !targetAccountId) {
       setError("Please map the Date and Amount columns and select a target account");
       return;
     }
@@ -128,14 +134,34 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
       const mapped = rows
         .map((row) => {
           const dateStr = row[mapping.date]?.trim();
-          const amountStr = row[mapping.amount]?.trim();
-          const desc = mapping.description ? row[mapping.description]?.trim() || null : null;
-          if (!dateStr || !amountStr) return null;
-          const amount = parseFloat(amountStr.replace(/[$,\u20AC\u00A3()]/g, "").replace(/^\((.+)\)$/, "-$1"));
-          if (isNaN(amount)) return null;
+          if (!dateStr) return null;
+          const amount = resolveAmount(row, mapping.amount);
+          // Skip rows where neither debit nor credit (or amount) had any value.
+          if (amount === 0) {
+            const hasAnyAmountCell =
+              typeof mapping.amount === "string"
+                ? !!row[mapping.amount]?.trim()
+                : !!row[mapping.amount.debit]?.trim() || !!row[mapping.amount.credit]?.trim();
+            if (!hasAnyAmountCell) return null;
+          }
           const date = new Date(dateStr);
           if (isNaN(date.getTime())) return null;
-          return { date: date.toISOString(), amount, description: desc, accountId: targetAccountId };
+          const desc = mapping.description ? row[mapping.description]?.trim() || null : null;
+          const vendor = mapping.vendor ? row[mapping.vendor]?.trim() || null : null;
+          const notes = mapping.notes ? row[mapping.notes]?.trim() || null : null;
+          const externalId =
+            mapping.externalId && row[mapping.externalId]?.trim()
+              ? row[mapping.externalId]!.trim()
+              : undefined;
+          return {
+            date: date.toISOString(),
+            amount,
+            description: desc,
+            accountId: targetAccountId,
+            vendor,
+            notes,
+            externalId,
+          };
         })
         .filter(Boolean);
       const res = await apiFetch("/api/import", {
@@ -168,7 +194,13 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
         setImportProgress((p) => Math.min(p + 5, 90));
       }, 100);
       const mapped = toImport.map((t) => ({
-        date: t.date, amount: t.amount, description: t.description, accountId: t.accountId,
+        date: t.date,
+        amount: t.amount,
+        description: t.description,
+        accountId: t.accountId,
+        vendor: t.vendor ?? null,
+        notes: t.notes ?? null,
+        externalId: t.externalId || undefined,
       }));
       const res = await apiFetch("/api/import", {
         method: "POST",
@@ -225,7 +257,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
     setHeaders([]);
     setRows([]);
     setMapping({ date: "", amount: "", description: "", category: "" });
-    setMappingConfidence({ date: 0, amount: 0, description: 0, category: 0 });
+    setMappingConfidence({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
     setPreview([]);
     setResult(null);
     setError(null);
@@ -328,7 +360,8 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
         <PreviewStep preview={preview} activePreview={activePreview} loading={loading}
           importProgress={importProgress} editingRow={editingRow} setEditingRow={setEditingRow}
           toggleRowExclusion={toggleRowExclusion} updatePreviewRow={updatePreviewRow}
-          executeImport={executeImport} formatCurrency={fmtCurrency} setStep={setStep} />
+          executeImport={executeImport} formatCurrency={fmtCurrency} setStep={setStep}
+          amountSynthesized={typeof mapping.amount === "object"} />
       )}
       {step === "result" && result && (
         <ResultStep result={result} reset={reset} rollbackBatch={rollbackBatch} />

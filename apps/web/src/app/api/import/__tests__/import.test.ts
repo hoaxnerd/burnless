@@ -24,7 +24,7 @@ const {
   mockReturning,
   mockUpdate,
   mockSet,
-  _mockLimit,
+  mockLimit,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
@@ -34,7 +34,7 @@ const {
   mockReturning: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
-  _mockLimit: vi.fn(),
+  mockLimit: vi.fn(),
 }));
 
 const mockCategorizeWithMemory = vi.hoisted(() => vi.fn());
@@ -70,7 +70,7 @@ vi.mock("@burnless/db", () => ({
     update: mockUpdate,
   },
   transactions: { companyId: "companyId", externalId: "externalId", importBatchId: "importBatchId" },
-  financialAccounts: { id: "id", companyId: "companyId" },
+  financialAccounts: { id: "id", companyId: "companyId", name: "name" },
   importBatches: { id: "id", companyId: "companyId" },
   merchantCategoryMappings: { companyId: "companyId" },
 }));
@@ -100,9 +100,15 @@ vi.mock("@/lib/financial-validation", () => ({
 // Wire up Drizzle chain mocks
 function setupDbChains() {
   // SELECT chain: db.select({...}).from(...).where(...) → []
+  // Also supports .where(...).limit(N) via mockLimit
   mockSelect.mockReturnValue({ from: mockFrom });
   mockFrom.mockReturnValue({ where: mockWhere });
-  mockWhere.mockReturnValue([]);
+  // Default: where returns an array-like that ALSO exposes .limit(),
+  // so callers can either await it directly or chain .limit(N).
+  // mockLimit defaults to returning [] (no rows).
+  mockLimit.mockReturnValue([]);
+  const defaultWhereResult = Object.assign([] as unknown[], { limit: mockLimit });
+  mockWhere.mockReturnValue(defaultWhereResult);
 
   // INSERT chain: db.insert(...).values(...).returning()
   mockInsert.mockReturnValue({ values: mockValues });
@@ -112,6 +118,11 @@ function setupDbChains() {
   // UPDATE chain: db.update(...).set(...).where(...)
   mockUpdate.mockReturnValue({ set: mockSet });
   mockSet.mockReturnValue({ where: mockWhere });
+}
+
+// Helper: make any array also satisfy `.limit(N)` chain.
+function arrWithLimit(arr: unknown[], limitResult: unknown[] = arr) {
+  return Object.assign([...arr], { limit: () => limitResult });
 }
 
 import { POST } from "../route";
@@ -490,5 +501,323 @@ describe("POST /api/import", () => {
     expect(res.status).toBe(200);
     // Batch insert should have been called (fileName defaults internally)
     expect(mockInsert).toHaveBeenCalled();
+  });
+
+  // ── Vendor / notes write-through (Phase 1 §2.C) ─────────────────────────
+
+  it("persists vendor and notes columns on insert", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(validCtx());
+    mockRequireRole.mockReturnValue(null);
+
+    let selectCallCount = 0;
+    mockWhere.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) return [{ id: "acc-1" }]; // valid accounts
+      if (selectCallCount === 2) return []; // merchant memory
+      return []; // duplicates
+    });
+    mockReturning.mockResolvedValue([{ id: "batch-vendor" }]);
+
+    // Capture every values() call
+    const valuesCalls: unknown[][] = [];
+    mockValues.mockImplementation((v: unknown) => {
+      valuesCalls.push(Array.isArray(v) ? (v as unknown[]) : [v]);
+      return { returning: mockReturning };
+    });
+
+    const res = await POST(
+      makeRequest({
+        transactions: [
+          {
+            ...validTx,
+            vendor: "Slack",
+            notes: "Annual",
+          },
+        ],
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.imported).toBe(1);
+
+    // Find the insert-transactions call (an array of rows w/ vendor field)
+    const txInsertCall = valuesCalls.find(
+      (call) =>
+        Array.isArray(call) &&
+        call.length > 0 &&
+        typeof call[0] === "object" &&
+        call[0] !== null &&
+        "vendor" in (call[0] as Record<string, unknown>)
+    );
+    expect(txInsertCall).toBeDefined();
+    const row = (txInsertCall as Record<string, unknown>[])[0]!;
+    expect(row.vendor).toBe("Slack");
+    expect(row.notes).toBe("Annual");
+  });
+
+  // ── Imported account fallback (Phase 1 §2.C) ────────────────────────────
+
+  it("auto-creates 'Imported' account for sentinel accountId and reuses it", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(validCtx());
+    mockRequireRole.mockReturnValue(null);
+
+    // Track all insert targets (first arg to db.insert(...))
+    const insertTargets: unknown[] = [];
+    mockInsert.mockImplementation((target: unknown) => {
+      insertTargets.push(target);
+      return { values: mockValues };
+    });
+
+    // Track values to identify which insert it is
+    const valuesCalls: { target: unknown; values: unknown }[] = [];
+    mockValues.mockImplementation((v: unknown) => {
+      valuesCalls.push({ target: insertTargets[insertTargets.length - 1], values: v });
+      return { returning: mockReturning };
+    });
+
+    // Call order: 1=valid accounts, 2=merchant memory, 3=ensureImportedAccount lookup, 4=duplicates
+    let selectCallCount = 0;
+    mockWhere.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) return []; // valid accounts: empty (sentinel anyway)
+      if (selectCallCount === 2) return []; // merchant memory
+      if (selectCallCount === 3) {
+        // ensureImportedAccount lookup → empty (use .limit chain)
+        return arrWithLimit([], []);
+      }
+      return []; // duplicates
+    });
+
+    // Returning: order is (1) ensureImportedAccount creates → [{id: "imp-1"}]
+    //                    (2) batch row → [{id: "batch-imp"}]
+    let returningCallCount = 0;
+    mockReturning.mockImplementation(async () => {
+      returningCallCount++;
+      if (returningCallCount === 1) return [{ id: "imp-1" }];
+      if (returningCallCount === 2) return [{ id: "batch-imp" }];
+      return [];
+    });
+
+    const res1 = await POST(
+      makeRequest({
+        transactions: [{ ...validTx, accountId: "__imported__" }],
+      })
+    );
+    const body1 = await res1.json();
+
+    expect(res1.status).toBe(200);
+    expect(body1.imported).toBe(1);
+
+    // Confirm financialAccounts insert happened with correct shape
+    const accInsert = valuesCalls.find(
+      (c) =>
+        c.values &&
+        typeof c.values === "object" &&
+        !Array.isArray(c.values) &&
+        "name" in (c.values as Record<string, unknown>) &&
+        (c.values as Record<string, unknown>).name === "Imported"
+    );
+    expect(accInsert).toBeDefined();
+    const accRow = accInsert!.values as Record<string, unknown>;
+    expect(accRow.type).toBe("expense");
+    expect(accRow.category).toBe("operating_expense");
+
+    // Confirm transaction row points at the auto-created account
+    const txInsert = valuesCalls.find(
+      (c) =>
+        Array.isArray(c.values) &&
+        c.values.length > 0 &&
+        typeof (c.values as unknown[])[0] === "object" &&
+        "vendor" in ((c.values as unknown[])[0] as Record<string, unknown>)
+    );
+    expect(txInsert).toBeDefined();
+    const txRow = (txInsert!.values as Record<string, unknown>[])[0]!;
+    expect(txRow.accountId).toBe("imp-1");
+
+    // ── Second POST: should REUSE existing Imported account ──────────────
+    valuesCalls.length = 0;
+    insertTargets.length = 0;
+    selectCallCount = 0;
+    returningCallCount = 0;
+
+    mockWhere.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) return []; // valid accounts: empty
+      if (selectCallCount === 2) return []; // merchant memory
+      if (selectCallCount === 3) {
+        // ensureImportedAccount: now returns existing via .limit chain
+        return arrWithLimit([], [{ id: "imp-1" }]);
+      }
+      return []; // duplicates
+    });
+    mockReturning.mockImplementation(async () => {
+      returningCallCount++;
+      // Now only 1 returning call (batch creation), no account insert
+      if (returningCallCount === 1) return [{ id: "batch-imp-2" }];
+      return [];
+    });
+
+    const res2 = await POST(
+      makeRequest({
+        transactions: [
+          {
+            ...validTx,
+            accountId: "__imported__",
+            description: "Different desc to avoid dedupe",
+          },
+        ],
+      })
+    );
+    const body2 = await res2.json();
+
+    expect(res2.status).toBe(200);
+    expect(body2.imported).toBe(1);
+
+    // No second financialAccounts insert this time — verify by checking
+    // that no values call has name === "Imported"
+    const dupAccInsert = valuesCalls.find(
+      (c) =>
+        c.values &&
+        typeof c.values === "object" &&
+        !Array.isArray(c.values) &&
+        "name" in (c.values as Record<string, unknown>) &&
+        (c.values as Record<string, unknown>).name === "Imported"
+    );
+    expect(dupAccInsert).toBeUndefined();
+
+    // Tx should still point at imp-1
+    const txInsert2 = valuesCalls.find(
+      (c) =>
+        Array.isArray(c.values) &&
+        c.values.length > 0 &&
+        typeof (c.values as unknown[])[0] === "object" &&
+        "vendor" in ((c.values as unknown[])[0] as Record<string, unknown>)
+    );
+    expect(txInsert2).toBeDefined();
+    const txRow2 = (txInsert2!.values as Record<string, unknown>[])[0]!;
+    expect(txRow2.accountId).toBe("imp-1");
+  });
+
+  // ── accountId-aware externalId hashing (Phase 1 §2.C) ───────────────────
+
+  it("treats identical (date, amount, description) on different accounts as distinct", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(validCtx());
+    mockRequireRole.mockReturnValue(null);
+
+    let selectCallCount = 0;
+    mockWhere.mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) return [{ id: "acc-A" }, { id: "acc-B" }];
+      if (selectCallCount === 2) return []; // merchant memory
+      return []; // No existing duplicates
+    });
+    mockReturning.mockResolvedValue([{ id: "batch-multi" }]);
+
+    const valuesCalls: unknown[][] = [];
+    mockValues.mockImplementation((v: unknown) => {
+      valuesCalls.push(Array.isArray(v) ? (v as unknown[]) : [v]);
+      return { returning: mockReturning };
+    });
+
+    const res = await POST(
+      makeRequest({
+        transactions: [
+          { ...validTx, accountId: "acc-A" },
+          { ...validTx, accountId: "acc-B" },
+        ],
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.imported).toBe(2);
+    expect(body.skipped).toBe(0);
+
+    // Find the tx insert; both rows should have DIFFERENT externalIds
+    const txInsert = valuesCalls.find(
+      (call) =>
+        Array.isArray(call) &&
+        call.length === 2 &&
+        typeof call[0] === "object" &&
+        "externalId" in (call[0] as Record<string, unknown>)
+    );
+    expect(txInsert).toBeDefined();
+    const rows = txInsert as Record<string, unknown>[];
+    expect(rows[0]!.externalId).not.toBe(rows[1]!.externalId);
+  });
+
+  // ── Re-import dedupe regression ─────────────────────────────────────────
+
+  it("skips all rows on re-import (existing externalIds match)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(validCtx());
+    mockRequireRole.mockReturnValue(null);
+
+    // Compute the externalId the route will generate for validTx + acc-1
+    // We only need the duplicates lookup to return whatever the route asks for.
+    // Easiest: have the duplicates select return a row whose externalId matches
+    // anything by echoing whatever was queried via inArray. Since we can't
+    // intercept the inArray clause through the mock chain, instead:
+    // the route inserts into a Set from the rows we return. So return a row
+    // that we know matches. The route generates an externalId from
+    // (date|amount|description|accountId). Just echo back ANY string that
+    // matches what `prepared` produced — easier: return the same row spec by
+    // simulating the route's hash. But we can't easily compute it in the test
+    // without duplicating the hash. Simpler approach: stub the duplicates
+    // SELECT to return `[{ externalId: <echo> }]` for whatever is asked.
+    // The route iterates `existing` and adds each `row.externalId` to the
+    // dedupe set. We can match by having the duplicates query return ALL the
+    // externalIds the route is asking about, by delegating through a captured
+    // value. But the .where chain doesn't expose its arg in this mock setup.
+    //
+    // Easier path: we know the dedupe loop matches by string equality. We can
+    // capture the externalId the route uses by intercepting the FIRST insert
+    // attempt (dry run) — but we want a real import here, not dry.
+    //
+    // Cleanest: do a first "dry run" pass to learn the externalId, then a
+    // second real pass with the duplicates select pre-seeded to that id.
+    let capturedExternalId: string | null = null;
+    let selectCount1 = 0;
+    mockWhere.mockImplementation(() => {
+      selectCount1++;
+      if (selectCount1 === 1) return [{ id: "acc-1" }];
+      if (selectCount1 === 2) return [];
+      return [];
+    });
+    const valuesCalls1: unknown[][] = [];
+    mockValues.mockImplementation((v: unknown) => {
+      valuesCalls1.push(Array.isArray(v) ? (v as unknown[]) : [v]);
+      return { returning: mockReturning };
+    });
+
+    const dry = await POST(
+      makeRequest({
+        transactions: [validTx],
+        dryRun: true,
+      })
+    );
+    const dryBody = await dry.json();
+    expect(dry.status).toBe(200);
+    capturedExternalId = dryBody.transactions[0].externalId;
+    expect(capturedExternalId).toMatch(/^import:/);
+
+    // ── Now real import: dedupe select returns the captured externalId ──
+    let selectCount2 = 0;
+    mockWhere.mockImplementation(() => {
+      selectCount2++;
+      if (selectCount2 === 1) return [{ id: "acc-1" }];
+      if (selectCount2 === 2) return []; // merchant memory
+      return [{ externalId: capturedExternalId }]; // duplicates: match
+    });
+    mockReturning.mockResolvedValue([{ id: "batch-redup" }]);
+
+    const res = await POST(
+      makeRequest({ transactions: [validTx] })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.imported).toBe(0);
+    expect(body.skipped).toBe(1);
   });
 });

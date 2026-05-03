@@ -26,6 +26,21 @@ export interface RevenueStreamSnapshotRow {
   tierCount?: number;
 }
 
+export interface ExpenseSnapshotRow {
+  id: string;
+  accountId: string;
+  accountName: string;
+  vendor: string | null;
+  notes: string | null;
+  frequency: "monthly" | "quarterly" | "annual";
+  departmentId: string | null;
+  isOneTime: boolean;
+  isRecurring: boolean | null;
+  method: "fixed" | "growth_rate" | "per_unit" | "percentage_of" | "custom_formula";
+  /** Most-recent month's resolved amount in company currency units (number, not formatted). */
+  currentAmount: number;
+}
+
 export interface FinancialSnapshot {
   company: {
     name: string;
@@ -63,6 +78,8 @@ export interface FinancialSnapshot {
   revenueByMonth: Array<{ month: string; amount: number }>;
   revenueStreams: RevenueStreamSnapshotRow[];
   expensesByMonth: Array<{ month: string; amount: number }>;
+  /** Per-line expense detail; `expensesByMonth` (aggregate) is preserved for back-compat. */
+  expenses: ExpenseSnapshotRow[];
   cashByMonth: Array<{ month: string; amount: number }>;
   headcountByMonth: Array<{ month: string; count: number }>;
   profitAndLoss: {
@@ -94,6 +111,34 @@ export interface FinancialSnapshot {
   departments: Array<{
     id: string;
     name: string;
+  }>;
+  /**
+   * Per-headcount detail for the active scenario — enables AI tools to reason
+   * about individual hires rather than only aggregate cost. Phase 1 §1.5.
+   */
+  headcountDetails: Array<{
+    id: string;
+    title: string;
+    name: string | null;
+    employeeType: string;
+    count: number;
+    salary: number;
+    salaryChanges: Array<{
+      effectiveDate: string;
+      newSalary: number;
+      reason: string | null;
+    }>;
+    bonuses: Array<{
+      payoutMonth: string;
+      amount: number;
+      type: string;
+    }>;
+    equityGrants: Array<{
+      grantDate: string;
+      shares: number;
+      grantType: string;
+      vestingSchedule: Array<{ type: string; date: string; sharesVested: number }>;
+    }>;
   }>;
 }
 

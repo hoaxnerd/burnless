@@ -29,7 +29,8 @@ export type MetricCategory =
   | "retention"
   | "cash_flow"
   | "balance_sheet"
-  | "customer";
+  | "customer"
+  | "expense";
 
 export type MetricTier = "core" | "advanced" | "deep";
 
@@ -729,6 +730,83 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     href: "/expenses",
   },
 
+  // ── Expense Mix (totalOpex parent + components, umbrella §1.4) ───────────
+
+  {
+    slug: "totalOpex",
+    name: "Total Operating Expenses",
+    description: "All operating expenses combined for the month",
+    formula: "Sum of forecast lines on operating_expense and cogs accounts + personnel costs",
+    dependsOn: [],
+    category: "expense",
+    tier: "core",
+    format: "currency",
+    direction: "lower_better",
+    icon: "TrendingDown",
+    color: "rose",
+    href: "/expenses",
+  },
+  {
+    slug: "fixedExpenses",
+    name: "Fixed Expenses",
+    description: "Sum of forecast lines using the fixed method",
+    formula: "Sum where forecastLines.method = 'fixed'",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Lock",
+    color: "slate",
+    href: "/expenses",
+  },
+  {
+    slug: "variableExpenses",
+    name: "Variable Expenses",
+    description: "Sum of growth-rate and per-unit forecast lines",
+    formula: "Sum where forecastLines.method ∈ {growth_rate, per_unit}",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Activity",
+    color: "amber",
+    href: "/expenses",
+  },
+  {
+    slug: "percentageDrivenExpenses",
+    name: "Percentage-Driven Expenses",
+    description: "Sum of forecast lines tied to a percentage of another driver",
+    formula: "Sum where forecastLines.method ∈ {percentage_of, custom_formula}",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Percent",
+    color: "violet",
+    href: "/expenses",
+  },
+  {
+    slug: "oneTimeExpenses",
+    name: "One-Time Expenses",
+    description: "Sum of forecast lines flagged isOneTime",
+    formula: "Sum where forecastLines.isOneTime = true",
+    dependsOn: ["totalOpex"],
+    parentMetricId: "totalOpex",
+    category: "expense",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Zap",
+    color: "rose",
+    href: "/expenses",
+  },
+
   // ── Growth ───────────────────────────────────────────────────────────────
 
   {
@@ -1028,6 +1106,87 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     color: "orange",
     href: "/revenue",
   },
+
+  // ── Employer Benefits parent + 4 generic components (umbrella §1.4) ──────
+  {
+    slug: "totalEmployerBenefitsCost",
+    name: "Total Employer Benefits",
+    description:
+      "Total non-salary employer cost across statutory, insurance, retirement, and other benefits",
+    formula: "Sum of benefitsBreakdown components × salary across all headcount",
+    dependsOn: [],
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Heart",
+    color: "rose",
+    href: "/team",
+  },
+  {
+    slug: "statutoryEmployerContributionsCost",
+    name: "Statutory Employer Contributions",
+    description:
+      "Country-mandated employer contributions (e.g. FICA in US, NI in UK, EPF in IN, Super in AU)",
+    formula:
+      "Sum of statutoryEmployerContributionsCost × salary across all headcount",
+    dependsOn: ["totalEmployerBenefitsCost"],
+    parentMetricId: "totalEmployerBenefitsCost",
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Landmark",
+    color: "slate",
+    href: "/team",
+  },
+  {
+    slug: "insuranceBenefitsCost",
+    name: "Insurance Benefits",
+    description: "Health, dental, life, disability insurance costs",
+    formula: "Sum of insuranceBenefitsCost × salary across all headcount",
+    dependsOn: ["totalEmployerBenefitsCost"],
+    parentMetricId: "totalEmployerBenefitsCost",
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Shield",
+    color: "emerald",
+    href: "/team",
+  },
+  {
+    slug: "retirementContributionsCost",
+    name: "Retirement Contributions",
+    description:
+      "Employer-side retirement contributions (401k match, pension, EPF employer, etc.)",
+    formula:
+      "Sum of retirementContributionsCost × salary across all headcount",
+    dependsOn: ["totalEmployerBenefitsCost"],
+    parentMetricId: "totalEmployerBenefitsCost",
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Coins",
+    color: "amber",
+    href: "/team",
+  },
+  {
+    slug: "otherBenefitsCost",
+    name: "Other Benefits",
+    description: "Other employer-paid benefits (perks, allowances, training)",
+    formula: "Sum of otherBenefitsCost × salary across all headcount",
+    dependsOn: ["totalEmployerBenefitsCost"],
+    parentMetricId: "totalEmployerBenefitsCost",
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Gift",
+    color: "indigo",
+    href: "/team",
+  },
 ];
 
 // ── Lookup Helpers ───────────────────────────────────────────────────────────
@@ -1097,6 +1256,7 @@ export const CATEGORY_META: Record<MetricCategory, { label: string; description:
   cash_flow: { label: "Cash Flow", description: "Free cash flow and operating cash metrics" },
   balance_sheet: { label: "Balance Sheet", description: "Working capital and asset metrics" },
   customer: { label: "Customers", description: "Customer counts and acquisition" },
+  expense: { label: "Expenses", description: "Operating expenses by behavior (fixed, variable, percentage, one-time)" },
 };
 
 // ── Default Dashboard Layouts ────────────────────────────────────────────────

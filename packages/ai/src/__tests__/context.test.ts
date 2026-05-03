@@ -51,6 +51,7 @@ function makeInput(overrides: Record<string, unknown> = {}) {
     fundingRounds: [
       { name: "Seed", type: "equity", amount: 1000000, date: "2025-06-01", isProjected: false },
     ],
+    headcountDetails: [],
     ...overrides,
   };
 }
@@ -112,11 +113,107 @@ describe("buildFinancialSnapshot", () => {
     expect(snapshot.fundingRounds[0]!.amount).toBe(1000000);
   });
 
+  it("includes headcountDetails field with empty default", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    expect(snapshot.headcountDetails).toEqual([]);
+  });
+
+  it("round-trips populated headcountDetails (Phase 1 §1.5)", () => {
+    const input = makeInput({
+      headcountDetails: [
+        {
+          id: "hc-1",
+          title: "Senior Engineer",
+          name: "Alice",
+          employeeType: "full_time",
+          count: 1,
+          salary: 150000,
+          salaryChanges: [
+            { effectiveDate: "2026-07-01", newSalary: 165000, reason: "annual review" },
+          ],
+          bonuses: [{ payoutMonth: "2026-12", amount: 10000, type: "performance" }],
+          equityGrants: [
+            {
+              grantDate: "2026-01-01",
+              shares: 10000,
+              grantType: "iso",
+              vestingSchedule: [
+                { type: "cliff", date: "2027-01-01", sharesVested: 2500 },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.headcountDetails).toHaveLength(1);
+    const hc = snapshot.headcountDetails[0]!;
+    expect(hc.title).toBe("Senior Engineer");
+    expect(hc.name).toBe("Alice");
+    expect(hc.salaryChanges).toHaveLength(1);
+    expect(hc.bonuses[0]!.amount).toBe(10000);
+    expect(hc.equityGrants[0]!.shares).toBe(10000);
+    expect(hc.equityGrants[0]!.vestingSchedule).toHaveLength(1);
+  });
+
   it("passes through company metadata", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     expect(snapshot.company.name).toBe("Acme Inc");
     expect(snapshot.company.stage).toBe("seed");
     expect(snapshot.scenario.name).toBe("Base Case");
+  });
+
+  it("defaults expenses to empty array when expenseLines absent", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    expect(snapshot.expenses).toEqual([]);
+  });
+
+  it("maps expenseLines into per-row expenses", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-1",
+          accountId: "a1",
+          accountName: "AWS Hosting",
+          vendor: "Amazon Web Services",
+          notes: "Production cluster",
+          frequency: "monthly",
+          departmentId: "d1",
+          isOneTime: false,
+          isRecurring: true,
+          method: "fixed",
+          currentAmount: 4200,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.expenses).toHaveLength(1);
+    expect(snapshot.expenses[0]!.vendor).toBe("Amazon Web Services");
+    expect(snapshot.expenses[0]!.frequency).toBe("monthly");
+    expect(snapshot.expenses[0]!.method).toBe("fixed");
+    expect(snapshot.expenses[0]!.currentAmount).toBe(4200);
+    expect(snapshot.expenses[0]!.isRecurring).toBe(true);
+  });
+
+  it("applies sensible defaults for optional expenseLine fields", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-2",
+          accountId: "a1",
+          accountName: "Misc",
+          method: "fixed",
+          currentAmount: 100,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    expect(snapshot.expenses[0]!.vendor).toBeNull();
+    expect(snapshot.expenses[0]!.notes).toBeNull();
+    expect(snapshot.expenses[0]!.frequency).toBe("monthly");
+    expect(snapshot.expenses[0]!.departmentId).toBeNull();
+    expect(snapshot.expenses[0]!.isOneTime).toBe(false);
+    expect(snapshot.expenses[0]!.isRecurring).toBeNull();
   });
 
   it("handles empty series maps", () => {
@@ -238,6 +335,47 @@ describe("formatContextForPrompt", () => {
     expect(text).toContain("Base Case");
   });
 
+  it("includes Team Detail section when headcountDetails populated", () => {
+    const input = makeInput({
+      headcountDetails: [
+        {
+          id: "hc-1",
+          title: "Senior Engineer",
+          name: "Alice",
+          employeeType: "full_time",
+          count: 1,
+          salary: 150000,
+          salaryChanges: [
+            { effectiveDate: "2026-07-01", newSalary: 165000, reason: "annual review" },
+          ],
+          bonuses: [{ payoutMonth: "2026-12", amount: 10000, type: "performance" }],
+          equityGrants: [
+            {
+              grantDate: "2026-01-01",
+              shares: 10000,
+              grantType: "iso",
+              vestingSchedule: [{ type: "cliff", date: "2027-01-01", sharesVested: 2500 }],
+            },
+          ],
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Team Detail");
+    expect(text).toContain("Senior Engineer");
+    expect(text).toContain("Alice");
+    expect(text).toContain("annual review");
+    expect(text).toContain("performance");
+    expect(text).toContain("ISO");
+  });
+
+  it("omits Team Detail section when headcountDetails empty", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).not.toContain("Team Detail");
+  });
+
   it("includes departments", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
@@ -317,6 +455,52 @@ describe("formatContextForPrompt", () => {
     const snapshot = buildFinancialSnapshot(makeInput() as never);
     const text = formatContextForPrompt(snapshot);
     expect(text).not.toContain("Active Revenue Streams");
+  });
+
+  it("omits Active expense lines section when expenses is empty", () => {
+    const snapshot = buildFinancialSnapshot(makeInput() as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).not.toContain("Active expense lines");
+  });
+
+  it("renders Active expense lines section sorted by currentAmount desc with annotations", () => {
+    const input = makeInput({
+      expenseLines: [
+        {
+          id: "exp-small",
+          accountId: "a1",
+          accountName: "Coffee",
+          vendor: null,
+          frequency: "monthly",
+          isRecurring: false,
+          method: "fixed",
+          currentAmount: 50,
+        },
+        {
+          id: "exp-big",
+          accountId: "a1",
+          accountName: "AWS",
+          vendor: "Amazon",
+          frequency: "monthly",
+          isRecurring: true,
+          method: "fixed",
+          currentAmount: 9000,
+        },
+      ],
+    });
+    const snapshot = buildFinancialSnapshot(input as never);
+    const text = formatContextForPrompt(snapshot);
+    expect(text).toContain("Active expense lines");
+    // bigger one rendered first
+    const awsIdx = text.indexOf("AWS (fixed, monthly, recurring — Amazon): 9000");
+    const coffeeIdx = text.indexOf("Coffee (fixed, monthly, non-recurring): 50");
+    expect(awsIdx).toBeGreaterThan(-1);
+    expect(coffeeIdx).toBeGreaterThan(-1);
+    expect(awsIdx).toBeLessThan(coffeeIdx);
+    // The expense-line rows themselves emit raw numeric amounts (no currency symbol).
+    // Other sections (funding, P&L) intentionally use formatCurrency at the boundary.
+    expect(text).toContain(": 9000");
+    expect(text).toContain(": 50");
   });
 
   it("formats percentage-point metrics without double-multiplication", () => {

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import { Suspense } from "react";
-import { getCompany, getActiveScenario, getServerScenarioId, getAccounts } from "@/lib/data";
+import { getCompany, getActiveScenario, getServerScenarioId, getAccounts, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
@@ -11,7 +11,7 @@ import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { aggregateBudgetTimeline } from "@/lib/budget-timeline";
 import { formatCurrency } from "@burnless/types";
 import { ExpensesView } from "./expenses-view";
-import { AddExpenseForm } from "./add-expense-form";
+import { ExpenseFormModal } from "./expense-form-modal";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { ExpensesEmptyState } from "@/components/ui/empty-state";
 
@@ -45,11 +45,20 @@ export default async function ExpensesPage() {
 }
 
 async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
-  const [data, accounts, expenseDetails] = await Promise.all([
+  const [data, accounts, expenseDetails, departments] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),
     computeExpenseDetails(companyId, scenarioId),
+    getDepartments(companyId),
   ]);
+
+  // Forecast-line list reused both as `forecastLines` for the form
+  // (`percentage_of` source dropdown) and threaded into the table for editing.
+  const formAccounts = accounts
+    .filter((a) => a.category === "operating_expense" || a.category === "cogs")
+    .map((a) => ({ id: a.id, name: a.name }));
+  const formDepartments = departments.map((d) => ({ id: d.id, name: d.name }));
+  const formForecastLines = expenseDetails.lineItems.map((l) => ({ id: l.id, name: l.accountName }));
 
   // Show empty state if no expense data exists
   if (expenseDetails.lineItems.length === 0) {
@@ -62,9 +71,11 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
               Intelligent spend management
             </p>
           </div>
-          <AddExpenseForm
-            scenarioId={scenarioId}
-            accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+          <ExpenseFormModal
+            mode="add"
+            accounts={formAccounts}
+            departments={formDepartments}
+            forecastLines={formForecastLines}
           />
         </div>
         <ExpensesEmptyState />
@@ -173,9 +184,11 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
             Intelligent spend management
           </p>
         </div>
-        <AddExpenseForm
-          scenarioId={scenarioId}
-          accounts={accounts.map((a) => ({ id: a.id, name: a.name, category: a.category }))}
+        <ExpenseFormModal
+          mode="add"
+          accounts={formAccounts}
+          departments={formDepartments}
+          forecastLines={formForecastLines}
         />
       </div>
 
@@ -183,6 +196,9 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
         summaryMetrics={summaryMetrics}
         resolvedSlotData={resolvedSlotData}
         expenseDetails={expenseDetails}
+        accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+        departments={formDepartments}
+        forecastLines={formForecastLines}
         timeline={timeline}
         opexTimeline={opexTimeline}
         cogsTimeline={cogsTimeline}
