@@ -12,16 +12,51 @@ import type { ToolContext, ToolHandler } from "./types";
 import { scenarioSchemas, scenarioHandlers } from "./scenarios";
 import { headcountSchemas, headcountHandlers } from "./headcount";
 import { revenueSchemas, revenueHandlers } from "./revenue";
+import {
+  createFundingRound,
+  updateFundingRound,
+  deleteFundingRound,
+  addFundingRoundInvestor,
+  markGrantMilestoneHit,
+  modelDilution,
+} from "./funding";
+import {
+  CreateFundingRoundSchema,
+  UpdateFundingRoundSchema,
+  DeleteFundingRoundSchema,
+  AddFundingRoundInvestorSchema,
+  MarkGrantMilestoneHitSchema,
+  ModelDilutionSchema,
+} from "@burnless/ai";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
+const fundingSchemas: Record<string, z.ZodType> = {
+  create_funding_round: CreateFundingRoundSchema,
+  update_funding_round: UpdateFundingRoundSchema,
+  delete_funding_round: DeleteFundingRoundSchema,
+  add_funding_round_investor: AddFundingRoundInvestorSchema,
+  mark_grant_milestone_hit: MarkGrantMilestoneHitSchema,
+  model_dilution: ModelDilutionSchema,
+};
+
+const fundingHandlers: Record<string, ToolHandler> = {
+  create_funding_round: createFundingRound,
+  update_funding_round: updateFundingRound,
+  delete_funding_round: deleteFundingRound,
+  add_funding_round_investor: addFundingRoundInvestor,
+  mark_grant_milestone_hit: markGrantMilestoneHit,
+  model_dilution: modelDilution,
+};
+
 const toolSchemas: Record<string, z.ZodType> = {
   ...scenarioSchemas,
   ...headcountSchemas,
   ...revenueSchemas,
+  ...fundingSchemas,
   ...forecastingSchemas,
   ...analyticsSchemas,
   ...webSearchSchemas,
@@ -31,6 +66,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...scenarioHandlers,
   ...headcountHandlers,
   ...revenueHandlers,
+  ...fundingHandlers,
   ...forecastingHandlers,
   ...analyticsHandlers,
   ...webSearchHandlers,
@@ -42,7 +78,8 @@ const toolHandlers: Record<string, ToolHandler> = {
 const MUTATION_TOOLS = new Set([
   // Create
   "create_scenario", "add_headcount", "create_department", "add_revenue_stream",
-  "add_funding_round", "create_expense", "create_account",
+  "create_funding_round", "add_funding_round_investor", "mark_grant_milestone_hit",
+  "create_expense", "create_account",
   "add_salary_change", "add_bonus", "add_equity_grant",
   // Update
   "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
@@ -75,9 +112,11 @@ const MUTATION_CACHE_TAGS: Record<string, string[]> = {
   add_revenue_stream: ["revenue-streams", "scenario-overrides"],
   update_revenue_stream: ["revenue-streams", "scenario-overrides"],
   delete_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  add_funding_round: ["funding-rounds", "scenario-overrides"],
+  create_funding_round: ["funding-rounds", "scenario-overrides"],
   update_funding_round: ["funding-rounds", "scenario-overrides"],
   delete_funding_round: ["funding-rounds", "scenario-overrides"],
+  add_funding_round_investor: ["funding-rounds"],
+  mark_grant_milestone_hit: ["funding-rounds", "scenario-overrides"],
   create_expense: ["forecast-lines", "scenario-overrides"],
   update_expense: ["forecast-lines", "scenario-overrides"],
   delete_expense: ["forecast-lines", "scenario-overrides"],
