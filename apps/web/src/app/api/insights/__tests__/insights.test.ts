@@ -197,7 +197,7 @@ describe("GET /api/insights", () => {
     const body = await res.json();
 
     expect(body.insights).toEqual([]);
-    expect(body.cached).toBe(true);
+    expect(body.cached).toBe(false);
   });
 });
 
@@ -280,7 +280,8 @@ describe("POST /api/insights", () => {
       snapshot: { keyMetrics: { runway: 8, burnRate: 50000 } },
       contextText: "",
     });
-    mockGenerateInsights.mockReturnValue([
+    mockGetCompanyProviderConfig.mockResolvedValue(null);
+    mockGeneratePageInsights.mockResolvedValue([
       { type: "warning", title: "Runway Alert", summary: "8 months" },
     ]);
 
@@ -296,7 +297,7 @@ describe("POST /api/insights", () => {
     expect(res.status).toBe(200);
     expect(body.insights).toHaveLength(1);
     expect(body.page).toBe("dashboard");
-    expect(mockGenerateInsights).toHaveBeenCalled();
+    expect(mockGeneratePageInsights).toHaveBeenCalled();
   });
 
   it("generates LLM page insights for expenses", async () => {

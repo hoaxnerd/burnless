@@ -220,7 +220,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Cache the generated insights — skip caching empty results so they retry next time
   const cacheKey = `scenario:${scenario.id}`;
-  if (insights.length > 0) {
+  if ((insights ?? []).length > 0) {
     await db
       .insert(aiInsightCache)
       .values({
@@ -242,7 +242,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   return NextResponse.json({
-    insights,
+    insights: insights ?? [],
     page,
     scenario: {
       id: scenario.id,
