@@ -5,6 +5,7 @@ import {
   shareClasses,
   optionPools,
   companies,
+  auditEntityTypeEnum,
 } from "../schema";
 
 describe("Phase 2 funding schema", () => {
@@ -43,6 +44,18 @@ describe("Phase 2 funding schema", () => {
     expect(cols).toEqual(
       expect.arrayContaining([
         "id", "companyId", "name", "totalReserved", "refreshDate", "deletedAt",
+      ]),
+    );
+  });
+});
+
+describe("audit_entity_type enum (Phase 2 D extension)", () => {
+  it("includes funding_round_investor, share_class, option_pool", () => {
+    expect(auditEntityTypeEnum.enumValues).toEqual(
+      expect.arrayContaining([
+        "funding_round_investor",
+        "share_class",
+        "option_pool",
       ]),
     );
   });
