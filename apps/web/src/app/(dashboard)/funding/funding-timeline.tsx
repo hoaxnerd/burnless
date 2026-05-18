@@ -17,8 +17,8 @@ export function FundingTimeline({ rounds }: { rounds: TimelineRound[] }) {
   if (rounds.length === 0) return null;
 
   const sorted = [...rounds].sort((a, b) => a.date.localeCompare(b.date));
-  const startYear = Number(sorted[0].date.slice(0, 4));
-  const endYear = Number(sorted[sorted.length - 1].date.slice(0, 4));
+  const startYear = Number(sorted[0]!.date.slice(0, 4));
+  const endYear = Number(sorted[sorted.length - 1]!.date.slice(0, 4));
   const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
 
   const colorByType: Record<string, string> = {

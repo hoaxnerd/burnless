@@ -15,7 +15,7 @@ interface Investor {
 export function InvestorList({ roundId }: { roundId: string }) {
   const { data, mutate } = useSWR<{ investors: Investor[] }>(
     `/api/funding-rounds/${roundId}/investors`,
-    (url) => apiFetch(url).then((r) => r.json()),
+    (url: string) => apiFetch(url).then((r) => r.json()),
   );
   const { fmtCurrency } = useLocale();
   const [adding, setAdding] = useState(false);
