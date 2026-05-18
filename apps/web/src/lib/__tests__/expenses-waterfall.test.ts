@@ -22,13 +22,15 @@ describe("expenses page waterfall prevention (BUR-198 regression)", () => {
     expect(expensesSource).toContain("Promise.all");
   });
 
-  it("should fetch budget scenario in the Promise.all batch", () => {
-    // The Promise.all should include getBudgetScenario
+  it("should fetch getDepartments in the Promise.all batch", () => {
+    // getBudgetScenario was removed when budget computation was refactored into
+    // aggregateBudgetTimeline (a pure fn over expenseDetails). The batch now
+    // fetches computeDashboardData, getAccounts, computeExpenseDetails, getDepartments.
     const promiseAllBlock = expensesSource.match(
       /Promise\.all\(\[[\s\S]*?\]\)/
     );
     expect(promiseAllBlock).not.toBeNull();
-    expect(promiseAllBlock![0]).toContain("getBudgetScenario");
+    expect(promiseAllBlock![0]).toContain("getDepartments");
   });
 
   it("should fetch computeDashboardData in the Promise.all batch", () => {
