@@ -57,6 +57,10 @@ export interface MetricsInput {
   depreciationAmortization?: MonthlySeries;
   /** Monthly retention spend (for Customer Retention Cost) */
   retentionSpend?: MonthlySeries;
+  /** Phase 2 D §1.4 D6 — monthly debt interest (operating; added to burn). */
+  interestExpense?: MonthlySeries;
+  /** Phase 2 D §1.4 D6 — monthly debt principal (financing; added to runway denominator). */
+  principalPayments?: MonthlySeries;
 }
 
 /** A single computed metric value. */
@@ -331,17 +335,27 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   const netBurnRate = months.map((m) => {
     const rev = D(input.revenue.get(m) ?? 0);
     const exp = D(input.totalExpenses.get(m) ?? 0);
-    const net = exp.minus(rev);
-    return { month: m, value: dRound2(dMax(0, net)) };
+    const interest = D(input.interestExpense?.get(m) ?? 0);
+    // Phase 2 D §1.4 D6: interest is operating expense (P&L line); principal is financing
+    // (cash flow only). totalExpenses contains operating accounts; interestExpense arrives
+    // as a separate series from FundingImpact (engine doesn't route interest into the
+    // accounts pipeline to keep the boundary explicit).
+    const operatingBurn = exp.plus(interest).minus(rev);
+    return { month: m, value: dRound2(dMax(0, operatingBurn)) };
   });
 
   const cashPos = seriesToArray(input.cashPosition);
 
   const cashRunwayMonths = months.map((m, i) => {
     const cash = D(input.cashPosition.get(m) ?? 0);
-    const burn = D(netBurnRate[i]?.value ?? 0);
-    if (burn.lte(0)) return { month: m, value: 999 };
-    return { month: m, value: dRound2(cash.div(burn)) };
+    const operatingBurn = D(netBurnRate[i]?.value ?? 0);
+    const principal = D(input.principalPayments?.get(m) ?? 0);
+    // Phase 2 D §1.4 D6: runway nets total debt service. Interest is already in
+    // operatingBurn (above); principal is added back here as it's a contractual cash
+    // outflow that drains the runway even though it doesn't appear on the P&L.
+    const totalCashConsumption = operatingBurn.plus(principal);
+    if (totalCashConsumption.lte(0)) return { month: m, value: 999 };
+    return { month: m, value: dRound2(cash.div(totalCashConsumption)) };
   });
 
   // Operating income
