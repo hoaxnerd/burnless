@@ -8,7 +8,7 @@ import { Button } from "@/components/ui";
 import { formatCurrency } from "@burnless/types";
 import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
-  Step, ParsedRow, ColumnMapping, MappingConfidence,
+  Step, ParsedRow, ColumnMapping, AnyColumnMapping, MappingConfidence,
   AccountOption, PreviewTransaction, ImportResult, ImportBatch,
 } from "./import-utils";
 import { UploadStep } from "./upload-step";
@@ -90,7 +90,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
           setHeaders(parsedHeaders);
           setRows(results.data);
           const { mapping: autoMap, confidence } = autoMapColumns(parsedHeaders);
-          setMapping(autoMap);
+          setMapping(autoMap as ColumnMapping);
           setMappingConfidence(confidence);
           loadAccounts();
           setStep("map");
