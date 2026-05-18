@@ -27,6 +27,14 @@ vi.mock("@burnless/db", () => ({
   revenueStreams: { scenarioId: "scenarioId" },
   headcountPlans: { scenarioId: "scenarioId" },
   fundingRounds: { companyId: "companyId" },
+  getResolvedData: vi.fn(async () => ({
+    forecastLines: [],
+    revenueStreams: [],
+    headcountPlans: [],
+    financialAccounts: [],
+    fundingRounds: [],
+    departments: [],
+  })),
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), isNull: vi.fn() }));
@@ -38,6 +46,13 @@ vi.mock("@burnless/engine", () => ({
   computeAllHeadcountCosts: vi
     .fn()
     .mockReturnValue({ totalCost: new Map(), headcount: new Map() }),
+  D: vi.fn((v: number) => ({
+    plus: vi.fn().mockReturnThis(),
+    minus: vi.fn().mockReturnThis(),
+    toNumber: vi.fn().mockReturnValue(v ?? 0),
+  })),
+  dRound2: vi.fn((v: unknown) => (typeof v === "object" && v !== null && "toNumber" in v ? (v as { toNumber: () => number }).toNumber() : Number(v ?? 0))),
+  monthKey: vi.fn((d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`),
   compareScenarios: vi.fn().mockReturnValue({
     baseScenario: { id: "base-1", name: "Base" },
     compareScenario: { id: "comp-1", name: "Compare" },
