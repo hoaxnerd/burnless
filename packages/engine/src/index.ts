@@ -180,6 +180,7 @@ export {
   type ConvertibleParams,
   type DebtParams,
   type GrantParams,
+  type GrantMatchWarning,
   type FundingRoundInput,
   type FundingRoundType,
 } from "./funding";
