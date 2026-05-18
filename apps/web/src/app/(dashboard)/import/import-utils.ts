@@ -2,6 +2,8 @@
 
 export type Step = "upload" | "map" | "preview" | "result";
 
+export type ImportTarget = "transactions" | "funding-rounds";
+
 export interface ParsedRow {
   [key: string]: string;
 }
@@ -12,6 +14,7 @@ export interface DebitCreditAmount {
 }
 
 export interface ColumnMapping {
+  target?: "transactions"; // optional + defaulted to keep all existing callers compiling
   date: string;
   /**
    * Either a single column name (single-column amount layout) OR a
@@ -27,6 +30,24 @@ export interface ColumnMapping {
   notes?: string;
   externalId?: string;
 }
+
+/** New (Phase 2 D D9) — disjoint shape for funding round CSV imports. */
+export interface FundingRoundColumnMapping {
+  target: "funding-rounds";
+  name: string;
+  roundType: string;
+  amount: string;
+  date: string;
+  closeDate?: string;
+  valuationCap?: string;
+  discountRate?: string;
+  interestRate?: string;
+  termMonths?: string;
+  notes?: string;
+}
+
+/** Discriminated union used by autoMapColumns return type. */
+export type AnyColumnMapping = ColumnMapping | FundingRoundColumnMapping;
 
 export interface MappingConfidence {
   date: number;
@@ -174,6 +195,20 @@ export const COLUMN_PATTERNS: Record<string, { patterns: RegExp[] }> = {
   },
 };
 
+/** Pattern dictionary for funding-round column auto-detection (Phase 2 D D9). */
+export const FUNDING_COLUMN_PATTERNS: Record<string, RegExp[]> = {
+  name: [/^round\s*name$/i, /^name$/i, /^round$/i],
+  roundType: [/^round\s*type$/i, /^type$/i, /^stage$/i],
+  amount: [/amount\s*raised/i, /^amount$/i, /total\s*raised/i, /raise(d)?/i],
+  date: [/signing\s*date/i, /^date$/i, /^signed$/i],
+  closeDate: [/close\s*date/i, /closing/i],
+  valuationCap: [/valuation\s*cap/i, /^cap$/i, /pre.?money\s*cap/i],
+  discountRate: [/discount/i],
+  interestRate: [/interest/i, /^rate$/i],
+  termMonths: [/term/i, /maturity/i],
+  notes: [/notes/i, /comment/i],
+};
+
 // ── Helper Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -257,19 +292,69 @@ function pickBest(
 }
 
 /**
- * Auto-detect a `ColumnMapping` from a CSV header row.
+ * Auto-detect a column mapping from a CSV header row.
  *
- * Order of resolution (each consumed header is locked from later slots):
- *   1. date
- *   2. debit + credit pair detection — if BOTH score, use the polymorphic
- *      `{ debit, credit }` shape and skip single-amount detection.
- *      Else fall back to single `amount`.
- *   3. description, category, vendor, notes, externalId
+ * Pass `opts.target` to switch between import modes:
+ *   - `"transactions"` (default) — returns `ColumnMapping` (existing behaviour, back-compat)
+ *   - `"funding-rounds"` — returns `FundingRoundColumnMapping`
+ *
+ * The return type widens to `AnyColumnMapping`; callers can narrow via `.target`.
  */
-export function autoMapColumns(headers: string[]): {
-  mapping: ColumnMapping;
-  confidence: MappingConfidence;
-} {
+export function autoMapColumns(
+  headers: string[],
+  opts?: { target?: ImportTarget },
+): { mapping: AnyColumnMapping; confidence: MappingConfidence } {
+  const target = opts?.target ?? "transactions";
+
+  if (target === "funding-rounds") {
+    const usedFunding = new Set<string>();
+    const pick = (slot: keyof typeof FUNDING_COLUMN_PATTERNS) => {
+      const picked = pickBest(headers, usedFunding, FUNDING_COLUMN_PATTERNS[slot]!);
+      if (picked) {
+        usedFunding.add(picked.header);
+        return { header: picked.header, score: picked.score };
+      }
+      return null;
+    };
+    const name = pick("name");
+    const roundType = pick("roundType");
+    const amount = pick("amount");
+    const date = pick("date");
+    const closeDate = pick("closeDate");
+    const valuationCap = pick("valuationCap");
+    const discountRate = pick("discountRate");
+    const interestRate = pick("interestRate");
+    const termMonths = pick("termMonths");
+    const notes = pick("notes");
+
+    const mapping: FundingRoundColumnMapping = {
+      target: "funding-rounds",
+      name: name?.header ?? "",
+      roundType: roundType?.header ?? "",
+      amount: amount?.header ?? "",
+      date: date?.header ?? "",
+      closeDate: closeDate?.header,
+      valuationCap: valuationCap?.header,
+      discountRate: discountRate?.header,
+      interestRate: interestRate?.header,
+      termMonths: termMonths?.header,
+      notes: notes?.header,
+    };
+    // Funding mapping does not use MappingConfidence (which is transaction-shaped) — zero-fill
+    // every key so the return type stays consistent. UI surface for funding doesn't read confidence.
+    const confidence: MappingConfidence = {
+      date: date?.score ?? 0,
+      amount: amount?.score ?? 0,
+      description: 0,
+      category: 0,
+      vendor: 0,
+      notes: notes?.score ?? 0,
+      externalId: 0,
+    };
+    return { mapping, confidence };
+  }
+
+  // Transaction branch — existing implementation unchanged.
   const mapping: ColumnMapping = {
     date: "",
     amount: "",

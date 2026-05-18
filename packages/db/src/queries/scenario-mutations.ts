@@ -82,6 +82,16 @@ export async function scenarioUpdate(
   changes: Record<string, any>,
   scenarioId: string | null,
 ) {
+  // Phase 2 D §1.2: roundType is immutable post-creation. The primary gate is the
+  // update_funding_round Zod schema in packages/ai/src/schemas/funding.ts which omits
+  // the field entirely. This strip is defense-in-depth for any direct caller that
+  // bypasses the schema (e.g. raw DB scripts, future internal tools). Mutates the
+  // local `changes` reference by reassignment — function param is not reused after.
+  if (entityType === "funding_round" && changes && "type" in changes) {
+    const { type: _stripped, ...rest } = changes as Record<string, unknown>;
+    changes = rest as typeof changes;
+  }
+
   if (!scenarioId) {
     const [row] = await db
       .update(table)

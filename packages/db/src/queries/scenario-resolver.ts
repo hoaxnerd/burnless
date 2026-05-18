@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "../index";
 import {
   scenarioOverrides,
@@ -6,9 +6,11 @@ import {
   headcountPlans,
   forecastLines,
   fundingRounds,
+  fundingRoundInvestors,
   departments,
   financialAccounts,
 } from "../schema";
+import { listShareClasses, listOptionPools } from "./funding";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +98,8 @@ export async function getResolvedData(
     baseFunding,
     baseDepts,
     baseAccounts,
+    baseShareClasses,
+    baseOptionPools,
   ] = await Promise.all([
     db.select().from(revenueStreams).where(eq(revenueStreams.companyId, companyId)),
     db.select().from(headcountPlans).where(eq(headcountPlans.companyId, companyId)),
@@ -103,7 +107,19 @@ export async function getResolvedData(
     db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId)),
     db.select().from(departments).where(eq(departments.companyId, companyId)),
     db.select().from(financialAccounts).where(eq(financialAccounts.companyId, companyId)),
+    listShareClasses(companyId),
+    listOptionPools(companyId),
   ]);
+
+  // Fetch investors scoped to this company's rounds (done after baseFunding is known)
+  const roundIds = baseFunding.map((r) => r.id);
+  const baseInvestors =
+    roundIds.length > 0
+      ? await db
+          .select()
+          .from(fundingRoundInvestors)
+          .where(inArray(fundingRoundInvestors.fundingRoundId, roundIds))
+      : [];
 
   const [
     revenueResolved,
@@ -128,5 +144,10 @@ export async function getResolvedData(
     fundingRounds: fundingResolved,
     departments: deptsResolved,
     financialAccounts: accountsResolved,
+    fundingRoundInvestors: baseInvestors.filter((i) =>
+      fundingResolved.some((r) => r.id === i.fundingRoundId),
+    ),
+    shareClasses: baseShareClasses,
+    optionPools: baseOptionPools,
   };
 }

@@ -14,6 +14,7 @@ import {
   seriesToArray,
 } from "./utils";
 import { D, dRound2 } from "./decimal";
+import type { FundingImpact } from "./funding";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -404,7 +405,8 @@ export function generateCashFlow(
   accounts: AccountData[],
   startingCash: number = 0,
   fundingInflows?: MonthlySeries,
-  workingCapital?: WorkingCapitalConfig
+  workingCapital?: WorkingCapitalConfig,
+  fundingImpact?: FundingImpact,
 ): CashFlowStatement {
   // Net income (same as P&L)
   const revenue = sumByCategory(accounts, "revenue");
@@ -448,18 +450,41 @@ export function generateCashFlow(
   // Financing: liability changes + equity changes + funding
   const liabilityChanges = sumByCategory(accounts, "liability");
   const equityChanges = sumByCategory(accounts, "equity");
-  let financingCF = addSeries(liabilityChanges, equityChanges);
-  if (fundingInflows) {
-    financingCF = addSeries(financingCF, fundingInflows);
+  const legacyFinancing = addSeries(liabilityChanges, equityChanges);
+
+  // Phase 2 D §1.3: split into equityInflows + debtInflows + principalPayments.
+  let financingChildren: StatementLineItem[] | undefined;
+  let financingCF: MonthlySeries;
+  if (fundingImpact) {
+    const equityInflows = fundingImpact.equityInflows;
+    const debtInflows = fundingImpact.debtInflows;
+    const principalNeg = new Map<string, number>();
+    for (const [m, v] of fundingImpact.principalPayments) principalNeg.set(m, -v);
+    financingChildren = [
+      { name: "Equity Inflows", values: seriesToArray(equityInflows) },
+      { name: "Debt Inflows", values: seriesToArray(debtInflows) },
+      { name: "Principal Payments", values: seriesToArray(principalNeg) },
+    ];
+    financingCF = addSeries(addSeries(equityInflows, debtInflows), principalNeg);
+  } else {
+    let combined = legacyFinancing;
+    if (fundingInflows) combined = addSeries(combined, fundingInflows);
+    financingCF = combined;
   }
 
   const netCashChange = addSeries(addSeries(operatingCF, investingCF), financingCF);
   const endingCash = cumulativeSeries(netCashChange, startingCash);
 
+  const financingCashFlow: StatementLineItem = {
+    name: "Financing Cash Flow",
+    values: seriesToArray(financingCF),
+    children: financingChildren,
+  };
+
   return {
     operatingCashFlow: buildLineItem("Operating Cash Flow", operatingCF),
     investingCashFlow: buildLineItem("Investing Cash Flow", investingCF),
-    financingCashFlow: buildLineItem("Financing Cash Flow", financingCF),
+    financingCashFlow,
     netCashChange: buildLineItem("Net Cash Change", netCashChange),
     endingCash: seriesToArray(endingCash),
   };

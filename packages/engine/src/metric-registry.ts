@@ -37,6 +37,7 @@ export type MetricTier = "core" | "advanced" | "deep";
 export type MetricFormat =
   | "currency"
   | "percent"
+  | "percentage"
   | "number"
   | "months"
   | "ratio"
@@ -107,11 +108,12 @@ export interface MetricDefinition {
 export const METRIC_REGISTRY: MetricDefinition[] = [
   // ── Core Hero KPIs (Tier 0) ──────────────────────────────────────────────
 
+  // Phase 2 D §1.4 D6: cashPosition now accounts for debt drawdowns and repayments
   {
     slug: "cashPosition",
     name: "Cash Position",
-    description: "Total cash available, including funding and cumulative net income",
-    formula: "Starting Cash + Cumulative Net Income + Funding Inflows",
+    description: "Total cash available, net of equity funding, debt drawdowns, principal repayments, and cumulative net income",
+    formula: "Starting Cash + Equity Inflows + Debt Drawdowns − Principal Repayments + Cumulative Net Income",
     dependsOn: ["netIncome"],
     category: "cash",
     tier: "core",
@@ -120,12 +122,14 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "Wallet",
     color: "emerald",
     href: "/funding",
+    aiContext: { include: "both" },
   },
+  // Phase 2 D §1.4 D6: netBurnRate excludes debt principal (financing item); includes interestExpense (operating item)
   {
     slug: "netBurnRate",
     name: "Monthly Burn",
-    description: "Net cash consumed per month after revenue",
-    formula: "max(0, Total Expenses - Total Revenue)",
+    description: "Net operating cash consumed per month after revenue; includes interest expense but excludes debt principal repayments (financing item)",
+    formula: "max(0, Total Expenses + Interest Expense − Total Revenue)",
     dependsOn: ["totalRevenue", "burnRate"],
     category: "cash",
     tier: "core",
@@ -134,12 +138,14 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "Flame",
     color: "orange",
     href: "/expenses",
+    aiContext: { include: "both" },
   },
+  // Phase 2 D §1.4 D6: cashRunwayMonths denominator now includes debt service (principal + interest)
   {
     slug: "cashRunwayMonths",
     name: "Runway",
-    description: "Months of operation remaining at current burn rate",
-    formula: "Cash Position / Net Burn Rate",
+    description: "Months of cash remaining accounting for full debt service obligations (operating burn + principal repayments)",
+    formula: "Cash Position / (Net Burn Rate + Principal Repayments) — Net Burn Rate already includes Debt Service interest component",
     dependsOn: ["cashPosition", "netBurnRate"],
     category: "cash",
     tier: "core",
@@ -154,6 +160,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "Clock",
     color: "blue",
     href: "/scenarios",
+    aiContext: { include: "both" },
   },
   {
     slug: "mrr",
@@ -1187,6 +1194,108 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     color: "indigo",
     href: "/team",
   },
+
+  // ── Ownership / Cap-Table Metrics (Phase 2 D §1.4 D7) ───────────────────
+
+  // Phase 2 D §1.4 D7: totalOwnership parent — umbrella for cap-table breakdown
+  {
+    slug: "totalOwnership",
+    name: "Total Ownership",
+    description: "Fully-diluted ownership breakdown across all share classes and instruments (common, preferred, SAFEs, option pool)",
+    formula: "Common + Preferred + SAFE Overhang + Option Pool Overhang = 100%",
+    dependsOn: [],
+    category: "cash",
+    tier: "advanced",
+    format: "percentage",
+    direction: "neutral",
+    icon: "PieChart",
+    color: "violet",
+    href: "/funding",
+    aiContext: { include: "parent_only" },
+  },
+  {
+    slug: "commonStockOwnership",
+    name: "Common Stock Ownership",
+    description: "Founder + employee common shares as a percentage of fully-diluted cap table",
+    formula: "Common Shares / Total Fully-Diluted Shares × 100",
+    dependsOn: ["totalOwnership"],
+    parentMetricId: "totalOwnership",
+    category: "cash",
+    tier: "advanced",
+    format: "percentage",
+    direction: "neutral",
+    icon: "Users",
+    color: "blue",
+    href: "/funding",
+    aiContext: { include: "both" },
+  },
+  {
+    slug: "preferredStockOwnership",
+    name: "Preferred Stock Ownership",
+    description: "Investor preferred shares (all series) as a percentage of fully-diluted cap table",
+    formula: "Preferred Shares / Total Fully-Diluted Shares × 100",
+    dependsOn: ["totalOwnership"],
+    parentMetricId: "totalOwnership",
+    category: "cash",
+    tier: "advanced",
+    format: "percentage",
+    direction: "neutral",
+    icon: "Star",
+    color: "amber",
+    href: "/funding",
+    aiContext: { include: "both" },
+  },
+  {
+    slug: "safeOverhang",
+    name: "SAFE Overhang",
+    description: "Dilution from unconverted SAFEs expressed as a percentage of fully-diluted cap table",
+    formula: "SAFE Converted Shares (at cap/discount) / Total Fully-Diluted Shares × 100",
+    dependsOn: ["totalOwnership"],
+    parentMetricId: "totalOwnership",
+    category: "cash",
+    tier: "deep",
+    format: "percentage",
+    direction: "neutral",
+    icon: "Shield",
+    color: "indigo",
+    href: "/funding",
+    aiContext: { include: "both" },
+  },
+  {
+    slug: "optionPoolOverhang",
+    name: "Option Pool Overhang",
+    description: "Unissued employee option pool as a percentage of fully-diluted cap table",
+    formula: "Unissued Option Pool / Total Fully-Diluted Shares × 100",
+    dependsOn: ["totalOwnership"],
+    parentMetricId: "totalOwnership",
+    category: "cash",
+    tier: "advanced",
+    format: "percentage",
+    direction: "neutral",
+    icon: "Settings",
+    color: "slate",
+    href: "/funding",
+    aiContext: { include: "both" },
+  },
+
+  // ── Interest Expense (Phase 2 D §1.4 D6) ────────────────────────────────
+
+  // Phase 2 D §1.4 D6: interestExpense — operating cost surfaced separately from principal
+  {
+    slug: "interestExpense",
+    name: "Interest Expense",
+    description: "Monthly interest cost on debt facilities; treated as an operating expense (not principal repayment)",
+    formula: "Sum of (Outstanding Principal × Monthly Rate) across all active debt rounds",
+    dependsOn: [],
+    category: "cash",
+    tier: "advanced",
+    format: "currency",
+    direction: "lower_better",
+    icon: "Percent",
+    color: "rose",
+    href: "/funding",
+    aiContext: { include: "both" },
+  },
 ];
 
 // ── Lookup Helpers ───────────────────────────────────────────────────────────
@@ -1382,7 +1491,7 @@ export const ENTITY_METRIC_IMPACT: Record<string, string[]> = {
   revenue:         ["mrr", "arr", "totalRevenue", "revenueGrowthPercent", "netNewMrr", "newMrr"],
   headcount:       ["headcount", "totalOpex", "burnRate", "headcountCost"],
   "forecast-lines": ["burnRate", "totalOpex", "totalRevenue"],
-  funding:         ["cashPosition"],
+  funding:         ["cashPosition", "cashRunwayMonths", "netBurnRate", "interestExpense", "totalOwnership", "commonStockOwnership", "preferredStockOwnership", "safeOverhang", "optionPoolOverhang"],
   expenses:        ["burnRate", "totalOpex", "netBurnRate"],
   scenarios:       ["*"], // scenario change affects all metrics
   accounts:        ["totalOpex", "totalRevenue"],

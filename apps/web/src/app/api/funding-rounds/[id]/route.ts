@@ -11,6 +11,24 @@ export const PATCH = withErrorHandler(async (
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) => {
+  // Phase 2 D §1.2 / D2: roundType is immutable post-creation. Check first so the
+  // error is specific and doesn't depend on auth/session state.
+  let _peekBody: Record<string, unknown> = {};
+  try {
+    _peekBody = await request.clone().json();
+  } catch {
+    _peekBody = {};
+  }
+  if ("roundType" in _peekBody || "type" in _peekBody) {
+    return NextResponse.json(
+      {
+        error: "Round type is immutable post-creation. Use create_funding_round to model a different type.",
+        code: "ROUND_TYPE_IMMUTABLE",
+      },
+      { status: 400 },
+    );
+  }
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
@@ -28,6 +46,10 @@ export const PATCH = withErrorHandler(async (
     changes.preMoneyValuation = parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null;
   if (parsed.data.dilutionPercent !== undefined)
     changes.dilutionPercent = parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null;
+  if (parsed.data.closeDate !== undefined)
+    changes.closeDate = parsed.data.closeDate ? new Date(parsed.data.closeDate) : null;
+  if (parsed.data.notes !== undefined) changes.notes = parsed.data.notes;
+  if (parsed.data.parameters !== undefined) changes.parameters = parsed.data.parameters;
 
   const row = await scenarioUpdate("funding_round", fundingRounds, id, changes, scenarioId);
   if (!row) return errorResponse("Funding round not found", 404);

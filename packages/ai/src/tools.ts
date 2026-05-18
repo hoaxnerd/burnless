@@ -439,49 +439,61 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_funding_round",
+    name: "create_funding_round",
     description:
-      "Add a funding round (actual or projected) — models cash injection from investors, debt, or grants.",
+      "Create a new funding round (actual or projected). This is the ONLY tool that sets roundType — roundType is immutable after creation. Supports equity (pre_seed/seed/series_a/series_b/series_c_plus), safe, convertible, debt, and grant rounds. Supply round-type-specific parameters for full fidelity: equity→{shareClassId?, sharesIssued?, pricePerShare?, liquidationPreference?}; safe→{valuationCap?, discountRate?, mfn?, proRata?}; convertible→{valuationCap?, discountRate?, interestRate?, maturityDate?, conversionThreshold?}; debt→{interestRate, termMonths, repaymentSchedule?, firstPaymentDate?}; grant→{milestones:[{id,label,amount,dueDate,hitDate?}], matchRequirement?}.",
     inputSchema: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          description: "Round name (e.g., 'Seed Round', 'Series A')",
+          description: "Round name (e.g., 'Seed Round', 'Series A', 'SBIR Phase 1')",
         },
-        type: {
+        roundType: {
           type: "string",
-          enum: ["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"],
-          description: "Type of funding",
+          enum: ["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "safe", "convertible", "debt", "grant"],
+          description: "Type of funding. Immutable after creation.",
         },
         amount: {
           type: "number",
-          description: "Funding amount in base currency",
+          description: "Total round size / funding amount in base currency",
         },
         date: {
           type: "string",
-          description: "Expected date of funding (YYYY-MM-DD)",
+          description: "Expected or actual close date (YYYY-MM-DD)",
+        },
+        closeDate: {
+          type: "string",
+          description: "Legal close date if different from expected date (YYYY-MM-DD)",
         },
         preMoneyValuation: {
           type: "number",
-          description: "Pre-money valuation (optional)",
+          description: "Pre-money valuation (optional; required for meaningful dilution modeling)",
         },
         dilutionPercent: {
           type: "number",
-          description: "Dilution percentage (e.g., 0.15 for 15%)",
+          description: "Dilution percentage 0–100 (e.g., 20 for 20%)",
+        },
+        notes: {
+          type: "string",
+          description: "Free-form notes about the round",
+        },
+        parameters: {
+          type: "object",
+          description: "Round-type-specific parameters. See tool description for per-type shapes.",
         },
         isProjected: {
           type: "boolean",
-          description: "Whether this is a projected (future) round vs. completed",
+          description: "true = future/projected round; false = completed round",
         },
       },
-      required: ["name", "type", "amount", "date"],
+      required: ["name", "roundType", "amount", "date"],
     },
   },
   {
     name: "update_funding_round",
     description:
-      "Update an existing funding round's details — name, amount, date, valuation, dilution, or projected status.",
+      "Update an existing funding round's mutable fields — name, amount, date, closeDate, valuation, dilution, notes, parameters, or projected status. roundType cannot be changed after creation (use delete + recreate to change type).",
     inputSchema: {
       type: "object",
       properties: {
@@ -493,30 +505,37 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
           type: "string",
           description: "New round name",
         },
-        type: {
-          type: "string",
-          enum: ["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"],
-          description: "New funding type",
-        },
         amount: {
           type: "number",
           description: "New funding amount",
         },
         date: {
           type: "string",
-          description: "New date (YYYY-MM-DD)",
+          description: "New expected/actual date (YYYY-MM-DD)",
+        },
+        closeDate: {
+          type: ["string", "null"],
+          description: "New legal close date (YYYY-MM-DD) or null to clear",
         },
         preMoneyValuation: {
-          type: "number",
-          description: "New pre-money valuation",
+          type: ["number", "null"],
+          description: "New pre-money valuation or null to clear",
         },
         dilutionPercent: {
-          type: "number",
-          description: "New dilution percentage (e.g., 0.15 for 15%)",
+          type: ["number", "null"],
+          description: "New dilution percentage 0–100 or null to clear",
+        },
+        notes: {
+          type: ["string", "null"],
+          description: "Updated notes; null clears",
+        },
+        parameters: {
+          type: "object",
+          description: "Updated round-type-specific parameters (merged with existing)",
         },
         isProjected: {
           type: "boolean",
-          description: "Whether this is projected vs. completed",
+          description: "Mark as projected (true) or completed (false)",
         },
       },
       required: ["id"],
@@ -525,7 +544,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "delete_funding_round",
     description:
-      "Delete a funding round.",
+      "Delete a funding round and all associated investors. This also removes any scenario overrides referencing the round.",
     inputSchema: {
       type: "object",
       properties: {
@@ -535,6 +554,56 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
       },
       required: ["id"],
+    },
+  },
+  {
+    name: "add_funding_round_investor",
+    description:
+      "Add an investor record to an existing funding round. Tracks individual LP/investor participation within a round for cap-table detail.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fundingRoundId: {
+          type: "string",
+          description: "The funding round ID to attach this investor to",
+        },
+        name: {
+          type: "string",
+          description: "Investor name (person or firm)",
+        },
+        email: {
+          type: "string",
+          description: "Investor email (optional, for contact records)",
+        },
+        amountInvested: {
+          type: "number",
+          description: "Amount invested by this specific investor",
+        },
+      },
+      required: ["fundingRoundId", "name", "amountInvested"],
+    },
+  },
+  {
+    name: "mark_grant_milestone_hit",
+    description:
+      "Record that a grant milestone has been achieved. Sets the hitDate on the milestone inside the grant round's parameters. Only valid for rounds with roundType='grant'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fundingRoundId: {
+          type: "string",
+          description: "ID of the grant funding round containing the milestone",
+        },
+        milestoneId: {
+          type: "string",
+          description: "ID of the milestone (matches id field in the grant's milestones array)",
+        },
+        hitDate: {
+          type: "string",
+          description: "Date the milestone was hit (YYYY-MM-DD)",
+        },
+      },
+      required: ["fundingRoundId", "milestoneId", "hitDate"],
     },
   },
   {
@@ -799,7 +868,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "model_dilution",
     description:
-      "Model equity dilution from a potential funding round. Shows pre/post ownership percentages, option pool impact, and effective valuation.",
+      "Model equity dilution from a hypothetical funding round — shows pre/post ownership percentages, option pool impact, and effective valuation. Read-only calculation; does not create a round.",
     inputSchema: {
       type: "object",
       properties: {
@@ -809,30 +878,23 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
         },
         preMoneyValuation: {
           type: "number",
-          description: "Pre-money valuation",
+          description: "Pre-money valuation for this round",
         },
         existingOwnershipPercent: {
           type: "number",
-          description: "Founder/team current ownership as a decimal (e.g., 0.80 for 80%). Defaults to 1.0 if first round.",
+          description: "Founder/team current ownership as a percentage 0–100 (e.g., 80 for 80%). Required for meaningful dilution output.",
         },
         optionPoolPercent: {
           type: "number",
-          description: "New option pool to create as a percent of post-money (e.g., 0.10 for 10%). Defaults to 0.",
+          description: "New option pool to create as a percent of post-money 0–100 (e.g., 10 for 10%). Defaults to 0 if omitted.",
         },
         existingRounds: {
           type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              amount: { type: "number" },
-              ownership: { type: "number", description: "Ownership percentage acquired (decimal)" },
-            },
-          },
-          description: "Previous funding rounds for cap table context",
+          items: { type: "object" },
+          description: "Previous funding rounds for additional cap-table context (informational only)",
         },
       },
-      required: ["roundAmount", "preMoneyValuation"],
+      required: ["roundAmount", "preMoneyValuation", "existingOwnershipPercent"],
     },
   },
   {

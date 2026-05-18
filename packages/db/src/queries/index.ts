@@ -72,3 +72,9 @@ export {
   removeEquityGrant,
 } from "./equity-grants";
 export type { EquityGrant, NewEquityGrant } from "./equity-grants";
+
+export {
+  listInvestorsForRound,
+  listShareClasses,
+  listOptionPools,
+} from "./funding";

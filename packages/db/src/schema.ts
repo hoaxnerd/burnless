@@ -124,6 +124,8 @@ export const fundingRoundTypeEnum = pgEnum("funding_round_type", [
   "series_c_plus",
   "debt",
   "grant",
+  "safe",
+  "convertible",
 ]);
 
 export const revenueStreamTypeEnum = pgEnum("revenue_stream_type", [
@@ -268,6 +270,9 @@ export const companies = pgTable("companies", {
   billingSubscriptionId: text("billing_subscription_id"),
   billingPlan: text("billing_plan").default("free"),
   benefitsRates: jsonb("benefits_rates").notNull().default({}),
+  foundersOwnershipPercent: numeric("founders_ownership_percent", { precision: 7, scale: 4 })
+    .notNull()
+    .default("100.0000"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()
@@ -769,6 +774,9 @@ export const fundingRounds = pgTable(
     }),
     dilutionPercent: numeric("dilution_percent", { precision: 7, scale: 4 }),
     isProjected: boolean("is_projected").notNull().default(false),
+    closeDate: timestamp("close_date", { mode: "date" }),
+    notes: text("notes"),
+    parameters: jsonb("parameters").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -778,6 +786,60 @@ export const fundingRounds = pgTable(
   (table) => [
     index("funding_rounds_company_idx").on(table.companyId),
   ]
+);
+
+export const fundingRoundInvestors = pgTable(
+  "funding_round_investors",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    fundingRoundId: text("funding_round_id")
+      .notNull()
+      .references(() => fundingRounds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email"),
+    amountInvested: numeric("amount_invested", { precision: 18, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("funding_round_investors_round_idx").on(table.fundingRoundId),
+  ],
+);
+
+export const shareClasses = pgTable(
+  "share_classes",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    totalAuthorized: numeric("total_authorized", { precision: 18, scale: 0 }).notNull(),
+    totalIssued: numeric("total_issued", { precision: 18, scale: 0 }).notNull().default("0"),
+    parValue: numeric("par_value", { precision: 18, scale: 6 }).notNull().default("0.000001"),
+    liquidationPreference: numeric("liquidation_preference", {
+      precision: 7,
+      scale: 4,
+    }).notNull().default("1.0000"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [index("share_classes_company_idx").on(table.companyId)],
+);
+
+export const optionPools = pgTable(
+  "option_pools",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    totalReserved: numeric("total_reserved", { precision: 18, scale: 0 }).notNull(),
+    refreshDate: timestamp("refresh_date", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [index("option_pools_company_idx").on(table.companyId)],
 );
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
@@ -1304,11 +1366,24 @@ export const revenueStreamsRelations = relations(revenueStreams, ({ one }) => ({
   }),
 }));
 
-export const fundingRoundsRelations = relations(fundingRounds, ({ one }) => ({
-  company: one(companies, {
-    fields: [fundingRounds.companyId],
-    references: [companies.id],
+export const fundingRoundsRelations = relations(fundingRounds, ({ one, many }) => ({
+  company: one(companies, { fields: [fundingRounds.companyId], references: [companies.id] }),
+  investors: many(fundingRoundInvestors),
+}));
+
+export const fundingRoundInvestorsRelations = relations(fundingRoundInvestors, ({ one }) => ({
+  round: one(fundingRounds, {
+    fields: [fundingRoundInvestors.fundingRoundId],
+    references: [fundingRounds.id],
   }),
+}));
+
+export const shareClassesRelations = relations(shareClasses, ({ one }) => ({
+  company: one(companies, { fields: [shareClasses.companyId], references: [companies.id] }),
+}));
+
+export const optionPoolsRelations = relations(optionPools, ({ one }) => ({
+  company: one(companies, { fields: [optionPools.companyId], references: [companies.id] }),
 }));
 
 export const metricsRelations = relations(metrics, ({ one }) => ({
@@ -1513,6 +1588,9 @@ export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
   "salary_change",
   "bonus",
   "equity_grant",
+  "funding_round_investor",
+  "share_class",
+  "option_pool",
 ]);
 
 export const financialAuditLogs = pgTable(

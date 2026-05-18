@@ -9,7 +9,7 @@ import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
 import { FundingView } from "./funding-view";
-import { AddFundingForm } from "./add-funding-form";
+import { AddFundingButton } from "./add-funding-button";
 import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
@@ -129,7 +129,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
             Capital sources, fundraising history, and cap table
           </p>
         </div>
-        <AddFundingForm />
+        <AddFundingButton />
       </div>
 
       <FundingView

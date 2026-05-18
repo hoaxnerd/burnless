@@ -142,3 +142,6 @@ export {
   AddRevenueStreamSchema,
   UpdateRevenueStreamSchema,
 } from "./schemas/revenue";
+
+// Funding tool schemas (canonical, single source of truth; roundType immutability enforced)
+export * from "./schemas/funding";
