@@ -135,7 +135,6 @@ export interface FundingImpact {
 }
 
 // --- Exports added in subsequent tasks ---
-// computeConvertibleNote (Task 9)
 // computeDebt (Task 10)
 // computeGrant (Task 11)
 // computeCapTable (Task 13)
@@ -184,9 +183,56 @@ export function computeSafeConversion(
     const discountPrice = priced.mul(D(1).minus(safeParams.discountRate));
     candidates.push({ method: "discount", price: discountPrice });
   }
-  // Pick the lowest price (most shares for holder).
-  const winner = candidates.reduce((a, b) => (b.price.lt(a.price) ? b : a));
+  // Pick the lowest price (most shares for holder). On a tie, later candidates (cap, discount) win
+  // over "priced" — cap / discount terms are more specific and holder-favourable by convention.
+  const winner = candidates.reduce((a, b) => (b.price.lte(a.price) ? b : a));
   const effectivePricePerShare = Number(winner.price.toFixed(6));
   const sharesIssued = Math.floor(Number(D(safeAmount).div(winner.price).toFixed(0)));
   return { method: winner.method, effectivePricePerShare, sharesIssued };
+}
+
+// --- Task 9: Convertible note conversion math ---
+
+export interface ConvertibleNoteConversionInput {
+  noteAmount: number;
+  noteParams: ConvertibleParams;
+  issueDate: string;
+  conversionDate: string;
+  qualifiedRoundPreMoney: number;
+  qualifiedRoundPricePerShare: number;
+  preRoundFullyDilutedShares: number;
+}
+
+export interface ConvertibleNoteConversionResult extends SafeConversionResult {
+  accruedInterest: number;
+  principalPlusInterest: number;
+}
+
+export function computeConvertibleNote(
+  input: ConvertibleNoteConversionInput,
+): ConvertibleNoteConversionResult {
+  const issue = new Date(input.issueDate);
+  const convert = new Date(input.conversionDate);
+  // Month-based accrual: avoids leap-year / day-count drift; matches standard simple-interest convention.
+  const monthsElapsed =
+    (convert.getFullYear() - issue.getFullYear()) * 12 +
+    (convert.getMonth() - issue.getMonth());
+  const yearsElapsed = monthsElapsed / 12;
+  const accrued = D(input.noteAmount).mul(input.noteParams.interestRate ?? 0).mul(yearsElapsed);
+  const total = D(input.noteAmount).plus(accrued);
+  const safeResult = computeSafeConversion({
+    safeAmount: Number(total.toFixed(2)),
+    safeParams: {
+      valuationCap: input.noteParams.valuationCap,
+      discountRate: input.noteParams.discountRate,
+    },
+    qualifiedRoundPreMoney: input.qualifiedRoundPreMoney,
+    qualifiedRoundPricePerShare: input.qualifiedRoundPricePerShare,
+    preRoundFullyDilutedShares: input.preRoundFullyDilutedShares,
+  });
+  return {
+    ...safeResult,
+    accruedInterest: Number(accrued.toFixed(2)),
+    principalPlusInterest: Number(total.toFixed(2)),
+  };
 }
