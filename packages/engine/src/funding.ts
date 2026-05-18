@@ -134,8 +134,95 @@ export interface FundingImpact {
   warnings: GrantMatchWarning[];
 }
 
+// --- Task 12: Cap table composition ---
+
+export interface CapTableInput {
+  foundersOwnershipPercent: number;
+  foundersTotalShares: number;
+  shareClasses: ShareClassInput[];
+  optionPools: OptionPoolInput[];
+  pendingSafes: Array<{ id: string; amount: number; valuationCap?: number; discountRate?: number }>;
+  pendingConvertibles: Array<{
+    id: string;
+    amount: number;
+    valuationCap?: number;
+    discountRate?: number;
+    interestRate?: number;
+    issueDate?: string;
+  }>;
+}
+
+export function computeCapTable(input: CapTableInput): CapTable {
+  const rows: CapTableRow[] = [];
+
+  const commonStock = input.shareClasses
+    .filter((s) => /common/i.test(s.name))
+    .reduce((sum, s) => sum + s.totalIssued, 0);
+  const preferredStock = input.shareClasses
+    .filter((s) => !/common/i.test(s.name))
+    .reduce((sum, s) => sum + s.totalIssued, 0);
+  // Fully-diluted option pool = entire reserved pool (not just ungranted portion).
+  // Granted shares are already counted in commonStock; the pool overhang = total reserved.
+  const optionPoolOverhang = input.optionPools.reduce(
+    (sum, p) => sum + p.totalReserved,
+    0,
+  );
+  const preMoneyFD = commonStock + preferredStock + optionPoolOverhang;
+  const safeOverhang = input.pendingSafes.reduce((sum, s) => {
+    if (!s.valuationCap || preMoneyFD === 0) return sum;
+    const capPrice = D(s.valuationCap).div(preMoneyFD);
+    const shares = Math.floor(Number(D(s.amount).div(capPrice).toFixed(0)));
+    return sum + shares;
+  }, 0);
+  const convertibleOverhang = input.pendingConvertibles.reduce((sum, c) => {
+    if (!c.valuationCap || preMoneyFD === 0) return sum;
+    const capPrice = D(c.valuationCap).div(preMoneyFD);
+    const shares = Math.floor(Number(D(c.amount).div(capPrice).toFixed(0)));
+    return sum + shares;
+  }, 0);
+
+  const totalFullyDiluted =
+    commonStock + preferredStock + optionPoolOverhang + safeOverhang + convertibleOverhang;
+
+  if (commonStock > 0) {
+    rows.push({
+      holder: "Founders",
+      shareClass: "Common",
+      shares: input.foundersTotalShares,
+      ownershipPercent: totalFullyDiluted > 0 ? input.foundersTotalShares / totalFullyDiluted : 0,
+    });
+  }
+  for (const s of input.shareClasses) {
+    if (/common/i.test(s.name)) continue;
+    rows.push({
+      holder: s.name,
+      shareClass: s.name,
+      shares: s.totalIssued,
+      ownershipPercent: totalFullyDiluted > 0 ? s.totalIssued / totalFullyDiluted : 0,
+    });
+  }
+  for (const p of input.optionPools) {
+    rows.push({
+      holder: p.name,
+      shareClass: "Option Pool",
+      shares: p.totalReserved,
+      ownershipPercent: totalFullyDiluted > 0 ? p.totalReserved / totalFullyDiluted : 0,
+    });
+  }
+
+  return {
+    rows,
+    totalFullyDiluted,
+    totals: {
+      commonStock,
+      preferredStock,
+      safeOverhang: safeOverhang + convertibleOverhang,
+      optionPoolOverhang,
+    },
+  };
+}
+
 // --- Exports added in subsequent tasks ---
-// computeCapTable (Task 13)
 // computeFundingImpact (Task 14)
 
 // --- Task 10: Debt schedule ---
