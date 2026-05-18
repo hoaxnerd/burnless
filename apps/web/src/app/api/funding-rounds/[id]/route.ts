@@ -11,6 +11,24 @@ export const PATCH = withErrorHandler(async (
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) => {
+  // Phase 2 D §1.2 / D2: roundType is immutable post-creation. Check first so the
+  // error is specific and doesn't depend on auth/session state.
+  let _peekBody: Record<string, unknown> = {};
+  try {
+    _peekBody = await request.clone().json();
+  } catch {
+    _peekBody = {};
+  }
+  if ("roundType" in _peekBody || "type" in _peekBody) {
+    return NextResponse.json(
+      {
+        error: "Round type is immutable post-creation. Use create_funding_round to model a different type.",
+        code: "ROUND_TYPE_IMMUTABLE",
+      },
+      { status: 400 },
+    );
+  }
+
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "editor");
