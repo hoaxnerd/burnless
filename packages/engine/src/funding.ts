@@ -135,10 +135,74 @@ export interface FundingImpact {
 }
 
 // --- Exports added in subsequent tasks ---
-// computeDebt (Task 10)
 // computeGrant (Task 11)
 // computeCapTable (Task 13)
 // computeFundingImpact (Task 14)
+
+// --- Task 10: Debt schedule ---
+
+export interface DebtComputeInput {
+  principal: number;
+  debtParams: DebtParams;
+  issueDate: string;
+  months: string[]; // ordered "YYYY-MM"
+}
+
+export interface DebtComputeResult {
+  draws: MonthlySeries; // principal disbursement (financing CF inflow)
+  interestExpense: MonthlySeries; // monthly interest (operating P&L)
+  principalPayments: MonthlySeries; // monthly principal (financing CF outflow)
+}
+
+/**
+ * Compute monthly debt schedule. Pure function — no I/O. Idempotent.
+ *
+ * Schedule kinds:
+ *   - straight_line: principal evenly split across termMonths; interest on declining balance.
+ *   - interest_only: interest only until final month, full principal balloon at term end.
+ *   - amortized: equal monthly P+I payment (mortgage-style). Implemented in Task 10.5 if needed.
+ */
+export function computeDebt(input: DebtComputeInput): DebtComputeResult {
+  const { principal, debtParams, issueDate, months } = input;
+  const issueKey = issueDate.slice(0, 7);
+  const firstPay = (debtParams.firstPaymentDate ?? issueDate).slice(0, 7);
+  const monthlyRate = D(debtParams.interestRate).div(12);
+  const schedule = debtParams.repaymentSchedule ?? "straight_line";
+
+  const draws: MonthlySeries = new Map();
+  const interestExpense: MonthlySeries = new Map();
+  const principalPayments: MonthlySeries = new Map();
+  for (const m of months) {
+    draws.set(m, 0);
+    interestExpense.set(m, 0);
+    principalPayments.set(m, 0);
+  }
+  if (months.includes(issueKey)) draws.set(issueKey, principal);
+
+  let balance = D(principal);
+  let monthsPaid = 0;
+  for (const m of months) {
+    if (m < firstPay) continue;
+    if (monthsPaid >= debtParams.termMonths) break;
+
+    const interest = dRound2(balance.mul(monthlyRate));
+    interestExpense.set(m, Number(interest));
+
+    let principalThisMonth = D(0);
+    if (schedule === "straight_line") {
+      principalThisMonth = D(principal).div(debtParams.termMonths);
+    } else if (schedule === "interest_only") {
+      if (monthsPaid === debtParams.termMonths - 1) {
+        principalThisMonth = balance;
+      }
+    }
+    const roundedPrincipal = dRound2(principalThisMonth);
+    principalPayments.set(m, Number(roundedPrincipal));
+    balance = balance.minus(roundedPrincipal);
+    monthsPaid += 1;
+  }
+  return { draws, interestExpense, principalPayments };
+}
 
 // --- Task 8: SAFE conversion math ---
 
