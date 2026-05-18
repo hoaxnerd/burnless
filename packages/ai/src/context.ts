@@ -69,11 +69,15 @@ interface ContextInput {
   headcountSeries: MonthlySeries;
   profitAndLoss: ProfitAndLoss;
   fundingRounds: Array<{
+    id: string;
     name: string;
     type: string;
     amount: number;
     date: string;
+    closeDate?: string | null;
     isProjected: boolean;
+    parameters?: Record<string, unknown>;
+    investors?: Array<{ name: string; amountInvested: number }>;
   }>;
   revenueStreams?: RevenueStreamLike[];
   headcountDetails: Array<{
@@ -169,7 +173,21 @@ export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
       totalOpex: sumLineItem(profitAndLoss.operatingExpenses.values),
       netIncome: sumLineItem(profitAndLoss.netIncome.values),
     },
-    fundingRounds: input.fundingRounds,
+    fundingRounds: input.fundingRounds.map((r) => ({
+      name: r.name,
+      type: r.type,
+      amount: r.amount,
+      date: r.date,
+      closeDate: r.closeDate ?? null,
+      isProjected: r.isProjected ?? false,
+      parameters: r.parameters ?? {},
+      investors: (r.investors ?? []).map((i) => ({
+        name: i.name,
+        amountInvested: Number(i.amountInvested),
+      })),
+      interestPaidYtd: 0,
+      principalPaidYtd: 0,
+    })),
     scenarios: input.scenarios,
     accounts: input.accounts,
     departments: input.departments,

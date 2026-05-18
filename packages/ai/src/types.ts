@@ -94,7 +94,12 @@ export interface FinancialSnapshot {
     type: string;
     amount: number;
     date: string;
+    closeDate: string | null;
     isProjected: boolean;
+    parameters: Record<string, unknown>;
+    investors: Array<{ name: string; amountInvested: number }>;
+    interestPaidYtd: number;
+    principalPaidYtd: number;
   }>;
   scenarios: Array<{
     id: string;

@@ -78,11 +78,14 @@ export async function buildAiContext(
     headcountSeries: dashboard.headcountSeries,
     profitAndLoss: dashboard.profitAndLoss,
     fundingRounds: funding.map((f) => ({
+      id: f.id,
       name: f.name,
       type: f.type,
       amount: Number(f.amount),
       date: new Date(f.date).toISOString().slice(0, 10),
+      closeDate: f.closeDate ? new Date(f.closeDate).toISOString().slice(0, 10) : null,
       isProjected: f.isProjected,
+      parameters: (f.parameters as Record<string, unknown> | null) ?? {},
     })),
     // Phase 1 §1.5: per-headcount detail (Team Detail section in the prompt).
     // Wire-up to the salary-changes / bonuses / equity-grants resolvers will
