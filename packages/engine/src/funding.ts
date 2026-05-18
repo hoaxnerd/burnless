@@ -135,9 +135,58 @@ export interface FundingImpact {
 }
 
 // --- Exports added in subsequent tasks ---
-// computeSafeConversion (Task 8)
 // computeConvertibleNote (Task 9)
 // computeDebt (Task 10)
 // computeGrant (Task 11)
 // computeCapTable (Task 13)
 // computeFundingImpact (Task 14)
+
+// --- Task 8: SAFE conversion math ---
+
+export interface SafeConversionInput {
+  safeAmount: number;
+  safeParams: SafeParams;
+  qualifiedRoundPreMoney: number;
+  qualifiedRoundPricePerShare: number;
+  preRoundFullyDilutedShares: number;
+}
+
+export interface SafeConversionResult {
+  method: "cap" | "discount" | "priced";
+  effectivePricePerShare: number;
+  sharesIssued: number;
+}
+
+/**
+ * SAFE conversion at a qualified financing event.
+ *
+ * Conversion price is the LOWER of:
+ *   - cap path: valuationCap / preRoundFullyDilutedShares
+ *   - discount path: pricePerShare * (1 - discountRate)
+ *   - priced path: pricePerShare (fallback when neither cap nor discount apply)
+ *
+ * Lower price = more shares for the SAFE holder. We always take the holder-favorable
+ * outcome (industry standard YC SAFE clause).
+ */
+export function computeSafeConversion(
+  input: SafeConversionInput,
+): SafeConversionResult {
+  const { safeAmount, safeParams, qualifiedRoundPricePerShare, preRoundFullyDilutedShares } = input;
+  const priced = D(qualifiedRoundPricePerShare);
+  const candidates: Array<{ method: SafeConversionResult["method"]; price: Decimal }> = [
+    { method: "priced", price: priced },
+  ];
+  if (safeParams.valuationCap && safeParams.valuationCap > 0) {
+    const capPrice = D(safeParams.valuationCap).div(preRoundFullyDilutedShares);
+    candidates.push({ method: "cap", price: capPrice });
+  }
+  if (safeParams.discountRate && safeParams.discountRate > 0) {
+    const discountPrice = priced.mul(D(1).minus(safeParams.discountRate));
+    candidates.push({ method: "discount", price: discountPrice });
+  }
+  // Pick the lowest price (most shares for holder).
+  const winner = candidates.reduce((a, b) => (b.price.lt(a.price) ? b : a));
+  const effectivePricePerShare = Number(winner.price.toFixed(6));
+  const sharesIssued = Math.floor(Number(D(safeAmount).div(winner.price).toFixed(0)));
+  return { method: winner.method, effectivePricePerShare, sharesIssued };
+}
