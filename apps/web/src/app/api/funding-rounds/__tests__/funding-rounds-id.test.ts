@@ -85,6 +85,32 @@ describe("funding-rounds/[id] PATCH", () => {
     const body = await res.json();
     expect(body.name).toBe("Series A");
   });
+
+  it("Phase 2 D: parameters/closeDate/notes reach scenarioUpdate (not silently dropped)", async () => {
+    // This test guards against regression of the silent-strip bug where Zod's
+    // default strip behaviour dropped Phase 2 D fields before the route plumbed them.
+    const payload = {
+      parameters: { valuationCap: 5000000, discountRate: 0.2 },
+      closeDate: "2026-06-30",
+      notes: "Expected to close Q2.",
+    };
+    mockScenarioUpdate.mockResolvedValue({ id: "fr-2", ...payload });
+    const res = await PATCH(
+      makeRequest("http://localhost/api/funding-rounds/fr-2", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+      makeParams("fr-2"),
+    );
+    expect(res.status).toBe(200);
+    // Verify scenarioUpdate received the three Phase 2 D fields in its changes argument.
+    const [, , , changes] = mockScenarioUpdate.mock.calls[0] as [unknown, unknown, unknown, Record<string, unknown>];
+    expect(changes.parameters).toEqual(payload.parameters);
+    expect(changes.notes).toBe(payload.notes);
+    // closeDate is coerced to a Date object in the route.
+    expect(changes.closeDate).toBeInstanceOf(Date);
+    expect((changes.closeDate as Date).toISOString().startsWith("2026-06-30")).toBe(true);
+  });
 });
 
 describe("funding-rounds/[id] DELETE", () => {

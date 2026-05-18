@@ -46,6 +46,10 @@ export const PATCH = withErrorHandler(async (
     changes.preMoneyValuation = parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null;
   if (parsed.data.dilutionPercent !== undefined)
     changes.dilutionPercent = parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null;
+  if (parsed.data.closeDate !== undefined)
+    changes.closeDate = parsed.data.closeDate ? new Date(parsed.data.closeDate) : null;
+  if (parsed.data.notes !== undefined) changes.notes = parsed.data.notes;
+  if (parsed.data.parameters !== undefined) changes.parameters = parsed.data.parameters;
 
   const row = await scenarioUpdate("funding_round", fundingRounds, id, changes, scenarioId);
   if (!row) return errorResponse("Funding round not found", 404);

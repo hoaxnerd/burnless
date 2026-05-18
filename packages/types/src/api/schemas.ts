@@ -236,12 +236,18 @@ export const createFundingRoundSchema = z.object({
 
 export const updateFundingRoundSchema = z.object({
   name: z.string().min(1).optional(),
-  type: fundingRoundTypeEnum.optional(),
+  // NOTE: `type`/`roundType` are intentionally omitted — they are immutable
+  // post-creation. The route-level peek-strip enforces this with a 400 before
+  // Zod ever runs; omitting them here keeps the schema in sync with intent.
   amount: positiveAmount().optional(),
   date: dateString().optional(),
   preMoneyValuation: positiveAmount().nullable().optional(),
   dilutionPercent: percentage().nullable().optional(),
   isProjected: z.boolean().optional(),
+  // Phase 2 D fields — were previously silently dropped by Zod strip.
+  closeDate: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  parameters: z.record(z.unknown()).optional(),
 });
 
 export type CreateFundingRoundInput = z.infer<typeof createFundingRoundSchema>;
