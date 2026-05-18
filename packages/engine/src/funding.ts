@@ -135,7 +135,6 @@ export interface FundingImpact {
 }
 
 // --- Exports added in subsequent tasks ---
-// computeGrant (Task 11)
 // computeCapTable (Task 13)
 // computeFundingImpact (Task 14)
 
@@ -299,4 +298,57 @@ export function computeConvertibleNote(
     accruedInterest: Number(accrued.toFixed(2)),
     principalPlusInterest: Number(total.toFixed(2)),
   };
+}
+
+// --- Task 11: Grant disbursement + match warnings ---
+
+export interface GrantComputeInput {
+  roundId: string;
+  roundName: string;
+  params: GrantParams;
+  cumulativeQualifyingSpend: Record<string, number>;
+}
+
+export interface GrantComputeResult {
+  disbursements: MonthlySeries;
+  warnings: GrantMatchWarning[];
+}
+
+/**
+ * Phase 2 D §1.5 / D5: Grant disbursement + match warning.
+ *
+ * Disbursement triggers on the month each milestone's hitDate falls in (caller marks
+ * milestones hit via the mark_grant_milestone_hit AI tool / direct API). Unhit
+ * milestones produce no cash. Engine does NOT gate disbursement on match status — real
+ * grants frequently allow partial-match or conditional clauses; gating is a
+ * legal/operational decision the user owns. Warning surfaces the unmet condition so the
+ * UI and AI can flag it.
+ */
+export function computeGrant(input: GrantComputeInput): GrantComputeResult {
+  const disbursements: MonthlySeries = new Map();
+  const warnings: GrantMatchWarning[] = [];
+
+  for (const milestone of input.params.milestones) {
+    if (!milestone.hitDate) continue;
+    const month = milestone.hitDate.slice(0, 7);
+    disbursements.set(month, (disbursements.get(month) ?? 0) + milestone.amount);
+
+    if (input.params.matchRequirement) {
+      const matchMonth = input.params.matchRequirement.asOf.slice(0, 7);
+      const checkMonth = month >= matchMonth ? month : matchMonth;
+      const actual = input.cumulativeQualifyingSpend[checkMonth] ?? 0;
+      if (actual < input.params.matchRequirement.requiredAmount) {
+        warnings.push({
+          roundId: input.roundId,
+          roundName: input.roundName,
+          milestoneId: milestone.id,
+          milestoneLabel: milestone.label,
+          requiredAmount: input.params.matchRequirement.requiredAmount,
+          actualAmount: actual,
+          asOf: input.params.matchRequirement.asOf,
+        });
+      }
+    }
+  }
+  return { disbursements, warnings };
 }
