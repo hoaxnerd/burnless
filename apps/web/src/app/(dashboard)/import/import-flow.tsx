@@ -10,6 +10,7 @@ import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, AnyColumnMapping, MappingConfidence,
   AccountOption, PreviewTransaction, ImportResult, ImportBatch,
+  FundingRoundColumnMapping, ImportTarget,
 } from "./import-utils";
 import { UploadStep } from "./upload-step";
 import { MapStep } from "./map-step";
@@ -23,12 +24,14 @@ interface ImportFlowProps {
 }
 
 export function ImportFlow({ embedded = false }: ImportFlowProps) {
+  const [target, setTarget] = useState<ImportTarget>("transactions");
   const [step, setStep] = useState<Step>("upload");
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({ date: "", amount: "", description: "", category: "" });
   const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
+  const [fundingPreview, setFundingPreview] = useState<Array<Record<string, unknown>>>([]);
   const [targetAccountId, setTargetAccountId] = useState("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [preview, setPreview] = useState<PreviewTransaction[]>([]);
@@ -89,7 +92,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
           const parsedHeaders = results.meta.fields || [];
           setHeaders(parsedHeaders);
           setRows(results.data);
-          const { mapping: autoMap, confidence } = autoMapColumns(parsedHeaders);
+          const { mapping: autoMap, confidence } = autoMapColumns(parsedHeaders, { target });
           setMapping(autoMap as ColumnMapping);
           setMappingConfidence(confidence);
           loadAccounts();
@@ -117,7 +120,74 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
 
   const handleDragLeave = useCallback(() => { setDragActive(false); }, []);
 
+  const generateFundingPreview = async () => {
+    const fm = mapping as unknown as FundingRoundColumnMapping;
+    if (!fm.name || !fm.roundType || !fm.amount || !fm.date) {
+      setError("Please map the Name, Round Type, Amount, and Date columns");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: "funding-rounds",
+          rounds: rows,
+          mapping: fm,
+          dryRun: true,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        setError(errData.error || "Failed to preview funding import");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      setFundingPreview(data.preview ?? []);
+      setStep("preview");
+    } catch { setError("Failed to generate preview"); }
+    finally { setLoading(false); }
+  };
+
+  const executeFundingImport = async () => {
+    const fm = mapping as unknown as FundingRoundColumnMapping;
+    setLoading(true);
+    setError(null);
+    setImportProgress(0);
+    try {
+      const progressInterval = setInterval(() => {
+        setImportProgress((p) => Math.min(p + 5, 90));
+      }, 100);
+      const res = await apiFetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: "funding-rounds",
+          rounds: rows,
+          mapping: fm,
+          dryRun: false,
+        }),
+      });
+      clearInterval(progressInterval);
+      setImportProgress(100);
+      if (!res.ok) {
+        const errData = await res.json();
+        setError(errData.error || "Import failed");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      setResult({ imported: data.imported, skipped: data.skipped, errors: data.errors ?? [] });
+      setStep("result");
+    } catch { setError("Import failed"); }
+    finally { setLoading(false); }
+  };
+
   const generatePreview = async () => {
+    if (target === "funding-rounds") { await generateFundingPreview(); return; }
     // Validate that amount is fully mapped \u2014 single-column needs a header,
     // polymorphic needs both debit and credit headers.
     const amountReady =
@@ -185,6 +255,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
   };
 
   const executeImport = async () => {
+    if (target === "funding-rounds") { await executeFundingImport(); return; }
     setLoading(true);
     setError(null);
     setImportProgress(0);
@@ -259,6 +330,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
     setMapping({ date: "", amount: "", description: "", category: "" });
     setMappingConfidence({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
     setPreview([]);
+    setFundingPreview([]);
     setResult(null);
     setError(null);
     setImportProgress(0);
@@ -275,7 +347,9 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
       {!embedded && (
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50">Import Transactions</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50">
+              {target === "funding-rounds" ? "Import Funding Rounds" : "Import Transactions"}
+            </h1>
             <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
               Upload bank statements, connect accounts, or import spreadsheets
             </p>
@@ -306,6 +380,29 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
           setShowHistory={setShowHistory} rollbackBatch={rollbackBatch} />
       )}
       {/* TODO: Bank Sync — future release */}
+
+      {/* Target selector — only visible on upload step (changing mid-flow would reset state) */}
+      {step === "upload" && (
+        <div className="mb-4 flex items-center gap-3">
+          <label htmlFor="import-target" className="text-sm font-medium text-surface-700 dark:text-surface-300 shrink-0">
+            Import type
+          </label>
+          <select
+            id="import-target"
+            value={target}
+            onChange={(e) => {
+              setTarget(e.target.value as ImportTarget);
+              // Reset mapping so it re-auto-maps on next file pick
+              setMapping({ date: "", amount: "", description: "", category: "" });
+              setFundingPreview([]);
+            }}
+            className="rounded-md border border-surface-300 bg-white px-3 py-1.5 text-sm text-surface-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-50"
+          >
+            <option value="transactions">Transactions</option>
+            <option value="funding-rounds">Funding Rounds</option>
+          </select>
+        </div>
+      )}
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-6 sm:mb-8 overflow-x-auto">
@@ -356,7 +453,68 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
           setTargetAccountId={setTargetAccountId} accounts={accounts} loading={loading}
           reset={reset} generatePreview={generatePreview} />
       )}
-      {step === "preview" && (
+      {step === "preview" && target === "funding-rounds" && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-surface-900 dark:text-surface-50">
+                Funding Rounds Preview
+              </h2>
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                {fundingPreview.length} round{fundingPreview.length !== 1 ? "s" : ""} to import
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setStep("map")}>Back</Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={executeImport}
+                disabled={loading || fundingPreview.length === 0}
+              >
+                {loading ? "Importing…" : `Import ${fundingPreview.length} Round${fundingPreview.length !== 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-surface-200 dark:border-surface-700">
+            <table className="min-w-full text-sm">
+              <thead className="bg-surface-50 dark:bg-surface-800">
+                <tr>
+                  {["Name", "Type", "Amount", "Date", "Valuation Cap"].map((col) => (
+                    <th key={col} className="px-3 py-2 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wide">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100 dark:divide-surface-700 bg-white dark:bg-surface-900">
+                {fundingPreview.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-4 text-center text-surface-400 dark:text-surface-500">
+                      No rows to import
+                    </td>
+                  </tr>
+                ) : (
+                  fundingPreview.map((row, i) => (
+                    <tr key={i} className="hover:bg-surface-50 dark:hover:bg-surface-800">
+                      <td className="px-3 py-2 font-medium text-surface-900 dark:text-surface-50">{String(row.name ?? "")}</td>
+                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{String(row.type ?? "")}</td>
+                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{fmtCurrency(Number(row.amount ?? 0))}</td>
+                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{row.date ? new Date(String(row.date)).toLocaleDateString() : ""}</td>
+                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">
+                        {row.parameters && typeof row.parameters === "object" && "valuationCap" in (row.parameters as object)
+                          ? fmtCurrency(Number((row.parameters as Record<string, unknown>).valuationCap ?? 0))
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {step === "preview" && target === "transactions" && (
         <PreviewStep preview={preview} activePreview={activePreview} loading={loading}
           importProgress={importProgress} editingRow={editingRow} setEditingRow={setEditingRow}
           toggleRowExclusion={toggleRowExclusion} updatePreviewRow={updatePreviewRow}
