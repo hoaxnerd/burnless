@@ -1,13 +1,96 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, transactions, financialAccounts, importBatches, merchantCategoryMappings } from "@burnless/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { db, transactions, financialAccounts, importBatches, merchantCategoryMappings, fundingRounds } from "@burnless/db";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import { monetaryAmount } from "@/lib/financial-validation";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+import type { FundingRoundColumnMapping } from "@/app/(dashboard)/import/import-utils";
 import crypto from "crypto";
+
+// ── Funding import handler (Phase 2 D D9) ────────────────────────────────────
+
+async function handleFundingImport(
+  body: { rounds: Array<Record<string, string>>; mapping: FundingRoundColumnMapping; dryRun: boolean },
+  ctx: { companyId: string },
+) {
+  const errors: Array<{ rowNumber: number; field: string; message: string }> = [];
+  const toInsert: (typeof fundingRounds.$inferInsert)[] = [];
+  const skipped: number[] = [];
+
+  for (let i = 0; i < body.rounds.length; i++) {
+    const row = body.rounds[i]!;
+    const m = body.mapping;
+    try {
+      const name = row[m.name];
+      const roundType = row[m.roundType];
+      const amount = Number(String(row[m.amount] ?? "").replace(/[$,]/g, ""));
+      const date = row[m.date];
+      if (!name || !roundType || !amount || !date) {
+        errors.push({ rowNumber: i + 1, field: "required", message: "Missing required field" });
+        continue;
+      }
+      // Dedupe key: (companyId, name, closeDate)
+      const closeDate = m.closeDate ? (row[m.closeDate] ?? null) : null;
+      const exists = await db
+        .select({ id: fundingRounds.id })
+        .from(fundingRounds)
+        .where(
+          and(
+            eq(fundingRounds.companyId, ctx.companyId),
+            eq(fundingRounds.name, name),
+            closeDate ? eq(fundingRounds.closeDate, new Date(closeDate)) : sql`close_date IS NULL`,
+          ),
+        );
+      if (exists.length > 0) {
+        skipped.push(i + 1);
+        continue;
+      }
+      const parameters: Record<string, unknown> = {};
+      if (m.valuationCap && row[m.valuationCap]) parameters.valuationCap = Number(row[m.valuationCap]);
+      if (m.discountRate && row[m.discountRate]) parameters.discountRate = Number(row[m.discountRate]!) / 100;
+      if (m.interestRate && row[m.interestRate]) parameters.interestRate = Number(row[m.interestRate]!) / 100;
+      if (m.termMonths && row[m.termMonths]) parameters.termMonths = Number(row[m.termMonths]);
+      toInsert.push({
+        companyId: ctx.companyId,
+        name,
+        type: roundType as "pre_seed" | "seed" | "series_a" | "series_b" | "series_c_plus" | "debt" | "grant" | "safe" | "convertible",
+        amount: String(amount),
+        date: new Date(date),
+        closeDate: closeDate ? new Date(closeDate) : null,
+        notes: m.notes ? (row[m.notes] ?? null) : null,
+        parameters,
+      });
+    } catch (err: unknown) {
+      errors.push({ rowNumber: i + 1, field: "parse", message: String((err as Error).message ?? err) });
+    }
+  }
+
+  if (body.dryRun) {
+    return NextResponse.json({
+      target: "funding-rounds",
+      imported: toInsert.length,
+      skipped: skipped.length,
+      errors,
+      preview: toInsert,
+    });
+  }
+
+  if (toInsert.length > 0) {
+    await db.insert(fundingRounds).values(toInsert);
+    revalidateTag("funding-rounds");
+    revalidateTag("cap-table");
+  }
+  return NextResponse.json({
+    target: "funding-rounds",
+    imported: toInsert.length,
+    skipped: skipped.length,
+    errors,
+  });
+}
 
 // ── Schema ───────────────────────────────────────────────────────────────────
 
@@ -96,8 +179,36 @@ export const POST = withErrorHandler(async (request: Request) => {
   const roleErr = requireRole(ctx, "editor");
   if (roleErr) return roleErr;
 
-  const parsed = await parseBody(request, importSchema);
-  if ("error" in parsed) return parsed.error;
+  // Peek at target before full schema parse so funding rounds can use a different shape.
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return errorResponse("Invalid JSON body", 400);
+  }
+  const target = (rawBody as Record<string, unknown>)?.target ?? "transactions";
+
+  if (target === "funding-rounds") {
+    const fundingBody = rawBody as {
+      rounds: Array<Record<string, string>>;
+      mapping: FundingRoundColumnMapping;
+      dryRun: boolean;
+    };
+    return handleFundingImport(fundingBody, { companyId: ctx.companyId });
+  }
+
+  // Transaction branch — re-validate using the existing schema (parseBody reads
+  // request.json() internally, but since we already consumed the stream we pass
+  // the raw body through a synthetic wrapper).
+  const parsed = await z.object({
+    transactions: importSchema.shape.transactions,
+    dryRun: importSchema.shape.dryRun,
+    fileName: importSchema.shape.fileName,
+    columnMapping: importSchema.shape.columnMapping,
+  }).safeParseAsync(rawBody);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", 400);
+  }
 
   const { transactions: txInput, dryRun, fileName, columnMapping } = parsed.data;
 
