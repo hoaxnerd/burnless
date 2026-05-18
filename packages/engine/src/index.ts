@@ -160,6 +160,30 @@ export {
   type BudgetLineItem,
 } from "./budget";
 
+// Funding & cap table
+export {
+  computeCapTable,
+  computeFundingImpact,
+  computeDebt,
+  computeSafeConversion,
+  computeConvertibleNote,
+  computeGrant,
+  type CapTable,
+  type CapTableRow,
+  type CapTableInput,
+  type FundingImpact,
+  type FundingImpactInput,
+  type ShareClassInput,
+  type OptionPoolInput,
+  type EquityParams,
+  type SafeParams,
+  type ConvertibleParams,
+  type DebtParams,
+  type GrantParams,
+  type FundingRoundInput,
+  type FundingRoundType,
+} from "./funding";
+
 // Integration framework
 export {
   ProviderRegistry,
