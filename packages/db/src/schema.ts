@@ -124,6 +124,8 @@ export const fundingRoundTypeEnum = pgEnum("funding_round_type", [
   "series_c_plus",
   "debt",
   "grant",
+  "safe",
+  "convertible",
 ]);
 
 export const revenueStreamTypeEnum = pgEnum("revenue_stream_type", [
