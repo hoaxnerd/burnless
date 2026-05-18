@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { DollarSign, Calculator, TrendingUp, Clock, Pencil } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
-import { AddFundingForm, type EditRound } from "./add-funding-form";
+import { FundingRoundForm } from "./funding-round-form";
+import { Modal } from "@/components/ui";
 import { formatCurrency } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
@@ -185,7 +186,7 @@ export function FundingRoundsList({
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
   // Edit modal state
-  const [editingRound, setEditingRound] = useState<EditRound | null>(null);
+  const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
   const {
     isInScenarioMode,
     overrideMap,
@@ -349,11 +350,28 @@ export function FundingRoundsList({
 
       {/* Edit funding round modal */}
       {editingRound && (
-        <AddFundingForm
-          editRound={editingRound}
+        <Modal
           open={!!editingRound}
           onClose={() => setEditingRound(null)}
-        />
+          title={`Edit: ${editingRound.name}`}
+        >
+          <FundingRoundForm
+            mode="edit"
+            initial={{
+              id: editingRound.id,
+              name: editingRound.name,
+              roundType: editingRound.type as any,
+              amount: editingRound.amount,
+              date: editingRound.date.includes("T")
+                ? editingRound.date.split("T")[0]!
+                : editingRound.date,
+              closeDate: null,
+              notes: null,
+              isProjected: editingRound.isProjected,
+            }}
+            onClose={() => setEditingRound(null)}
+          />
+        </Modal>
       )}
     </>
   );
