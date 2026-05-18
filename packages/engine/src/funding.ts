@@ -222,8 +222,78 @@ export function computeCapTable(input: CapTableInput): CapTable {
   };
 }
 
-// --- Exports added in subsequent tasks ---
-// computeFundingImpact (Task 14)
+// --- Task 13: FundingImpact orchestrator ---
+
+export interface FundingImpactInput {
+  rounds: FundingRoundInput[];
+  months: string[];
+  /** Cumulative qualifying spend by month (for grant match checks). Empty for no grants. */
+  cumulativeQualifyingSpend: Record<string, number>;
+}
+
+export function computeFundingImpact(input: FundingImpactInput): FundingImpact {
+  const initSeries = (): MonthlySeries => {
+    const m = new Map<string, number>();
+    for (const k of input.months) m.set(k, 0);
+    return m;
+  };
+  const equityInflows = initSeries();
+  const debtInflows = initSeries();
+  const interestExpense = initSeries();
+  const principalPayments = initSeries();
+  const grantDisbursements = initSeries();
+  const warnings: GrantMatchWarning[] = [];
+
+  const addToSeries = (series: MonthlySeries, key: string, val: number) => {
+    if (!series.has(key)) return; // outside horizon — drop silently
+    series.set(key, (series.get(key) ?? 0) + val);
+  };
+
+  for (const round of input.rounds) {
+    const cashMonth = (round.closeDate ?? round.date).slice(0, 7);
+    switch (round.roundType) {
+      case "pre_seed":
+      case "seed":
+      case "series_a":
+      case "series_b":
+      case "series_c_plus":
+      case "safe":
+      case "convertible": {
+        addToSeries(equityInflows, cashMonth, round.amount);
+        break;
+      }
+      case "debt": {
+        const debt = computeDebt({
+          principal: round.amount,
+          debtParams: round.parameters as DebtParams,
+          issueDate: round.date,
+          months: input.months,
+        });
+        for (const m of input.months) {
+          addToSeries(debtInflows, m, debt.draws.get(m) ?? 0);
+          addToSeries(interestExpense, m, debt.interestExpense.get(m) ?? 0);
+          addToSeries(principalPayments, m, debt.principalPayments.get(m) ?? 0);
+        }
+        break;
+      }
+      case "grant": {
+        const grant = computeGrant({
+          roundId: round.id,
+          roundName: round.name,
+          params: round.parameters as GrantParams,
+          cumulativeQualifyingSpend: input.cumulativeQualifyingSpend,
+        });
+        for (const m of input.months) {
+          addToSeries(grantDisbursements, m, grant.disbursements.get(m) ?? 0);
+        }
+        warnings.push(...grant.warnings);
+        break;
+      }
+    }
+  }
+
+  return { equityInflows, debtInflows, interestExpense, principalPayments, grantDisbursements, warnings };
+}
 
 // --- Task 10: Debt schedule ---
 
