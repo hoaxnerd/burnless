@@ -18,6 +18,7 @@ import {
   generateProfitAndLoss,
   generateCashFlow,
   generateBalanceSheet,
+  computeFundingImpact,
   type ForecastLineInput,
   type RevenueStreamInput,
   type HeadcountPlanInput,
@@ -32,6 +33,7 @@ import {
   addSeries,
   subtractSeries,
   monthKey,
+  monthRange,
   D,
   dRound2,
 } from "@burnless/engine";
@@ -100,6 +102,38 @@ export const computeDashboardData = cache(async function computeDashboardData(
     getFundingRounds(companyId),
     getTransactions(companyId),
   ]);
+
+  // Phase 2 D §1.3: build structured funding inflows + impact for the new burn/runway
+  // semantics and cash-flow children. Must be computed before metricsInput is assembled.
+  const fundingInflows: MonthlySeries = new Map();
+  for (const round of funding) {
+    const roundDate = new Date(round.date);
+    if (round.isProjected || roundDate >= periodStart) {
+      const key = monthKey(roundDate);
+      fundingInflows.set(key, (fundingInflows.get(key) ?? 0) + Number(round.amount));
+    }
+  }
+
+  // Phase 2 D §1.3: compute structured funding impact for the new burn/runway semantics
+  // and cash-flow children. Cumulative qualifying spend for grant match warnings is left
+  // empty for v1 — a follow-up can derive it from transactions filtered by grant-specific
+  // categories.
+  const horizonMonths = monthRange(periodStart, periodEnd).map((d) => monthKey(d));
+  const fundingImpact = computeFundingImpact({
+    rounds: funding.map((r) => ({
+      id: r.id,
+      name: r.name,
+      roundType: r.type as any, // DB enum matches FundingRoundType verbatim
+      amount: Number(r.amount),
+      date: (typeof r.date === "string" ? new Date(r.date) : r.date).toISOString().slice(0, 10),
+      closeDate: r.closeDate
+        ? (typeof r.closeDate === "string" ? new Date(r.closeDate) : r.closeDate).toISOString().slice(0, 10)
+        : null,
+      parameters: (r.parameters ?? {}) as any,
+    })),
+    months: horizonMonths,
+    cumulativeQualifyingSpend: {},
+  });
 
   // Fetch forecast value overrides
   const lineIds = fLines.map((l) => l.id);
@@ -293,6 +327,8 @@ export const computeDashboardData = cache(async function computeDashboardData(
     cashPosition,
     netIncome,
     headcount: headcountCosts.headcount,
+    interestExpense: fundingImpact.interestExpense,
+    principalPayments: fundingImpact.principalPayments,
   };
   const metrics = computeAllMetrics(metricsInput);
 
@@ -355,19 +391,10 @@ export const computeDashboardData = cache(async function computeDashboardData(
     });
   }
 
-  const fundingInflows: MonthlySeries = new Map();
-  for (const round of funding) {
-    const roundDate = new Date(round.date);
-    if (round.isProjected || roundDate >= periodStart) {
-      const key = monthKey(roundDate);
-      fundingInflows.set(key, (fundingInflows.get(key) ?? 0) + Number(round.amount));
-    }
-  }
-
   const profitAndLoss = generateProfitAndLoss(accountDataList, {
     personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
   });
-  const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows);
+  const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows, undefined, fundingImpact);
 
   // Add derived balance sheet accounts so generateBalanceSheet has data.
   // Asset: Cash position (cumulative running balance, already computed above).
