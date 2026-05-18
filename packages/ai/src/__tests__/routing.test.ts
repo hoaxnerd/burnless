@@ -107,8 +107,8 @@ describe("Cost estimation", () => {
     expect(cost).toBe(10500);
   });
 
-  it("returns 0 for unknown models", () => {
-    expect(estimateCostMicros("unknown-model", 1000, 500)).toBe(0);
+  it("returns a conservative fallback for unknown models", () => {
+    expect(estimateCostMicros("unknown-model", 1000, 500)).toBeGreaterThan(0);
   });
 
   it("handles zero tokens", () => {
