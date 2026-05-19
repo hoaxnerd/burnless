@@ -25,7 +25,7 @@ import {
   type ExpensePayloadNormalized,
 } from "@/lib/expense-params";
 import { FrequencySelector, type Frequency } from "./components/FrequencySelector";
-import { LocalDateRangePicker } from "./components/LocalDateRangePicker";
+import { DateRangePicker } from "@/components/forms/primitives";
 import { FixedFields } from "./forecast-method-fields/FixedFields";
 import { GrowthRateFields } from "./forecast-method-fields/GrowthRateFields";
 import { PerUnitFields } from "./forecast-method-fields/PerUnitFields";
@@ -103,6 +103,15 @@ function defaultStartDate(): Date {
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
 }
 
+/**
+ * Format a Date as a YYYY-MM-DD ISO day-string using UTC components.
+ * Used to adapt the form's `Date | null` state to the canonical
+ * `<DateRangePicker>`'s ISO-string prop boundary (Phase 3 F §F4).
+ */
+function dateToIsoDay(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ExpenseForm({
@@ -123,6 +132,7 @@ export function ExpenseForm({
     }
     return defaultParamsForMethod(initialValue?.method ?? "fixed");
   });
+  // Held as Date (not ISO string) — normalizeExpensePayload + submit validation expect Date | null.
   const [startDate, setStartDate] = useState<Date | null>(
     () => toDate(initialValue?.startDate) ?? defaultStartDate(),
   );
@@ -264,12 +274,13 @@ export function ExpenseForm({
         )}
       </div>
 
-      <LocalDateRangePicker
-        startDate={startDate}
-        endDate={endDate}
-        onChange={({ startDate: s, endDate: ed }) => {
-          setStartDate(s);
-          setEndDate(ed);
+      {/* Phase 3 F §F4: canonical DateRangePicker (ISO-string boundary). */}
+      <DateRangePicker
+        startDate={startDate ? dateToIsoDay(startDate) : ""}
+        endDate={endDate ? dateToIsoDay(endDate) : null}
+        onChange={({ startDate: s, endDate: e }) => {
+          setStartDate(s ? new Date(`${s}T00:00:00.000Z`) : null);
+          setEndDate(e ? new Date(`${e}T00:00:00.000Z`) : null);
         }}
         required
       />
