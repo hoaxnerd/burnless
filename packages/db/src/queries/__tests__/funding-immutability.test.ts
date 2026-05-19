@@ -41,6 +41,7 @@ describe("scenarioUpdate funding-round roundType immutability", () => {
       .select()
       .from(fundingRounds)
       .where(eq(fundingRounds.id, round.id));
+    if (!after) throw new Error("funding round not found after update");
     expect(after.name).toBe("Renamed");
     expect(after.amount).toBe("2000000.00");
     expect(after.type).toBe("seed"); // unchanged — type stripped
