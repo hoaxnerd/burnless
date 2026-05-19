@@ -37,7 +37,6 @@ export type MetricTier = "core" | "advanced" | "deep";
 export type MetricFormat =
   | "currency"
   | "percent"
-  | "percentage"
   | "number"
   | "months"
   | "ratio"
@@ -91,6 +90,14 @@ export interface MetricDefinition {
    * When set, this metric is a component of `parentMetricId`.
    * Parent metrics have no `parentMetricId`. Drill-down UI queries
    * children via `getMetricChildren(parentSlug)`.
+   *
+   * **Convention note (Phase 3 F §F3):** within a parent/child family,
+   * children declare `dependsOn: [parent]`. Structurally that is inverted
+   * (a parent value is the sum of its children), but `dependsOn` here means
+   * "evaluation predecessor" — parents are computed first from raw data,
+   * then components are derived. The DAG consumer (`packages/engine/src/dag.ts`)
+   * treats `dependsOn` as ordering, not composition. Do not flip the direction
+   * without auditing every `dependsOn` consumer.
    */
   parentMetricId?: string;
   /**
@@ -208,6 +215,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "DollarSign",
     color: "emerald",
     href: "/revenue",
+    aiContext: { include: "both" },
   },
 
   // ── Revenue mix components (under totalRevenue) ──────────────────────────
@@ -752,6 +760,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "TrendingDown",
     color: "rose",
     href: "/expenses",
+    aiContext: { include: "both" },
   },
   {
     slug: "fixedExpenses",
@@ -1129,6 +1138,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     icon: "Heart",
     color: "rose",
     href: "/team",
+    aiContext: { include: "both" },
   },
   {
     slug: "statutoryEmployerContributionsCost",
@@ -1206,7 +1216,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     dependsOn: [],
     category: "cash",
     tier: "advanced",
-    format: "percentage",
+    format: "percent",
     direction: "neutral",
     icon: "PieChart",
     color: "violet",
@@ -1222,7 +1232,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     parentMetricId: "totalOwnership",
     category: "cash",
     tier: "advanced",
-    format: "percentage",
+    format: "percent",
     direction: "neutral",
     icon: "Users",
     color: "blue",
@@ -1238,7 +1248,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     parentMetricId: "totalOwnership",
     category: "cash",
     tier: "advanced",
-    format: "percentage",
+    format: "percent",
     direction: "neutral",
     icon: "Star",
     color: "amber",
@@ -1254,7 +1264,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     parentMetricId: "totalOwnership",
     category: "cash",
     tier: "deep",
-    format: "percentage",
+    format: "percent",
     direction: "neutral",
     icon: "Shield",
     color: "indigo",
@@ -1270,7 +1280,7 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     parentMetricId: "totalOwnership",
     category: "cash",
     tier: "advanced",
-    format: "percentage",
+    format: "percent",
     direction: "neutral",
     icon: "Settings",
     color: "slate",

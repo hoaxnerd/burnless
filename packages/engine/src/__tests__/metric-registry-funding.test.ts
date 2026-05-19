@@ -20,7 +20,7 @@ describe("Phase 2 D registry edits", () => {
   it("totalOwnership parent exists with 4 children summing to 100%", () => {
     const parent = METRIC_REGISTRY.find((x) => x.slug === "totalOwnership")!;
     expect(parent).toBeDefined();
-    expect(parent.format).toBe("percentage");
+    expect(parent.format).toBe("percent");
     const children = getMetricChildren("totalOwnership");
     const slugs = children.map((c) => c.slug).sort();
     expect(slugs).toEqual([
@@ -31,7 +31,7 @@ describe("Phase 2 D registry edits", () => {
     ]);
     for (const c of children) {
       expect(c.parentMetricId).toBe("totalOwnership");
-      expect(c.format).toBe("percentage");
+      expect(c.format).toBe("percent");
     }
   });
 
