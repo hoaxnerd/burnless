@@ -150,6 +150,11 @@ Playwright e2e (`apps/web/e2e/`):
 - **Inputs sanitized; system prompts trusted.** Sanitize user content only.
 - **Migrations: `db:push` for dev, `db:generate` + `db:migrate` for prod.** Push diverges from migration files — keep both in sync before shipping.
 - **No mocks for DB tests.** PGLite real Postgres semantics.
+
+### Data-entry umbrella contracts (Phase 0–3 cumulative)
+
+> Source spec: `docs/superpowers/specs/2026-04-24-data-entry-umbrella-design.md`. Each contract below is a code-true distillation of an umbrella §1.x rule. When you touch a surface governed by one of these, tag the change with the contract it depends on (e.g. `// Phase 2 D §1.4 D6`) so future readers can trace back.
+
 - **Currency formatter is centralized.** React: `useLocale().fmtCurrency` / `fmtCompact`. Server / non-React utility: `formatCurrency(value, currency, locale, opts?)` from `@burnless/types`. Never hardcode `$`/`€`/`£`/`¥`/`₹` or `new Intl.NumberFormat(..., { currency: "USD" })`. Regression-guarded by `apps/web/src/__tests__/no-hardcoded-currency.test.ts` (with allowlist for AI-provider USD pricing, JSDoc/comments, fixtures, marketing pages — see file for the explained list).
 - **Currency change requires confirm after financial data.** `companies.currency` is Zod-validated against `CURRENCY_CODES` whitelist (10 codes in `@burnless/types`). `PATCH /api/company` calls `hasFinancialData(companyId)`; if true and `?confirm=true` is missing, throws `ConfirmableError("CURRENCY_CHANGE_REQUIRES_CONFIRMATION", { from, to })` → 409. UI (`settings/page.tsx`) catches the 409 and shows a generic confirm dialog using the existing `Modal` primitive; on Confirm retries with `?confirm=true`, on Cancel reverts the dropdown to `loadedCurrency`. Server-side reads should guard with `isValidCurrency(company.currency) ? company.currency : "USD"` before passing to formatters (rows persisted before the whitelist landed could hold any text).
 - **`roundType` is immutable after creation (Phase 2 D).** `fundingRounds.roundType` is set once on insert; the edit form renders a read-only badge (`"<Type> (immutable)"`) instead of a `<select>`. API `PATCH /api/funding-rounds/[id]` silently strips `roundType` from the update payload — never overwrites it. Reason: downstream cash-flow, cap-table, and interest calculations depend on the type being stable.
