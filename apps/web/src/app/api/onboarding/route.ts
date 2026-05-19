@@ -14,7 +14,6 @@ import {
   scenarios,
   financialAccounts,
   departments,
-  revenueStreams,
   aiFeatureFlags,
 } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -24,7 +23,6 @@ import {
   onboardingSchema,
   parseStage,
   parseBusinessModel,
-  parseMoneyAmount,
 } from "@/lib/onboarding-helpers";
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -70,7 +68,6 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const stage = parseStage(body.stage);
   const businessModel = parseBusinessModel(body.business_model);
-  const monthlyRevenue = parseMoneyAmount(body.monthly_revenue ?? "0");
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -138,31 +135,6 @@ export const POST = withErrorHandler(async (request: Request) => {
         defaultDepts.map((name) => ({ companyId: company.id, name }))
       );
 
-      // Create initial revenue stream if user has revenue
-      if (monthlyRevenue > 0) {
-        const revenueType = businessModel === "saas" ? "subscription" : businessModel === "services" ? "services" : "one_time";
-
-        // Each revenue type has its own parameter shape expected by the engine
-        let revenueParams: Record<string, number>;
-        if (revenueType === "subscription") {
-          revenueParams = { monthlyPrice: monthlyRevenue, startingCustomers: 1, newCustomersPerMonth: 5, monthlyChurnRate: 0.05 };
-        } else if (revenueType === "services") {
-          // Convert monthly revenue into hours * rate (assume $150/hr default)
-          const hourlyRate = 150;
-          revenueParams = { hoursPerMonth: Math.round(monthlyRevenue / hourlyRate), hourlyRate };
-        } else {
-          // one_time: convert to units * price (1 unit at full amount)
-          revenueParams = { unitsPerMonth: 1, pricePerUnit: monthlyRevenue };
-        }
-
-        await tx.insert(revenueStreams).values({
-          companyId: company.id,
-          name: `${body.company_name} Revenue`,
-          type: revenueType,
-          parameters: revenueParams,
-        });
-      }
-
       // AI features start disabled — user must opt in via Settings > AI Features.
       // This ensures no AI calls are made without explicit consent.
       await tx.insert(aiFeatureFlags).values({
@@ -179,9 +151,12 @@ export const POST = withErrorHandler(async (request: Request) => {
         },
       });
 
-      // Note: We no longer auto-generate expense forecast lines during onboarding.
-      // Users should add their real expenses explicitly via the expenses page.
-      // This avoids showing placeholder/dummy data that confuses users.
+      // Note: We no longer auto-generate revenue streams or expense forecast lines
+      // during onboarding. Users add their real revenue/expenses explicitly via
+      // /revenue and /expenses. This avoids placeholder data confusion — e.g. a
+      // "Monthly Revenue $15k" answer used to balloon to $351k MRR within six
+      // months because the silent seed assumed "$15k = ARPU × 1 customer" plus
+      // a hardcoded "+5 customers/month, 5% churn" growth curve.
 
       return { companyId: company.id, scenarioId: scenario.id };
     });

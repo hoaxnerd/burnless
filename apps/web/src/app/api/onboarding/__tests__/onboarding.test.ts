@@ -56,6 +56,7 @@ vi.mock("@burnless/db", () => ({
   departments: {},
   forecastLines: {},
   revenueStreams: {},
+  aiFeatureFlags: {},
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -222,6 +223,40 @@ describe("POST /api/onboarding", () => {
 
     expect(res.status).toBe(201);
     expect(mockTransaction).toHaveBeenCalled();
+  });
+
+  /* ── Regression: no silent revenue stream auto-create ─────────── */
+
+  // Onboarding used to insert a subscription revenueStream with
+  // startingCustomers=1, +5 new/month, 5% churn — so a "Monthly Revenue $15k"
+  // answer ballooned to ~$351k MRR by month 6 on a brand-new dashboard.
+  // Now: monthly_revenue is captured but no data row is created on the user's
+  // behalf — they add a real stream via /revenue.
+  it("does not insert into revenueStreams even when monthly_revenue is set", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue(null);
+
+    const dbMod = await import("@burnless/db");
+    const tablesInserted: unknown[] = [];
+    const txInsert = vi.fn().mockImplementation((table: unknown) => {
+      tablesInserted.push(table);
+      return {
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: "new-id" }]),
+        }),
+      };
+    });
+    mockTransaction.mockImplementation(
+      async (fn: (tx: { insert: typeof txInsert }) => Promise<unknown>) =>
+        fn({ insert: txInsert })
+    );
+
+    const res = await POST(
+      makeRequest({ ...validBody, monthly_revenue: "$50k" })
+    );
+
+    expect(res.status).toBe(201);
+    expect(tablesInserted).not.toContain(dbMod.revenueStreams);
   });
 
   /* ── Error handling ───────────────────────────────────────────── */
