@@ -177,6 +177,27 @@ describe("middleware", () => {
       expect(res.status).not.toBe(403);
     });
 
+    // Regression: dev allowlist must not pin to a fixed port set. Devs run on
+    // whatever port turbo/next picks (or PORT=...), and CSRF on a localhost
+    // request from the same machine adds no protection.
+    it("allows mutations from any localhost port in dev mode", async () => {
+      const req = createRequest("/api/accounts", {
+        method: "POST",
+        headers: { origin: "http://localhost:5987" },
+      });
+      const res = middleware(req);
+      expect(res.status).not.toBe(403);
+    });
+
+    it("allows mutations from any 127.0.0.1 port in dev mode", async () => {
+      const req = createRequest("/api/accounts", {
+        method: "POST",
+        headers: { origin: "http://127.0.0.1:8421" },
+      });
+      const res = middleware(req);
+      expect(res.status).not.toBe(403);
+    });
+
     it("blocks mutations from unknown origin in dev mode", async () => {
       const req = createRequest("/api/accounts", {
         method: "POST",

@@ -15,14 +15,23 @@ function getAllowedOrigins(): Set<string> {
   if (process.env.ALLOWED_ORIGINS) {
     process.env.ALLOWED_ORIGINS.split(",").forEach((o) => origins.add(o.trim()));
   }
-  // Always allow localhost in development (any common dev port)
-  if (process.env.NODE_ENV !== "production") {
-    for (const port of [3000, 3001, 3002, 3003]) {
-      origins.add(`http://localhost:${port}`);
-      origins.add(`http://127.0.0.1:${port}`);
-    }
-  }
   return origins;
+}
+
+/**
+ * In dev mode any localhost / 127.0.0.1 origin is allowed regardless of port —
+ * devs run on whatever port turbo/next/PORT picks, and CSRF on a same-machine
+ * loopback request adds no real protection. Production must rely on the
+ * configured allowlist.
+ */
+function isDevLoopbackOrigin(source: string): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    const u = new URL(source);
+    return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1");
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -94,7 +103,10 @@ export function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (allowed.size > 0 && source && !allowed.has(source)) {
+    // A source is acceptable if it's in the configured allowlist OR (in dev) is
+    // a loopback origin. In dev with no configured allowlist, only loopback is
+    // accepted; that keeps "blocks https://evil.com in dev" intact.
+    if (source && !allowed.has(source) && !isDevLoopbackOrigin(source)) {
       return NextResponse.json(
         { error: "Forbidden: invalid origin" },
         { status: 403 }
