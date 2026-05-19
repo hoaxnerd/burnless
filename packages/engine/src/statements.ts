@@ -400,6 +400,14 @@ export function computeWorkingCapitalAdjustments(
  * Financing CF = liability changes + equity changes + funding
  *
  * Falls back to simplified model (CF ≈ net income) when no WorkingCapitalConfig provided.
+ *
+ * @param fundingInflows  **@deprecated** Phase 2 D introduced `fundingImpact`
+ *   (5th arg) which structurally subsumes this Map. When both are supplied,
+ *   `fundingImpact` wins and `fundingInflows` is silently ignored. New callers
+ *   MUST pass `fundingImpact` and OMIT `fundingInflows`. The legacy parameter
+ *   is retained only for backwards compatibility with `/api/statements` until
+ *   Phase 3 F migrates it (then a future plan can remove this parameter
+ *   outright). See Phase 3 F §F6.
  */
 export function generateCashFlow(
   accounts: AccountData[],
