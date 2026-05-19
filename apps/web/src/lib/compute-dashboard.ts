@@ -103,14 +103,19 @@ export const computeDashboardData = cache(async function computeDashboardData(
     getTransactions(companyId),
   ]);
 
-  // Phase 2 D §1.3: build structured funding inflows + impact for the new burn/runway
-  // semantics and cash-flow children. Must be computed before metricsInput is assembled.
-  const fundingInflows: MonthlySeries = new Map();
+  // Phase 2 D §1.3 + Phase 3 F §F6: raw funding-inflow series used only for
+  // the dashboard's cumFunding chart accumulator below. NOT passed to
+  // generateCashFlow — that path consumes fundingImpact (this Map's
+  // structured successor).
+  const dashboardFundingInflowSeries: MonthlySeries = new Map();
   for (const round of funding) {
     const roundDate = new Date(round.date);
     if (round.isProjected || roundDate >= periodStart) {
       const key = monthKey(roundDate);
-      fundingInflows.set(key, (fundingInflows.get(key) ?? 0) + Number(round.amount));
+      dashboardFundingInflowSeries.set(
+        key,
+        (dashboardFundingInflowSeries.get(key) ?? 0) + Number(round.amount),
+      );
     }
   }
 
@@ -394,7 +399,16 @@ export const computeDashboardData = cache(async function computeDashboardData(
   const profitAndLoss = generateProfitAndLoss(accountDataList, {
     personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
   });
-  const cashFlow = generateCashFlow(accountDataList, startingCash, fundingInflows, undefined, fundingImpact);
+  // Phase 3 F §F6: fundingInflows is dead-coded here — fundingImpact wins
+  // inside generateCashFlow. Keep the local Map only for the cumFunding
+  // accumulator below (raw inflow series for the dashboard chart).
+  const cashFlow = generateCashFlow(
+    accountDataList,
+    startingCash,
+    /* fundingInflows */ undefined,
+    /* workingCapital */ undefined,
+    fundingImpact,
+  );
 
   // Add derived balance sheet accounts so generateBalanceSheet has data.
   // Asset: Cash position (cumulative running balance, already computed above).
@@ -414,7 +428,7 @@ export const computeDashboardData = cache(async function computeDashboardData(
     const paidInCapital: MonthlySeries = new Map();
     let cumFunding = startingCash;
     for (const m of months) {
-      cumFunding += fundingInflows.get(m) ?? 0;
+      cumFunding += dashboardFundingInflowSeries.get(m) ?? 0;
       paidInCapital.set(m, dRound2(D(cumFunding)));
     }
     accountDataList.push({ id: "bs-paid-in-capital", name: "Paid-in Capital", category: "equity", values: paidInCapital });
