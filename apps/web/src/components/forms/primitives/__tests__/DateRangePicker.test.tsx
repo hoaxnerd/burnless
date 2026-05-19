@@ -49,3 +49,32 @@ describe("DateRangePicker", () => {
     });
   });
 });
+
+describe("DateRangePicker hint prop", () => {
+  it("renders hint text below the inputs when provided", () => {
+    render(
+      <DateRangePicker
+        startDate="2026-01-01"
+        endDate={null}
+        onChange={() => {}}
+        hint="Leave end date blank for ongoing items"
+      />,
+    );
+    expect(
+      screen.getByText("Leave end date blank for ongoing items"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render any hint paragraph when hint is omitted", () => {
+    render(
+      <DateRangePicker
+        startDate="2026-01-01"
+        endDate={null}
+        onChange={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByText(/leave end date/i),
+    ).not.toBeInTheDocument();
+  });
+});
