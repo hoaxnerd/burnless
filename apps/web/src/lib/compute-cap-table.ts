@@ -12,6 +12,44 @@ import { eq } from "drizzle-orm";
 import { computeCapTable, type CapTable } from "@burnless/engine";
 import { getCompany } from "./data";
 
+/**
+ * Build the option-pool projection consumed by the engine's computeCapTable.
+ * Exported for testability — extracted from computeCapTableInner so the
+ * single-pool guard (Phase 3 F §F5) can be exercised without mocking DB calls.
+ *
+ * Throws when more than one pool is supplied: per-pool grant attribution
+ * requires an optionPoolId column on equityGrants (deferred — schema change
+ * out of Phase 3 F scope).
+ */
+export function buildOptionPoolsWithGranted(
+  pools: { id: string; name: string; totalReserved: string | number }[],
+  grants: { shares: string | number }[],
+): { id: string; name: string; totalReserved: number; totalGranted: number }[] {
+  // Phase 3 F §F5: equityGrants has no optionPoolId column today, so per-pool
+  // attribution is impossible without a schema migration. Cap-table currently
+  // supports a single pool only — guard against the multi-pool case so the
+  // limitation is loud, not silent. When a second pool is added, an
+  // optionPoolId column on equityGrants must land in the same change.
+  if (pools.length > 1) {
+    throw new Error(
+      "compute-cap-table: multiple option pools detected. " +
+        "Per-pool grant attribution requires an optionPoolId column on " +
+        "equityGrants (deferred — see Phase 3 F §F5). Cap-table currently " +
+        "supports a single pool only.",
+    );
+  }
+  const totalGrantedCompanyWide = grants.reduce(
+    (sum, g) => sum + Number(g.shares),
+    0,
+  );
+  return pools.map((p) => ({
+    id: p.id,
+    name: p.name,
+    totalReserved: Number(p.totalReserved),
+    totalGranted: totalGrantedCompanyWide,
+  }));
+}
+
 async function computeCapTableInner(
   companyId: string,
   scenarioId: string | null,
@@ -42,12 +80,7 @@ async function computeCapTableInner(
     .from(equityGrants)
     .where(eq(equityGrants.companyId, companyId));
 
-  const optionPoolsWithGranted = pools.map((p) => ({
-    id: p.id,
-    name: p.name,
-    totalReserved: Number(p.totalReserved),
-    totalGranted: grants.reduce((sum, g) => sum + Number(g.shares), 0),
-  }));
+  const optionPoolsWithGranted = buildOptionPoolsWithGranted(pools, grants);
 
   const pendingSafes = resolvedRounds
     .filter((r: any) => r.type === "safe")
