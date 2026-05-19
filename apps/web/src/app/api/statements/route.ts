@@ -13,13 +13,14 @@ import {
   generateProfitAndLoss,
   generateCashFlow,
   generateBalanceSheet,
+  computeFundingImpact,
   type ForecastLineInput,
   type RevenueStreamInput,
   type HeadcountPlanInput,
   type AccountData,
-  type MonthlySeries,
   addSeries,
   monthKey,
+  monthRange,
 } from "@burnless/engine";
 
 /**
@@ -157,21 +158,41 @@ export const GET = withErrorHandler(async (request: Request) => {
     });
   }
 
-  // Compute funding inflows (resolved through scenario overlay)
+  // Phase 3 F §F6: route through computeFundingImpact (subsumes the legacy
+  // fundingInflows Map). Mirrors the construction in compute-dashboard.ts.
   const funding = data.fundingRounds;
-  const fundingInflows: MonthlySeries = new Map();
-  for (const round of funding) {
-    if (round.isProjected || round.date >= periodStart) {
-      const key = monthKey(round.date);
-      fundingInflows.set(key, (fundingInflows.get(key) ?? 0) + Number(round.amount));
-    }
-  }
+  const horizonMonths = monthRange(periodStart, periodEnd).map((d) => monthKey(d));
+  const fundingImpact = computeFundingImpact({
+    rounds: funding.map((r) => ({
+      id: r.id,
+      name: r.name,
+      roundType: r.type as any, // DB enum matches FundingRoundType verbatim
+      amount: Number(r.amount),
+      date: (typeof r.date === "string" ? new Date(r.date) : r.date)
+        .toISOString()
+        .slice(0, 10),
+      closeDate: r.closeDate
+        ? (typeof r.closeDate === "string" ? new Date(r.closeDate) : r.closeDate)
+            .toISOString()
+            .slice(0, 10)
+        : null,
+      parameters: (r.parameters ?? {}) as any,
+    })),
+    months: horizonMonths,
+    cumulativeQualifyingSpend: {},
+  });
 
   // Generate statements
   const pnl = generateProfitAndLoss(accountDataList, {
     personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
   });
-  const cashFlow = generateCashFlow(accountDataList, 0, fundingInflows);
+  const cashFlow = generateCashFlow(
+    accountDataList,
+    0,
+    /* fundingInflows */ undefined,
+    /* workingCapital */ undefined,
+    fundingImpact,
+  );
   const balanceSheet = generateBalanceSheet(accountDataList);
 
   return NextResponse.json({

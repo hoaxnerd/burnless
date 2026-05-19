@@ -27,6 +27,8 @@ const {
   mockGenerateBalanceSheet,
   mockMonthKey,
   mockAddSeries,
+  mockComputeFundingImpact,
+  mockMonthRange,
 } = vi.hoisted(() => ({
   mockComputeAllForecastLines: vi.fn(),
   mockAggregateByAccount: vi.fn(),
@@ -37,6 +39,8 @@ const {
   mockGenerateBalanceSheet: vi.fn(),
   mockMonthKey: vi.fn(),
   mockAddSeries: vi.fn(),
+  mockComputeFundingImpact: vi.fn(),
+  mockMonthRange: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -68,6 +72,8 @@ vi.mock("@burnless/engine", () => ({
   generateBalanceSheet: mockGenerateBalanceSheet,
   monthKey: mockMonthKey,
   addSeries: mockAddSeries,
+  computeFundingImpact: mockComputeFundingImpact,
+  monthRange: mockMonthRange,
 }));
 
 import { GET } from "../route";
@@ -87,6 +93,15 @@ function setupEmptyEngine() {
   mockGenerateCashFlow.mockReturnValue({ operatingCashFlow: { name: "Operating", values: [], children: [] } });
   mockGenerateBalanceSheet.mockReturnValue({ assets: { name: "Assets", values: [], children: [] } });
   mockAddSeries.mockReturnValue(new Map());
+  mockMonthRange.mockReturnValue([]);
+  mockComputeFundingImpact.mockReturnValue({
+    equityInflows: new Map(),
+    debtInflows: new Map(),
+    interestExpense: new Map(),
+    principalPayments: new Map(),
+    grantDisbursements: new Map(),
+    warnings: [],
+  });
 }
 
 function emptyResolvedData() {
