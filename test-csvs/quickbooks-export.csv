@@ -1,0 +1,21 @@
+Transaction Date,Transaction Type,Num,Memo,Account,Amount,Category
+01/15/2025,Expense,,Gusto Payroll January,Checking,-52000.00,Payroll Expenses
+01/15/2025,Expense,,Google Ads Q1 Campaign,Checking,-7500.00,Advertising & Marketing
+01/15/2025,Expense,,WeWork SFO January Rent,Checking,-4200.00,Rent & Lease
+01/17/2025,Deposit,,Stripe Payout,Checking,11800.00,Sales Revenue
+01/20/2025,Expense,,AWS Invoice #9128374,Checking,-3200.00,Cloud Services
+01/22/2025,Expense,,Slack Business+ Annual,Checking,-2380.00,Software Subscriptions
+01/22/2025,Expense,,GitHub Team Plan,Checking,-2400.00,Software Subscriptions
+01/25/2025,Deposit,,TechCorp Consulting Invoice #1042,Checking,6000.00,Professional Services
+01/28/2025,Expense,,Embroker E&O Policy,Checking,-850.00,Insurance
+01/31/2025,Expense,,LinkedIn Campaign Jan,Checking,-7600.00,Advertising & Marketing
+02/03/2025,Expense,,Vercel Pro Plan,Checking,-3250.00,Cloud Services
+02/05/2025,Expense,,PlanetScale DB,Checking,-3100.00,Cloud Services
+02/10/2025,Expense,,Stripe Processing Fees,Checking,-180.00,Bank Charges & Fees
+02/14/2025,Expense,,Flight SFO-NYC Offsite,Checking,-1800.00,Travel
+02/15/2025,Expense,,Gusto Payroll February,Checking,-53500.00,Payroll Expenses
+02/15/2025,Expense,,Cooley LLP Retainer Feb,Checking,-3500.00,Legal & Professional
+02/17/2025,Deposit,,Stripe Payout,Checking,12400.00,Sales Revenue
+02/20/2025,Expense,,AWS Invoice #9231056,Checking,-3350.00,Cloud Services
+02/24/2025,Expense,,Linear Pro,Checking,-2410.00,Software Subscriptions
+02/28/2025,Expense,,Figma Org Plan,Checking,-2390.00,Software Subscriptions

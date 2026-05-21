@@ -1,0 +1,21 @@
+Date,Description,Amount,Category,Status,Bank Description
+2025-01-15,Gusto Payroll - January,-52000.00,Payroll,Completed,GUSTO PAY 012025
+2025-01-15,Google Ads Campaign,-7500.00,Marketing,Completed,GOOGLE ADS 7837291
+2025-01-15,WeWork Office Rent,-4200.00,Rent,Completed,WEWORK SFO Q1
+2025-01-17,Stripe Payout - SaaS subscriptions,11800.00,Revenue,Completed,STRIPE TRANSFER
+2025-01-20,AWS Monthly Invoice,-3200.00,Infrastructure,Completed,AMAZON WEB SERVICES
+2025-01-22,Slack Business+,-2380.00,Software,Completed,SLACK TECH INC
+2025-01-22,GitHub Team,-2400.00,Software,Completed,GITHUB INC
+2025-01-25,TechCorp Consulting,-6000.00,Revenue,Completed,TECHCORP LLC WIRE
+2025-01-28,Embroker Insurance,-850.00,Insurance,Completed,EMBROKER INC
+2025-01-31,LinkedIn Ads,-7600.00,Marketing,Completed,LINKEDIN CORP
+2025-02-03,Vercel Pro Plan,-3250.00,Infrastructure,Completed,VERCEL INC
+2025-02-05,PlanetScale Database,-3100.00,Infrastructure,Completed,PLANETSCALE INC
+2025-02-10,Stripe Processing Fees,-180.00,Payment Processing,Completed,STRIPE FEES
+2025-02-14,Team offsite flight SFO-NYC,-1800.00,Travel,Completed,UNITED AIRLINES
+2025-02-15,Gusto Payroll - February,-53500.00,Payroll,Completed,GUSTO PAY 022025
+2025-02-15,Cooley LLP Retainer,-3500.00,Legal,Completed,COOLEY LLP
+2025-02-17,Stripe Payout - SaaS subscriptions,12400.00,Revenue,Completed,STRIPE TRANSFER
+2025-02-20,AWS Monthly Invoice,-3350.00,Infrastructure,Completed,AMAZON WEB SERVICES
+2025-02-24,Datadog Pro,-2420.00,Software,Completed,DATADOG INC
+2025-02-28,SOC 2 Compliance Audit,-3600.00,Legal,Completed,VANTA INC

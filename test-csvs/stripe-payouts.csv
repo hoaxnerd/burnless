@@ -1,0 +1,11 @@
+arrival_date,amount,currency,description,status,type
+2025-01-05,2450.00,usd,Payout for Jan 1-5,paid,payout
+2025-01-12,3180.00,usd,Payout for Jan 6-12,paid,payout
+2025-01-19,2890.00,usd,Payout for Jan 13-19,paid,payout
+2025-01-26,3280.00,usd,Payout for Jan 20-26,paid,payout
+2025-02-02,2640.00,usd,Payout for Jan 27 - Feb 2,paid,payout
+2025-02-09,3150.00,usd,Payout for Feb 3-9,paid,payout
+2025-02-16,3420.00,usd,Payout for Feb 10-16,paid,payout
+2025-02-23,2980.00,usd,Payout for Feb 17-23,paid,payout
+2025-03-02,3560.00,usd,Payout for Feb 24 - Mar 2,paid,payout
+2025-03-09,3740.00,usd,Payout for Mar 3-9,paid,payout
