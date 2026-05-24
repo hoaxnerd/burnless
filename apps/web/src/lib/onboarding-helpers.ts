@@ -13,6 +13,39 @@ export const onboardingSchema = z.object({
   team_size: z.string().optional().default("1"),
   funding: z.string().optional().default("0"),
   main_expenses: z.string().optional().default("General operations"),
+  user_name: z.string().optional(),
+  founders: z.array(z.string()).optional().default([]),
+  funding_rounds: z.array(z.object({
+    name: z.string(),
+    type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
+    amount: z.number(),
+    date: z.string(),
+    preMoneyValuation: z.number().nullable().optional(),
+    dilutionPercent: z.number().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  })).optional().default([]),
+  headcount: z.array(z.object({
+    title: z.string(),
+    department: z.enum(["Engineering", "Sales", "Marketing", "Operations", "General & Admin"]),
+    employeeType: z.enum(["full_time", "part_time", "contractor"]),
+    salary: z.number(),
+    startDate: z.string(),
+  })).optional().default([]),
+  expenses: z.array(z.object({
+    name: z.string(),
+    category: z.enum(["Cloud Infrastructure", "Marketing", "Office & Admin", "Software & Tools"]),
+    amount: z.number(),
+    startDate: z.string(),
+    isRecurring: z.boolean(),
+  })).optional().default([]),
+  revenue_streams: z.array(z.object({
+    name: z.string(),
+    type: z.enum(["subscription", "one_time", "usage_based", "services", "marketplace", "ecommerce", "hardware"]),
+    amount: z.number(),
+    quantity: z.number(),
+    startDate: z.string(),
+    notes: z.string().nullable().optional(),
+  })).optional().default([]),
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

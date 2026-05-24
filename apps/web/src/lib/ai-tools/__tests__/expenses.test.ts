@@ -32,6 +32,10 @@ vi.mock("../../compute-dashboard", () => ({
   computeDashboardData: vi.fn(),
 }));
 
+vi.mock("../../data", () => ({
+  getDefaultScenario: vi.fn(),
+}));
+
 vi.mock("@burnless/engine", () => ({
   seriesToArray: vi.fn(),
 }));

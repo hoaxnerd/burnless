@@ -176,6 +176,7 @@ async function seed() {
       timezone: "America/New_York",
       region: "us-east",
       ownerId: IDS.user,
+      billingPlan: "pro",
     })
     .onConflictDoNothing();
 

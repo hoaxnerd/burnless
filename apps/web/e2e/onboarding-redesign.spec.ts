@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+test.use({ storageState: "e2e/.auth/user.json" });
+
 /**
  * Onboarding UX Simplification E2E Tests — BUR-193 / BUR-182
  *
@@ -65,6 +67,10 @@ test.describe("Onboarding redesigned review step", () => {
       .filter({ hasText: /skip all/i })
       .first()
       .click();
+
+    // Should go to the Done step and show success
+    await expect(page.getByText(/you're all set/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: /go to dashboard/i }).click();
 
     // Should navigate to dashboard
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
@@ -223,7 +229,7 @@ test.describe("Onboarding redesigned review step", () => {
 
     // Should show error
     await expect(
-      page.getByText("Company name is required")
+      page.getByText("Company name is required").first()
     ).toBeVisible();
   });
 

@@ -1022,6 +1022,48 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "search",
+    description: "Search Google/the web for information about a company (e.g. founders, funding, pricing, exact revenue range). Returns search snippets and page URLs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query (e.g. 'resend company founders' or 'resend pricing')",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "crawl",
+    description: "Fetch the markdown content of a webpage by URL (e.g. homepage, pricing, or about page). Preferred method to read pages.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL of the webpage to crawl.",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "browser_use",
+    description: "Use Cloudflare Browser Rendering to load a page and extract text. Use this ONLY as a last resort fallback when crawl is blocked by Cloudflare/anti-bot protection.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL of the webpage to open in the browser.",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
 
 /**

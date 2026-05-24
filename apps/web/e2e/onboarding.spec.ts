@@ -91,7 +91,7 @@ test.describe("Onboarding flow", () => {
     await page.getByRole("button", { name: "Create My Company" }).click();
 
     // Should show error
-    await expect(page.getByText("Company name is required")).toBeVisible();
+    await expect(page.getByText("Company name is required").first()).toBeVisible();
   });
 
   test("website URL enables submit button", async ({ page }) => {

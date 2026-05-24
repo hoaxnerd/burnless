@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, SkipForward } from "lucide-react";
 import { DEFAULTS } from "./constants";
 
-const ENRICHMENT_TIMEOUT_SECS = 30;
+const ENRICHMENT_TIMEOUT_SECS = 120;
 
 interface EnrichingStepProps {
   greeting: string;

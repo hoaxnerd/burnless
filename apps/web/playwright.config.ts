@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import fs from "fs";
+import path from "path";
 
 /**
  * Playwright E2E test configuration for burnless web app.
@@ -6,6 +8,44 @@ import { defineConfig, devices } from "@playwright/test";
  * Runs against the local dev server by default.
  * Set BASE_URL env var to test against a deployed instance.
  */
+
+// ── .env loader ─────────────────────────────────────────────────────────────
+//
+// Playwright doesn't auto-load `.env` files, and we deliberately avoid adding a
+// `dotenv` dependency just for this — its surface is tiny (KEY=value lines with
+// optional surrounding quotes) and the failure mode (missing var) is loud.
+// Anything not in `apps/web/.env` must be set in the shell or passed via CI.
+function loadDotenv(envPath: string) {
+  if (!fs.existsSync(envPath)) return;
+  const content = fs.readFileSync(envPath, "utf-8");
+  for (const rawLine of content.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const sep = line.indexOf("=");
+    if (sep <= 0) continue;
+    const key = line.slice(0, sep).trim();
+    let val = line.slice(sep + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
+loadDotenv(path.resolve(__dirname, ".env"));
+
+// AUTH_SECRET must come from the developer's `.env` or CI secrets. If it is
+// genuinely missing we fail-fast here rather than baking a literal secret into
+// the repo — leaked test secrets get reused, and pattern scanners flag them.
+const AUTH_SECRET = process.env.AUTH_SECRET;
+if (!AUTH_SECRET && !process.env.BASE_URL) {
+  throw new Error(
+    "AUTH_SECRET is not set. Add it to apps/web/.env or export it before running playwright.",
+  );
+}
+
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "./e2e/test-results",
@@ -56,5 +96,13 @@ export default defineConfig({
         url: "http://localhost:3000",
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
+        env: {
+          DATABASE_URL: process.env.DATABASE_URL || "",
+          NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          AUTH_SECRET: AUTH_SECRET ?? "",
+          // Rate-limit bypass is hard-gated to non-production in middleware.ts
+          // and api-rate-limit.ts — safe to set unconditionally here.
+          DISABLE_RATE_LIMIT: "true",
+        },
       },
 });

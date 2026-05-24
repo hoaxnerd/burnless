@@ -49,6 +49,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 function reviveDates<T>(value: T): T {
   if (value === null || value === undefined) return value;
+  if (value instanceof Date) return value;
   if (typeof value === "string" && ISO_DATE_RE.test(value)) {
     return new Date(value) as unknown as T;
   }

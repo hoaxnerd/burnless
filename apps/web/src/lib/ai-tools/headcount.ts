@@ -28,6 +28,7 @@ import {
   dateString,
   optionalDate,
   benefitsRate,
+  requireCompanyId,
 } from "./types";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -154,17 +155,18 @@ async function addHeadcount(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addHeadcountSchema>;
+  const ctx = requireCompanyId(context);
 
   const [company] = await db
     .select({ currency: companies.currency, locale: companies.locale })
     .from(companies)
-    .where(eq(companies.id, context.companyId))
+    .where(eq(companies.id, ctx.companyId))
     .limit(1);
   const currency = company?.currency && isValidCurrency(company.currency) ? company.currency : "USD";
   const locale = company?.locale ?? undefined;
 
   const insertValues: Record<string, unknown> = {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     departmentId: data.departmentId,
     title: data.title,
     salary: num(data.salary)!,
@@ -184,7 +186,7 @@ async function addHeadcount(
     "headcount_plan",
     headcountPlans,
     insertValues,
-    context.scenarioId
+    ctx.scenarioId ?? null
   );
 
   const fteCount = data.count ?? 1;
@@ -202,11 +204,12 @@ async function createDepartment(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof createDepartmentSchema>;
+  const ctx = requireCompanyId(context);
 
   const row = await scenarioInsert("department", departments, {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     name: data.name,
-  }, context.scenarioId);
+  }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -220,6 +223,7 @@ async function updateHeadcount(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof updateHeadcountSchema>;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
@@ -230,7 +234,7 @@ async function updateHeadcount(
       parameters: headcountPlans.parameters,
     })
     .from(headcountPlans)
-    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, context.companyId)));
+    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
@@ -269,7 +273,7 @@ async function updateHeadcount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, context.scenarioId);
+  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -282,17 +286,18 @@ async function deleteHeadcount(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof deleteHeadcountSchema>;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
     .select({ id: headcountPlans.id, title: headcountPlans.title, companyId: headcountPlans.companyId })
     .from(headcountPlans)
-    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, context.companyId)));
+    .where(and(eq(headcountPlans.id, data.id), eq(headcountPlans.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
 
-  await scenarioDelete("headcount_plan", headcountPlans, data.id, context.scenarioId);
+  await scenarioDelete("headcount_plan", headcountPlans, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -305,11 +310,12 @@ async function updateDepartment(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof updateDepartmentSchema>;
+  const ctx = requireCompanyId(context);
 
   const [existing] = await db
     .select({ id: departments.id })
     .from(departments)
-    .where(and(eq(departments.id, data.id), eq(departments.companyId, context.companyId)));
+    .where(and(eq(departments.id, data.id), eq(departments.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Department not found or access denied" });
   }
@@ -318,7 +324,7 @@ async function updateDepartment(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("department", departments, data.id, { name: data.name }, context.scenarioId);
+  await scenarioUpdate("department", departments, data.id, { name: data.name }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -331,16 +337,17 @@ async function deleteDepartment(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof deleteDepartmentSchema>;
+  const ctx = requireCompanyId(context);
 
   const [existing] = await db
     .select({ id: departments.id, name: departments.name })
     .from(departments)
-    .where(and(eq(departments.id, data.id), eq(departments.companyId, context.companyId)));
+    .where(and(eq(departments.id, data.id), eq(departments.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Department not found or access denied" });
   }
 
-  await scenarioDelete("department", departments, data.id, context.scenarioId);
+  await scenarioDelete("department", departments, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -364,21 +371,22 @@ async function addSalaryChange(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addSalaryChangeSchema>;
+  const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
 
   const row = await createSalaryChange(
     {
-      companyId: context.companyId,
+      companyId: ctx.companyId,
       headcountId: data.headcountId,
       effectiveDate: new Date(data.effectiveDate),
       newSalary: num(data.newSalary)!,
       reason: data.reason ?? null,
     },
-    context.scenarioId
+    ctx.scenarioId ?? null
   );
 
   return JSON.stringify({
@@ -393,8 +401,9 @@ async function addBonus(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addBonusSchema>;
+  const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
@@ -404,14 +413,14 @@ async function addBonus(
 
   const row = await createBonus(
     {
-      companyId: context.companyId,
+      companyId: ctx.companyId,
       headcountId: data.headcountId,
       payoutMonth: new Date(monthStr),
       amount: num(data.amount)!,
       type: data.type,
       notes: data.notes ?? null,
     },
-    context.scenarioId
+    ctx.scenarioId ?? null
   );
 
   return JSON.stringify({
@@ -426,15 +435,16 @@ async function addEquityGrant(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof addEquityGrantSchema>;
+  const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, context.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
 
   const row = await createEquityGrant(
     {
-      companyId: context.companyId,
+      companyId: ctx.companyId,
       headcountId: data.headcountId,
       grantDate: new Date(data.grantDate),
       shares: data.shares.toFixed(4),
@@ -445,7 +455,7 @@ async function addEquityGrant(
       grantType: data.grantType,
       parameters: { vestingSchedule: data.vestingSchedule },
     },
-    context.scenarioId
+    ctx.scenarioId ?? null
   );
 
   return JSON.stringify({

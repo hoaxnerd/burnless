@@ -13,6 +13,18 @@ import { NextResponse } from "next/server";
 import { checkRateLimitAsync, RATE_LIMITS } from "./rate-limit";
 
 /**
+ * Whether the dev/test escape hatch is enabled. `DISABLE_RATE_LIMIT=true` is
+ * ignored in production so a stray prod env var can never silently disable
+ * abuse protection. Mirrored in `middleware.ts` for the edge layer.
+ */
+export function isRateLimitDisabled(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DISABLE_RATE_LIMIT === "true"
+  );
+}
+
+/**
  * Extract client IP from request headers.
  */
 function getClientIp(request: Request): string {
@@ -37,6 +49,8 @@ export async function applyRateLimit(
   tier: string,
   keyOverride?: string
 ): Promise<NextResponse | null> {
+  if (isRateLimitDisabled()) return null;
+
   const config = RATE_LIMITS[tier];
   if (!config) return null;
 

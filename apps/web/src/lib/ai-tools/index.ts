@@ -31,6 +31,7 @@ import {
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
+import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...forecastingSchemas,
   ...analyticsSchemas,
   ...webSearchSchemas,
+  ...webScrapingSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -70,6 +72,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...forecastingHandlers,
   ...analyticsHandlers,
   ...webSearchHandlers,
+  ...webScrapingHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
@@ -174,6 +177,9 @@ function logToolAudit(
   result: unknown,
   durationMs: number
 ) {
+  if (!context.companyId) {
+    return;
+  }
   db.insert(aiToolAuditLogs)
     .values({
       companyId: context.companyId,

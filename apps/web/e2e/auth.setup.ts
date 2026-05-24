@@ -68,6 +68,13 @@ setup("authenticate test user", async ({ page }) => {
       WHERE email = ${DEMO_USER.email}
         AND email_verified IS NULL
     `;
+
+    // Ensure demo company has pro plan to allow scenario creation in E2E tests
+    await sql`
+      UPDATE companies
+      SET billing_plan = 'pro'
+      WHERE id = '00000000-0000-4000-a000-000000000010'
+    `;
   } finally {
     await sql.end();
   }

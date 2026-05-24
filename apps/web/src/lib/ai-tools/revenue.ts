@@ -14,6 +14,7 @@ import {
 import type { ToolContext, ToolHandler } from "./types";
 import {
   idString,
+  requireCompanyId,
 } from "./types";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -38,14 +39,16 @@ async function addRevenueStream(
   }
   const data = parsed.data;
 
+  const ctx = requireCompanyId(context);
+
   const row = await scenarioInsert("revenue_stream", revenueStreams, {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     name: data.name,
     type: data.type,
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
     parameters: data.parameters,
-  }, context.scenarioId);
+  }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -64,11 +67,13 @@ async function updateRevenueStream(
   }
   const data = parsed.data;
 
+  const ctx = requireCompanyId(context);
+
   // Verify ownership
   const [existing] = await db
     .select({ id: revenueStreams.id, name: revenueStreams.name, companyId: revenueStreams.companyId })
     .from(revenueStreams)
-    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, context.companyId)));
+    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
@@ -87,7 +92,7 @@ async function updateRevenueStream(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, context.scenarioId);
+  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -101,22 +106,25 @@ async function deleteRevenueStream(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteRevenueStreamSchema>;
 
+  const ctx = requireCompanyId(context);
+
   // Verify ownership
   const [existing] = await db
     .select({ id: revenueStreams.id, name: revenueStreams.name, companyId: revenueStreams.companyId })
     .from(revenueStreams)
-    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, context.companyId)));
+    .where(and(eq(revenueStreams.id, data.id), eq(revenueStreams.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
 
-  await scenarioDelete("revenue_stream", revenueStreams, data.id, context.scenarioId);
+  await scenarioDelete("revenue_stream", revenueStreams, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
     message: `Deleted revenue stream "${existing.name}".`,
   });
 }
+
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 

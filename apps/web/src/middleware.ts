@@ -62,6 +62,14 @@ export function middleware(request: NextRequest) {
     return res;
   }
 
+  // Dev/test escape hatch — never honored in production (see api-rate-limit.ts).
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DISABLE_RATE_LIMIT === "true"
+  ) {
+    return next();
+  }
+
   // Skip health check (monitoring services poll frequently)
   if (pathname === "/api/health") return next();
 

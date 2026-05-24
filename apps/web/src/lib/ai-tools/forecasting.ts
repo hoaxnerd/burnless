@@ -9,11 +9,13 @@ import { z } from "zod";
 import { CreateExpenseSchema, UpdateExpenseSchema } from "@burnless/ai";
 import { computeDashboardData } from "../compute-dashboard";
 import { seriesToArray } from "@burnless/engine";
+import { getDefaultScenario } from "../data";
 import type { ToolContext, ToolHandler } from "./types";
 import {
   optionalId,
   monthCount,
   sumValues,
+  requireCompanyId,
 } from "./types";
 
 // ── Update/Delete Schemas ────────────────────────────────────────────────────
@@ -57,9 +59,10 @@ async function createForecastLine(
     });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   const row = await scenarioInsert("forecast_line", forecastLines, {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     accountId: data.accountId,
     method: data.method,
     parameters: data.parameters,
@@ -71,7 +74,7 @@ async function createForecastLine(
     frequency: data.frequency,
     isOneTime: data.isOneTime,
     isRecurring: data.isRecurring ?? null,
-  }, context.scenarioId);
+  }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -85,8 +88,16 @@ async function generateStatements(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof generateStatementsSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
-  const dashboard = await computeDashboardData(context.companyId, scenarioId);
+  const ctx = requireCompanyId(context);
+  let scenarioId = data.scenarioId || ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
 
   const pnl = dashboard.profitAndLoss;
 
@@ -114,12 +125,20 @@ async function forecastRevenue(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof forecastRevenueSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
+  const ctx = requireCompanyId(context);
+  let scenarioId = data.scenarioId || ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
   const months = Math.min(data.months, 36);
   const method = data.method;
   const includeCI = data.includeConfidenceIntervals;
 
-  const dashboard = await computeDashboardData(context.companyId, scenarioId);
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
   const revArray = seriesToArray(dashboard.totalRevenue);
 
   if (revArray.length < 2) {
@@ -240,12 +259,13 @@ async function updateForecastLine(
     });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
     .select({ id: forecastLines.id, accountId: forecastLines.accountId, companyId: forecastLines.companyId })
     .from(forecastLines)
-    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, context.companyId)));
+    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
@@ -267,7 +287,7 @@ async function updateForecastLine(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, context.scenarioId);
+  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -287,17 +307,18 @@ async function deleteForecastLine(
     });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
     .select({ id: forecastLines.id, accountId: forecastLines.accountId, companyId: forecastLines.companyId })
     .from(forecastLines)
-    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, context.companyId)));
+    .where(and(eq(forecastLines.id, data.id), eq(forecastLines.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
 
-  await scenarioDelete("forecast_line", forecastLines, data.id, context.scenarioId);
+  await scenarioDelete("forecast_line", forecastLines, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,

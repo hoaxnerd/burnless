@@ -274,7 +274,15 @@ describe("onboardingSchema", () => {
 
     it("accepts the default values used when skipping", () => {
       const result = onboardingSchema.parse(SKIP_DEFAULTS);
-      expect(result).toEqual(SKIP_DEFAULTS);
+      expect(result).toEqual({
+        ...SKIP_DEFAULTS,
+        user_name: undefined,
+        founders: [],
+        funding_rounds: [],
+        headcount: [],
+        expenses: [],
+        revenue_streams: [],
+      });
     });
 
     it("parseStage handles the default 'Pre-seed'", () => {
@@ -321,6 +329,75 @@ describe("onboardingSchema", () => {
           expect(msg).not.toMatch(/ZodError/);
         }
       }
+    });
+  });
+
+  describe("complex arrays validation", () => {
+    it("validates and parses valid founders, funding rounds, headcount, expenses, and revenue streams", () => {
+      const input = {
+        company_name: "Acme Corp",
+        founders: ["John Doe", "Jane Smith"],
+        funding_rounds: [
+          {
+            name: "Seed Round",
+            type: "seed",
+            amount: 1500000,
+            date: "2026-05-15",
+            preMoneyValuation: 8000000,
+            dilutionPercent: 15,
+            notes: "VC lead",
+          },
+        ],
+        headcount: [
+          {
+            title: "Engineer",
+            department: "Engineering",
+            employeeType: "full_time",
+            salary: 120000,
+            startDate: "2026-06-01",
+          },
+        ],
+        expenses: [
+          {
+            name: "AWS",
+            category: "Cloud Infrastructure",
+            amount: 2000,
+            startDate: "2026-06-01",
+            isRecurring: true,
+          },
+        ],
+        revenue_streams: [
+          {
+            name: "SaaS Pro",
+            type: "subscription",
+            amount: 49,
+            quantity: 100,
+            startDate: "2026-06-01",
+            notes: "Self-serve",
+          },
+        ],
+      };
+      const result = onboardingSchema.parse(input);
+      expect(result.founders).toEqual(["John Doe", "Jane Smith"]);
+      expect(result.funding_rounds[0]?.amount).toBe(1500000);
+      expect(result.headcount[0]?.salary).toBe(120000);
+      expect(result.expenses[0]?.amount).toBe(2000);
+      expect(result.revenue_streams[0]?.quantity).toBe(100);
+    });
+
+    it("rejects invalid types or missing fields in arrays", () => {
+      const input = {
+        company_name: "Acme Corp",
+        funding_rounds: [
+          {
+            name: "Seed Round",
+            // missing type
+            amount: 1500000,
+            date: "2026-05-15",
+          },
+        ],
+      };
+      expect(() => onboardingSchema.parse(input)).toThrow();
     });
   });
 });

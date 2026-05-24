@@ -124,7 +124,9 @@ export function ExpenseForm({
   onCancel,
 }: ExpenseFormProps) {
   // Pre-populate from initialValue (edit mode) or sensible defaults (add mode).
-  const [accountId, setAccountId] = useState<string>(initialValue?.accountId ?? "");
+  const [accountId, setAccountId] = useState<string>(
+    initialValue?.accountId ?? (accounts[0]?.id ?? ""),
+  );
   const [method, setMethod] = useState<ForecastMethod>(initialValue?.method ?? "fixed");
   const [parameters, setParameters] = useState<Record<string, unknown>>(() => {
     if (initialValue?.parameters && Object.keys(initialValue.parameters).length > 0) {
@@ -151,6 +153,17 @@ export function ExpenseForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [paramsError, setParamsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const isParamsValid = useMemo(() => {
+    if (method === "fixed") {
+      const amt = parameters.amount as number;
+      return typeof amt === "number" && amt > 0;
+    }
+    const val = validateExpenseParams(method, parameters);
+    return val.success;
+  }, [method, parameters]);
+
+  const isValid = accountId !== "" && startDate !== null && isParamsValid;
 
   // Switching method MUST reset parameters to the new method's defaults so
   // foreign keys from the previous method don't leak past `.strict()` Zod.
@@ -384,7 +397,7 @@ export function ExpenseForm({
         </button>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !isValid}
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
         >
           {submitting

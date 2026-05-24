@@ -401,7 +401,7 @@ export default function AiCompanionPage() {
     <div className="flex flex-col lg:flex-row h-[calc(100vh-7rem)] lg:h-[calc(100vh-4rem)]">
       <div className="flex flex-1 flex-col min-w-0 lg:mr-4">
         {/* ─── Page Header ─────────────────────────────────────── */}
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-surface-900 flex items-center gap-2">
               <div className="relative">

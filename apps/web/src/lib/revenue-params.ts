@@ -48,6 +48,39 @@ export function defaultParamsForType(type: RevenueStreamType): Record<string, un
   }
 }
 
+/**
+ * Build a parameters object for a revenue stream from a single (unit price,
+ * quantity) pair — the shape produced by the onboarding research agent, which
+ * doesn't know about per-type field names. We slot the two values into the
+ * type-appropriate keys and leave growth/churn assumptions at zero so nothing
+ * silently extrapolates beyond what the user reviewed.
+ *
+ * - marketplace: `quantity` is interpreted as monthly GMV multiplier
+ * - all other types: `amount` × `quantity` matches the user's intent
+ */
+export function paramsFromUnitPricing(
+  type: RevenueStreamType,
+  amount: number,
+  quantity: number,
+): Record<string, unknown> {
+  const defaults = defaultParamsForType(type);
+  switch (type) {
+    case "subscription":
+      return { ...defaults, monthlyPrice: amount, startingCustomers: quantity };
+    case "one_time":
+    case "hardware":
+      return { ...defaults, pricePerUnit: amount, unitsPerMonth: quantity };
+    case "services":
+      return { ...defaults, hourlyRate: amount, hoursPerMonth: quantity };
+    case "usage_based":
+      return { ...defaults, pricePerUnit: amount, activeUsers: quantity, avgUsagePerUser: 1 };
+    case "marketplace":
+      return { ...defaults, startingGmv: amount * quantity, takeRate: 0.1 };
+    case "ecommerce":
+      return { ...defaults, averageOrderValue: amount, ordersPerMonth: quantity };
+  }
+}
+
 // ── normalizeStreamPayload ────────────────────────────────────────────────────
 
 export interface StreamPayloadInput {

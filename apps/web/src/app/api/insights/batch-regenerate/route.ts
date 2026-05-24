@@ -183,9 +183,7 @@ export const POST = withErrorHandler(async function POST(request: Request) {
       }
 
       try {
-        let insights: unknown[];
-
-        insights = await generatePageInsights({
+        const insights = await generatePageInsights({
           page: page as InsightPage,
           snapshot,
           providerConfig: companyProviderConfig,

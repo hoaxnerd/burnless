@@ -41,6 +41,7 @@ COPY . .
 # Build needs env vars at build time for Next.js public vars
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_STANDALONE=true
 
 # Next.js collects telemetry — disable in Docker builds
 ENV NEXT_TELEMETRY_DISABLED=1

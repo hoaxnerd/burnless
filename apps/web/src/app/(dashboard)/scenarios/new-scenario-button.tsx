@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { CreateScenarioModal } from "@/components/scenarios/create-scenario-modal";
 
 export function NewScenarioButton() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -20,6 +22,9 @@ export function NewScenarioButton() {
       <CreateScenarioModal
         open={open}
         onClose={() => setOpen(false)}
+        onCreated={(scenario) => {
+          router.push(`/scenarios/${scenario.id}`);
+        }}
       />
     </>
   );

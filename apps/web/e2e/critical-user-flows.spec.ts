@@ -97,7 +97,7 @@ test.describe("Auth flow: register → login → dashboard", () => {
     await page.getByPlaceholder("Enter your password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/(dashboard|onboarding)/, { timeout: 15_000 });
   });
 
   test("wrong password shows error message", async ({ page }) => {
@@ -224,11 +224,12 @@ test.describe("Onboarding: company setup flow", () => {
     await page.getByPlaceholder("My Startup Inc.").fill("");
     await page.getByRole("button", { name: "Create My Company" }).click();
 
-    await expect(page.getByText("Company name is required")).toBeVisible();
+    await expect(page.getByText("Company name is required").first()).toBeVisible();
   });
 
   test.describe("Full onboarding (requires DB)", () => {
     test.skip(!dbAvailable, "Requires DATABASE_URL");
+    test.use({ storageState: "e2e/.auth/user.json" });
 
     test("manual form submission creates company and shows success", async ({
       page,
@@ -308,7 +309,7 @@ test.describe("Dashboard: authenticated with seeded data", () => {
       "Funding",
       "Team",
       "Scenarios",
-      "Reports",
+      "Data Room",
       "Settings",
     ];
 
@@ -357,7 +358,7 @@ test.describe("Dashboard: authenticated with seeded data", () => {
 
     await expect(page).toHaveURL(/\/revenue/);
     await expect(
-      page.getByRole("heading", { name: "Revenue" })
+      page.getByRole("heading", { name: "Revenue", exact: true })
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -408,13 +409,13 @@ test.describe("Expense management: add and view expenses", () => {
 
     // Modal should open with form fields
     await expect(
-      page.getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      page.getByPlaceholder("e.g. AWS")
     ).toBeVisible();
     await expect(page.getByPlaceholder("5000")).toBeVisible();
     // Use label locator instead of getByText to avoid matching multiple elements
-    await expect(page.locator("label", { hasText: "Category" })).toBeVisible();
+    await expect(page.locator("label", { hasText: "Account" })).toBeVisible();
     await expect(
-      page.locator("label", { hasText: "Monthly Amount" })
+      page.locator("label", { hasText: "Amount" })
     ).toBeVisible();
   });
 
@@ -426,13 +427,13 @@ test.describe("Expense management: add and view expenses", () => {
 
     await page.getByRole("button", { name: "Add Expense" }).click();
     await expect(
-      page.getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      page.getByPlaceholder("e.g. AWS")
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Cancel" }).click();
 
     await expect(
-      page.getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      page.getByPlaceholder("e.g. AWS")
     ).not.toBeVisible();
   });
 
@@ -464,7 +465,7 @@ test.describe("Expense management: add and view expenses", () => {
     await page.getByRole("button", { name: "Add Expense" }).click();
 
     await page
-      .getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      .getByPlaceholder("e.g. AWS")
       .fill("E2E Test Expense");
     await page.getByPlaceholder("5000").fill("1500");
 
@@ -484,7 +485,7 @@ test.describe("Expense management: add and view expenses", () => {
 
     const expenseName = `E2E Expense ${Date.now()}`;
     await page
-      .getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      .getByPlaceholder("e.g. AWS")
       .fill(expenseName);
     await page.getByPlaceholder("5000").fill("2500");
 
@@ -495,7 +496,7 @@ test.describe("Expense management: add and view expenses", () => {
 
     // Modal should close after successful creation
     await expect(
-      page.getByPlaceholder("e.g. AWS Hosting, Office Rent")
+      page.getByPlaceholder("e.g. AWS")
     ).not.toBeVisible({ timeout: 10_000 });
   });
 
@@ -526,7 +527,7 @@ test.describe("Companion: chat interaction", () => {
       page.getByRole("heading", { name: /companion/i }).first()
     ).toBeVisible({ timeout: 10_000 });
     await expect(
-      page.getByText("I'm your financial companion")
+      page.getByText("Your personal CFO that understands your numbers")
     ).toBeVisible();
   });
 
@@ -587,7 +588,7 @@ test.describe("Companion: chat interaction", () => {
 
     await newChatButton.click();
     await expect(
-      page.getByText("I'm your financial companion")
+      page.getByText("Your personal CFO that understands your numbers")
     ).toBeVisible();
   });
 
@@ -599,11 +600,11 @@ test.describe("Companion: chat interaction", () => {
 
     // Toggle open
     await historyButton.click();
-    await expect(page.getByText("Recent Conversations")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
 
     // Toggle closed
-    await historyButton.click();
-    await expect(page.getByText("Recent Conversations")).not.toBeVisible();
+    await historyButton.evaluate(el => (el as HTMLButtonElement).click());
+    await expect(page.getByRole("heading", { name: "History" })).not.toBeVisible();
   });
 });
 
@@ -640,11 +641,14 @@ test.describe("Scenario creation: create and view scenarios", () => {
 
     await page.getByRole("button", { name: /new scenario/i }).click();
 
-    // Template dialog should show templates
-    await expect(page.getByText("Fundraise Scenario")).toBeVisible();
-    await expect(page.getByText("Growth Acceleration")).toBeVisible();
-    await expect(page.getByText("Lean Operations")).toBeVisible();
-    await expect(page.getByText("Hiring Plan")).toBeVisible();
+    // Select the "Template" path card
+    await page.getByRole("button", { name: "Template" }).click();
+
+    // Template picker should show templates
+    await expect(page.getByRole("button", { name: "Fundraise", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Growth Acceleration", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lean Operations", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hiring Plan", exact: true })).toBeVisible();
   });
 
   test("selecting a template creates scenario and navigates to detail", async ({
@@ -657,11 +661,17 @@ test.describe("Scenario creation: create and view scenarios", () => {
 
     await page.getByRole("button", { name: /new scenario/i }).click();
 
-    // Click on "Lean Operations" template (less likely to duplicate)
-    await page
-      .locator("button")
-      .filter({ hasText: "Lean Operations" })
-      .click();
+    // Select the "Template" path card
+    await page.getByRole("button", { name: "Template" }).click();
+
+    // Select the "Lean Operations" template button
+    await page.getByRole("button", { name: "Lean Operations", exact: true }).click();
+
+    // Enter a scenario name
+    await page.getByLabel("Scenario name").fill(`E2E Lean Ops ${Date.now()}`);
+
+    // Click "Create Scenario"
+    await page.getByRole("button", { name: "Create Scenario" }).click();
 
     // Should navigate to the new scenario's detail page
     await expect(page).toHaveURL(/\/scenarios\//, { timeout: 15_000 });

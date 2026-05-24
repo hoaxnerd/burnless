@@ -135,6 +135,8 @@ describe("<ExpenseForm> add mode", () => {
       />,
     );
 
+    fireEvent.change(screen.getByLabelText("Account"), { target: { value: "" } });
+
     await act(async () => {
       fireEvent.submit(screen.getByRole("form", { name: "Add expense" }));
     });

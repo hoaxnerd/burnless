@@ -197,7 +197,6 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Route to appropriate insight generator
   let insights: unknown[];
-  let cacheType: "dashboard" | "revenue" | "expense" | "scenario" | "funding" | "team" | "reports" | "general";
 
   // LLM-powered page insights — wrapped in try/catch so failures return empty insights
   const pageKey = page as InsightPage;
@@ -216,7 +215,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     );
     insights = [];
   }
-  cacheType = page === "expenses" ? "expense" : page === "scenarios" ? "scenario" : page;
+  const cacheType = page === "expenses" ? ("expense" as const) : page === "scenarios" ? ("scenario" as const) : page;
 
   // Cache the generated insights — skip caching empty results so they retry next time
   const cacheKey = `scenario:${scenario.id}`;

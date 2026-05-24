@@ -8,7 +8,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
 import type { ToolContext, ToolHandler } from "./types";
-import { nameString, descriptionString, idString, sumValues } from "./types";
+import { nameString, descriptionString, idString, sumValues, requireCompanyId } from "./types";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -39,14 +39,15 @@ async function createScenario(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof createScenarioSchema>;
+  const ctx = requireCompanyId(context);
   const [row] = await db
     .insert(scenarios)
     .values({
-      companyId: context.companyId,
+      companyId: ctx.companyId,
       name: data.name,
       description: data.description ?? null,
       source: "ai",
-      aiConversationId: context.conversationId ?? null,
+      aiConversationId: ctx.conversationId ?? null,
     })
     .returning();
 
@@ -64,10 +65,11 @@ async function compareScenariosTool(
   const data = input as z.infer<typeof compareScenarioSchema>;
   const baseId = data.baseScenarioId;
   const compareId = data.compareScenarioId;
+  const ctx = requireCompanyId(context);
 
   const [baseDash, compareDash] = await Promise.all([
-    computeDashboardData(context.companyId, baseId),
-    computeDashboardData(context.companyId, compareId),
+    computeDashboardData(ctx.companyId, baseId),
+    computeDashboardData(ctx.companyId, compareId),
   ]);
 
   const basePnL = baseDash.profitAndLoss;
@@ -93,12 +95,13 @@ async function updateScenario(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof updateScenarioSchema>;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
     .select({ id: scenarios.id })
     .from(scenarios)
-    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
   }
@@ -129,12 +132,13 @@ async function deleteScenario(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof deleteScenarioSchema>;
+  const ctx = requireCompanyId(context);
 
   // Verify ownership
   const [existing] = await db
     .select({ id: scenarios.id, name: scenarios.name })
     .from(scenarios)
-    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, context.companyId), isNull(scenarios.deletedAt)));
+    .where(and(eq(scenarios.id, data.id), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
   }

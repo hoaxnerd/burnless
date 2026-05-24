@@ -10,7 +10,7 @@ const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   // Standalone output for Docker — bundles server + dependencies into .next/standalone
-  output: "standalone",
+  output: process.env.NEXT_STANDALONE === "true" ? "standalone" : undefined,
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

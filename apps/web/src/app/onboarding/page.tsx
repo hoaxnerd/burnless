@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
-import type { OnboardingStep, CompanyFields } from "./_components/types";
+import type { OnboardingStep, CompanyFields, FundingRound, HeadcountRole, OperatingExpense, RevenueStream } from "./_components/types";
 import { DEFAULTS } from "./_components/constants";
 import { parseMoneyAmount, parseTeamSize } from "@/lib/onboarding-helpers";
 import { WebsiteStep } from "./_components/website-step";
@@ -22,6 +22,11 @@ export default function OnboardingPage() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [greeting, setGreeting] = useState("");
   const [fields, setFields] = useState<CompanyFields>({ ...DEFAULTS });
+  const [founders, setFounders] = useState<string[]>([]);
+  const [fundingRounds, setFundingRounds] = useState<FundingRound[]>([]);
+  const [headcount, setHeadcount] = useState<HeadcountRole[]>([]);
+  const [expenses, setExpenses] = useState<OperatingExpense[]>([]);
+  const [revenueStreams, setRevenueStreams] = useState<RevenueStream[]>([]);
   const [enrichedCount, setEnrichedCount] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +109,16 @@ export default function OnboardingPage() {
                 fieldCount++;
                 setEnrichedCount(fieldCount);
               }
+            } else if (event.type === "founders") {
+              setFounders(event.value || []);
+            } else if (event.type === "funding_rounds") {
+              setFundingRounds(event.value || []);
+            } else if (event.type === "headcount") {
+              setHeadcount(event.value || []);
+            } else if (event.type === "expenses") {
+              setExpenses(event.value || []);
+            } else if (event.type === "revenue_streams") {
+              setRevenueStreams(event.value || []);
             } else if (event.type === "status") {
               setGreeting(event.message);
             } else if (event.type === "done") {
@@ -179,7 +194,14 @@ export default function OnboardingPage() {
 
   // ── Create company ──────────────────────────────────────────────────────
 
-  const handleCreate = async () => {
+  const handleCreate = async (extraData?: {
+    userName?: string;
+    founders: string[];
+    fundingRounds: FundingRound[];
+    headcount: HeadcountRole[];
+    expenses: OperatingExpense[];
+    revenueStreams: RevenueStream[];
+  }) => {
     if (!fields.company_name.value.trim()) {
       setCreateError("Company name is required");
       return;
@@ -205,6 +227,12 @@ export default function OnboardingPage() {
           team_size: fields.team_size.value,
           funding: fields.funding.value,
           main_expenses: fields.main_expenses.value,
+          user_name: extraData?.userName ?? "",
+          founders: extraData?.founders ?? [],
+          funding_rounds: extraData?.fundingRounds ?? [],
+          headcount: extraData?.headcount ?? [],
+          expenses: extraData?.expenses ?? [],
+          revenue_streams: extraData?.revenueStreams ?? [],
         }),
       });
 
@@ -259,6 +287,11 @@ export default function OnboardingPage() {
           onUpdateField={updateField}
           onCreate={handleCreate}
           onSkipOnboarding={skipOnboarding}
+          initialFounders={founders}
+          initialFundingRounds={fundingRounds}
+          initialHeadcount={headcount}
+          initialExpenses={expenses}
+          initialRevenueStreams={revenueStreams}
         />
       );
 

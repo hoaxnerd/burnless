@@ -7,8 +7,8 @@ import { z } from "zod";
 // ── Context ──────────────────────────────────────────────────────────────────
 
 export interface ToolContext {
-  companyId: string;
-  scenarioId: string;
+  companyId?: string;
+  scenarioId?: string;
   userId: string;
   conversationId?: string;
   writeMode?: "full" | "confirm" | "read_only";
@@ -86,3 +86,15 @@ export function latest(arr: Array<{ month: string; value: number }> | undefined)
 // ── Tool handler type ────────────────────────────────────────────────────────
 
 export type ToolHandler = (input: Record<string, unknown>, context: ToolContext) => Promise<string>;
+
+export interface CompanyToolContext extends ToolContext {
+  companyId: string;
+}
+
+export function requireCompanyId(context: ToolContext): CompanyToolContext {
+  if (!context.companyId) {
+    throw new Error("Company ID is required for this operation.");
+  }
+  return context as CompanyToolContext;
+}
+

@@ -8,9 +8,10 @@ import { financialAccounts } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
+import { getDefaultScenario } from "../data";
 import { seriesToArray } from "@burnless/engine";
 import type { ToolContext, ToolHandler } from "./types";
-import { nameString, idString, optionalId, sumValues, latest } from "./types";
+import { nameString, idString, optionalId, sumValues, latest, requireCompanyId } from "./types";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -107,8 +108,16 @@ async function computeMetrics(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof computeMetricsSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
-  const dashboard = await computeDashboardData(context.companyId, scenarioId);
+  const ctx = requireCompanyId(context);
+  let scenarioId = data.scenarioId || ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
 
   const m = dashboard.metrics;
 
@@ -147,12 +156,14 @@ async function createAccount(
 ): Promise<string> {
   const data = input as z.infer<typeof createAccountSchema>;
 
+  const ctx = requireCompanyId(context);
+
   const row = await scenarioInsert("financial_account", financialAccounts, {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     name: data.name,
     type: data.type,
     category: data.category,
-  }, context.scenarioId);
+  }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -165,11 +176,13 @@ async function categorizeTransactions(
   input: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> {
+  const ctx = requireCompanyId(context);
+
   // Fetch existing accounts for category matching
   const accounts = await db
     .select()
     .from(financialAccounts)
-    .where(eq(financialAccounts.companyId, context.companyId));
+    .where(eq(financialAccounts.companyId, ctx.companyId));
 
   const data = input as z.infer<typeof categorizeTransactionsSchema>;
   const txns = data.transactions;
@@ -201,7 +214,16 @@ async function generateReportNarrative(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof generateReportNarrativeSchema>;
-  const dashboard = await computeDashboardData(context.companyId, context.scenarioId);
+  const ctx = requireCompanyId(context);
+  let scenarioId = ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
 
   const m = dashboard.metrics;
   const pnl = dashboard.profitAndLoss;
@@ -260,8 +282,16 @@ async function suggestCostCuts(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof suggestCostCutsSchema>;
-  const scenarioId = data.scenarioId || context.scenarioId;
-  const dashboard = await computeDashboardData(context.companyId, scenarioId);
+  const ctx = requireCompanyId(context);
+  let scenarioId = data.scenarioId || ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
 
   const excludeCategories = data.excludeCategories;
   const targetSavingsPercent = data.targetSavingsPercent;
@@ -270,7 +300,7 @@ async function suggestCostCuts(
   const accounts = await db
     .select()
     .from(financialAccounts)
-    .where(eq(financialAccounts.companyId, context.companyId));
+    .where(eq(financialAccounts.companyId, ctx.companyId));
 
   const expenseAccounts = accounts.filter(
     (a) =>
@@ -312,7 +342,16 @@ async function benchmarkMetrics(
   context: ToolContext
 ): Promise<string> {
   const data = input as z.infer<typeof benchmarkMetricsSchema>;
-  const dashboard = await computeDashboardData(context.companyId, context.scenarioId);
+  const ctx = requireCompanyId(context);
+  let scenarioId = ctx.scenarioId;
+  if (!scenarioId) {
+    const defScenario = await getDefaultScenario(ctx.companyId);
+    if (!defScenario) {
+      return JSON.stringify({ success: false, error: "No scenario found" });
+    }
+    scenarioId = defScenario.id;
+  }
+  const dashboard = await computeDashboardData(ctx.companyId, scenarioId);
   const m = dashboard.metrics;
 
   // Determine stage
@@ -373,10 +412,12 @@ async function updateAccount(
 ): Promise<string> {
   const data = input as z.infer<typeof updateAccountSchema>;
 
+  const ctx = requireCompanyId(context);
+
   const [existing] = await db
     .select({ id: financialAccounts.id, name: financialAccounts.name, isSystem: financialAccounts.isSystem })
     .from(financialAccounts)
-    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, context.companyId)));
+    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Account not found or access denied" });
   }
@@ -393,7 +434,7 @@ async function updateAccount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, context.scenarioId);
+  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -407,10 +448,12 @@ async function deleteAccount(
 ): Promise<string> {
   const data = input as z.infer<typeof deleteAccountSchema>;
 
+  const ctx = requireCompanyId(context);
+
   const [existing] = await db
     .select({ id: financialAccounts.id, name: financialAccounts.name, isSystem: financialAccounts.isSystem })
     .from(financialAccounts)
-    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, context.companyId)));
+    .where(and(eq(financialAccounts.id, data.id), eq(financialAccounts.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Account not found or access denied" });
   }
@@ -418,7 +461,7 @@ async function deleteAccount(
     return JSON.stringify({ success: false, error: "Cannot delete system accounts" });
   }
 
-  await scenarioDelete("financial_account", financialAccounts, data.id, context.scenarioId);
+  await scenarioDelete("financial_account", financialAccounts, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,

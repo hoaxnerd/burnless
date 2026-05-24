@@ -65,6 +65,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
   const [activeScenarioName, setActiveScenarioName] = useState<string | null>(null);
 
   // Hydrate from sessionStorage on mount (survives refresh)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = readSessionStorage();
     if (stored) {
@@ -74,6 +75,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       setCookie(stored.id);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const enterScenario = useCallback(
     (id: string, name: string) => {

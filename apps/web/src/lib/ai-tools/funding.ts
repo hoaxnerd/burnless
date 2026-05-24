@@ -16,6 +16,7 @@ import {
   ModelDilutionSchema,
 } from "@burnless/ai";
 import type { ToolHandler } from "./types";
+import { requireCompanyId } from "./types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,11 @@ export const createFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
-  const { currency, locale } = await getCompanyCurrency(context.companyId);
+  const ctx = requireCompanyId(context);
+  const { currency, locale } = await getCompanyCurrency(ctx.companyId);
 
   const row = await scenarioInsert("funding_round", fundingRounds, {
-    companyId: context.companyId,
+    companyId: ctx.companyId,
     name: data.name,
     type: data.roundType,
     amount: String(data.amount),
@@ -53,7 +55,7 @@ export const createFundingRound: ToolHandler = async (input, context) => {
     notes: data.notes ?? null,
     parameters: (data.parameters as Record<string, unknown>) ?? {},
     isProjected: data.isProjected ?? false,
-  }, context.scenarioId);
+  }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -68,11 +70,12 @@ export const updateFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   const [existing] = await db
     .select({ id: fundingRounds.id, name: fundingRounds.name })
     .from(fundingRounds)
-    .where(and(eq(fundingRounds.id, data.id), eq(fundingRounds.companyId, context.companyId)));
+    .where(and(eq(fundingRounds.id, data.id), eq(fundingRounds.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
@@ -100,7 +103,7 @@ export const updateFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, context.scenarioId);
+  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -114,16 +117,17 @@ export const deleteFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   const [existing] = await db
     .select({ id: fundingRounds.id, name: fundingRounds.name })
     .from(fundingRounds)
-    .where(and(eq(fundingRounds.id, data.id), eq(fundingRounds.companyId, context.companyId)));
+    .where(and(eq(fundingRounds.id, data.id), eq(fundingRounds.companyId, ctx.companyId)));
   if (!existing) {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
 
-  await scenarioDelete("funding_round", fundingRounds, data.id, context.scenarioId);
+  await scenarioDelete("funding_round", fundingRounds, data.id, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -137,17 +141,18 @@ export const addFundingRoundInvestor: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   // Verify the funding round belongs to this company
   const [round] = await db
     .select({ id: fundingRounds.id, name: fundingRounds.name })
     .from(fundingRounds)
-    .where(and(eq(fundingRounds.id, data.fundingRoundId), eq(fundingRounds.companyId, context.companyId)));
+    .where(and(eq(fundingRounds.id, data.fundingRoundId), eq(fundingRounds.companyId, ctx.companyId)));
   if (!round) {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
 
-  const { currency, locale } = await getCompanyCurrency(context.companyId);
+  const { currency, locale } = await getCompanyCurrency(ctx.companyId);
 
   const [row] = await db
     .insert(fundingRoundInvestors)
@@ -172,11 +177,12 @@ export const markGrantMilestoneHit: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
+  const ctx = requireCompanyId(context);
 
   const [round] = await db
     .select({ id: fundingRounds.id, name: fundingRounds.name, type: fundingRounds.type, parameters: fundingRounds.parameters })
     .from(fundingRounds)
-    .where(and(eq(fundingRounds.id, data.fundingRoundId), eq(fundingRounds.companyId, context.companyId)));
+    .where(and(eq(fundingRounds.id, data.fundingRoundId), eq(fundingRounds.companyId, ctx.companyId)));
   if (!round) {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
@@ -194,7 +200,7 @@ export const markGrantMilestoneHit: ToolHandler = async (input, context) => {
   milestones[idx] = { ...milestones[idx], hitDate: data.hitDate };
   const updatedParams = { ...params, milestones };
 
-  await scenarioUpdate("funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams }, context.scenarioId);
+  await scenarioUpdate("funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams }, ctx.scenarioId ?? null);
 
   return JSON.stringify({
     success: true,
@@ -208,7 +214,8 @@ export const modelDilution: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: parsed.error.message });
   }
   const data = parsed.data;
-  const { currency, locale } = await getCompanyCurrency(context.companyId);
+  const ctx = requireCompanyId(context);
+  const { currency, locale } = await getCompanyCurrency(ctx.companyId);
 
   const roundAmount = data.roundAmount;
   const preMoneyValuation = data.preMoneyValuation;

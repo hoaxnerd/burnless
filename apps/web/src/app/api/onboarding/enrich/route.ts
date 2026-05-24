@@ -10,12 +10,12 @@
  */
 
 import { z } from "zod";
-import { getProviderForFeature, createProvider } from "@burnless/ai";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
-import { checkAiFeatureAllowed, getCompanyProviderConfig } from "@/lib/ai-feature-flags";
+import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getUserCompany } from "@/lib/api-helpers";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
+import { runOnboardingAgent } from "@/lib/onboarding-agent";
 
 const enrichSchema = z.object({
   websiteUrl: z
@@ -28,18 +28,6 @@ const enrichSchema = z.object({
       return url;
     }),
 });
-
-interface EnrichedField {
-  field: string;
-  value: string;
-  confidence: "high" | "medium" | "low";
-}
-
-interface EnrichmentResult {
-  companyName: string;
-  greeting: string;
-  fields: EnrichedField[];
-}
 
 export const POST = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "ai");
@@ -70,136 +58,71 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let pingInterval: NodeJS.Timeout | undefined;
       const send = (data: Record<string, unknown>) => {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-        );
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+          );
+        } catch {
+          // stream might be closed
+        }
       };
 
       try {
-        // Step 1: Fetch the website
-        send({ type: "status", message: "Analyzing website..." });
+        // Send a ping/heartbeat every 5 seconds to keep the connection alive
+        pingInterval = setInterval(() => {
+          send({ type: "ping" });
+        }, 5000);
 
-        let websiteContent = "";
-        try {
-          const res = await fetch(body.websiteUrl, {
-            headers: {
-              "User-Agent": "burnless/1.0 (Financial Planning Tool)",
-            },
-            signal: AbortSignal.timeout(10000),
-          });
-          if (res.ok) {
-            const html = await res.text();
-            // Extract visible text content (strip HTML tags, limit size)
-            websiteContent = html
-              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-              .replace(/<[^>]+>/g, " ")
-              .replace(/\s+/g, " ")
-              .trim()
-              .slice(0, 8000);
-          }
-        } catch {
-          // Website fetch failed — we'll work with just the URL
-          send({
-            type: "status",
-            message: "Could not reach website, analyzing URL...",
-          });
+        // Run the agent loop
+        const agentResult = await runOnboardingAgent(body.websiteUrl, user.id, (statusMessage) => {
+          send({ type: "status", message: statusMessage });
+        });
+
+        // Send greeting
+        send({
+          type: "greeting",
+          companyName: agentResult.companyName,
+          greeting: `Onboarding ${agentResult.companyName}`,
+        });
+
+        // Derivations for basic company fields
+        const totalFunding = agentResult.fundingRounds.reduce((acc, r) => acc + r.amount, 0);
+        const totalHeadcount = agentResult.headcount.length;
+        const totalMonthlyRevenue = agentResult.revenueStreams.reduce((acc, r) => acc + (r.amount * r.quantity), 0);
+        const mainExpensesSummary = agentResult.expenses.map(e => e.name).slice(0, 3).join(", ") || "General operations";
+
+        const basicFields = [
+          { field: "company_name", value: agentResult.companyName, confidence: "high" },
+          { field: "stage", value: agentResult.stage || "Pre-seed", confidence: "high" },
+          { field: "business_model", value: agentResult.businessModel || "SaaS", confidence: "high" },
+          { field: "industry", value: agentResult.industry || "Software & SaaS", confidence: "high" },
+          { field: "team_size", value: String(totalHeadcount), confidence: "high" },
+          { field: "monthly_revenue", value: String(totalMonthlyRevenue), confidence: "high" },
+          { field: "funding", value: String(totalFunding), confidence: "high" },
+          { field: "main_expenses", value: mainExpensesSummary, confidence: "high" },
+        ];
+
+        // Send basic fields so existing UI parses them cleanly
+        for (const f of basicFields) {
+          send({ type: "field", ...f });
         }
 
-        // Step 2: Use AI to analyze the company
-        send({ type: "status", message: "Learning about your company..." });
+        // Send complex arrays
+        send({ type: "founders", value: agentResult.founders });
+        send({ type: "funding_rounds", value: agentResult.fundingRounds });
+        send({ type: "headcount", value: agentResult.headcount });
+        send({ type: "expenses", value: agentResult.expenses });
+        send({ type: "revenue_streams", value: agentResult.revenueStreams });
 
-        // Use company-specific provider config if available, else fall back to default routing
-        const companyConfig = membership ? await getCompanyProviderConfig(membership.companyId) : undefined;
-        const provider = companyConfig
-          ? createProvider(companyConfig)
-          : getProviderForFeature("onboarding_enrich");
-        if (!provider) {
-          // No AI provider configured — return empty enrichment
-          send({ type: "done", result: null });
-          controller.close();
-          return;
-        }
-
-        const prompt = websiteContent
-          ? `Analyze this company website and extract structured information.
-
-Website URL: ${body.websiteUrl}
-Website content:
-${websiteContent}
-
-Extract the following fields. For each field, provide your best guess and a confidence level (high/medium/low). If you can't determine a field, skip it.
-
-Respond ONLY with valid JSON in this exact format:
-{
-  "companyName": "the company name",
-  "greeting": "a short greeting under 5 words like 'Onboarding [Company Name]'",
-  "fields": [
-    {"field": "company_name", "value": "...", "confidence": "high"},
-    {"field": "stage", "value": "one of: Pre-seed, Seed, Series A, Series B+, Bootstrapped", "confidence": "medium"},
-    {"field": "business_model", "value": "one of: SaaS, Marketplace, E-commerce, Services, Hardware, Other", "confidence": "high"},
-    {"field": "industry", "value": "the industry/vertical", "confidence": "high"},
-    {"field": "team_size", "value": "estimated number", "confidence": "low"},
-    {"field": "monthly_revenue", "value": "estimated range like $0, $10K, $50K, $100K+", "confidence": "low"},
-    {"field": "funding", "value": "known funding or $0 if bootstrapped", "confidence": "low"},
-    {"field": "main_expenses", "value": "likely expense categories", "confidence": "medium"}
-  ]
-}
-
-Only include fields you have reasonable data for. Be concise.`
-          : `I have a website URL but couldn't fetch its content: ${body.websiteUrl}
-
-Based on the domain name alone, try to infer what you can about the company.
-
-Respond ONLY with valid JSON:
-{
-  "companyName": "best guess from domain",
-  "greeting": "a short greeting under 5 words like 'Onboarding [Company Name]'",
-  "fields": [
-    {"field": "company_name", "value": "...", "confidence": "medium"}
-  ]
-}
-
-Only include fields you can reasonably infer from the domain name.`;
-
-        const text = await provider.generateText(prompt);
-
-        // Parse the response
-        if (!text) {
-          send({ type: "done", result: null });
-          controller.close();
-          return;
-        }
-
-        try {
-          // Extract JSON from the response (may be wrapped in markdown)
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) throw new Error("No JSON found");
-
-          const result: EnrichmentResult = JSON.parse(jsonMatch[0]);
-
-          // Send greeting first
-          send({
-            type: "greeting",
-            companyName: result.companyName,
-            greeting: result.greeting,
-          });
-
-          // Stream each field with a small delay for visual effect
-          for (const field of result.fields) {
-            send({ type: "field", ...field });
-          }
-
-          send({ type: "done", result });
-        } catch {
-          send({ type: "done", result: null });
-        }
+        send({ type: "done", result: agentResult });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Enrichment failed";
         send({ type: "error", message });
       } finally {
+        if (pingInterval) clearInterval(pingInterval);
         controller.close();
       }
     },
