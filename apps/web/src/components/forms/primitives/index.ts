@@ -6,3 +6,5 @@ export { CurrencyInput } from "./CurrencyInput";
 export type { CurrencyInputProps } from "./CurrencyInput";
 export { NumberInput } from "./NumberInput";
 export type { NumberInputProps } from "./NumberInput";
+export { SingleDateInput } from "./SingleDateInput";
+export type { SingleDateInputProps } from "./SingleDateInput";
