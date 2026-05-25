@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
+import { useLocale } from "@/components/locale/locale-context";
 import Papa from "papaparse";
 import { Button } from "@/components/ui";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
@@ -338,6 +339,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
     setEditingRow(null);
   };
 
+  const { fmtDate } = useLocale();
   const fmtCurrency = (n: number) => formatCurrency(n, currency);
 
   const activePreview = preview.filter((t) => !t.isDuplicate && !t._excluded);
@@ -501,7 +503,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
                       <td className="px-3 py-2 font-medium text-surface-900 dark:text-surface-50">{String(row.name ?? "")}</td>
                       <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{String(row.type ?? "")}</td>
                       <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{fmtCurrency(Number(row.amount ?? 0))}</td>
-                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{row.date ? new Date(String(row.date)).toLocaleDateString() : ""}</td>
+                      <td className="px-3 py-2 text-surface-600 dark:text-surface-300">{row.date ? fmtDate(String(row.date)) : ""}</td>
                       <td className="px-3 py-2 text-surface-600 dark:text-surface-300">
                         {row.parameters && typeof row.parameters === "object" && "valuationCap" in (row.parameters as object)
                           ? fmtCurrency(Number((row.parameters as Record<string, unknown>).valuationCap ?? 0))

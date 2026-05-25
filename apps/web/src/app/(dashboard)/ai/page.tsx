@@ -26,6 +26,7 @@ import { InsightsPanel, InsightCard } from "./_components/insights-panel";
 import type { Message, Insight, Conversation } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
+import { useLocale } from "@/components/locale/locale-context";
 
 /* ─── AI Credits Configuration ────────────────────────────────────── */
 // AI credits ratio: how many cents equal 1 AI credit.
@@ -112,6 +113,7 @@ export default function AiCompanionPage() {
   const { planLimit, checkResponse, clearLimit } = usePlanLimit();
   const { activeScenarioId } = useScenario();
   const { companionName, credits } = useAiFlags();
+  const { fmtDate } = useLocale();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledParamRef = useRef<string | null>(null);
@@ -679,7 +681,7 @@ export default function AiCompanionPage() {
                       >
                         {conv.title ?? "Untitled conversation"}
                         <span className="ml-2 text-xs text-surface-400">
-                          {new Date(conv.updatedAt).toLocaleDateString()}
+                          {fmtDate(conv.updatedAt)}
                         </span>
                       </button>
                     ))}

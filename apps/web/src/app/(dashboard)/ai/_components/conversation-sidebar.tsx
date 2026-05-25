@@ -5,6 +5,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { Conversation } from "./types";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -17,6 +18,7 @@ function ConversationList({
   onLoadConversation,
   loading,
 }: ConversationListProps) {
+  const { fmtDate } = useLocale();
   if (loading) {
     return (
       <div className="flex items-center gap-2 px-1 py-3 text-sm text-surface-400">
@@ -40,7 +42,7 @@ function ConversationList({
         >
           {conv.title ?? "Untitled conversation"}
           <span className="ml-2 text-xs text-surface-400">
-            {new Date(conv.updatedAt).toLocaleDateString()}
+            {fmtDate(conv.updatedAt)}
           </span>
         </button>
       ))}

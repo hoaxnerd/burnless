@@ -2,6 +2,7 @@
 
 import { X, FileSpreadsheet, RotateCcw } from "lucide-react";
 import type { ImportBatch } from "./import-utils";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface ImportHistoryPanelProps {
   history: ImportBatch[];
@@ -16,6 +17,7 @@ export function ImportHistoryPanel({
   setShowHistory,
   rollbackBatch,
 }: ImportHistoryPanelProps) {
+  const { fmtDate } = useLocale();
   return (
     <div className="mb-6 rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 overflow-hidden animate-slide-up">
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-200 dark:border-surface-700">
@@ -74,7 +76,7 @@ export function ImportHistoryPanel({
                     </span>
                   </td>
                   <td className="py-2 px-4 text-surface-600 dark:text-surface-400 text-xs">
-                    {new Date(batch.createdAt).toLocaleDateString()}
+                    {fmtDate(batch.createdAt)}
                   </td>
                   <td className="py-2 px-4 text-right">
                     {batch.status === "completed" && (

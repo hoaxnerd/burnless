@@ -3,6 +3,7 @@
 import { Check, Sparkles, Pencil, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui";
 import type { Step, PreviewTransaction } from "./import-utils";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface PreviewStepProps {
   preview: PreviewTransaction[];
@@ -38,6 +39,7 @@ export function PreviewStep({
   setStep,
   amountSynthesized = false,
 }: PreviewStepProps) {
+  const { fmtDate } = useLocale();
   return (
     <div className="space-y-6 animate-slide-up">
       <div className="grid grid-cols-4 gap-4 max-w-4xl">
@@ -141,7 +143,7 @@ export function PreviewStep({
                       )}
                     </td>
                     <td className="py-2 px-3 text-surface-900 dark:text-surface-50">
-                      {new Date(t.date).toLocaleDateString()}
+                      {fmtDate(t.date)}
                     </td>
                     <td className="py-2 px-3 text-right">
                       {isEditing ? (
