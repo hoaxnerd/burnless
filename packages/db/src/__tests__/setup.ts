@@ -8,6 +8,10 @@ import * as schema from "../schema";
 
 let pglite: PGlite;
 let testDb: ReturnType<typeof drizzle>;
+// Set to true when this module reuses an instance created externally (e.g. by
+// apps/web/vitest.setup.db.ts). In that case afterAll skips close() since the
+// external setup owns the lifecycle.
+let externalInstance = false;
 
 /**
  * Get the shared PGLite-backed Drizzle instance for tests.
@@ -55,13 +59,34 @@ async function runMigrations(client: PGlite) {
   }
 }
 
-// Vitest global setup — runs once before all tests in this package
+// Vitest global setup — runs once before all tests in this package.
+//
+// When apps/web/vitest.setup.db.ts has already created a PGLite instance and
+// assigned it to globalThis.__burnless_db (and __burnless_pglite), this hook
+// reuses that instance. This ensures that factories (which call getTestDb())
+// and scenario-resolver.ts (which imports db from "../index", which reads
+// globalThis.__burnless_db) all operate on the same in-memory database.
 beforeAll(async () => {
+  const g = globalThis as unknown as {
+    __burnless_db?: ReturnType<typeof drizzle>;
+    __burnless_pglite?: PGlite;
+  };
+
+  if (g.__burnless_db && g.__burnless_pglite) {
+    // External setup (e.g. apps/web/vitest.setup.db.ts) already created and
+    // migrated the db. Reuse it — migrations have already been applied.
+    testDb = g.__burnless_db;
+    pglite = g.__burnless_pglite;
+    externalInstance = true;
+    return;
+  }
+
   pglite = new PGlite();
   await runMigrations(pglite);
   testDb = drizzle(pglite, { schema });
 });
 
 afterAll(async () => {
+  if (externalInstance) return; // lifecycle owned by the external setup file
   await pglite.close();
 });

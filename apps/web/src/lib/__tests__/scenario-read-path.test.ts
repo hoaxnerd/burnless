@@ -32,29 +32,6 @@ import {
   createFinancialAccount,
 } from "@db-test/factories";
 
-// ── Mock: @burnless/db ───────────────────────────────────────────────────────
-// Replace the `db` export with a Proxy that lazily delegates to the PGLite
-// instance at call time (inside test bodies, after beforeAll has run).
-// All other exports (schema tables, query helpers) are passed through from
-// the actual module so data.ts can import them normally.
-
-vi.mock("@burnless/db", async () => {
-  const actual = await vi.importActual<typeof import("@burnless/db")>("@burnless/db");
-  // Lazy proxy: defers getTestDb() until the first property access on `db`,
-  // which happens inside async test bodies (after beforeAll).
-  const lazyDb = new Proxy({} as ReturnType<typeof getTestDb>, {
-    get(_target, prop: string | symbol) {
-      const testDb = getTestDb();
-      const value = Reflect.get(testDb, prop);
-      if (typeof value === "function") {
-        return (value as (...a: unknown[]) => unknown).bind(testDb);
-      }
-      return value;
-    },
-  });
-  return { ...actual, db: lazyDb };
-});
-
 // ── Mock: next/cache ─────────────────────────────────────────────────────────
 // cachedQuery wraps unstable_cache. Make it a passthrough so queries run
 // directly against the PGLite instance without Next.js cache involvement.
