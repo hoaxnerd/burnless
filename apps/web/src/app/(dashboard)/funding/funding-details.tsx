@@ -215,8 +215,9 @@ export function FundingRoundsList({
         throw new Error((data as { error?: string }).error ?? "Failed to delete");
       }
       router.refresh();
-    } catch {
-      // Silently fail - user can retry
+    } catch (err) {
+      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
+      console.error("Failed to delete funding round:", err);
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);

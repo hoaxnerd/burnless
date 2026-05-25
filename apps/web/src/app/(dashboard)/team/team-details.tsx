@@ -154,8 +154,9 @@ export function TeamRoster({
         throw new Error(data.error ?? "Failed to delete");
       }
       router.refresh();
-    } catch {
-      // Silently fail - user can retry
+    } catch (err) {
+      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
+      console.error("Failed to delete headcount entry:", err);
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -437,8 +438,9 @@ export function PlannedHiresSection({
         throw new Error(data.error ?? "Failed to delete");
       }
       router.refresh();
-    } catch {
-      // Silently fail - user can retry
+    } catch (err) {
+      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
+      console.error("Failed to delete headcount entry:", err);
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
