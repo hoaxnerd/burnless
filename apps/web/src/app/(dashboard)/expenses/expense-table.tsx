@@ -572,7 +572,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        {!synthetic && !overrideTag && (
+                        {!synthetic && (
                           <>
                             <button
                               onClick={() => setEditingItem(item)}
@@ -588,22 +588,10 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                                 setDeletingItem(item);
                               }}
                               className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              title="Delete expense"
+                              title={overrideTag ? "Delete (creates a scenario delete override)" : "Delete expense"}
                               aria-label={`Delete ${displayName}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                        {!synthetic && overrideTag && (
-                          <>
-                            <button
-                              onClick={() => setEditingItem(item)}
-                              className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                              title="Edit expense"
-                              aria-label={`Edit ${displayName}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                           </>
                         )}
