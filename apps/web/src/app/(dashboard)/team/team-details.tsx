@@ -306,7 +306,13 @@ export function TeamRoster({
                                           ? "text-white bg-danger-600 hover:bg-danger-700"
                                           : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
                                       }`}
-                                      title={confirmDeleteId === member.id ? "Click again to confirm" : "Delete team member"}
+                                      title={
+                                        confirmDeleteId === member.id
+                                          ? "Click again to confirm"
+                                          : memberOverrideTag
+                                            ? "Delete (creates a scenario delete override)"
+                                            : "Delete team member"
+                                      }
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -576,7 +582,13 @@ export function PlannedHiresSection({
                                         ? "text-white bg-danger-600 hover:bg-danger-700"
                                         : "text-surface-400 hover:text-danger-600 hover:bg-danger-50"
                                     }`}
-                                    title={confirmDeleteId === hire.id ? "Click again to confirm" : "Delete planned hire"}
+                                    title={
+                                      confirmDeleteId === hire.id
+                                        ? "Click again to confirm"
+                                        : hireOverrideTag
+                                          ? "Delete (creates a scenario delete override)"
+                                          : "Delete planned hire"
+                                    }
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
