@@ -3,7 +3,12 @@
 /**
  * Sub-form for `percentage_of` forecast method.
  * Engine fields: { sourceLineId, percentage }. NOT `ofAccountId`.
+ *
+ * `percentage` is stored as a 0-1 fractional decimal in the engine.
+ * PercentageInput handles the 0-1 ↔ 0-100 display conversion automatically.
  */
+
+import { PercentageInput } from "@/components/forms/primitives";
 
 interface PercentageOfParams {
   sourceLineId: string;
@@ -17,7 +22,7 @@ interface PercentageOfFieldsProps {
   disabled?: boolean;
 }
 
-const inputClass =
+const selectClass =
   "w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500";
 
 export function PercentageOfFields({
@@ -37,7 +42,7 @@ export function PercentageOfFields({
           value={params.sourceLineId}
           disabled={disabled}
           onChange={(e) => onChange({ ...params, sourceLineId: e.target.value })}
-          className={inputClass}
+          className={selectClass}
         >
           <option value="">Select a forecast line…</option>
           {lines.map((l) => (
@@ -52,27 +57,16 @@ export function PercentageOfFields({
           </p>
         )}
       </div>
-      <div>
-        <label htmlFor="po-pct" className="block text-sm font-medium text-surface-700 mb-1">
-          Percentage
-        </label>
-        <input
-          id="po-pct"
-          type="number"
-          step="0.001"
-          value={Number.isFinite(params.percentage) ? params.percentage : 0}
-          disabled={disabled}
-          onChange={(e) =>
-            onChange({
-              ...params,
-              percentage: e.target.value === "" ? 0 : Number(e.target.value),
-            })
-          }
-          className={inputClass}
-          placeholder="0.15"
-        />
-        <p className="mt-1 text-xs text-surface-500">Decimal, e.g. 0.15 = 15%.</p>
-      </div>
+      <PercentageInput
+        label="Percentage"
+        value={params.percentage}
+        onChange={(v) => onChange({ ...params, percentage: v })}
+        required
+        disabled={disabled}
+        min={0}
+        max={10}
+        step={0.1}
+      />
     </div>
   );
 }

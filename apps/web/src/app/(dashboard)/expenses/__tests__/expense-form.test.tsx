@@ -191,7 +191,8 @@ describe("<ExpenseForm> edit mode", () => {
 
     expect((screen.getByLabelText("Forecast method") as HTMLSelectElement).value).toBe("growth_rate");
     expect((screen.getByLabelText("Base amount") as HTMLInputElement).value).toBe("500");
-    expect((screen.getByLabelText("Monthly growth rate") as HTMLInputElement).value).toBe("0.03");
+    // PercentageInput displays 0-1 engine values as 0-100; 0.03 → "3"
+    expect((screen.getByLabelText("Monthly growth rate") as HTMLInputElement).value).toBe("3");
     expect((screen.getByLabelText("Vendor (optional)") as HTMLInputElement).value).toBe("Landlord LLC");
     expect((screen.getByLabelText("Notes (optional)") as HTMLTextAreaElement).value).toBe("Rent for HQ");
     expect((screen.getByLabelText("Yes, recurring") as HTMLInputElement).checked).toBe(true);
