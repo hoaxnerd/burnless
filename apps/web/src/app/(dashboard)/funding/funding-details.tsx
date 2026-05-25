@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { DollarSign, Calculator, TrendingUp, Clock, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { DollarSign, Calculator, TrendingUp, Clock, Pencil, Trash2 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { FundingRoundForm } from "./funding-round-form";
@@ -10,6 +11,7 @@ import { formatCurrency } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface FundingRound {
   id: string;
@@ -185,8 +187,11 @@ export function FundingRoundsList({
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
+  const router = useRouter();
   // Edit modal state
   const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const {
     isInScenarioMode,
     overrideMap,
@@ -195,6 +200,28 @@ export function FundingRoundsList({
     handleRemove,
     handleRestore,
   } = useScenarioOverrides("funding_round");
+
+  async function handleInlineDelete(id: string) {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const res = await apiFetch(`/api/funding-rounds/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to delete");
+      }
+      router.refresh();
+    } catch {
+      // Silently fail - user can retry
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
 
   if (rounds.length === 0) {
     return (
@@ -252,13 +279,33 @@ export function FundingRoundsList({
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => setEditingRound(round)}
-                          className="mt-0.5 rounded-lg p-1.5 text-surface-300 opacity-0 group-hover:opacity-100 hover:bg-surface-100 hover:text-surface-600 transition-all"
-                          aria-label={`Edit ${round.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                          <button
+                            onClick={() => setEditingRound(round)}
+                            className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
+                            aria-label={`Edit ${round.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleInlineDelete(round.id); }}
+                            disabled={deletingId === round.id}
+                            className={`rounded-lg p-1.5 transition-colors disabled:opacity-50 ${
+                              confirmDeleteId === round.id
+                                ? "text-white bg-danger-600 hover:bg-danger-700"
+                                : "text-surface-300 hover:text-danger-600 hover:bg-danger-50"
+                            }`}
+                            title={
+                              confirmDeleteId === round.id
+                                ? "Click again to confirm"
+                                : roundOverrideTag
+                                  ? "Delete (creates a scenario delete override)"
+                                  : "Delete funding round"
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <div className="text-right">
                           <p className="text-sm font-bold tabular-nums text-surface-900">
                             {formatCurrency(round.amount, "USD", undefined, { compact: true })}
@@ -313,13 +360,33 @@ export function FundingRoundsList({
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => setEditingRound(round)}
-                          className="mt-0.5 rounded-lg p-1.5 text-surface-300 opacity-0 group-hover:opacity-100 hover:bg-surface-100 hover:text-surface-600 transition-all"
-                          aria-label={`Edit ${round.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                          <button
+                            onClick={() => setEditingRound(round)}
+                            className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
+                            aria-label={`Edit ${round.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleInlineDelete(round.id); }}
+                            disabled={deletingId === round.id}
+                            className={`rounded-lg p-1.5 transition-colors disabled:opacity-50 ${
+                              confirmDeleteId === round.id
+                                ? "text-white bg-danger-600 hover:bg-danger-700"
+                                : "text-surface-300 hover:text-danger-600 hover:bg-danger-50"
+                            }`}
+                            title={
+                              confirmDeleteId === round.id
+                                ? "Click again to confirm"
+                                : roundOverrideTag
+                                  ? "Delete (creates a scenario delete override)"
+                                  : "Delete funding round"
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <div className="text-right">
                           <p className="text-sm font-medium tabular-nums text-surface-500 italic">
                             {formatCurrency(round.amount, "USD", undefined, { compact: true })}
