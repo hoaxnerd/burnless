@@ -77,6 +77,10 @@ const ALLOWED = [
   "apps/web/src/components/charts/chart-theme.ts",
   // chart-tooltip.tsx line 7: comment showing example format.
   "apps/web/src/components/charts/chart-tooltip.tsx",
+  // chart-axis-formatter.test.ts (Plan 4 E Task 7): pins formatCompactCurrency
+  // output ("$120k", "$4.0M", "$0") — fixture assertions in a test, not display code.
+  // formatCompactCurrency defaults to "$" when no currency/locale is supplied.
+  "apps/web/src/components/charts/__tests__/",
 
   // ── AI page-context sample prompts ────────────────────────────────────────
   // page-context.ts line 48: sample question "$3M raise at $12M pre" shown
