@@ -47,5 +47,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (row) await logAudit(ctx, "forecast_line", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
   return NextResponse.json(row, { status: 201 });
 });

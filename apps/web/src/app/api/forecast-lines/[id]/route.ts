@@ -27,6 +27,7 @@ export const PATCH = withErrorHandler(async (
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
   return NextResponse.json(row);
 });
 
@@ -46,5 +47,6 @@ export const DELETE = withErrorHandler(async (
   await logAudit(ctx, "forecast_line", id, "delete", {});
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
   return NextResponse.json({ deleted: true });
 });

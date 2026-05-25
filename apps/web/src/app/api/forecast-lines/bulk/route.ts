@@ -129,6 +129,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
   revalidateTag("expense-details");
   revalidateTag("dashboard");
 

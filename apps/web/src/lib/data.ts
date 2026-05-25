@@ -149,18 +149,26 @@ export const getAccounts = cachedQuery(
 );
 
 /**
- * Get all forecast lines for a scenario's company.
- * Looks up the companyId from the scenario for backward compatibility.
- * In the overlay model, forecast lines are company-scoped base data.
+ * Get forecast lines for a scenario's company, with scenario overrides merged.
+ * Phase 4 A §A1: closes the same overlay-bypass regression as getRevenueStreams.
  */
 export const getForecastLines = cachedQuery(
   async (scenarioId: string) => {
-    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    const [scenario] = await db
+      .select({ companyId: scenarios.companyId })
+      .from(scenarios)
+      .where(eq(scenarios.id, scenarioId))
+      .limit(1);
     if (!scenario) return [];
-    return db.select().from(forecastLines).where(eq(forecastLines.companyId, scenario.companyId));
+    const base = await db
+      .select()
+      .from(forecastLines)
+      .where(eq(forecastLines.companyId, scenario.companyId));
+    const resolved = await resolveEntities("forecast_line", base, scenarioId);
+    return resolved.map(({ _override, ...entity }) => entity);
   },
   ["forecast-lines"],
-  { revalidate: 30, tags: ["forecast-lines"] }
+  { revalidate: 30, tags: ["forecast-lines", "scenario-overrides"] }
 );
 
 /** Get forecast values (overrides) for a set of forecast lines. */
