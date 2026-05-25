@@ -13,7 +13,8 @@
       { "name": "next" }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@db-test/*": ["../../packages/db/src/__tests__/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

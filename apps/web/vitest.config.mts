@@ -14,6 +14,14 @@ export default defineConfig({
       deps: {
         external: ["ioredis"],
       },
+      // Allow imports from the monorepo root so DB test helpers
+      // (packages/db/src/__tests__/setup.ts, factories.ts) can be used
+      // in apps/web integration tests.
+      fs: {
+        allow: [
+          path.resolve(import.meta.dirname, "../.."),
+        ],
+      },
     },
     coverage: {
       provider: "v8",
@@ -30,6 +38,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      // Allow test files to import packages/db test helpers via a stable alias.
+      // Used by: src/lib/__tests__/scenario-read-path.test.ts
+      "@db-test": path.resolve(import.meta.dirname, "../../packages/db/src/__tests__"),
     },
   },
 });
