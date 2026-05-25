@@ -1,4 +1,4 @@
-import { isValidCurrency } from "@burnless/types";
+import { isValidCurrency, type CurrencyCode } from "@burnless/types";
 
 /**
  * Resolve the currency code to use for server-side formatting.
@@ -10,7 +10,7 @@ import { isValidCurrency } from "@burnless/types";
  * Server Components cannot use `useLocale()`; this is their alternative.
  * Pattern: `formatCurrency(v, companyCurrency(company), undefined, ...)`.
  */
-export function companyCurrency(company: { currency?: string | null } | null | undefined): string {
+export function companyCurrency(company: { currency?: string | null } | null | undefined): CurrencyCode {
   const raw = company?.currency;
   if (typeof raw === "string" && isValidCurrency(raw)) {
     return raw;

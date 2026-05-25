@@ -9,6 +9,7 @@ import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { RevenueView } from "./revenue-view";
 import { AddRevenueStreamButton } from "./add-revenue-stream-button";
 import { SetupPrompt, ScenarioPrompt, RevenueEmptyState } from "@/components/ui/empty-state";
@@ -24,12 +25,12 @@ export default async function RevenuePage() {
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <RevenueContent companyId={company.id} scenarioId={scenario.id} />
+      <RevenueContent companyId={company.id} scenarioId={scenario.id} company={company} />
     </Suspense>
   );
 }
 
-async function RevenueContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
+async function RevenueContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string; company: { currency?: string | null } }) {
   const [data, revenueDetails] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),
@@ -60,7 +61,7 @@ async function RevenueContent({ companyId, scenarioId }: { companyId: string; sc
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const g = revenueDetails.growthMetrics;
-  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+  const fc = (v: number) => formatCurrency(v, companyCurrency(company), undefined, { compact: true });
 
   const spark = (series: { month: string; value: number }[]) => {
     const vals = series.slice(-8).map(t => t.value);
