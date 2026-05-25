@@ -15,6 +15,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
 
 // Guard: block execution in production environments
 if (process.env.NODE_ENV === "production") {
@@ -205,9 +207,29 @@ function defaultDepartments(ids: typeof FREE | typeof PRO | typeof TEAM, company
 
 // ── Main seed function ────────────────────────────────────────────────────
 
-async function seedTestAccounts() {
-  const client = postgres(connectionString);
-  const db = drizzle(client, { schema });
+// Use Record<string, unknown> so both the fully-typed postgres instance and the
+// generic PGLite instance from getTestDb() (which lacks a schema type param)
+// are assignable without casting.
+type AnyDb = PostgresJsDatabase<Record<string, unknown>> | PgliteDatabase<Record<string, unknown>>;
+
+/**
+ * Seed the three test accounts (free/pro/team) into the supplied database.
+ * When called without a `db` argument (CLI path), it opens a new postgres-js
+ * connection using DATABASE_URL and closes it afterwards.
+ *
+ * Exported so vitest suites can inject a PGLite instance instead.
+ */
+export async function seedTestAccounts(injectedDb?: AnyDb): Promise<void> {
+  let client: ReturnType<typeof postgres> | null = null;
+  let db: AnyDb;
+
+  if (injectedDb) {
+    db = injectedDb;
+  } else {
+    client = postgres(connectionString);
+    db = drizzle(client, { schema });
+  }
+
   const passwordHash = await hashPassword(TEST_PASSWORD);
 
   console.log("🧪 Seeding test accounts...\n");
@@ -732,11 +754,17 @@ async function seedTestAccounts() {
   console.log("║  TEAM  │ test-team-viewer@burnless.app│(viewer member)      ║");
   console.log("╚══════════════════════════════════════════════════════════════╝");
 
-  await client.end();
-  process.exit(0);
+  if (client) {
+    await client.end();
+  }
 }
 
-seedTestAccounts().catch((err) => {
-  console.error("❌ Seed test accounts failed:", err);
-  process.exit(1);
-});
+// CLI entry point — only run when invoked directly (not imported by tests).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seedTestAccounts().then(() => {
+    process.exit(0);
+  }).catch((err) => {
+    console.error("❌ Seed test accounts failed:", err);
+    process.exit(1);
+  });
+}
