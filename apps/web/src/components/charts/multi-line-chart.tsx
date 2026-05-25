@@ -77,7 +77,7 @@ export function MultiLineChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={formatValue}
+            tickFormatter={(v) => formatValue(v)} // [Phase 4 E Task 7] wrap to drop Recharts' implicit index arg
             tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
             axisLine={false}
             tickLine={false}

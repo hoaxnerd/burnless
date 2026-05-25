@@ -103,14 +103,18 @@ export function formatCompactAmount(
   currency: CurrencyCode = "USD",
   locale?: string
 ): string {
-  const config = CURRENCIES[currency];
-  const symbol = config?.symbol ?? currency;
+  // [Phase 4 E Task 7] Guard: if a non-CurrencyCode value leaks in at runtime
+  // (e.g. Recharts passing a tick index as the second arg), fall back to USD so
+  // we never render a raw number as the currency symbol ("4120k" bug).
+  const safeCurrency: CurrencyCode = CURRENCIES[currency] ? currency : "USD";
+  const config = CURRENCIES[safeCurrency];
+  const symbol = config.symbol;
   const abs = Math.abs(amount);
   const sign = amount < 0 ? "-" : "";
-  const resolvedLocale = locale || config?.defaultLocale || "en-US";
+  const resolvedLocale = locale || config.defaultLocale || "en-US";
 
   // Indian numbering: lakhs and crores
-  if (resolvedLocale === "en-IN" || currency === "INR") {
+  if (resolvedLocale === "en-IN" || safeCurrency === "INR") {
     if (abs >= 1_00_00_000) return `${sign}${symbol}${(abs / 1_00_00_000).toFixed(1)}Cr`;
     if (abs >= 1_00_000) return `${sign}${symbol}${(abs / 1_00_000).toFixed(1)}L`;
     if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(0)}k`;
