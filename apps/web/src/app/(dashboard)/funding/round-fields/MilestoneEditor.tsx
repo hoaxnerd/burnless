@@ -1,6 +1,6 @@
 "use client";
 
-import { CurrencyInput } from "@/components/forms/primitives";
+import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
 
 interface Milestone {
   id: string;
@@ -43,12 +43,13 @@ export function MilestoneEditor({ milestones, onChange }: MilestoneEditorProps) 
               label=""
             />
           </div>
-          <input
-            type="date"
-            className="col-span-3 input-sm"
-            value={m.dueDate}
-            onChange={(e) => updateAt(i, { dueDate: e.target.value })}
-          />
+          <div className="col-span-3">
+            <SingleDateInput
+              label="Due Date"
+              value={m.dueDate}
+              onChange={(v) => updateAt(i, { dueDate: v })}
+            />
+          </div>
           <button
             type="button"
             className="col-span-2 btn-ghost-sm text-danger"

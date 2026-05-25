@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { apiFetch } from "@/lib/api-fetch";
 import { useState } from "react";
 import { useLocale } from "@/components/locale/locale-context";
+import { CurrencyInput } from "@/components/forms/primitives";
 
 interface Investor {
   id: string;
@@ -21,16 +22,16 @@ export function InvestorList({ roundId }: { roundId: string }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
 
   const submit = async () => {
     const res = await apiFetch(`/api/funding-rounds/${roundId}/investors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email: email || undefined, amountInvested: Number(amount) }),
+      body: JSON.stringify({ name, email: email || undefined, amountInvested: amount }),
     });
     if (res.ok) {
-      setAdding(false); setName(""); setEmail(""); setAmount("");
+      setAdding(false); setName(""); setEmail(""); setAmount(0);
       mutate();
     }
   };
@@ -61,9 +62,18 @@ export function InvestorList({ roundId }: { roundId: string }) {
       </ul>
       {adding ? (
         <div className="flex gap-2 items-end">
+          {/* No text primitive yet — see primitives/README.md promotion rule */}
           <input className="input-sm flex-1" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          {/* No text primitive yet — see primitives/README.md promotion rule */}
           <input className="input-sm flex-1" placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="input-sm w-32" type="number" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <div className="w-48">
+            <CurrencyInput
+              label="Amount"
+              value={amount}
+              onChange={setAmount}
+              min={0}
+            />
+          </div>
           <button type="button" className="btn-primary-sm" onClick={submit}>Add</button>
           <button type="button" className="btn-ghost-sm" onClick={() => setAdding(false)}>Cancel</button>
         </div>

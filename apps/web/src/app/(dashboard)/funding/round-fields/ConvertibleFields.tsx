@@ -1,6 +1,6 @@
 "use client";
 
-import { CurrencyInput, PercentageInput } from "@/components/forms/primitives";
+import { CurrencyInput, PercentageInput, SingleDateInput } from "@/components/forms/primitives";
 
 interface ConvertibleFieldsProps {
   params: {
@@ -34,17 +34,13 @@ export function ConvertibleFields({ params, setParameters }: ConvertibleFieldsPr
         max={0.5}
         hint="Accrues from issuance until conversion."
       />
-      <div>
-        <label className="text-sm font-medium">Maturity Date</label>
-        <input
-          type="date"
-          className="input"
-          value={params.maturityDate ?? ""}
-          onChange={(e) =>
-            setParameters((p) => ({ ...p, maturityDate: e.target.value || undefined }))
-          }
-        />
-      </div>
+      <SingleDateInput
+        label="Maturity Date"
+        value={params.maturityDate ?? ""}
+        onChange={(v) =>
+          setParameters((p) => ({ ...p, maturityDate: v || undefined }))
+        }
+      />
       <CurrencyInput
         value={params.conversionThreshold ?? 0}
         onChange={(v) => setParameters((p) => ({ ...p, conversionThreshold: v || undefined }))}

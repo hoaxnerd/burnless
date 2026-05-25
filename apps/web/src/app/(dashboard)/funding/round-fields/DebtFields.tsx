@@ -1,6 +1,6 @@
 "use client";
 
-import { NumberInput, PercentageInput } from "@/components/forms/primitives";
+import { NumberInput, PercentageInput, SingleDateInput } from "@/components/forms/primitives";
 
 interface DebtFieldsProps {
   params: {
@@ -45,20 +45,16 @@ export function DebtFields({ params, setParameters }: DebtFieldsProps) {
           <option value="amortized">Amortized (equal P+I each month) — coming soon</option>
         </select>
       </div>
-      <div>
-        <label className="text-sm font-medium">First Payment Date</label>
-        <input
-          type="date"
-          className="input"
-          value={params.firstPaymentDate ?? ""}
-          onChange={(e) =>
-            setParameters((p) => ({
-              ...p,
-              firstPaymentDate: e.target.value || undefined,
-            }))
-          }
-        />
-      </div>
+      <SingleDateInput
+        label="First Payment Date"
+        value={params.firstPaymentDate ?? ""}
+        onChange={(v) =>
+          setParameters((p) => ({
+            ...p,
+            firstPaymentDate: v || undefined,
+          }))
+        }
+      />
     </div>
   );
 }

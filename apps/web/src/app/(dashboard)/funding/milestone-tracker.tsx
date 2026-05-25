@@ -2,6 +2,7 @@
 
 import { apiFetch } from "@/lib/api-fetch";
 import { useLocale } from "@/components/locale/locale-context";
+import { SingleDateInput } from "@/components/forms/primitives";
 
 interface Milestone {
   id: string;
@@ -47,12 +48,12 @@ export function MilestoneTracker({
           {m.hitDate ? (
             <span className="badge-success">Hit {m.hitDate}</span>
           ) : (
-            <input
-              type="date"
-              className="input-sm"
-              onChange={(e) => markHit(m.id, e.target.value)}
-              defaultValue=""
-              aria-label={`Mark ${m.label} hit on date`}
+            // value="" is intentional: after onChange fires markHit the parent
+            // re-renders with hitDate set, replacing this field with a badge.
+            <SingleDateInput
+              label={`Mark ${m.label} hit on date`}
+              value=""
+              onChange={(v) => { if (v) markHit(m.id, v); }}
             />
           )}
         </li>

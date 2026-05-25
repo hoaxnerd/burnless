@@ -1,6 +1,6 @@
 "use client";
 
-import { CurrencyInput } from "@/components/forms/primitives";
+import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
 import { MilestoneEditor } from "./MilestoneEditor";
 
 interface Milestone {
@@ -45,12 +45,10 @@ export function GrantFields({ params, setParameters }: GrantFieldsProps) {
           hint="Cumulative company spend that must occur by the date below."
         />
         <div className="mt-2">
-          <label className="text-sm font-medium">Match As-Of Date</label>
-          <input
-            type="date"
-            className="input"
+          <SingleDateInput
+            label="Match As-Of Date"
             value={params.matchRequirement?.asOf ?? ""}
-            onChange={(e) => setMatch({ asOf: e.target.value })}
+            onChange={(v) => setMatch({ asOf: v })}
           />
         </div>
         <div className="text-xs text-muted mt-1">
