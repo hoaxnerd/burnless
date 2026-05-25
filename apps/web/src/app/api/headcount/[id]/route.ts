@@ -38,6 +38,7 @@ export const PATCH = withErrorHandler(async (
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1 — tag parity with data.ts
   return NextResponse.json(row);
 });
 
@@ -57,5 +58,6 @@ export const DELETE = withErrorHandler(async (
   await logAudit(ctx, "headcount_plan", id, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");
+  revalidateTag("scenario-overrides"); // Phase 4 A §A1 — tag parity with data.ts
   return NextResponse.json({ deleted: true });
 });

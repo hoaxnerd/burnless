@@ -208,17 +208,26 @@ export const getRevenueStreams = cachedQuery(
 );
 
 /**
- * Get headcount plans for a scenario's company.
- * Looks up the companyId from the scenario for backward compatibility.
+ * Get headcount plans for a scenario's company, with scenario overrides merged.
+ * Phase 4 A §A1.
  */
 export const getHeadcountPlans = cachedQuery(
   async (scenarioId: string) => {
-    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    const [scenario] = await db
+      .select({ companyId: scenarios.companyId })
+      .from(scenarios)
+      .where(eq(scenarios.id, scenarioId))
+      .limit(1);
     if (!scenario) return [];
-    return db.select().from(headcountPlans).where(eq(headcountPlans.companyId, scenario.companyId));
+    const base = await db
+      .select()
+      .from(headcountPlans)
+      .where(eq(headcountPlans.companyId, scenario.companyId));
+    const resolved = await resolveEntities("headcount_plan", base, scenarioId);
+    return resolved.map(({ _override, ...entity }) => entity);
   },
   ["headcount-plans"],
-  { revalidate: 30, tags: ["headcount-plans"] }
+  { revalidate: 30, tags: ["headcount-plans", "scenario-overrides"] }
 );
 
 /**
