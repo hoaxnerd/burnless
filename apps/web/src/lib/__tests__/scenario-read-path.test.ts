@@ -15,10 +15,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 // ── PGLite setup via packages/db setup file ─────────────────────────────────
-// Importing this file registers beforeAll/afterAll hooks that spin up PGLite
-// and make getTestDb() available for the duration of this suite.
-// The @db-test alias is defined in vitest.config.mts.
-import "@db-test/setup";
+// Importing this module registers PGLite beforeAll/afterAll hooks for the suite.
 import { getTestDb } from "@db-test/setup";
 
 // ── Factory imports ──────────────────────────────────────────────────────────
@@ -89,9 +86,8 @@ import {
   getFundingRounds,
 } from "../data";
 
-// Note: resetFactoryCounter is imported but intentionally NOT called in beforeEach.
-// Each test creates entities with monotonically-incrementing IDs. Resetting the
-// counter would cause duplicate PK errors since PGLite persists data for the suite.
+// No resetFactoryCounter call needed: IDs are monotonically incrementing per-suite,
+// so each createX() call produces a unique PK even without a reset between tests.
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -133,7 +129,7 @@ describe("Phase 4 A — scenario read-path regression", () => {
     const account = await createFinancialAccount(company.id);
 
     // Scenario-created forecast line (no base row — action: "create")
-    const fakeLineId = "00000000-0000-4000-a000-scenario-0001";
+    const fakeLineId = "00000000-0000-4000-a000-0000feedbeef";
     await createScenarioOverride(scenario.id, "forecast_line", fakeLineId, "create", {
       id: fakeLineId,
       companyId: company.id,
