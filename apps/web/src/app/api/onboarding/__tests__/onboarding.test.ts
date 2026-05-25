@@ -164,33 +164,20 @@ describe("POST /api/onboarding", () => {
 
   /* ── Idempotency ──────────────────────────────────────────────── */
 
-  it("returns existing company when user already has one", async () => {
+  it("returns 409 ONBOARDING_ALREADY_COMPLETE when user already has a company", async () => {
     mockGetAuthUser.mockResolvedValue({ id: "user-1" });
     mockGetUserCompany.mockResolvedValue({ companyId: "existing-co" });
-    mockLimit.mockResolvedValue([{ id: "existing-scenario" }]);
 
     const res = await POST(makeRequest(validBody));
     const body = await res.json();
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("ONBOARDING_ALREADY_COMPLETE");
     expect(body.companyId).toBe("existing-co");
-    expect(body.scenarioId).toBe("existing-scenario");
-    expect(body.existing).toBe(true);
+    expect(body.redirectTo).toBe("/dashboard");
+    expect(body.error).toBeTruthy();
     // Should NOT have called transaction for creation
     expect(mockTransaction).not.toHaveBeenCalled();
-  });
-
-  it("returns null scenarioId when existing company has no default scenario", async () => {
-    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
-    mockGetUserCompany.mockResolvedValue({ companyId: "existing-co" });
-    mockLimit.mockResolvedValue([]);
-
-    const res = await POST(makeRequest(validBody));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.companyId).toBe("existing-co");
-    expect(body.scenarioId).toBeNull();
   });
 
   /* ── Successful creation ──────────────────────────────────────── */

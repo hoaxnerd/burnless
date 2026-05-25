@@ -174,6 +174,14 @@ export default function OnboardingPage() {
         }),
       });
 
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({})) as { code?: string; redirectTo?: string };
+        if (data.code === "ONBOARDING_ALREADY_COMPLETE") {
+          window.location.href = data.redirectTo ?? "/dashboard";
+          return;
+        }
+      }
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Could not create company");
@@ -242,6 +250,14 @@ export default function OnboardingPage() {
           revenue_streams: extraData?.revenueStreams ?? [],
         }),
       });
+
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({})) as { code?: string; redirectTo?: string };
+        if (data.code === "ONBOARDING_ALREADY_COMPLETE") {
+          window.location.href = data.redirectTo ?? "/dashboard";
+          return;
+        }
+      }
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

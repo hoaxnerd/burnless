@@ -23,7 +23,7 @@ import {
   aiFeatureFlags,
   users,
 } from "@burnless/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAuthUser, getUserCompany, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -70,27 +70,19 @@ export const POST = withErrorHandler(async (request: Request) => {
     return errorResponse("Something doesn't look right — please try again", 400);
   }
 
-  // Idempotency: if user already has a company, return it instead of creating a duplicate
+  // Idempotency: if user already has a company, reject the re-submit explicitly.
+  // A silent 200 would make the user think their fresh inputs were accepted when
+  // nothing actually changed. A 409 tells the client to redirect them home.
   const existingMembership = await getUserCompany(userId);
   if (existingMembership) {
-    const [defaultScenario] = await db
-      .select({ id: scenarios.id })
-      .from(scenarios)
-      .where(
-        and(
-          eq(scenarios.companyId, existingMembership.companyId),
-          isNull(scenarios.deletedAt),
-        ),
-      )
-      .limit(1);
-
     return NextResponse.json(
       {
+        error: "Company already exists for this user",
+        code: "ONBOARDING_ALREADY_COMPLETE",
         companyId: existingMembership.companyId,
-        scenarioId: defaultScenario?.id ?? null,
-        existing: true,
+        redirectTo: "/dashboard",
       },
-      { status: 200 },
+      { status: 409 },
     );
   }
 
