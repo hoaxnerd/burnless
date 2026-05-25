@@ -10,6 +10,7 @@ interface EnrichingStepProps {
   enrichedCount: number;
   onSkipToForm: () => void;
   onSkipOnboarding: () => void;
+  agentError?: string | null;
 }
 
 export function EnrichingStep({
@@ -18,6 +19,7 @@ export function EnrichingStep({
   enrichedCount,
   onSkipToForm,
   onSkipOnboarding,
+  agentError,
 }: EnrichingStepProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -96,6 +98,12 @@ export function EnrichingStep({
           <p className="mt-2 text-xs text-surface-400">
             Moving to manual entry in {remaining}s&hellip;
           </p>
+        )}
+
+        {agentError && (
+          <div className="mt-6 rounded-lg bg-danger-50 dark:bg-danger-950 border border-danger-500/20 px-4 py-3 text-sm text-danger-700 dark:text-danger-400 text-left">
+            Our research agent ran into trouble: {agentError}. You can still fill in your data manually.
+          </div>
         )}
 
         <button

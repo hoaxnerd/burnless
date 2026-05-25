@@ -29,6 +29,7 @@ export default function OnboardingPage() {
   const [revenueStreams, setRevenueStreams] = useState<RevenueStream[]>([]);
   const [enrichedCount, setEnrichedCount] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
   const movedToReviewRef = useRef(false);
@@ -125,6 +126,12 @@ export default function OnboardingPage() {
               // Move to review
               movedToReviewRef.current = true;
               setStep("review");
+            } else if (event.type === "agent_failed") {
+              setAgentError(event.message ?? "Onboarding agent failed");
+              setTimeout(() => {
+                movedToReviewRef.current = true;
+                setStep("review");
+              }, 2_500);
             }
           } catch {
             // Skip malformed events
@@ -276,6 +283,7 @@ export default function OnboardingPage() {
           enrichedCount={enrichedCount}
           onSkipToForm={skipToForm}
           onSkipOnboarding={skipOnboarding}
+          agentError={agentError}
         />
       );
 

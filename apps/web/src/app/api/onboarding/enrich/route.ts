@@ -117,10 +117,12 @@ export const POST = withErrorHandler(async (request: Request) => {
         send({ type: "revenue_streams", value: agentResult.revenueStreams });
 
         send({ type: "done", result: agentResult });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Enrichment failed";
-        send({ type: "error", message });
+      } catch (err: unknown) {
+        send({
+          type: "agent_failed",
+          message: err instanceof Error ? err.message : "Onboarding agent failed",
+          recoverable: true,
+        });
       } finally {
         if (pingInterval) clearInterval(pingInterval);
         controller.close();
