@@ -24,7 +24,13 @@ import type {
 } from "./types";
 
 const DEFAULT_YEAR = "2026";
-const DEFAULT_START_DATE = "2026-06-01";
+
+/** Today as YYYY-MM-DD in the server's TZ. Phase 4 E §J: replaces the
+ * hardcoded '2026-06-01' default that made every AI-suggested date land
+ * in June regardless of when onboarding ran. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 // ── Primitive coercion ──────────────────────────────────────────────────────
 
@@ -216,7 +222,9 @@ function healHeadcountRole(raw: Record<string, unknown>): HeadcountRoleDraft {
     department: mapDepartment(raw.department ?? raw.dept),
     employeeType: mapEmployeeType(raw.employeeType ?? raw.type),
     salary: cleanNumber(raw.salary) || 120_000,
-    startDate: cleanDate(raw.startDate ?? raw.start_date),
+    // Phase 4 E §J: fall back to today when startDate is absent so AI-suggested
+    // hires don't silently land on 2026-01-01. cleanDate passes ISO through.
+    startDate: cleanDate(raw.startDate ?? raw.start_date ?? todayIso()),
   };
 }
 
@@ -224,16 +232,16 @@ function healHeadcountRole(raw: Record<string, unknown>): HeadcountRoleDraft {
 // review step is honest, fallbacks were silently lying like 5f7f7da's
 // auto-revenue-stream did. Constants retained for reference; unreached.
 const FALLBACK_HEADCOUNT_STAGE: HeadcountRoleDraft[] = [
-  { title: "CTO / Co-Founder", department: "Engineering", employeeType: "full_time", salary: 140_000, startDate: DEFAULT_START_DATE },
-  { title: "Lead Engineer", department: "Engineering", employeeType: "full_time", salary: 130_000, startDate: DEFAULT_START_DATE },
-  { title: "Product Designer", department: "Engineering", employeeType: "full_time", salary: 110_000, startDate: DEFAULT_START_DATE },
-  { title: "Account Executive", department: "Sales", employeeType: "full_time", salary: 80_000, startDate: DEFAULT_START_DATE },
-  { title: "Growth Marketer", department: "Marketing", employeeType: "full_time", salary: 90_000, startDate: DEFAULT_START_DATE },
+  { title: "CTO / Co-Founder", department: "Engineering", employeeType: "full_time", salary: 140_000, startDate: todayIso() },
+  { title: "Lead Engineer", department: "Engineering", employeeType: "full_time", salary: 130_000, startDate: todayIso() },
+  { title: "Product Designer", department: "Engineering", employeeType: "full_time", salary: 110_000, startDate: todayIso() },
+  { title: "Account Executive", department: "Sales", employeeType: "full_time", salary: 80_000, startDate: todayIso() },
+  { title: "Growth Marketer", department: "Marketing", employeeType: "full_time", salary: 90_000, startDate: todayIso() },
 ];
 
 const FALLBACK_HEADCOUNT_MINIMAL: HeadcountRoleDraft[] = [
-  { title: "Software Engineer", department: "Engineering", employeeType: "full_time", salary: 120_000, startDate: DEFAULT_START_DATE },
-  { title: "Product Manager", department: "Engineering", employeeType: "full_time", salary: 110_000, startDate: DEFAULT_START_DATE },
+  { title: "Software Engineer", department: "Engineering", employeeType: "full_time", salary: 120_000, startDate: todayIso() },
+  { title: "Product Manager", department: "Engineering", employeeType: "full_time", salary: 110_000, startDate: todayIso() },
 ];
 
 function healHeadcount(raw: unknown): HeadcountRoleDraft[] {
@@ -254,7 +262,7 @@ function healExpense(raw: unknown): ExpenseDraft | null {
       name: raw,
       category: mapExpenseCategory(raw),
       amount: 2_500,
-      startDate: DEFAULT_START_DATE,
+      startDate: todayIso(),
       isRecurring: true,
     };
   }
@@ -264,15 +272,15 @@ function healExpense(raw: unknown): ExpenseDraft | null {
     name: pickString(rec, "name", "vendor") || "Office Supplies",
     category: mapExpenseCategory(rec.category ?? rec.cat ?? rec.name),
     amount: cleanNumber(rec.amount) || 1_500,
-    startDate: cleanDate(rec.startDate ?? rec.start_date),
+    startDate: cleanDate(rec.startDate ?? rec.start_date ?? todayIso()),
     isRecurring: rec.isRecurring !== undefined ? Boolean(rec.isRecurring) : true,
   };
 }
 
 const FALLBACK_EXPENSES: ExpenseDraft[] = [
-  { name: "AWS Cloud Infrastructure", category: "Cloud Infrastructure", amount: 2_000, startDate: DEFAULT_START_DATE, isRecurring: true },
-  { name: "Google Workspace & Slack", category: "Software & Tools", amount: 500, startDate: DEFAULT_START_DATE, isRecurring: true },
-  { name: "Marketing & Ads", category: "Marketing", amount: 1_500, startDate: DEFAULT_START_DATE, isRecurring: true },
+  { name: "AWS Cloud Infrastructure", category: "Cloud Infrastructure", amount: 2_000, startDate: todayIso(), isRecurring: true },
+  { name: "Google Workspace & Slack", category: "Software & Tools", amount: 500, startDate: todayIso(), isRecurring: true },
+  { name: "Marketing & Ads", category: "Marketing", amount: 1_500, startDate: todayIso(), isRecurring: true },
 ];
 
 function healExpenses(raw: unknown): ExpenseDraft[] {
@@ -289,7 +297,7 @@ function healRevenueStream(raw: unknown): RevenueStreamDraft | null {
       type: "subscription",
       amount: 49,
       quantity: 100,
-      startDate: DEFAULT_START_DATE,
+      startDate: todayIso(),
       notes: "",
     };
   }
@@ -300,7 +308,7 @@ function healRevenueStream(raw: unknown): RevenueStreamDraft | null {
     type: mapRevenueType(rec.type),
     amount: cleanNumber(rec.amount) || 49,
     quantity: cleanNumber(rec.quantity) || 100,
-    startDate: cleanDate(rec.startDate ?? rec.start_date),
+    startDate: cleanDate(rec.startDate ?? rec.start_date ?? todayIso()),
     notes: typeof rec.notes === "string" ? rec.notes : "",
   };
 }
@@ -319,7 +327,7 @@ function fallbackRevenueFromArr(raw: Record<string, unknown>): RevenueStreamDraf
         type: "subscription",
         amount: 49,
         quantity: 150,
-        startDate: DEFAULT_START_DATE,
+        startDate: todayIso(),
         notes: "Default estimate",
       },
     ];
@@ -332,7 +340,7 @@ function fallbackRevenueFromArr(raw: Record<string, unknown>): RevenueStreamDraf
       type: "subscription",
       amount: 100,
       quantity: Math.max(1, Math.round(monthlyRev / 100)),
-      startDate: DEFAULT_START_DATE,
+      startDate: todayIso(),
       notes: `Based on estimated ARR of $${(annual / 1_000_000).toFixed(1)}M`,
     },
   ];

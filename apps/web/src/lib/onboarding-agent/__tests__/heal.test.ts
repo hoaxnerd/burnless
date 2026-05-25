@@ -121,6 +121,37 @@ describe("healOnboardingResult — enum mapping", () => {
   });
 });
 
+describe("healOnboardingResult — todayIso default startDate (Phase 4 E Task 2)", () => {
+  it("uses today's date when a hire's startDate is missing", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = healOnboardingResult({
+      companyName: "Test Co",
+      headcount: [
+        { title: "Engineer", department: "Engineering", employeeType: "full_time", salary: 120_000 /* no startDate */ },
+      ],
+    } as never);
+    expect(result.headcount[0]?.startDate).toBe(today);
+  });
+
+  it("uses today's date when an expense's startDate is missing", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = healOnboardingResult({
+      companyName: "Test Co",
+      expenses: [{ name: "AWS", category: "Cloud Infrastructure", amount: 2000 }],
+    } as never);
+    expect(result.expenses[0]?.startDate).toBe(today);
+  });
+
+  it("uses today's date when a revenue stream's startDate is missing", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = healOnboardingResult({
+      companyName: "Test Co",
+      revenueStreams: [{ name: "Pro Plan", type: "subscription", amount: 99, quantity: 50 }],
+    } as never);
+    expect(result.revenueStreams[0]?.startDate).toBe(today);
+  });
+});
+
 describe("healOnboardingResult — fallbacks", () => {
   // Removed (Phase 4 E Task 1): "returns minimal fallback headcount when
   // nothing supplied" and "returns a richer stage plan when headcount is a
