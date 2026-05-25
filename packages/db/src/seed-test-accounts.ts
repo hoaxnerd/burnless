@@ -337,6 +337,8 @@ async function seedTestAccounts() {
   }
 
   console.log("    → Revenue stream + forecast lines");
+  // Phase 4 B Task 6: onConflictDoUpdate (not DoNothing) so re-seed resets the
+  // canonical name + parameters even after a promoted E2E scenario polluted them.
   await db.insert(schema.revenueStreams).values({
     id: PRO.rsSubscription,
     companyId: PRO.company,
@@ -350,7 +352,21 @@ async function seedTestAccounts() {
       expansionRate: 0.01,
       priceGrowthRate: 0,
     },
-  }).onConflictDoNothing();
+  }).onConflictDoUpdate({
+    target: schema.revenueStreams.id,
+    set: {
+      name: "Platform Subscriptions",
+      type: "subscription",
+      parameters: {
+        startingCustomers: 30,
+        monthlyPrice: 99,
+        newCustomersPerMonth: 5,
+        monthlyChurnRate: 0.04,
+        expansionRate: 0.01,
+        priceGrowthRate: 0,
+      },
+    },
+  });
 
   const forecastStart = monthDate(2026, 1);
   const forecastEnd = monthDate(2026, 12);
