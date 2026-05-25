@@ -58,5 +58,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (row) await logAudit(ctx, "funding_round", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   return NextResponse.json(row, { status: 201 });
 });

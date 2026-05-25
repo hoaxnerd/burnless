@@ -36,6 +36,7 @@ export const DELETE = withErrorHandler(async (
     );
   await logAudit(ctx, "funding_round_investor", investorId, "delete", {});
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   revalidateTag("cap-table");
   return NextResponse.json({ deleted: true });
 });

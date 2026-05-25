@@ -189,7 +189,7 @@ describe("Phase 4 A — scenario read-path regression", () => {
       name: "Should Not Appear",
     });
 
-    const results = await getFundingRounds(company.id);
+    const results = await getFundingRounds(company.id, null);
     const names = (results as Array<{ name: string }>).map((r) => r.name);
     expect(names).toContain("Base Round");
   });

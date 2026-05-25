@@ -271,13 +271,26 @@ export const getDepartments = cachedQuery(
   { revalidate: 60, tags: ["departments"] }
 );
 
-/** Get funding rounds for a company. */
+/**
+ * Get funding rounds for a company, with scenario overrides merged when
+ * a scenarioId is supplied. Pass `null` for explicit base-only (data-room,
+ * AI base context, etc.).
+ * Phase 4 A §A1: signature changed from (companyId) to (companyId, scenarioId).
+ */
 export const getFundingRounds = cachedQuery(
-  async (companyId: string) => {
-    return db.select().from(fundingRounds).where(eq(fundingRounds.companyId, companyId));
+  async (companyId: string, scenarioId: string | null) => {
+    const base = await db
+      .select()
+      .from(fundingRounds)
+      .where(eq(fundingRounds.companyId, companyId));
+    if (!scenarioId) {
+      return base;
+    }
+    const resolved = await resolveEntities("funding_round", base, scenarioId);
+    return resolved.map(({ _override, ...entity }) => entity);
   },
   ["funding-rounds"],
-  { revalidate: 30, tags: ["funding-rounds"] }
+  { revalidate: 30, tags: ["funding-rounds", "scenario-overrides"] }
 );
 
 /** Get a scenario by ID. */

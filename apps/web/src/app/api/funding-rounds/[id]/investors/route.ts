@@ -63,6 +63,7 @@ export const POST = withErrorHandler(async (
   if (!inserted) return errorResponse("Insert failed", 500);
   await logAudit(ctx, "funding_round_investor", inserted.id, "create", { after: inserted });
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   revalidateTag("cap-table");
   return NextResponse.json({ investor: inserted }, { status: 201 });
 });

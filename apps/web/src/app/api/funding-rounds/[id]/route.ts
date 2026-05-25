@@ -56,6 +56,7 @@ export const PATCH = withErrorHandler(async (
   await logAudit(ctx, "funding_round", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   return NextResponse.json(row);
 });
 
@@ -75,5 +76,6 @@ export const DELETE = withErrorHandler(async (
   await logAudit(ctx, "funding_round", id, "delete", {});
   await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   return NextResponse.json({ deleted: true });
 });

@@ -62,6 +62,7 @@ export const PATCH = withErrorHandler(async (
   );
   await logAudit(ctx, "funding_round", id, "update", { after: { milestoneId, hitDate: parsed.data.hitDate } });
   revalidateTag("funding-rounds");
+  revalidateTag("scenario-overrides");
   revalidateTag("cap-table");
   return NextResponse.json({ milestone: updated.find((m) => m.id === milestoneId) });
 });
