@@ -30,15 +30,22 @@ test.describe("Scenario delete UX uniformity (Phase 4 B)", () => {
     await expect(page.getByRole("dialog", { name: "Edit Expense" })).not.toBeVisible({ timeout: 10_000 });
 
     // The Delete button MUST be present even though the row is now overridden.
-    const deleteBtn = page.locator(`button[aria-label="Delete ${name}"]`);
+    // Use .first() — the expense name may appear on multiple month rows.
+    const deleteBtn = page.locator(`button[aria-label="Delete ${name}"]`).first();
     await expect(deleteBtn).toBeVisible({ timeout: 10_000 });
+
+    // Count edit buttons before delete so we can verify one fewer afterwards.
+    const editCountBefore = await page.locator(`button[aria-label="Edit ${name}"]`).count();
     await deleteBtn.click();
 
     // Modal confirm — button text is "Delete" (see expense-table.tsx:653)
     await page.getByRole("button", { name: /^Delete( expense)?$/ }).click();
 
-    // Row should disappear from the list.
-    await expect(page.locator(`button[aria-label="Edit ${name}"]`)).toHaveCount(0, { timeout: 10_000 });
+    // One fewer Edit button for this name means the row was removed from the list.
+    await expect(page.locator(`button[aria-label="Edit ${name}"]`)).toHaveCount(
+      editCountBefore - 1,
+      { timeout: 10_000 },
+    );
   });
 
   test("delete an overridden hire on /team surfaces immediately", async ({ page }) => {
