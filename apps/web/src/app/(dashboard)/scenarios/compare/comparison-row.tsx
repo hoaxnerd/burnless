@@ -1,5 +1,6 @@
 "use client";
 
+import type { CurrencyCode } from "@burnless/types";
 import type { ComparisonLine } from "./comparison-types";
 import { formatCurrency, formatDelta } from "./comparison-types";
 
@@ -8,14 +9,16 @@ export function ComparisonRow({
   baseName,
   compareName,
   isCurrency,
+  currency,
 }: {
   line: ComparisonLine;
   baseName: string;
   compareName: string;
   isCurrency: boolean;
+  currency: CurrencyCode;
 }) {
   const fmt = (v: number) =>
-    isCurrency ? formatCurrency(v, "USD", undefined, { compact: true }) : String(Math.round(v));
+    isCurrency ? formatCurrency(v, currency, undefined, { compact: true }) : String(Math.round(v));
 
   return (
     <>
@@ -61,7 +64,7 @@ export function ComparisonRow({
               }`}
             >
               <span className="sr-only">{positive ? "Favorable" : "Unfavorable"}:</span>
-              {formatDelta(d.value, isCurrency)}
+              {formatDelta(d.value, isCurrency, currency)}
               {pct !== 0 && (
                 <span className="ml-1 text-[10px] opacity-70">
                   ({pct >= 0 ? "+" : ""}

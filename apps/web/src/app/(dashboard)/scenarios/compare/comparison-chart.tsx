@@ -1,5 +1,6 @@
 "use client";
 
+import type { CurrencyCode } from "@burnless/types";
 import type { ComparisonLine } from "./comparison-types";
 import { formatCurrency, formatMonth } from "./comparison-types";
 
@@ -10,12 +11,14 @@ export function ComparisonChart({
   compareName,
   isCurrency,
   positiveIsGood,
+  currency,
 }: {
   line: ComparisonLine;
   baseName: string;
   compareName: string;
   isCurrency: boolean;
   positiveIsGood: boolean;
+  currency: CurrencyCode;
 }) {
   const width = 500;
   const height = 200;
@@ -52,7 +55,7 @@ export function ComparisonChart({
     );
   }
 
-  const fmt = (v: number) => isCurrency ? formatCurrency(v, "USD", undefined, { compact: true }) : String(Math.round(v));
+  const fmt = (v: number) => isCurrency ? formatCurrency(v, currency, undefined, { compact: true }) : String(Math.round(v));
 
   return (
     <div className="rounded-xl bg-surface-0 border border-surface-200 p-5">

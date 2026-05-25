@@ -38,11 +38,12 @@ export interface ComparisonData {
 }
 
 import { formatCurrency } from "@burnless/types";
+import type { CurrencyCode } from "@burnless/types";
 export { formatCurrency };
 
-export function formatDelta(value: number, isCurrency: boolean): string {
+export function formatDelta(value: number, isCurrency: boolean, currency: CurrencyCode): string {
   const sign = value >= 0 ? "+" : "";
-  if (isCurrency) return `${sign}${formatCurrency(value, "USD", undefined, { compact: true })}`;
+  if (isCurrency) return `${sign}${formatCurrency(value, currency, undefined, { compact: true })}`;
   return `${sign}${Math.round(value)}`;
 }
 

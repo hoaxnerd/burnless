@@ -7,6 +7,7 @@ import { ArrowLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
+import type { CurrencyCode } from "@burnless/types";
 import type { ScenarioOption, ComparisonData, DataDiffGroup, DataDiffItem } from "./comparison-types";
 import { formatCurrency, formatMonth } from "./comparison-types";
 import { ComparisonChart } from "./comparison-chart";
@@ -18,9 +19,11 @@ type Tab = "metrics" | "data";
 export function ComparisonView({
   scenarios,
   initialIds,
+  currency,
 }: {
   scenarios: ScenarioOption[];
   initialIds: string[];
+  currency: CurrencyCode;
 }) {
   const [baseId, setBaseId] = useState(initialIds[0] ?? "");
   const [compareId, setCompareId] = useState(initialIds[1] ?? "");
@@ -210,7 +213,7 @@ export function ComparisonView({
                           </span>
                           <span className="text-sm font-semibold text-surface-900">
                             {isCurrency
-                              ? formatCurrency(lastBase?.value ?? 0, "USD", undefined, { compact: true })
+                              ? formatCurrency(lastBase?.value ?? 0, currency, undefined, { compact: true })
                               : Math.round(lastBase?.value ?? 0)}
                           </span>
                         </div>
@@ -220,7 +223,7 @@ export function ComparisonView({
                           </span>
                           <span className="text-sm font-semibold text-surface-900">
                             {isCurrency
-                              ? formatCurrency(lastCompare?.value ?? 0, "USD", undefined, { compact: true })
+                              ? formatCurrency(lastCompare?.value ?? 0, currency, undefined, { compact: true })
                               : Math.round(lastCompare?.value ?? 0)}
                           </span>
                         </div>
@@ -230,6 +233,7 @@ export function ComparisonView({
                             percent={lastPct?.value ?? 0}
                             isCurrency={isCurrency}
                             positiveIsGood={line.name !== "Expenses"}
+                            currency={currency}
                           />
                         </div>
                       </div>
@@ -248,6 +252,7 @@ export function ComparisonView({
                     compareName={data.compareScenario.name}
                     isCurrency={line.name !== "Headcount"}
                     positiveIsGood={line.name !== "Expenses"}
+                    currency={currency}
                   />
                 ))}
               </div>
@@ -293,6 +298,7 @@ export function ComparisonView({
                             baseName={data.baseScenario.name}
                             compareName={data.compareScenario.name}
                             isCurrency={isCurrency}
+                            currency={currency}
                           />
                         );
                       })}

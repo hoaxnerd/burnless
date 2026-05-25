@@ -3,6 +3,7 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import { getCompany, getScenarios } from "@/lib/data";
+import { companyCurrency } from "@/lib/server-currency";
 import { ComparisonView } from "./comparison-view";
 
 async function CompareContent({
@@ -25,6 +26,7 @@ async function CompareContent({
     <ComparisonView
       scenarios={scenarioOptions}
       initialIds={selectedIds}
+      currency={companyCurrency(company)}
     />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { CurrencyCode } from "@burnless/types";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { formatDelta } from "./comparison-types";
 
@@ -8,11 +9,13 @@ export function DeltaBadge({
   percent,
   isCurrency,
   positiveIsGood,
+  currency,
 }: {
   value: number;
   percent: number;
   isCurrency: boolean;
   positiveIsGood: boolean;
+  currency: CurrencyCode;
 }) {
   if (value === 0) {
     return (
@@ -34,7 +37,7 @@ export function DeltaBadge({
     >
       <Icon className="h-3 w-3" />
       <span className="sr-only">{isGood ? "Favorable" : "Unfavorable"}:</span>
-      {formatDelta(value, isCurrency)}
+      {formatDelta(value, isCurrency, currency)}
       {percent !== 0 && (
         <span className="opacity-70">
           ({percent >= 0 ? "+" : ""}
