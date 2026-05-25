@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Track the currency as loaded from the server (used to revert on cancel)
-  const [loadedCurrency, setLoadedCurrency] = useState<string>("USD");
+  const [loadedCurrency, setLoadedCurrency] = useState<string>("");
 
   // Confirm dialog state — generic: holds whatever message the API returns
   type ConfirmState = { open: false } | { open: true; message: string };
