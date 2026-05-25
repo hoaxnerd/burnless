@@ -85,4 +85,33 @@ describe("employee-type-aware cost", () => {
     );
     expect(r.salary.get("2026-01")).toBeCloseTo(40 * 4.33 * 100 * 0.5, 2);
   });
+
+  it("treats missing employeeType as full_time (defensive default)", () => {
+    // Regression: legacy scenario-override JSONB rows (created before the
+    // create-schema's `employeeType.default("full_time")` landed) resolve
+    // without employeeType. The dashboard crashed with
+    // "Cannot read properties of undefined (reading 'mul')" because the switch
+    // fell through and returned undefined. monthlySalaryFor now mirrors the DB
+    // column default.
+    const r = computeHeadcountPlanCost(
+      {
+        id: "legacy",
+        departmentId: "d",
+        title: "Office Manager",
+        // @ts-expect-error — simulating legacy override data
+        employeeType: undefined,
+        count: 2,
+        salary: 110000,
+        hourlyRate: null,
+        hoursPerWeek: null,
+        startDate: new Date(2026, 4, 1),
+        endDate: null,
+        benefitsRate: 0,
+      },
+      new Date(2026, 4, 1),
+      new Date(2026, 5, 1),
+    );
+    // 2 FTE × 110_000 / 12 = 18_333.33
+    expect(r.salary.get("2026-05")).toBeCloseTo(18333.33, 2);
+  });
 });

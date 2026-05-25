@@ -141,7 +141,12 @@ function effectiveBenefitsRate(plan: HeadcountPlanInput): number {
 
 /** Compute the per-month salary cost for a single FTE on this plan, given a resolved annual salary. */
 function monthlySalaryFor(plan: HeadcountPlanInput, resolvedAnnualSalary: number) {
-  switch (plan.employeeType) {
+  // Defensive default: legacy scenario-override JSONB rows (created before the
+  // create-schema's `employeeType.default("full_time")` landed) can resolve
+  // without an employeeType. Mirror the DB column default rather than
+  // falling through and returning undefined.
+  const type: HeadcountEmployeeType = plan.employeeType ?? "full_time";
+  switch (type) {
     case "full_time":
       return D(resolvedAnnualSalary).div(12);
     case "part_time": {
