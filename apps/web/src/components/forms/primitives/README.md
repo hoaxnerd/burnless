@@ -12,6 +12,7 @@ umbrella (`docs/superpowers/specs/2026-04-24-data-entry-umbrella-design.md`
 | `CurrencyInput`   | Number input prefixed by the active currency  | Reads currency via `useLocale()`; emits raw `number` |
 | `PercentageInput` | 0–100 display ↔ 0–1 engine value              | Emits the 0–1 fractional value               |
 | `NumberInput`     | Bare number input with min/max/integer mode   | Emits `number \| null`                       |
+| `SingleDateInput` | Single ISO-YYYY-MM-DD date input matching the kit's prop conventions (label, required, disabled, hint). Use for any single-field date — close date, effective date, milestone due date, vesting date. For ranges use `<DateRangePicker>`. | ≥2 (funding round-fields, team child-row UIs) |
 
 ## Prop conventions
 
@@ -58,3 +59,10 @@ purpose — re-evaluate when a second consumer appears):
   `LocalDateRangePicker` fork deleted in favor of the canonical primitive.
   `hint` prop added to `DateRangePicker` for prop-shape uniformity across the
   kit. Promotion rule re-affirmed; no demotions or new promotions.
+- **Phase 4 D** (2026-05-25): Added `SingleDateInput` (≥2 consumers).
+  Swept `expenses/forecast-method-fields/`, `team/employee-type-fields/`
+  and team child-row UIs, and `funding/round-fields/` to use the kit
+  consistently. 30+ raw `<input type="number">` / `<input type="date">`
+  swapped across 19 files (~8 expenses, 23 team, 8 funding).
+  Regression test `apps/web/src/__tests__/no-raw-form-inputs.test.ts`
+  blocks reintroduction across 23 files.
