@@ -18,6 +18,7 @@ import {
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { useToast } from "@/components/ui/toast";
+import { useLocale } from "@/components/locale/locale-context";
 import { apiFetch } from "@/lib/api-fetch";
 import type { ScenarioItem } from "./scenarios-view";
 
@@ -94,6 +95,7 @@ function DropdownItem({
 
 export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
+  const { fmtDate } = useLocale();
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -332,7 +334,7 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
             isPromoted || isArchived ? "text-surface-300" : "text-surface-400"
           }`}
         >
-          Created {new Date(scenario.createdAt).toLocaleDateString()}
+          Created {fmtDate(scenario.createdAt)}
         </p>
 
         {/* Actions — vary by status/source */}
