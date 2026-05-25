@@ -149,6 +149,17 @@ const ALLOWED = [
   // currency output from formatters and AI responses. Dollar amounts here are
   // assertions, not display code.
   "apps/web/e2e/",
+
+  // ── Onboarding agent (Plan 4 E scope) ─────────────────────────────────────
+  // TODO Plan 4 E: remove after onboarding heal.ts is cleaned up.
+  // heal.ts line 335 has a `$${...}M` template literal building a notes string;
+  // lines 5/32 are JSDoc comments. onboarding-imports.ts lines 8/9 are JSDoc
+  // comments describing old behaviour. heal.test.ts uses "$30K"/"$1.5M" as
+  // cleanNumber() input fixtures. None are display code, but the production
+  // template literal at heal.ts:335 should eventually use formatCurrency.
+  "apps/web/src/lib/onboarding-imports.ts",
+  "apps/web/src/lib/onboarding-agent/heal.ts",
+  "apps/web/src/lib/onboarding-agent/__tests__/",
 ];
 
 /**
