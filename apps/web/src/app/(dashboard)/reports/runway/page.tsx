@@ -9,6 +9,7 @@ import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { RunwayView } from "./runway-view";
@@ -32,19 +33,19 @@ export default async function RunwayPage() {
         </p>
       </div>
       <Suspense fallback={<ReportContentSkeleton />}>
-        <RunwayContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+        <RunwayContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={companyCurrency(company)} />
       </Suspense>
     </div>
   );
 }
 
-async function RunwayContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+async function RunwayContent({ companyId, scenarioId, companyName, scenarioName, currency }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: ReturnType<typeof companyCurrency> }) {
   const data = await computeDashboardData(companyId, scenarioId);
 
   const { currentMonth } = data;
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+  const fc = (v: number) => formatCurrency(v, currency, undefined, { compact: true });
 
   const spark = (series: { month: string; value: number }[]) => {
     const vals = series.slice(-8).map(t => t.value);

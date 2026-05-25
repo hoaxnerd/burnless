@@ -8,6 +8,7 @@ import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { FundingView } from "./funding-view";
 import { AddFundingButton } from "./add-funding-button";
 import { SetupPrompt } from "@/components/ui/empty-state";
@@ -20,12 +21,12 @@ export default async function FundingPage() {
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <FundingContent companyId={company.id} scenarioId={scenarioId} />
+      <FundingContent companyId={company.id} scenarioId={scenarioId} currency={companyCurrency(company)} />
     </Suspense>
   );
 }
 
-async function FundingContent({ companyId, scenarioId: paramScenarioId }: { companyId: string; scenarioId?: string }) {
+async function FundingContent({ companyId, scenarioId: paramScenarioId, currency }: { companyId: string; scenarioId?: string; currency: ReturnType<typeof companyCurrency> }) {
   const scenario = await getActiveScenario(companyId, paramScenarioId);
   const [fundingRounds, data] = await Promise.all([
     getFundingRounds(companyId, scenario?.id ?? null),
@@ -62,7 +63,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
 
   const now = new Date();
   const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const fc = (v: number) => formatCurrency(v, "USD", undefined, { compact: true });
+  const fc = (v: number) => formatCurrency(v, currency, undefined, { compact: true });
 
   const spark = (series: { month: string; value: number }[]) => {
     const vals = series.slice(-8).map(t => t.value);
@@ -142,6 +143,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId }: { comp
         totalDilution={totalDilution}
         rounds={roundsForDisplay}
         resolvedSlotData={resolvedSlotData}
+        currency={currency}
       />
     </div>
   );

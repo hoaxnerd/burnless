@@ -12,6 +12,7 @@ import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
+import type { CurrencyCode } from "@burnless/types";
 
 interface FundingViewProps {
   totalRaised: number;
@@ -32,6 +33,7 @@ interface FundingViewProps {
     isProjected: boolean;
   }>;
   resolvedSlotData: ResolvedSlotData[];
+  currency: CurrencyCode;
 }
 
 export function FundingView({
@@ -44,6 +46,7 @@ export function FundingView({
   totalDilution,
   rounds,
   resolvedSlotData,
+  currency,
 }: FundingViewProps) {
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
@@ -142,6 +145,7 @@ export function FundingView({
         calcPreMoney={calcPreMoney}
         setCalcPreMoney={setCalcPreMoney}
         calcDilution={calcDilution}
+        currency={currency}
       />
     ),
     "dilution-calc": (
@@ -152,6 +156,7 @@ export function FundingView({
         calcPreMoney={calcPreMoney}
         setCalcPreMoney={setCalcPreMoney}
         calcDilution={calcDilution}
+        currency={currency}
       />
     ),
     "ai-insights": (

@@ -19,6 +19,7 @@ import { weeklyDigestEmail } from "@/lib/email/templates";
 import { getAiFlags } from "@/lib/ai-feature-flags";
 import { logger } from "@/lib/logger";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { companyCurrency } from "@/lib/server-currency";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const SKIP_CRON_AUTH = process.env.DISABLE_CRON_AUTH === "true";
@@ -84,10 +85,11 @@ export const GET = withErrorHandler(async function GET(request: Request) {
       }
 
       // Build deterministic summary
-      const deterministicSummary = buildDeterministicSummary(metrics);
+      const currency = companyCurrency(company);
+      const deterministicSummary = buildDeterministicSummary(metrics, currency);
 
       // Generate AI narrative (may return null if AI disabled or fails)
-      const narrative = await generateDigestNarrative(company.id, metrics);
+      const narrative = await generateDigestNarrative(company.id, metrics, currency);
 
       // Upsert digest to DB
       const weekStart = new Date(metrics.weekStart);
@@ -117,6 +119,7 @@ export const GET = withErrorHandler(async function GET(request: Request) {
           companyName: company.name,
           narrative,
           deterministicSummary,
+          currency,
           metrics: {
             cashPosition: metrics.cashPosition,
             cashChangePercent: metrics.cashChangePercent,

@@ -1,4 +1,4 @@
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -96,6 +96,7 @@ interface DigestEmailData {
   companyName: string;
   narrative: string | null;
   deterministicSummary: string;
+  currency: CurrencyCode;
   metrics: {
     cashPosition: number;
     cashChangePercent: number;
@@ -215,7 +216,7 @@ export function subscriptionCanceledEmail(
 export function weeklyDigestEmail(
   data: DigestEmailData
 ): { subject: string; html: string; text: string } {
-  const { metrics: m, narrative, deterministicSummary, companyName } = data;
+  const { metrics: m, narrative, deterministicSummary, companyName, currency } = data;
 
   const narrativeHtml = narrative
     ? `<div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;margin:0 0 24px;">
@@ -249,11 +250,11 @@ export function weeklyDigestEmail(
       ${narrativeHtml}
 
       <table style="width:100%;border-collapse:collapse;">
-        ${metricRow("Cash Position", formatCurrency(m.cashPosition, "USD", undefined, { compact: true }), m.cashChangePercent)}
-        ${metricRow("Monthly Burn", formatCurrency(m.burnRate, "USD", undefined, { compact: true }), m.burnChangePercent)}
+        ${metricRow("Cash Position", formatCurrency(m.cashPosition, currency, undefined, { compact: true }), m.cashChangePercent)}
+        ${metricRow("Monthly Burn", formatCurrency(m.burnRate, currency, undefined, { compact: true }), m.burnChangePercent)}
         ${metricRow("Runway", `${Math.round(m.runway)} mo`)}
-        ${m.mrr > 0 ? metricRow("MRR", formatCurrency(m.mrr, "USD", undefined, { compact: true }), m.mrrChangePercent) : ""}
-        ${metricRow("Total Expenses", formatCurrency(m.totalExpenses, "USD", undefined, { compact: true }), m.expenseChangePercent)}
+        ${m.mrr > 0 ? metricRow("MRR", formatCurrency(m.mrr, currency, undefined, { compact: true }), m.mrrChangePercent) : ""}
+        ${metricRow("Total Expenses", formatCurrency(m.totalExpenses, currency, undefined, { compact: true }), m.expenseChangePercent)}
         ${m.headcount > 0 ? metricRow("Headcount", String(m.headcount)) : ""}
       </table>
 

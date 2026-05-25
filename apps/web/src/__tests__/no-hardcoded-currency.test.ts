@@ -222,4 +222,37 @@ describe("no-hardcoded-currency", () => {
 
     expect(offenders, `Hardcoded Intl.NumberFormat currency codes found:\n${offenders.join("\n")}`).toEqual([]);
   });
+
+  it("has no `formatCurrency(v, 'XXX', ...)` with hardcoded ISO currency code", () => {
+    // Catches the exact pattern Plan 4 C spent 7 tasks fixing, which the previous
+    // regex gap silently missed: formatCurrency(value, "USD", ...) etc.
+    const raw = execSync(
+      `grep -rEn 'formatCurrency\\s*\\([^,)]+,\\s*"[A-Z]{3}"' apps packages --include='*.ts' --include='*.tsx' || true`,
+      { encoding: "utf8", cwd: REPO_ROOT, maxBuffer: 50 * 1024 * 1024 }
+    );
+
+    const offenders = raw
+      .split("\n")
+      .filter(Boolean)
+      .filter((line) => !line.includes(".d.ts:"))
+      .filter((line) => !isAllowed(line));
+
+    expect(offenders, `Hardcoded formatCurrency ISO codes found:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("has no `formatCompactAmount(v, 'XXX')` with hardcoded ISO currency code", () => {
+    // Catches the compact-amount variant of the same pattern.
+    const raw = execSync(
+      `grep -rEn 'formatCompactAmount\\s*\\([^,)]+,\\s*"[A-Z]{3}"' apps packages --include='*.ts' --include='*.tsx' || true`,
+      { encoding: "utf8", cwd: REPO_ROOT, maxBuffer: 50 * 1024 * 1024 }
+    );
+
+    const offenders = raw
+      .split("\n")
+      .filter(Boolean)
+      .filter((line) => !line.includes(".d.ts:"))
+      .filter((line) => !isAllowed(line));
+
+    expect(offenders, `Hardcoded formatCompactAmount ISO codes found:\n${offenders.join("\n")}`).toEqual([]);
+  });
 });

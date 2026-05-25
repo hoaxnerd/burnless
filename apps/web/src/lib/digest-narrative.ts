@@ -9,6 +9,7 @@ import type { DigestMetrics } from "./compute-digest";
 import { buildDeterministicSummary } from "./compute-digest";
 import { checkAiFeatureAllowed } from "./ai-feature-flags";
 import { setTrackingCompanyId } from "./ai-usage-tracker";
+import type { CurrencyCode } from "@burnless/types";
 
 const _DIGEST_SYSTEM_PROMPT = `You are the CFO of a startup. Write a concise weekly financial briefing for the founder.
 
@@ -25,14 +26,15 @@ Rules:
 
 export async function generateDigestNarrative(
   companyId: string,
-  metrics: DigestMetrics
+  metrics: DigestMetrics,
+  currency: CurrencyCode = "USD"
 ): Promise<string | null> {
   setTrackingCompanyId(companyId);
 
   const { allowed } = await checkAiFeatureAllowed(companyId, "weeklyDigest");
   if (!allowed) return null;
 
-  const deterministic = buildDeterministicSummary(metrics);
+  const deterministic = buildDeterministicSummary(metrics, currency);
 
   try {
     const result = await chat({

@@ -7,7 +7,7 @@ import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { FundingRoundForm } from "./funding-round-form";
 import { Modal } from "@/components/ui";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
@@ -173,6 +173,7 @@ interface FundingRoundsListProps {
   calcPreMoney: number;
   setCalcPreMoney: (v: number) => void;
   calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+  currency: CurrencyCode;
 }
 
 export function FundingRoundsList({
@@ -183,6 +184,7 @@ export function FundingRoundsList({
   calcPreMoney,
   setCalcPreMoney,
   calcDilution,
+  currency,
 }: FundingRoundsListProps) {
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
@@ -309,12 +311,12 @@ export function FundingRoundsList({
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold tabular-nums text-surface-900">
-                            {formatCurrency(round.amount, "USD", undefined, { compact: true })}
+                            {formatCurrency(round.amount, currency, undefined, { compact: true })}
                           </p>
                           <div className="flex items-center gap-3 mt-0.5">
                             {round.preMoneyValuation && (
                               <span className="text-[10px] text-surface-400">
-                                {formatCurrency(round.preMoneyValuation, "USD", undefined, { compact: true })} pre
+                                {formatCurrency(round.preMoneyValuation, currency, undefined, { compact: true })} pre
                               </span>
                             )}
                             {round.dilutionPercent && (
@@ -390,7 +392,7 @@ export function FundingRoundsList({
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium tabular-nums text-surface-500 italic">
-                            {formatCurrency(round.amount, "USD", undefined, { compact: true })}
+                            {formatCurrency(round.amount, currency, undefined, { compact: true })}
                           </p>
                           {round.dilutionPercent && (
                             <span className="text-[10px] text-surface-400 italic">
@@ -453,6 +455,7 @@ export function DilutionCalculator({
   calcPreMoney,
   setCalcPreMoney,
   calcDilution,
+  currency,
 }: {
   foundersOwnership: number;
   calcRaiseAmount: number;
@@ -460,6 +463,7 @@ export function DilutionCalculator({
   calcPreMoney: number;
   setCalcPreMoney: (v: number) => void;
   calcDilution: { dilution: number; postMoney: number; newOwnership: number };
+  currency: CurrencyCode;
 }) {
   return (
     <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
@@ -555,7 +559,7 @@ export function DilutionCalculator({
               Post-Money
             </p>
             <p className="text-xl font-bold tabular-nums text-surface-900">
-              {formatCurrency(calcDilution.postMoney, "USD", undefined, { compact: true })}
+              {formatCurrency(calcDilution.postMoney, currency, undefined, { compact: true })}
             </p>
           </div>
           <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
@@ -579,9 +583,11 @@ export function DilutionCalculator({
 export function FundraisingReadinessTip({
   currentRunway,
   currentBurn,
+  currency,
 }: {
   currentRunway: number;
   currentBurn: number;
+  currency: CurrencyCode;
 }) {
   const aiFlags = useOptionalAiFlags();
   const name = aiFlags?.companionName ?? "companion";
@@ -596,7 +602,7 @@ export function FundraisingReadinessTip({
           <p className="text-sm font-semibold text-surface-900">Fundraising Readiness</p>
           <p className="text-xs text-surface-600 mt-1 leading-relaxed">
             With <span className="font-semibold">{Math.round(currentRunway)} months</span> of runway at{" "}
-            <span className="font-semibold tabular-nums">{formatCurrency(currentBurn, "USD", undefined, { compact: true })}/mo</span> burn,
+            <span className="font-semibold tabular-nums">{formatCurrency(currentBurn, currency, undefined, { compact: true })}/mo</span> burn,
             {currentRunway <= 6
               ? " you should be actively fundraising now. Most rounds take 3-6 months."
               : currentRunway <= 12

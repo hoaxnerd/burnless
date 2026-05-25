@@ -7,7 +7,7 @@
 import {
   monthKey,
 } from "@burnless/engine";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { computeDashboardData } from "./compute-dashboard";
 import { computeExpenseDetails } from "./compute-expenses";
 import { computeRevenueDetails } from "./compute-revenue";
@@ -181,7 +181,7 @@ export async function computeWeeklyDigest(
 
 // ── Deterministic summary (no AI) ────────────────────────────────────────
 
-export function buildDeterministicSummary(m: DigestMetrics): string {
+export function buildDeterministicSummary(m: DigestMetrics, currency: CurrencyCode = "USD"): string {
   const lines: string[] = [];
 
   lines.push(`Weekly Financial Summary — ${m.currentMonth}`);
@@ -189,10 +189,10 @@ export function buildDeterministicSummary(m: DigestMetrics): string {
 
   // Cash & Runway
   lines.push(
-    `Cash: ${formatCurrency(m.cashPosition, "USD", undefined, { compact: true })} (${sign(m.cashChangePercent)}${m.cashChangePercent.toFixed(1)}% MoM)`
+    `Cash: ${formatCurrency(m.cashPosition, currency, undefined, { compact: true })} (${sign(m.cashChangePercent)}${m.cashChangePercent.toFixed(1)}% MoM)`
   );
   lines.push(
-    `Burn Rate: ${formatCurrency(m.burnRate, "USD", undefined, { compact: true })}/mo (${sign(m.burnChangePercent)}${m.burnChangePercent.toFixed(1)}% MoM)`
+    `Burn Rate: ${formatCurrency(m.burnRate, currency, undefined, { compact: true })}/mo (${sign(m.burnChangePercent)}${m.burnChangePercent.toFixed(1)}% MoM)`
   );
   lines.push(`Runway: ${Math.round(m.runway)} months`);
   lines.push("");
@@ -200,24 +200,24 @@ export function buildDeterministicSummary(m: DigestMetrics): string {
   // Revenue
   if (m.mrr > 0) {
     lines.push(
-      `MRR: ${formatCurrency(m.mrr, "USD", undefined, { compact: true })} (${sign(m.mrrChangePercent)}${m.mrrChangePercent.toFixed(1)}% MoM)`
+      `MRR: ${formatCurrency(m.mrr, currency, undefined, { compact: true })} (${sign(m.mrrChangePercent)}${m.mrrChangePercent.toFixed(1)}% MoM)`
     );
-    lines.push(`ARR: ${formatCurrency(m.arr, "USD", undefined, { compact: true })}`);
+    lines.push(`ARR: ${formatCurrency(m.arr, currency, undefined, { compact: true })}`);
   }
   if (m.totalRevenue > 0) {
-    lines.push(`Total Revenue: ${formatCurrency(m.totalRevenue, "USD", undefined, { compact: true })}/mo`);
+    lines.push(`Total Revenue: ${formatCurrency(m.totalRevenue, currency, undefined, { compact: true })}/mo`);
   }
   lines.push("");
 
   // Expenses
   lines.push(
-    `Total Expenses: ${formatCurrency(m.totalExpenses, "USD", undefined, { compact: true })}/mo (${sign(m.expenseChangePercent)}${m.expenseChangePercent.toFixed(1)}% MoM)`
+    `Total Expenses: ${formatCurrency(m.totalExpenses, currency, undefined, { compact: true })}/mo (${sign(m.expenseChangePercent)}${m.expenseChangePercent.toFixed(1)}% MoM)`
   );
   if (m.topExpenseCategories.length > 0) {
     lines.push("Top Spend:");
     for (const cat of m.topExpenseCategories) {
       lines.push(
-        `  - ${cat.name}: ${formatCurrency(cat.amount, "USD", undefined, { compact: true })} (${sign(cat.change)}${cat.change.toFixed(0)}%)`
+        `  - ${cat.name}: ${formatCurrency(cat.amount, currency, undefined, { compact: true })} (${sign(cat.change)}${cat.change.toFixed(0)}%)`
       );
     }
   }
