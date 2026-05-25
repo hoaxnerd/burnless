@@ -15,6 +15,7 @@ import { FullTimeFields } from "./employee-type-fields/FullTimeFields";
 import { PartTimeFields } from "./employee-type-fields/PartTimeFields";
 import { ContractorFields } from "./employee-type-fields/ContractorFields";
 import { BenefitsBreakdownEditor } from "./benefits-breakdown-editor";
+import { DateRangePicker } from "@/components/forms/primitives";
 
 interface Department {
   id: string;
@@ -237,26 +238,12 @@ export function HeadcountForm({
             <ContractorFields state={state} errors={errors} onChange={onChange} />
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="block font-medium text-surface-700 mb-1">Start date</span>
-              <input
-                type="date"
-                value={state.startDate}
-                onChange={(e) => onChange({ startDate: e.target.value })}
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="block font-medium text-surface-700 mb-1">End date (optional)</span>
-              <input
-                type="date"
-                value={state.endDate ?? ""}
-                onChange={(e) => onChange({ endDate: e.target.value || null })}
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-          </div>
+          <DateRangePicker
+            startDate={state.startDate}
+            endDate={state.endDate}
+            onChange={({ startDate, endDate }) => onChange({ startDate, endDate })}
+            required
+          />
 
           <fieldset className="rounded-lg border border-surface-200 p-3">
             <legend className="px-1 text-xs font-medium text-surface-700">Benefits breakdown</legend>

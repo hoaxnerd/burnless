@@ -15,6 +15,17 @@ vi.mock("@/components/ui", () => ({
       </div>
     ) : null,
 }));
+vi.mock("@/components/locale/locale-context", () => ({
+  useLocale: () => ({
+    currency: "USD",
+    currencySymbol: "$",
+    locale: "en-US",
+    fmtCurrency: (n: number) => `$${n.toFixed(2)}`,
+    fmtCompact: (n: number) => `$${n}`,
+    currencySettings: { currency: "USD", locale: "en-US" },
+  }),
+  LocaleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 import { SalaryChangesList } from "../salary-changes-list";
 
@@ -55,10 +66,10 @@ describe("<SalaryChangesList>", () => {
     render(<SalaryChangesList headcountId="h1" scenarioId="s1" changes={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-salary-change"));
-    fireEvent.change(screen.getByTestId("salary-change-effective-date"), {
+    fireEvent.change(screen.getByLabelText("Effective date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("salary-change-new-salary"), {
+    fireEvent.change(screen.getByLabelText("New salary"), {
       target: { value: "120000" },
     });
     fireEvent.change(screen.getByTestId("salary-change-reason"), {
@@ -116,10 +127,10 @@ describe("<SalaryChangesList>", () => {
     render(<SalaryChangesList headcountId="h1" scenarioId="s1" changes={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-salary-change"));
-    fireEvent.change(screen.getByTestId("salary-change-effective-date"), {
+    fireEvent.change(screen.getByLabelText("Effective date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("salary-change-new-salary"), {
+    fireEvent.change(screen.getByLabelText("New salary"), {
       target: { value: "120000" },
     });
     fireEvent.click(screen.getByTestId("submit-salary-change"));

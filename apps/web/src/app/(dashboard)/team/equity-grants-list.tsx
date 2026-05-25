@@ -8,6 +8,7 @@ import {
   VestingScheduleEditor,
   type VestingMilestone,
 } from "./vesting-schedule-editor";
+import { CurrencyInput, NumberInput, SingleDateInput } from "@/components/forms/primitives";
 
 export type GrantType = "iso" | "nso" | "rsu";
 
@@ -30,8 +31,8 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [grantDate, setGrantDate] = useState("");
-  const [shares, setShares] = useState("");
-  const [strikePrice, setStrikePrice] = useState("");
+  const [shares, setShares] = useState<number | null>(null);
+  const [strikePrice, setStrikePrice] = useState<number | null>(null);
   const [grantType, setGrantType] = useState<GrantType>("iso");
   const [vesting, setVesting] = useState<VestingMilestone[]>([]);
   const [saving, setSaving] = useState(false);
@@ -41,8 +42,8 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
 
   function reset() {
     setGrantDate("");
-    setShares("");
-    setStrikePrice("");
+    setShares(null);
+    setStrikePrice(null);
     setGrantType("iso");
     setVesting([]);
     setError(null);
@@ -65,8 +66,8 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
         },
         body: JSON.stringify({
           grantDate,
-          shares: parseFloat(shares),
-          strikePrice: strikePrice === "" ? null : parseFloat(strikePrice),
+          shares: shares ?? 0,
+          strikePrice: strikePrice,
           grantType,
           parameters: { vestingSchedule: vesting },
         }),
@@ -100,7 +101,7 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
     router.refresh();
   }
 
-  const totalSharesNum = shares === "" ? undefined : parseFloat(shares);
+  const totalSharesNum = shares === null ? undefined : shares;
 
   return (
     <div data-testid="equity-grants-list">
@@ -160,36 +161,24 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
 
       <Modal open={open} onClose={close} title="Add equity grant">
         <div className="space-y-3">
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Grant date</span>
-            <input
-              type="date"
-              value={grantDate}
-              onChange={(e) => setGrantDate(e.target.value)}
-              data-testid="equity-grant-date"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Shares</span>
-            <input
-              type="number"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              data-testid="equity-grant-shares"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Strike price (optional)</span>
-            <input
-              type="number"
-              value={strikePrice}
-              onChange={(e) => setStrikePrice(e.target.value)}
-              data-testid="equity-grant-strike-price"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
+          <SingleDateInput
+            label="Grant date"
+            value={grantDate}
+            onChange={setGrantDate}
+          />
+          <NumberInput
+            label="Shares"
+            value={shares}
+            onChange={(next) => setShares(next)}
+            min={0}
+          />
+          <CurrencyInput
+            label="Strike price (optional)"
+            value={strikePrice ?? 0}
+            onChange={(next) => setStrikePrice(next === 0 ? null : next)}
+            min={0}
+            step={0.01}
+          />
           <label className="block text-sm">
             <span className="block font-medium text-surface-700 mb-1">Type</span>
             <select

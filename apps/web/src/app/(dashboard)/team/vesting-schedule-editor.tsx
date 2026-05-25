@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { NumberInput, SingleDateInput } from "@/components/forms/primitives";
 
 export type VestingMilestoneType = "cliff" | "monthly" | "quarterly" | "annual" | "milestone";
 export interface VestingMilestone {
@@ -17,17 +18,17 @@ interface Props {
 export function VestingScheduleEditor({ value, onChange, totalShares }: Props) {
   const [type, setType] = useState<VestingMilestoneType>("cliff");
   const [date, setDate] = useState("");
-  const [sharesVested, setSharesVested] = useState("");
+  const [sharesVested, setSharesVested] = useState<number | null>(null);
   const total = value.reduce((s, v) => s + v.sharesVested, 0);
   const exceeds = totalShares !== undefined && total > totalShares;
 
   function addRow() {
-    if (!date || !sharesVested) return;
-    const next = [...value, { type, date, sharesVested: parseFloat(sharesVested) }];
+    if (!date || sharesVested === null) return;
+    const next = [...value, { type, date, sharesVested }];
     next.sort((a, b) => a.date.localeCompare(b.date));
     onChange(next);
     setDate("");
-    setSharesVested("");
+    setSharesVested(null);
   }
 
   function removeRow(i: number) {
@@ -76,19 +77,16 @@ export function VestingScheduleEditor({ value, onChange, totalShares }: Props) {
           <option value="annual">Annual</option>
           <option value="milestone">Milestone</option>
         </select>
-        <input
-          type="date"
+        <SingleDateInput
+          label="Vesting date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
-          data-testid="vesting-date"
+          onChange={setDate}
         />
-        <input
-          type="number"
-          min={0}
+        <NumberInput
+          label="Shares vested"
           value={sharesVested}
-          onChange={(e) => setSharesVested(e.target.value)}
-          data-testid="vesting-shares"
-          placeholder="shares"
+          onChange={(next) => setSharesVested(next)}
+          min={0}
         />
         <button type="button" onClick={addRow} data-testid="add-vesting">
           Add

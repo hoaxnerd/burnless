@@ -15,6 +15,17 @@ vi.mock("@/components/ui", () => ({
       </div>
     ) : null,
 }));
+vi.mock("@/components/locale/locale-context", () => ({
+  useLocale: () => ({
+    currency: "USD",
+    currencySymbol: "$",
+    locale: "en-US",
+    fmtCurrency: (n: number) => `$${n.toFixed(2)}`,
+    fmtCompact: (n: number) => `$${n}`,
+    currencySettings: { currency: "USD", locale: "en-US" },
+  }),
+  LocaleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 import { EquityGrantsList } from "../equity-grants-list";
 
@@ -55,13 +66,13 @@ describe("<EquityGrantsList>", () => {
     render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
-    fireEvent.change(screen.getByTestId("equity-grant-date"), {
+    fireEvent.change(screen.getByLabelText("Grant date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("equity-grant-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares"), {
       target: { value: "1000" },
     });
-    fireEvent.change(screen.getByTestId("equity-grant-strike-price"), {
+    fireEvent.change(screen.getByLabelText("Strike price (optional)"), {
       target: { value: "1.5" },
     });
     fireEvent.change(screen.getByTestId("equity-grant-type"), {
@@ -69,10 +80,10 @@ describe("<EquityGrantsList>", () => {
     });
 
     // Add one vesting milestone via embedded editor
-    fireEvent.change(screen.getByTestId("vesting-date"), {
+    fireEvent.change(screen.getByLabelText("Vesting date"), {
       target: { value: "2027-06-01" },
     });
-    fireEvent.change(screen.getByTestId("vesting-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares vested"), {
       target: { value: "250" },
     });
     fireEvent.click(screen.getByTestId("add-vesting"));
@@ -107,10 +118,10 @@ describe("<EquityGrantsList>", () => {
     render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
-    fireEvent.change(screen.getByTestId("equity-grant-date"), {
+    fireEvent.change(screen.getByLabelText("Grant date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("equity-grant-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares"), {
       target: { value: "500" },
     });
     fireEvent.click(screen.getByTestId("submit-equity-grant"));
@@ -157,10 +168,10 @@ describe("<EquityGrantsList>", () => {
     render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
-    fireEvent.change(screen.getByTestId("equity-grant-date"), {
+    fireEvent.change(screen.getByLabelText("Grant date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("equity-grant-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares"), {
       target: { value: "1000" },
     });
     fireEvent.click(screen.getByTestId("submit-equity-grant"));

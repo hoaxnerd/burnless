@@ -6,6 +6,8 @@ import {
   type VestingMilestone,
 } from "../vesting-schedule-editor";
 
+// Primitives use aria-label; no locale dependency in NumberInput/SingleDateInput.
+
 function Wrapper({
   initial = [],
   totalShares,
@@ -40,19 +42,19 @@ describe("<VestingScheduleEditor>", () => {
   it("adds rows and sorts ascending by date", () => {
     render(<Wrapper />);
     // Add a 2026-06 entry first
-    fireEvent.change(screen.getByTestId("vesting-date"), {
+    fireEvent.change(screen.getByLabelText("Vesting date"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("vesting-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares vested"), {
       target: { value: "200" },
     });
     fireEvent.click(screen.getByTestId("add-vesting"));
 
     // Then a 2026-01 entry
-    fireEvent.change(screen.getByTestId("vesting-date"), {
+    fireEvent.change(screen.getByLabelText("Vesting date"), {
       target: { value: "2026-01-01" },
     });
-    fireEvent.change(screen.getByTestId("vesting-shares"), {
+    fireEvent.change(screen.getByLabelText("Shares vested"), {
       target: { value: "100" },
     });
     fireEvent.click(screen.getByTestId("add-vesting"));

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import { Modal } from "@/components/ui";
+import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
 
 export type BonusType = "signing" | "performance" | "retention" | "other";
 
@@ -25,7 +26,7 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [payoutMonth, setPayoutMonth] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | null>(null);
   const [type, setType] = useState<BonusType>("performance");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,7 +36,7 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
 
   function reset() {
     setPayoutMonth("");
-    setAmount("");
+    setAmount(null);
     setType("performance");
     setNotes("");
     setError(null);
@@ -58,7 +59,7 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
         },
         body: JSON.stringify({
           payoutMonth,
-          amount: parseFloat(amount),
+          amount: amount ?? 0,
           type,
           notes: notes || null,
         }),
@@ -147,26 +148,17 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
 
       <Modal open={open} onClose={close} title="Add bonus">
         <div className="space-y-3">
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Payout month</span>
-            <input
-              type="date"
-              value={payoutMonth}
-              onChange={(e) => setPayoutMonth(e.target.value)}
-              data-testid="bonus-payout-month"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Amount</span>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              data-testid="bonus-amount"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
+          <SingleDateInput
+            label="Payout month"
+            value={payoutMonth}
+            onChange={setPayoutMonth}
+          />
+          <CurrencyInput
+            label="Amount"
+            value={amount ?? 0}
+            onChange={(next) => setAmount(next)}
+            min={0}
+          />
           <label className="block text-sm">
             <span className="block font-medium text-surface-700 mb-1">Type</span>
             <select

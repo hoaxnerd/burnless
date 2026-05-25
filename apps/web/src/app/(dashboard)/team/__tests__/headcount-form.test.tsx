@@ -19,6 +19,18 @@ vi.mock("@/components/ui", () => ({
     ) : null,
 }));
 
+vi.mock("@/components/locale/locale-context", () => ({
+  useLocale: () => ({
+    currency: "USD",
+    currencySymbol: "$",
+    locale: "en-US",
+    fmtCurrency: (n: number) => `$${n.toFixed(2)}`,
+    fmtCompact: (n: number) => `$${n}`,
+    currencySettings: { currency: "USD", locale: "en-US" },
+  }),
+  LocaleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const departments = [{ id: "d1", name: "Engineering" }];
 
 describe("<HeadcountForm>", () => {

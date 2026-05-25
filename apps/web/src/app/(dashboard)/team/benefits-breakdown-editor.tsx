@@ -1,6 +1,7 @@
 "use client";
 
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
+import { PercentageInput } from "@/components/forms/primitives";
 
 interface Props {
   value: BenefitsBreakdown;
@@ -30,30 +31,21 @@ export function BenefitsBreakdownEditor({ value, companyDefaults, onChange }: Pr
     >
       <div className="grid grid-cols-2 gap-3">
         {SLOTS.map(({ key, label }) => (
-          <label key={key} className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">{label}</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                step={0.001}
-                min={0}
-                max={1}
-                value={value[key] ?? ""}
-                placeholder={(companyDefaults[key] ?? 0).toString()}
-                onChange={(e) => {
-                  const next: BenefitsBreakdown = { ...value };
-                  const v = e.target.value === "" ? undefined : Number(e.target.value);
-                  if (v === undefined) delete next[key];
-                  else (next as Record<string, number>)[key] = v;
-                  onChange(next);
-                }}
-                className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-              <span className="hint text-xs text-surface-500 whitespace-nowrap">
-                {(((value[key] ?? 0) * 100).toFixed(2))}%
-              </span>
-            </div>
-          </label>
+          <PercentageInput
+            key={key}
+            label={label}
+            value={value[key] ?? 0}
+            onChange={(next) => {
+              const updated: BenefitsBreakdown = { ...value };
+              if (next === 0) delete updated[key];
+              else (updated as Record<string, number>)[key] = next;
+              onChange(updated);
+            }}
+            min={0}
+            max={1}
+            step={0.1}
+            hint={`Default: ${((companyDefaults[key] ?? 0) * 100).toFixed(2)}%`}
+          />
         ))}
       </div>
       <div className="flex items-center justify-between">

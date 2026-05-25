@@ -144,6 +144,13 @@ const ALLOWED = [
   // fmtCurrency/fmtCompact stub — fixture values in a test, not display code.
   "apps/web/src/app/(dashboard)/revenue/__tests__/",
 
+  // ── Team form tests (Plan 4 D Task 3) ─────────────────────────────────────
+  // headcount-form.test.tsx, bonuses-list.test.tsx, salary-changes-list.test.tsx,
+  // equity-grants-list.test.tsx use `$${n.toFixed(2)}` inside vi.mock()
+  // fmtCurrency/fmtCompact stubs for the CurrencyInput locale-context mock.
+  // Fixture values in tests, not display code.
+  "apps/web/src/app/(dashboard)/team/__tests__/",
+
   // ── E2E (Playwright) tests ────────────────────────────────────────────────
   // E2E tests assert text visible in the browser, which includes formatted
   // currency output from formatters and AI responses. Dollar amounts here are

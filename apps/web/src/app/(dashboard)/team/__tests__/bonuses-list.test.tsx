@@ -15,6 +15,17 @@ vi.mock("@/components/ui", () => ({
       </div>
     ) : null,
 }));
+vi.mock("@/components/locale/locale-context", () => ({
+  useLocale: () => ({
+    currency: "USD",
+    currencySymbol: "$",
+    locale: "en-US",
+    fmtCurrency: (n: number) => `$${n.toFixed(2)}`,
+    fmtCompact: (n: number) => `$${n}`,
+    currencySettings: { currency: "USD", locale: "en-US" },
+  }),
+  LocaleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 import { BonusesList } from "../bonuses-list";
 
@@ -55,10 +66,10 @@ describe("<BonusesList>", () => {
     render(<BonusesList headcountId="h1" scenarioId="s1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
-    fireEvent.change(screen.getByTestId("bonus-payout-month"), {
+    fireEvent.change(screen.getByLabelText("Payout month"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("bonus-amount"), {
+    fireEvent.change(screen.getByLabelText("Amount"), {
       target: { value: "5000" },
     });
     fireEvent.change(screen.getByTestId("bonus-type"), {
@@ -120,10 +131,10 @@ describe("<BonusesList>", () => {
     render(<BonusesList headcountId="h1" scenarioId="s1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
-    fireEvent.change(screen.getByTestId("bonus-payout-month"), {
+    fireEvent.change(screen.getByLabelText("Payout month"), {
       target: { value: "2026-06-01" },
     });
-    fireEvent.change(screen.getByTestId("bonus-amount"), {
+    fireEvent.change(screen.getByLabelText("Amount"), {
       target: { value: "5000" },
     });
     fireEvent.click(screen.getByTestId("submit-bonus"));

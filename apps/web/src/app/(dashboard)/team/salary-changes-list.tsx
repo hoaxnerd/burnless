@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import { Modal } from "@/components/ui";
+import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
 
 export interface SalaryChange {
   id: string;
@@ -22,7 +23,7 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState("");
-  const [newSalary, setNewSalary] = useState("");
+  const [newSalary, setNewSalary] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
 
   function reset() {
     setEffectiveDate("");
-    setNewSalary("");
+    setNewSalary(null);
     setReason("");
     setError(null);
   }
@@ -55,7 +56,7 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
         },
         body: JSON.stringify({
           effectiveDate,
-          newSalary: parseFloat(newSalary),
+          newSalary: newSalary ?? 0,
           reason: reason || null,
         }),
       });
@@ -144,26 +145,17 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
 
       <Modal open={open} onClose={close} title="Add salary change">
         <div className="space-y-3">
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Effective date</span>
-            <input
-              type="date"
-              value={effectiveDate}
-              onChange={(e) => setEffectiveDate(e.target.value)}
-              data-testid="salary-change-effective-date"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">New salary</span>
-            <input
-              type="number"
-              value={newSalary}
-              onChange={(e) => setNewSalary(e.target.value)}
-              data-testid="salary-change-new-salary"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
+          <SingleDateInput
+            label="Effective date"
+            value={effectiveDate}
+            onChange={setEffectiveDate}
+          />
+          <CurrencyInput
+            label="New salary"
+            value={newSalary ?? 0}
+            onChange={(next) => setNewSalary(next)}
+            min={0}
+          />
           <label className="block text-sm">
             <span className="block font-medium text-surface-700 mb-1">Reason (optional)</span>
             <input
