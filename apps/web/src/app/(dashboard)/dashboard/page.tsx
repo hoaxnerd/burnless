@@ -55,7 +55,7 @@ export default async function DashboardPage() {
     await Promise.all([
       computeDashboardData(company.id, scenario.id),
       getRevenueStreams(scenario.id),
-      getFundingRounds(company.id),
+      getFundingRounds(company.id, scenario.id),
       getDashboardPreferences().catch(() => null),
     ]);
 

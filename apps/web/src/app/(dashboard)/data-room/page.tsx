@@ -53,7 +53,7 @@ export default async function DataRoomPage() {
 async function DataRoomContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
   const [data, fundingRounds] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
-    getFundingRounds(companyId),
+    getFundingRounds(companyId, null), // Data room is base-only by design (artifact warehouse)
   ]);
 
   const latestRevenue = data.metrics.totalRevenue[data.metrics.totalRevenue.length - 1];

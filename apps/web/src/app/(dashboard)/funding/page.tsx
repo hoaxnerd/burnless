@@ -28,7 +28,7 @@ export default async function FundingPage() {
 async function FundingContent({ companyId, scenarioId: paramScenarioId }: { companyId: string; scenarioId?: string }) {
   const scenario = await getActiveScenario(companyId, paramScenarioId);
   const [fundingRounds, data] = await Promise.all([
-    getFundingRounds(companyId),
+    getFundingRounds(companyId, scenario?.id ?? null),
     scenario ? computeDashboardData(companyId, scenario.id) : null,
   ]);
 

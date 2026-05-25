@@ -36,7 +36,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),
     computeExpenseDetails(companyId, scenarioId),
-    getFundingRounds(companyId),
+    getFundingRounds(companyId, scenarioId),
   ]);
 
   const { metrics, currentMonth, totalRevenue, totalExpenses, netIncome, cashPosition, profitAndLoss } = data;

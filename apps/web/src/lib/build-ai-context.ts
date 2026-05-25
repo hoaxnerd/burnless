@@ -35,7 +35,7 @@ export async function buildAiContext(
       getScenarios(companyId),
       getAccounts(companyId),
       getDepartments(companyId),
-      getFundingRounds(companyId),
+      getFundingRounds(companyId, scenario.id),
     ]);
 
   const company = companyRows[0];

@@ -99,7 +99,7 @@ export const computeDashboardData = cache(async function computeDashboardData(
     getForecastLines(scenarioId),
     getRevenueStreams(scenarioId),
     getHeadcountPlans(scenarioId),
-    getFundingRounds(companyId),
+    getFundingRounds(companyId, scenarioId),
     getTransactions(companyId),
   ]);
 
