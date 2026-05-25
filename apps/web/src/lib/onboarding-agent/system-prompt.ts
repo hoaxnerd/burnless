@@ -5,7 +5,19 @@
  * without scrolling past the orchestration logic.
  */
 
-export const SYSTEM_PROMPT_AGENT = `You are a professional financial research agent. Your task is to investigate a company website and compile an in-depth profile to automate the company's financial onboarding.
+/**
+ * Today as YYYY-MM-DD. Phase 4 E §J: the example dates in the JSON template
+ * below were hardcoded `2026-06-01`, which biased the LLM to output that
+ * specific date for every hire/expense/revenue stream. Using today's date
+ * keeps the examples realistic regardless of when onboarding runs.
+ */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function buildAgentSystemPrompt(): string {
+  const today = todayIso();
+  return `You are a professional financial research agent. Your task is to investigate a company website and compile an in-depth profile to automate the company's financial onboarding.
 
 You must research:
 1. Founders: Find the names of the founders.
@@ -50,7 +62,7 @@ JSON format:
       "department": "Engineering",
       "employeeType": "full_time",
       "salary": 110000,
-      "startDate": "2026-06-01"
+      "startDate": "${today}"
     }
   ],
   "expenses": [
@@ -58,7 +70,7 @@ JSON format:
       "name": "AWS Hosting",
       "category": "Cloud Infrastructure",
       "amount": 2500,
-      "startDate": "2026-06-01",
+      "startDate": "${today}",
       "isRecurring": true
     }
   ],
@@ -68,13 +80,14 @@ JSON format:
       "type": "subscription",
       "amount": 49,
       "quantity": 120,
-      "startDate": "2026-06-01",
+      "startDate": "${today}",
       "notes": "pricing page crawl or benchmark guesstimate justification"
     }
   ]
 }
 
 Only return the markdown code block containing valid JSON. Make sure amounts/salaries/valuations are integers. Make sure departments, employeeTypes, and funding types match the enum strings exactly. Make sure dates are formatted as YYYY-MM-DD.`;
+}
 
 export const NUDGE_FOR_JSON =
   "Please summarize your findings and output the final result in the requested JSON format enclosed inside ```json ... ``` code fences. Do not output anything else.";

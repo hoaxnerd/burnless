@@ -14,7 +14,7 @@ import {
   type LlmMessage,
 } from "@burnless/ai";
 import { executeToolCall } from "@/lib/ai-tools";
-import { blockedHint, NUDGE_FOR_JSON, SYSTEM_PROMPT_AGENT } from "./system-prompt";
+import { blockedHint, NUDGE_FOR_JSON, buildAgentSystemPrompt } from "./system-prompt";
 import { isBlocked } from "./block-detection";
 import { healOnboardingResult } from "./heal";
 import type { OnboardingAgentResult } from "./types";
@@ -173,10 +173,14 @@ Use your tools to find accurate information.`,
 
   let finalJson: unknown = null;
 
+  // Build the system prompt once per onboarding run so the example date in
+  // the JSON template reflects the actual onboarding day, not server boot.
+  const systemPrompt = buildAgentSystemPrompt();
+
   for (let loop = 0; loop < MAX_LOOPS; loop++) {
     const response = await provider.complete({
       messages,
-      system: SYSTEM_PROMPT_AGENT,
+      system: systemPrompt,
       tools: agentTools,
     });
 
