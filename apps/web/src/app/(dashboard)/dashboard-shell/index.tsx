@@ -314,7 +314,7 @@ function DashboardContent({
           <aside
             className={`
               ${sidebarWidth} bg-surface-0 flex flex-col flex-shrink-0 transition-all duration-300
-              m-3 rounded-2xl shadow-lg border border-surface-200/60 h-[calc(100vh-1.5rem)]
+              m-3 rounded-2xl shadow-lg border border-surface-200/60 h-[calc(100%-1.5rem)]
               hidden lg:flex
             `}
             role="navigation"

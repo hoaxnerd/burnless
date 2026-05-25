@@ -294,6 +294,7 @@ export function FundingRoundsList({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleInlineDelete(round.id); }}
                             disabled={deletingId === round.id}
+                            aria-label={`Delete ${round.name}`}
                             className={`rounded-lg p-1.5 transition-colors disabled:opacity-50 ${
                               confirmDeleteId === round.id
                                 ? "text-white bg-danger-600 hover:bg-danger-700"
@@ -375,6 +376,7 @@ export function FundingRoundsList({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleInlineDelete(round.id); }}
                             disabled={deletingId === round.id}
+                            aria-label={`Delete ${round.name}`}
                             className={`rounded-lg p-1.5 transition-colors disabled:opacity-50 ${
                               confirmDeleteId === round.id
                                 ? "text-white bg-danger-600 hover:bg-danger-700"
