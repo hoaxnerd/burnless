@@ -48,7 +48,7 @@ vi.mock("@burnless/db", async () => {
   const lazyDb = new Proxy({} as ReturnType<typeof getTestDb>, {
     get(_target, prop: string | symbol) {
       const testDb = getTestDb();
-      const value = (testDb as unknown as Record<string | symbol, unknown>)[prop];
+      const value = Reflect.get(testDb, prop);
       if (typeof value === "function") {
         return (value as (...a: unknown[]) => unknown).bind(testDb);
       }
