@@ -10,6 +10,7 @@ import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { aggregateBudgetTimeline } from "@/lib/budget-timeline";
 import { formatCurrency } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { ExpensesView } from "./expenses-view";
 import { ExpenseFormModal } from "./expense-form-modal";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -39,12 +40,12 @@ export default async function ExpensesPage() {
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <ExpensesContent companyId={company.id} scenarioId={scenario.id} />
+      <ExpensesContent companyId={company.id} scenarioId={scenario.id} company={company} />
     </Suspense>
   );
 }
 
-async function ExpensesContent({ companyId, scenarioId }: { companyId: string; scenarioId: string }) {
+async function ExpensesContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string; company: { currency?: string | null } }) {
   const [data, accounts, expenseDetails, departments] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),
@@ -131,7 +132,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       slotId: "metric-0",
       content: { type: "metric", slug: "totalMonthly" },
       label: "Total Monthly",
-      value: formatCurrency(totalExpenseAmount, "USD", undefined, { compact: true }),
+      value: formatCurrency(totalExpenseAmount, companyCurrency(company), undefined, { compact: true }),
       change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
       changeLabel: changePercent !== null ? "vs last month" : undefined,
       hasData: totalExpenseAmount > 0,
@@ -142,7 +143,7 @@ async function ExpensesContent({ companyId, scenarioId }: { companyId: string; s
       slotId: "metric-1",
       content: { type: "metric", slug: "personnelCost" },
       label: "People",
-      value: formatCurrency(personnelCost, "USD", undefined, { compact: true }),
+      value: formatCurrency(personnelCost, companyCurrency(company), undefined, { compact: true }),
       description: `${summaryMetrics.personnelPercent.toFixed(0)}% of total`,
       hasData: personnelCost > 0,
       metricStyle: { icon: "TrendingUp", color: "blue", href: "/team" },
