@@ -399,13 +399,9 @@ export const computeDashboardData = cache(async function computeDashboardData(
   const profitAndLoss = generateProfitAndLoss(accountDataList, {
     personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
   });
-  // Phase 3 F §F6: fundingInflows is dead-coded here — fundingImpact wins
-  // inside generateCashFlow. Keep the local Map only for the cumFunding
-  // accumulator below (raw inflow series for the dashboard chart).
   const cashFlow = generateCashFlow(
     accountDataList,
     startingCash,
-    /* fundingInflows */ undefined,
     /* workingCapital */ undefined,
     fundingImpact,
   );

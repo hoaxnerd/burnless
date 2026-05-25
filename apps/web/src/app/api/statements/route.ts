@@ -158,8 +158,7 @@ export const GET = withErrorHandler(async (request: Request) => {
     });
   }
 
-  // Phase 3 F §F6: route through computeFundingImpact (subsumes the legacy
-  // fundingInflows Map). Mirrors the construction in compute-dashboard.ts.
+  // Phase 4 E §J: route through computeFundingImpact. Mirrors the construction in compute-dashboard.ts.
   const funding = data.fundingRounds;
   const horizonMonths = monthRange(periodStart, periodEnd).map((d) => monthKey(d));
   const fundingImpact = computeFundingImpact({
@@ -189,7 +188,6 @@ export const GET = withErrorHandler(async (request: Request) => {
   const cashFlow = generateCashFlow(
     accountDataList,
     0,
-    /* fundingInflows */ undefined,
     /* workingCapital */ undefined,
     fundingImpact,
   );

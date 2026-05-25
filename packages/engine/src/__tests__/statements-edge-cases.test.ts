@@ -5,6 +5,7 @@ import {
   generateBalanceSheet,
   type AccountData,
 } from "../statements";
+import type { FundingImpact } from "../funding";
 
 describe("statements — edge cases", () => {
   describe("P&L", () => {
@@ -149,8 +150,15 @@ describe("statements — edge cases", () => {
           values: new Map([["2026-01", 10000]]),
         },
       ];
-      const funding = new Map([["2026-01", 500000]]);
-      const cf = generateCashFlow(accounts, 0, funding);
+      const impact: FundingImpact = {
+        equityInflows: new Map([["2026-01", 500000]]),
+        debtInflows: new Map(),
+        interestExpense: new Map(),
+        principalPayments: new Map(),
+        grantDisbursements: new Map(),
+        warnings: [],
+      };
+      const cf = generateCashFlow(accounts, 0, undefined, impact);
       // Operating CF = 10000, Financing = 500000
       expect(cf.financingCashFlow.values[0]?.value).toBe(500000);
       // Ending cash = 0 + 10000 + 500000 = 510000

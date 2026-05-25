@@ -231,7 +231,7 @@ describe("working capital modeling", () => {
         payableTerms: { days: 30 },
       };
 
-      const cf = generateCashFlow(baseAccounts, 500000, undefined, config);
+      const cf = generateCashFlow(baseAccounts, 500000, config);
 
       // Operating CF should differ from simplified model
       // because A/R and A/P adjustments are applied
@@ -249,7 +249,7 @@ describe("working capital modeling", () => {
         ],
       };
 
-      const cf = generateCashFlow(baseAccounts, 500000, undefined, config);
+      const cf = generateCashFlow(baseAccounts, 500000, config);
 
       // Operating CF = 60000 + 10000 (depreciation) = 70000
       const jan = cf.operatingCashFlow.values.find((v) => v.month === "2026-01");

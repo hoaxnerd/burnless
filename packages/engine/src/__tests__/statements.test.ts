@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { generateProfitAndLoss, generateCashFlow, type AccountData } from "../statements";
 import type { MonthlySeries } from "../utils";
+import type { FundingImpact } from "../funding";
 
 function makeSeries(values: Record<string, number>): MonthlySeries {
   return new Map(Object.entries(values));
@@ -51,8 +52,15 @@ describe("statements", () => {
     });
 
     it("includes funding inflows in financing CF", () => {
-      const funding = new Map([["2026-01", 500000]]);
-      const cf = generateCashFlow(accounts, 0, funding);
+      const impact: FundingImpact = {
+        equityInflows: new Map([["2026-01", 500000]]),
+        debtInflows: new Map(),
+        interestExpense: new Map(),
+        principalPayments: new Map(),
+        grantDisbursements: new Map(),
+        warnings: [],
+      };
+      const cf = generateCashFlow(accounts, 0, undefined, impact);
       expect(cf.financingCashFlow.values[0]?.value).toBe(500000);
       // Net = 13000 + 500000 = 513000
       expect(cf.endingCash[0]?.value).toBe(513000);

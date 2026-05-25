@@ -24,7 +24,7 @@ describe("generateCashFlow integrates funding impact", () => {
       months,
       cumulativeQualifyingSpend: {},
     });
-    const cf = generateCashFlow([], 0, undefined, undefined, impact);
+    const cf = generateCashFlow([], 0, undefined, impact);
     expect(cf.financingCashFlow.children?.map((c) => c.name)).toEqual([
       "Equity Inflows",
       "Debt Inflows",
