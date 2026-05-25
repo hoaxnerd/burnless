@@ -299,6 +299,7 @@ export function TeamRoster({
                                       onClick={(e) => { e.stopPropagation(); openEditModal(member); }}
                                       className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                                       title="Edit team member"
+                                      aria-label={`Edit team member — ${member.title}${member.name ? ` (${member.name})` : ""}`}
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
@@ -317,6 +318,7 @@ export function TeamRoster({
                                             ? "Delete (creates a scenario delete override)"
                                             : "Delete team member"
                                       }
+                                      aria-label={`Delete team member — ${member.title}${member.name ? ` (${member.name})` : ""}`}
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -578,6 +580,7 @@ export function PlannedHiresSection({
                                     onClick={(e) => { e.stopPropagation(); openEditModalFromHire(hire); }}
                                     className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                                     title="Edit planned hire"
+                                    aria-label={`Edit planned hire — ${hire.title}${hire.name ? ` (${hire.name})` : ""}`}
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
                                   </button>
@@ -596,6 +599,7 @@ export function PlannedHiresSection({
                                           ? "Delete (creates a scenario delete override)"
                                           : "Delete planned hire"
                                     }
+                                    aria-label={`Delete planned hire — ${hire.title}${hire.name ? ` (${hire.name})` : ""}`}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>

@@ -53,7 +53,7 @@ test.describe("Scenario delete UX uniformity (Phase 4 B)", () => {
     await page.goto("/team");
 
     // Pick a planned-hire row and confirm-delete it twice (inline confirm pattern).
-    const delBtn = page.locator('button[aria-label="Delete planned hire"]').first();
+    const delBtn = page.locator('button[aria-label^="Delete planned hire"]').first();
     const count = await delBtn.count();
     test.skip(count === 0, "No planned hires in this fixture");
     await delBtn.click();
