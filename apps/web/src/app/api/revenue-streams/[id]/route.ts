@@ -44,6 +44,7 @@ export const PATCH = withErrorHandler(async (
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");
   revalidateTag("revenue-streams");
+  revalidateTag("scenario-overrides"); // revenue-stream data is merged via scenario-overrides cache
   return NextResponse.json(row);
 });
 
@@ -63,5 +64,6 @@ export const DELETE = withErrorHandler(async (
   await logAudit(ctx, "revenue_stream", id, "delete", {});
   await trackDataMutation(ctx.companyId, "revenue");
   revalidateTag("revenue-streams");
+  revalidateTag("scenario-overrides"); // revenue-stream data is merged via scenario-overrides cache
   return NextResponse.json({ deleted: true });
 });

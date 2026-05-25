@@ -61,6 +61,16 @@ export const DELETE = withErrorHandler(async (
   });
   await trackDataMutation(ctx.companyId, "scenarios");
   revalidateTag("scenarios");
+  revalidateTag("scenario-overrides");
+  // Invalidate the entity-typed cache so the affected resource's read path
+  // reflects the reverted state immediately.
+  const tagByEntityType: Record<string, string[]> = {
+    revenue_stream: ["revenue-streams"],
+    forecast_line: ["forecast-lines"],
+    headcount_plan: ["headcount-plans"],
+    funding_round: ["funding-rounds", "cap-table"],
+  };
+  for (const tag of tagByEntityType[override.entityType] ?? []) revalidateTag(tag);
 
   return NextResponse.json({ deleted: true });
 });

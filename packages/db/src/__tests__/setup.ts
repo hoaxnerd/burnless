@@ -46,10 +46,10 @@ async function runMigrations(client: PGlite) {
     for (const stmt of statements) {
       try {
         await client.exec(stmt);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Tolerate "already exists" errors from overlapping migrations
         // (e.g. enum created in both a manual and drizzle-generated migration)
-        const msg: string = err?.message ?? "";
+        const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("already exists") || msg.includes("duplicate_object")) {
           continue;
         }
@@ -84,9 +84,17 @@ beforeAll(async () => {
   pglite = new PGlite();
   await runMigrations(pglite);
   testDb = drizzle(pglite, { schema });
+  // Seed the globalThis singleton so packages/db/src/index.ts (and any
+  // relative `import { db } from "../index"` in queries) see the same
+  // PGLite instance instead of opening a production postgres connection.
+  g.__burnless_db = testDb;
+  g.__burnless_pglite = pglite;
 });
 
 afterAll(async () => {
   if (externalInstance) return; // lifecycle owned by the external setup file
+  const g = globalThis as unknown as { __burnless_db?: unknown; __burnless_pglite?: unknown };
+  delete g.__burnless_db;
+  delete g.__burnless_pglite;
   await pglite.close();
 });

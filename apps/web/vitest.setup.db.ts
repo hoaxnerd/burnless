@@ -22,6 +22,11 @@
  * This file's top-level code (synchronous) runs before any test-file import
  * chain can trigger `@burnless/db`. We import schema from the raw source path
  * (not from the `@burnless/db` barrel) to avoid triggering index.ts early.
+ *
+ * NOTE: this relies on Vitest's default (threads, shared VM context) runner.
+ * With `vmThreads` + `isolate: true`, globalThis is not shared across modules
+ * and this hijack would break — we'd need to switch to a forked runner or
+ * use a different mechanism (e.g., test-time DI of the db instance).
  */
 
 import { PGlite } from "@electric-sql/pglite";
