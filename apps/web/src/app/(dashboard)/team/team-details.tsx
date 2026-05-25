@@ -7,6 +7,7 @@ import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { formatCurrency } from "@burnless/types";
+import type { CurrencyCode } from "@burnless/types";
 import { HeadcountForm, type EditableHeadcount } from "./headcount-form";
 import { SalaryChangesList, type SalaryChange } from "./salary-changes-list";
 import { BonusesList, type Bonus } from "./bonuses-list";
@@ -84,6 +85,7 @@ interface TeamRosterProps {
   scenarioId: string;
   departments: Department[];
   companyBenefitsRates: BenefitsBreakdown;
+  currency: CurrencyCode;
 }
 
 export function TeamRoster({
@@ -92,6 +94,7 @@ export function TeamRoster({
   scenarioId,
   departments,
   companyBenefitsRates,
+  currency,
 }: TeamRosterProps) {
   const router = useRouter();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
@@ -236,7 +239,7 @@ export function TeamRoster({
                           {pct.toFixed(0)}%
                         </span>
                         <span className="text-sm font-semibold tabular-nums text-surface-900">
-                          {formatCurrency(dept.monthlyCost, "USD", undefined, { compact: true })}
+                          {formatCurrency(dept.monthlyCost, currency, undefined, { compact: true })}
                           <span className="text-xs font-normal text-surface-400">/mo</span>
                         </span>
                       </div>
@@ -286,10 +289,10 @@ export function TeamRoster({
                                 </button>
                                 <div className="flex items-center gap-4 text-right">
                                   <span className="text-xs tabular-nums text-surface-400">
-                                    {formatCurrency(member.salary, "USD", undefined, { compact: true })}/yr
+                                    {formatCurrency(member.salary, currency, undefined, { compact: true })}/yr
                                   </span>
                                   <span className="text-sm tabular-nums font-medium text-surface-700">
-                                    {formatCurrency(monthlyCost, "USD", undefined, { compact: true })}/mo
+                                    {formatCurrency(monthlyCost, currency, undefined, { compact: true })}/mo
                                   </span>
                                   <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                     <button
@@ -370,6 +373,7 @@ interface PlannedHiresSectionProps {
   scenarioId: string;
   departments: Department[];
   companyBenefitsRates: BenefitsBreakdown;
+  currency: CurrencyCode;
 }
 
 export function PlannedHiresSection({
@@ -377,6 +381,7 @@ export function PlannedHiresSection({
   scenarioId,
   departments,
   companyBenefitsRates,
+  currency,
 }: PlannedHiresSectionProps) {
   const router = useRouter();
   const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
@@ -503,7 +508,7 @@ export function PlannedHiresSection({
                     (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
                     0,
                   ),
-                  "USD", undefined, { compact: true }
+                  currency, undefined, { compact: true }
                 )}
                 /mo
               </span>
@@ -530,7 +535,7 @@ export function PlannedHiresSection({
                     <div className="flex items-center justify-between px-4 py-3 bg-surface-50">
                       <span className="text-sm font-semibold text-surface-900">{q.quarter}</span>
                       <span className="text-xs tabular-nums font-medium text-danger-600">
-                        +{formatCurrency(q.totalMonthlyImpact, "USD", undefined, { compact: true })}/mo
+                        +{formatCurrency(q.totalMonthlyImpact, currency, undefined, { compact: true })}/mo
                       </span>
                     </div>
                     <div className="divide-y divide-surface-100">
@@ -563,10 +568,10 @@ export function PlannedHiresSection({
                               </div>
                               <div className="flex items-center gap-4">
                                 <span className="text-xs tabular-nums text-surface-400">
-                                  {formatCurrency(hire.salary, "USD", undefined, { compact: true })}/yr
+                                  {formatCurrency(hire.salary, currency, undefined, { compact: true })}/yr
                                 </span>
                                 <span className="text-sm tabular-nums font-medium text-surface-700">
-                                  +{formatCurrency(impact, "USD", undefined, { compact: true })}/mo
+                                  +{formatCurrency(impact, currency, undefined, { compact: true })}/mo
                                 </span>
                                 <div className="flex items-center gap-1 opacity-0 group-hover/hire:opacity-100 transition-opacity">
                                   <button
@@ -616,9 +621,10 @@ export function PlannedHiresSection({
 
 interface HiringInsightTipProps {
   plannedHires: Array<{ salary: number; count: number; benefitsRate: number }>;
+  currency: CurrencyCode;
 }
 
-export function HiringInsightTip({ plannedHires }: HiringInsightTipProps) {
+export function HiringInsightTip({ plannedHires, currency }: HiringInsightTipProps) {
   const aiFlags = useOptionalAiFlags();
   const companionName = aiFlags?.companionName ?? "companion";
   const totalMonthlyImpact = plannedHires.reduce(
@@ -638,7 +644,7 @@ export function HiringInsightTip({ plannedHires }: HiringInsightTipProps) {
           <p className="text-xs text-surface-600 mt-1 leading-relaxed">
             {plannedHires.length} planned hire{plannedHires.length !== 1 ? "s" : ""} will add{" "}
             <span className="font-semibold tabular-nums">
-              {formatCurrency(totalMonthlyImpact, "USD", undefined, { compact: true })}
+              {formatCurrency(totalMonthlyImpact, currency, undefined, { compact: true })}
               /mo
             </span>{" "}
             to your burn rate. Ask the {companionName} to model the impact on runway

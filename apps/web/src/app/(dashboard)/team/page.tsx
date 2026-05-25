@@ -8,6 +8,8 @@ import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
+import type { CurrencyCode } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { TeamView } from "./team-view";
 import { HeadcountForm } from "./headcount-form";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
@@ -28,12 +30,13 @@ export default async function TeamPage() {
         scenarioId={scenario?.id}
         scenarioName={scenario?.name}
         companyBenefitsRates={companyBenefitsRates}
+        currency={companyCurrency(company)}
       />
     </Suspense>
   );
 }
 
-async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefitsRates }: { companyId?: string; scenarioId?: string; scenarioName?: string; companyBenefitsRates: BenefitsBreakdown }) {
+async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefitsRates, currency }: { companyId?: string; scenarioId?: string; scenarioName?: string; companyBenefitsRates: BenefitsBreakdown; currency: CurrencyCode }) {
   if (!companyId || !scenarioId) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
@@ -194,7 +197,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
       slotId: "metric-1",
       content: { type: "metric", slug: "monthlyPeopleCost" },
       label: "Monthly People Cost",
-      value: formatCurrency(totalMonthlyCost, "USD", undefined, { compact: true }),
+      value: formatCurrency(totalMonthlyCost, currency, undefined, { compact: true }),
       description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
       hasData: totalMonthlyCost > 0,
       metricStyle: { icon: "DollarSign", color: "emerald", href: "/team" },
@@ -203,7 +206,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
       slotId: "metric-2",
       content: { type: "metric", slug: "revenuePerEmployee" },
       label: "Revenue / Employee",
-      value: `${formatCurrency(revPerEmployee, "USD", undefined, { compact: true })}/mo`,
+      value: `${formatCurrency(revPerEmployee, currency, undefined, { compact: true })}/mo`,
       description: "Efficiency metric",
       hasData: revPerEmployee > 0,
       metricStyle: { icon: "TrendingUp", color: "teal", href: "/team" },
@@ -252,6 +255,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
         scenarioId={scenarioId}
         departments={departments.map((d) => ({ id: d.id, name: d.name }))}
         companyBenefitsRates={companyBenefitsRates}
+        currency={currency}
       />
     </div>
   );

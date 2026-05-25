@@ -12,6 +12,7 @@ import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
 import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
+import type { CurrencyCode } from "@burnless/types";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import type { SalaryChange } from "./salary-changes-list";
 import type { Bonus } from "./bonuses-list";
@@ -71,6 +72,7 @@ interface TeamViewProps {
   scenarioId: string;
   departments: Array<{ id: string; name: string }>;
   companyBenefitsRates: BenefitsBreakdown;
+  currency: CurrencyCode;
 }
 
 export function TeamView({
@@ -87,6 +89,7 @@ export function TeamView({
   scenarioId,
   departments,
   companyBenefitsRates,
+  currency,
 }: TeamViewProps) {
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
@@ -170,6 +173,7 @@ export function TeamView({
         scenarioId={scenarioId}
         departments={departments}
         companyBenefitsRates={companyBenefitsRates}
+        currency={currency}
       />
     ),
     "planned-hires": (
@@ -178,10 +182,11 @@ export function TeamView({
         scenarioId={scenarioId}
         departments={departments}
         companyBenefitsRates={companyBenefitsRates}
+        currency={currency}
       />
     ),
     "hiring-insight": (
-      <HiringInsightTip plannedHires={plannedHires} />
+      <HiringInsightTip plannedHires={plannedHires} currency={currency} />
     ),
     "ai-insights": (
       <AiPageInsights
@@ -193,7 +198,7 @@ export function TeamView({
         }}
       />
     ),
-  }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments, companyBenefitsRates]);
+  }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments, companyBenefitsRates, currency]);
 
   return (
     <PageLayoutProvider pageId="team">
