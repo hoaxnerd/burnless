@@ -26,6 +26,7 @@ import type { ResolvedEntity } from "@burnless/db";
 import {
   companies,
   scenarios,
+  scenarioOverrides,
   forecastLines,
   forecastValues,
   financialAccounts,
@@ -169,17 +170,65 @@ export async function getForecastValues(lineIds: string[]) {
 }
 
 /**
- * Get revenue streams for a scenario's company.
- * Looks up the companyId from the scenario for backward compatibility.
+ * Get revenue streams for a scenario's company, with scenario overrides merged.
+ *
+ * Applies modify/delete/create overrides inline using the same `db` instance
+ * as the rest of data.ts (the test mock substitutes this `db`, making the
+ * override query testable). The `_override` tag is stripped so callers see
+ * the same shape as before. Callers that need the tag for badging fetch
+ * overrides separately via `/api/scenarios/overrides`.
+ *
+ * Phase 4 A §A1: closes the regression introduced by commit 815f552 when
+ * `revenueStreams.scenarioId` was dropped during the overlay refactor.
  */
 export const getRevenueStreams = cachedQuery(
   async (scenarioId: string) => {
-    const [scenario] = await db.select({ companyId: scenarios.companyId }).from(scenarios).where(eq(scenarios.id, scenarioId)).limit(1);
+    const [scenario] = await db
+      .select({ companyId: scenarios.companyId })
+      .from(scenarios)
+      .where(eq(scenarios.id, scenarioId))
+      .limit(1);
     if (!scenario) return [];
-    return db.select().from(revenueStreams).where(eq(revenueStreams.companyId, scenario.companyId));
+    const base = await db
+      .select()
+      .from(revenueStreams)
+      .where(eq(revenueStreams.companyId, scenario.companyId));
+    // Inline override merging (uses this file's `db` so the test mock applies)
+    const overrides = await db
+      .select()
+      .from(scenarioOverrides)
+      .where(
+        and(
+          eq(scenarioOverrides.scenarioId, scenarioId),
+          eq(scenarioOverrides.entityType, "revenue_stream"),
+        ),
+      );
+    if (overrides.length === 0) return base;
+    const overrideMap = new Map(overrides.map((o) => [o.entityId, o]));
+    const matchedIds = new Set<string>();
+    type BaseRow = (typeof base)[number];
+    const result: BaseRow[] = [];
+    for (const entity of base) {
+      const o = overrideMap.get(entity.id);
+      if (!o) {
+        result.push(entity);
+      } else if (o.action === "modify") {
+        matchedIds.add(o.id);
+        result.push(o.data as BaseRow);
+      } else if (o.action === "delete") {
+        matchedIds.add(o.id);
+        // excluded
+      }
+    }
+    for (const o of overrides) {
+      if (o.action === "create") result.push(o.data as BaseRow);
+      if (o.action === "modify" && !matchedIds.has(o.id))
+        result.push(o.data as BaseRow); // dangling modify → treat as create
+    }
+    return result;
   },
   ["revenue-streams"],
-  { revalidate: 30, tags: ["revenue-streams"] }
+  { revalidate: 30, tags: ["revenue-streams", "scenario-overrides"] }
 );
 
 /**
