@@ -21,8 +21,12 @@ test.describe("Scenario realtime read path (Phase 4 A)", () => {
     await page.getByRole("textbox", { name: "Revenue stream name" }).fill(renameTo);
     await page.getByRole("button", { name: "Save changes" }).click();
 
+    // Wait for the dialog to close (signals PATCH completed successfully).
+    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10_000 });
+
     // The list should re-render with the new name without a full reload.
-    await expect(page.locator(`button[aria-label="Edit ${renameTo}"]`)).toBeVisible({ timeout: 5_000 });
+    // RSC router.refresh() can take up to ~10s on a loaded dev server — give it room.
+    await expect(page.locator(`button[aria-label="Edit ${renameTo}"]`)).toBeVisible({ timeout: 15_000 });
 
     // And after an explicit reload, it should still show the override.
     await page.reload();
