@@ -15,8 +15,10 @@
 import { describe, it, expect, vi } from "vitest";
 
 // ── PGLite setup via packages/db setup file ─────────────────────────────────
-// Importing this module registers PGLite beforeAll/afterAll hooks for the suite.
-import { getTestDb } from "@db-test/setup";
+// Importing this module triggers the apps/web vitest.setup.db.ts globalThis
+// hijack (assigning __burnless_db to a PGLite instance), which the production
+// @burnless/db module's singleton guard then captures.
+import "@db-test/setup";
 
 // ── Factory imports ──────────────────────────────────────────────────────────
 // Use the REAL factory names from packages/db/src/__tests__/factories.ts.
