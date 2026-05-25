@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, AnyColumnMapping, MappingConfidence,
@@ -21,9 +21,10 @@ import { BankSyncPanel } from "./bank-sync-panel";
 
 interface ImportFlowProps {
   embedded?: boolean;
+  currency?: CurrencyCode;
 }
 
-export function ImportFlow({ embedded = false }: ImportFlowProps) {
+export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowProps) {
   const [target, setTarget] = useState<ImportTarget>("transactions");
   const [step, setStep] = useState<Step>("upload");
   const [fileName, setFileName] = useState("");
@@ -337,7 +338,7 @@ export function ImportFlow({ embedded = false }: ImportFlowProps) {
     setEditingRow(null);
   };
 
-  const fmtCurrency = (n: number) => formatCurrency(n, "USD");
+  const fmtCurrency = (n: number) => formatCurrency(n, currency);
 
   const activePreview = preview.filter((t) => !t.isDuplicate && !t._excluded);
 

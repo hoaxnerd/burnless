@@ -8,7 +8,8 @@ import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
 import { getCompanyPlan } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { formatCompactAmount } from "@burnless/types";
+import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
+import { companyCurrency } from "@/lib/server-currency";
 import { DataRoomView } from "./data-room-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -45,12 +46,12 @@ export default async function DataRoomPage() {
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <DataRoomContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+      <DataRoomContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={companyCurrency(company)} />
     </Suspense>
   );
 }
 
-async function DataRoomContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+async function DataRoomContent({ companyId, scenarioId, companyName, scenarioName, currency }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: CurrencyCode }) {
   const [data, fundingRounds] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getFundingRounds(companyId, null), // Data room is base-only by design (artifact warehouse)
@@ -65,10 +66,7 @@ async function DataRoomContent({ companyId, scenarioId, companyName, scenarioNam
   const latestMrr = data.metrics.mrr[data.metrics.mrr.length - 1];
   const latestCustomers = data.metrics.totalCustomers[data.metrics.totalCustomers.length - 1];
 
-  // Compact formatter: falls back to USD when no company-level locale is
-  // available (server component; locale preference resolved at runtime via
-  // the locale provider on the client).
-  const fmtCurrency = (v: number) => formatCompactAmount(v, "USD");
+  const fmtCurrency = (v: number) => formatCompactAmount(v, currency);
 
   const keyMetrics = [
     { label: "Monthly Revenue", value: fmtCurrency(latestRevenue?.value ?? 0), category: "Revenue" },
