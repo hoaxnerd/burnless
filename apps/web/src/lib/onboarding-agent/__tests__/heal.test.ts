@@ -122,16 +122,11 @@ describe("healOnboardingResult — enum mapping", () => {
 });
 
 describe("healOnboardingResult — fallbacks", () => {
-  it("returns minimal fallback headcount when nothing supplied", () => {
-    const result = healOnboardingResult({});
-    expect(result.headcount).toHaveLength(2);
-    expect(result.headcount[0]?.department).toBe("Engineering");
-  });
-
-  it("returns a richer stage plan when headcount is a numeric size", () => {
-    const result = healOnboardingResult({ headcount: 5 });
-    expect(result.headcount).toHaveLength(5);
-  });
+  // Removed (Phase 4 E Task 1): "returns minimal fallback headcount when
+  // nothing supplied" and "returns a richer stage plan when headcount is a
+  // numeric size" — these locked in the silently-lying fallback behavior.
+  // heal now returns [] on empty/absent input (same fix as 5f7f7da for
+  // revenue streams). Covered by heal-no-fallbacks.test.ts.
 
   it("derives a single subscription stream from estimated annual revenue", () => {
     const result = healOnboardingResult({ annual_revenue: "12M" });

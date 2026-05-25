@@ -220,6 +220,9 @@ function healHeadcountRole(raw: Record<string, unknown>): HeadcountRoleDraft {
   };
 }
 
+// Phase 4 E §J: heal returns [] when the agent provides nothing — empty
+// review step is honest, fallbacks were silently lying like 5f7f7da's
+// auto-revenue-stream did. Constants retained for reference; unreached.
 const FALLBACK_HEADCOUNT_STAGE: HeadcountRoleDraft[] = [
   { title: "CTO / Co-Founder", department: "Engineering", employeeType: "full_time", salary: 140_000, startDate: DEFAULT_START_DATE },
   { title: "Lead Engineer", department: "Engineering", employeeType: "full_time", salary: 130_000, startDate: DEFAULT_START_DATE },
@@ -240,11 +243,9 @@ function healHeadcount(raw: unknown): HeadcountRoleDraft[] {
       .filter((rec): rec is Record<string, unknown> => rec !== null)
       .map(healHeadcountRole);
   }
-  // Number-shaped input ("headcount: 5") → seeded stage plan, not 5 copies.
-  if (typeof raw === "number" || cleanNumber(raw) > 0) {
-    return FALLBACK_HEADCOUNT_STAGE;
-  }
-  return FALLBACK_HEADCOUNT_MINIMAL;
+  // Number-shaped input ("headcount: 5") or absent → return empty; the
+  // review step will show an honest empty state. (Phase 4 E §J)
+  return [];
 }
 
 function healExpense(raw: unknown): ExpenseDraft | null {
@@ -275,7 +276,7 @@ const FALLBACK_EXPENSES: ExpenseDraft[] = [
 ];
 
 function healExpenses(raw: unknown): ExpenseDraft[] {
-  if (!Array.isArray(raw)) return FALLBACK_EXPENSES;
+  if (!Array.isArray(raw)) return []; // Phase 4 E §J: honest empty, not fake defaults
   return raw
     .map(healExpense)
     .filter((e): e is ExpenseDraft => e !== null);
@@ -339,7 +340,9 @@ function fallbackRevenueFromArr(raw: Record<string, unknown>): RevenueStreamDraf
 
 function healRevenueStreams(raw: Record<string, unknown>): RevenueStreamDraft[] {
   const candidate = raw.revenueStreams ?? raw.revenue_streams ?? raw.revenue;
-  if (Array.isArray(candidate) && candidate.length > 0) {
+  if (Array.isArray(candidate)) {
+    // Phase 4 E §J: if the agent explicitly gave us an array (even empty),
+    // respect it — empty is honest. Only fall back when no key was present.
     return candidate
       .map(healRevenueStream)
       .filter((r): r is RevenueStreamDraft => r !== null);
