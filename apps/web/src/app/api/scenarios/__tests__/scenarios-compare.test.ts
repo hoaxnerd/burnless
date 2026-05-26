@@ -53,9 +53,13 @@ vi.mock("@burnless/engine", () => ({
   })),
   dRound2: vi.fn((v: unknown) => (typeof v === "object" && v !== null && "toNumber" in v ? (v as { toNumber: () => number }).toNumber() : Number(v ?? 0))),
   monthKey: vi.fn((d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`),
+  // The engine's compareScenarios returns the scenario *name* as a string
+  // (ScenarioComparison.baseScenario: string). The API route wraps it into
+  // `{ id, name }` using the DB scenario record. Keep this mock honest to
+  // the engine type so the wrap regression is testable.
   compareScenarios: vi.fn().mockReturnValue({
-    baseScenario: { id: "base-1", name: "Base" },
-    compareScenario: { id: "comp-1", name: "Compare" },
+    baseScenario: "Base",
+    compareScenario: "Compare",
     revenue: {
       baseValues: [],
       compareValues: [],
@@ -230,8 +234,9 @@ describe("GET /api/scenarios/compare", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.baseScenario).toEqual({ id: "base-1", name: "Base" });
-    expect(body.compareScenario).toEqual({ id: "comp-1", name: "Compare" });
+    // API wraps the engine's plain-string name with the DB scenario id.
+    expect(body.baseScenario).toEqual({ id: "b1", name: "Base" });
+    expect(body.compareScenario).toEqual({ id: "c1", name: "Compare" });
     expect(body.lines).toHaveLength(5);
     expect(body.lines.map((l: { name: string }) => l.name)).toEqual([
       "Revenue",

@@ -56,7 +56,9 @@ export function ScenarioBanner() {
 
   if (!isInScenarioMode) return null;
 
-  const compareUrl = `/scenarios/compare?leftId=base&rightId=${activeScenarioId}`;
+  // Page reads `ids` (comma-separated). First id = base side, second = compare side.
+  // Use literal "base" for the current plan; comparison-view has a matching option.
+  const compareUrl = `/scenarios/compare?ids=base,${activeScenarioId}`;
   const changeLabel =
     overrideCount !== null
       ? `${overrideCount} change${overrideCount !== 1 ? "s" : ""} from base`

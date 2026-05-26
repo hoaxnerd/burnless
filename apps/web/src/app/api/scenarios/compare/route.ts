@@ -116,9 +116,19 @@ export const GET = withErrorHandler(async (request: Request) => {
   ]);
   const dataDiff = buildDataDiff(leftResolved, rightResolved);
 
+  // Wrap engine string-only scenario names into `{ id, name }` to match the
+  // client-side ComparisonData contract (apps/web/.../comparison-types.ts).
+  // Without this, every `data.baseScenario.name` lookup on the page reads
+  // undefined and renders blank labels in the metric / charts / breakdown tabs.
   return NextResponse.json({
-    baseScenario: result.baseScenario,
-    compareScenario: result.compareScenario,
+    baseScenario: {
+      id: isBaseLeft ? "base" : leftScenario!.id,
+      name: result.baseScenario,
+    },
+    compareScenario: {
+      id: rightScenario.id,
+      name: result.compareScenario,
+    },
     lines: [
       { name: "Revenue", ...serializeComparison(result.revenue) },
       { name: "Expenses", ...serializeComparison(result.expenses) },
