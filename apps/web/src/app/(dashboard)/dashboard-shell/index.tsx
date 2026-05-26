@@ -387,7 +387,12 @@ function DashboardContent({
           id="main-content"
           role="main"
         >
-          <div className="p-4 sm:p-6 lg:p-8">
+          {/* h-full so pages that need full-viewport layouts (e.g. AI chat
+              with pinned input + scrollable message list) can use h-full to
+              fill <main>'s already-correctly-sized space (flex-1 under the
+              scenario banner). Long pages overflow this wrapper visibly,
+              which still triggers <main>'s overflow-auto. */}
+          <div className="p-4 sm:p-6 lg:p-8 h-full">
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
