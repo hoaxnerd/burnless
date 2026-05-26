@@ -103,7 +103,7 @@ export const reports = [
     id: "scenario-compare",
     title: "Scenario Comparison",
     description: "Compare two scenarios side by side with delta analysis",
-    href: "/reports/scenario-compare",
+    href: "/scenarios/compare",
     icon: Shuffle,
     color: "from-fuchsia-500 to-pink-500",
   },

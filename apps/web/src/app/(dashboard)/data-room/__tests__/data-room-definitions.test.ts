@@ -57,7 +57,7 @@ const reports = [
   {
     id: "scenario-compare",
     title: "Scenario Comparison",
-    href: "/reports/scenario-compare",
+    href: "/scenarios/compare",
   },
 ];
 
@@ -111,9 +111,12 @@ describe("Report cards", () => {
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
 
-  it("all hrefs start with /reports/", () => {
+  it("all hrefs are routable (own page or canonical owner page)", () => {
+    // Most reports live at /reports/*. The scenario comparison was
+    // consolidated into the canonical /scenarios/compare page; the
+    // data-room tile now links there directly to avoid the redirect.
     for (const report of reports) {
-      expect(report.href).toMatch(/^\/reports\//);
+      expect(report.href).toMatch(/^\/(reports|scenarios)\//);
     }
   });
 
