@@ -4,18 +4,17 @@ import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
-import { Button, ChartCard, SwappableMetricCard } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { MultiLineChart, VarianceBarChart, chartColors } from "@/components/charts";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
 import type { CurrencyCode } from "@burnless/types";
 import type { ScenarioOption, ComparisonData, DataDiffGroup, DataDiffItem } from "./comparison-types";
 import { formatCurrency, formatMonth } from "./comparison-types";
-import { ComparisonChart } from "./comparison-chart";
 import { ComparisonRow } from "./comparison-row";
 import { DeltaBadge } from "./comparison-delta-badge";
 
-type Tab = "metrics" | "data" | "charts";
+type Tab = "metrics" | "data";
 
 export function ComparisonView({
   scenarios,
@@ -185,13 +184,6 @@ export function ComparisonView({
             >
               Data Changes
             </Button>
-            <Button
-              variant={activeTab === "charts" ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setActiveTab("charts")}
-            >
-              Charts
-            </Button>
           </div>
 
           {/* Metric Impact tab */}
@@ -250,17 +242,16 @@ export function ComparisonView({
                 })}
               </div>
 
-              {/* Visual trend charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Per-metric chart blocks — one outer card per metric, with
+                  Trend (MultiLineChart) + Variance (VarianceBarChart) as
+                  side-by-side children on lg, stacked on mobile. */}
+              <div className="space-y-6">
                 {data.lines.map((line) => (
-                  <ComparisonChart
+                  <MetricChartBlock
                     key={line.name}
                     line={line}
                     baseName={data.baseScenario.name}
                     compareName={data.compareScenario.name}
-                    isCurrency={line.name !== "Headcount"}
-                    positiveIsGood={line.name !== "Expenses"}
-                    currency={currency}
                   />
                 ))}
               </div>
@@ -321,101 +312,58 @@ export function ComparisonView({
           {activeTab === "data" && (
             <ComparisonDataDiff dataDiff={data.dataDiff} />
           )}
-
-          {/* Charts tab — per-line MultiLineChart + VarianceBarChart + SwappableMetricCard triple */}
-          {activeTab === "charts" && (
-            <ComparisonChartsTab
-              lines={data.lines}
-              baseName={data.baseScenario.name}
-              compareName={data.compareScenario.name}
-              currency={currency}
-            />
-          )}
         </div>
       )}
     </div>
   );
 }
 
-/* ── Charts tab ───────────────────────────────────────────────────────── */
+/* ── Per-metric chart block ───────────────────────────────────────────── */
 
-function ComparisonChartsTab({
-  lines,
+/**
+ * Outer card per metric containing the Trend (MultiLineChart, base vs compare)
+ * and Variance (VarianceBarChart, absolute delta per month) charts side-by-side.
+ * Responsive: stacks vertically on mobile, two columns on lg.
+ */
+function MetricChartBlock({
+  line,
   baseName,
   compareName,
-  currency,
 }: {
-  lines: ComparisonData["lines"];
+  line: ComparisonData["lines"][number];
   baseName: string;
   compareName: string;
-  currency: CurrencyCode;
 }) {
-  return (
-    <div className="space-y-8">
-      {lines.map((line) => {
-        const isCurrency = line.name !== "Headcount";
-        const chartData = line.baseValues.map((bv, i) => ({
-          month: bv.month,
-          [baseName]: bv.value,
-          [compareName]: line.compareValues[i]?.value ?? 0,
-        }));
-        const lastBase = line.baseValues[line.baseValues.length - 1]?.value ?? 0;
-        const lastCompare = line.compareValues[line.compareValues.length - 1]?.value ?? 0;
-        const delta = lastCompare - lastBase;
-        const deltaPct = lastBase !== 0
-          ? `${delta >= 0 ? "+" : ""}${((delta / Math.abs(lastBase)) * 100).toFixed(1)}%`
-          : undefined;
-        const fmt = (v: number) =>
-          isCurrency
-            ? formatCurrency(v, currency, undefined, { compact: true })
-            : Math.round(v).toLocaleString();
+  const chartData = line.baseValues.map((bv, i) => ({
+    month: bv.month,
+    [baseName]: bv.value,
+    [compareName]: line.compareValues[i]?.value ?? 0,
+  }));
 
-        return (
-          <div key={line.name} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <SwappableMetricCard
-                slug={`charts-base-${line.name}`}
-                pageId="scenarios/compare"
-                label={`${baseName} — ${line.name}`}
-                value={fmt(lastBase)}
-                metricStyle={{ icon: "BarChart3", color: "blue", href: "#" }}
-                stagger={0}
-              />
-              <SwappableMetricCard
-                slug={`charts-compare-${line.name}`}
-                pageId="scenarios/compare"
-                label={`${compareName} — ${line.name}`}
-                value={fmt(lastCompare)}
-                metricStyle={{ icon: "BarChart3", color: "amber", href: "#" }}
-                stagger={1}
-              />
-              <SwappableMetricCard
-                slug={`charts-delta-${line.name}`}
-                pageId="scenarios/compare"
-                label={`Delta — ${line.name}`}
-                value={fmt(delta)}
-                change={deltaPct}
-                metricStyle={{ icon: "ArrowUpRight", color: "violet", href: "#" }}
-                stagger={2}
-              />
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ChartCard title={line.name} subtitle={`${baseName} vs ${compareName}`}>
-                <MultiLineChart
-                  data={chartData}
-                  lines={[
-                    { dataKey: baseName, label: baseName, color: chartColors.brand },
-                    { dataKey: compareName, label: compareName, color: chartColors.warning, dashed: true },
-                  ]}
-                />
-              </ChartCard>
-              <ChartCard title={`${line.name} Variance`} subtitle="Absolute delta per month">
-                <VarianceBarChart data={line.deltaAbsolute} />
-              </ChartCard>
-            </div>
-          </div>
-        );
-      })}
+  return (
+    <div className="rounded-xl bg-surface-0 border border-surface-200 p-4 sm:p-6 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-surface-900">{line.name}</h3>
+        <p className="mt-0.5 text-xs text-surface-500">
+          {baseName} vs {compareName}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-lg border border-surface-100 bg-surface-50/50 p-3 sm:p-4">
+          <p className="mb-2 text-xs font-medium text-surface-500">Trend</p>
+          <MultiLineChart
+            data={chartData}
+            lines={[
+              { dataKey: baseName, label: baseName, color: chartColors.brand },
+              { dataKey: compareName, label: compareName, color: chartColors.warning, dashed: true },
+            ]}
+          />
+        </div>
+        <div className="rounded-lg border border-surface-100 bg-surface-50/50 p-3 sm:p-4">
+          <p className="mb-2 text-xs font-medium text-surface-500">Variance</p>
+          <VarianceBarChart data={line.deltaAbsolute} />
+        </div>
+      </div>
     </div>
   );
 }
