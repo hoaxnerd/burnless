@@ -30,9 +30,9 @@ You must research:
    - Return clear revenue streams (subscription, one_time, services, etc.) with estimated quantities (e.g. customer count or billable hours) and pricing amounts.
 
 Tools:
-- Use "search" to query the web (Max 5 calls).
-- Use "crawl" to read webpage markdown (Max 10 calls combined with browser_use).
-- Use "browser_use" ONLY as a last resort if crawl is blocked by anti-bot measures.
+- Use "search_web" to query the web; it returns structured JSON results ({ rank, title, url, snippet }) (Max 5 calls).
+- Use "read_webpage" to read a single webpage's markdown content (Max 10 calls combined with read_webpage_rendered).
+- Use "read_webpage_rendered" ONLY as a last resort if read_webpage is blocked by anti-bot measures.
 
 When you have collected enough information to construct the profile, output your final result as a valid JSON block enclosed inside \`\`\`json ... \`\`\` code fences.
 
@@ -93,4 +93,4 @@ export const NUDGE_FOR_JSON =
   "Please summarize your findings and output the final result in the requested JSON format enclosed inside ```json ... ``` code fences. Do not output anything else.";
 
 export const blockedHint = (url: string): string =>
-  `Access Denied (Cloudflare or anti-bot block). Do not try to crawl or browser_use this website again. Instead, use the 'search' tool to search Google for the public information about this company (e.g., search '${url} founders', '${url} funding rounds', etc.).`;
+  `Access Denied (Cloudflare or anti-bot block). Do not try to read_webpage or read_webpage_rendered this website again. Instead, use the 'search_web' tool to search the web for the public information about this company (e.g., search '${url} founders', '${url} funding rounds', etc.).`;

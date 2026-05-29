@@ -1,9 +1,10 @@
 /**
  * Onboarding research agent.
  *
- * Drives an LLM through a bounded tool-use loop (search / crawl / browser_use)
- * to gather a company profile from public web sources, then returns a healed,
- * canonically-typed `OnboardingAgentResult`. Progress is reported through the
+ * Drives an LLM through a bounded tool-use loop (search_web / read_webpage /
+ * read_webpage_rendered) to gather a company profile from public web sources,
+ * then returns a healed, canonically-typed `OnboardingAgentResult`. Progress is
+ * reported through the
  * `onStatus` callback so callers can stream updates to the UI.
  */
 
@@ -26,8 +27,8 @@ export { healOnboardingResult } from "./heal";
 
 const MAX_LOOPS = 15;
 const SEARCH_BUDGET = 5;
-const CRAWL_BUDGET = 10; // shared between `crawl` and `browser_use`
-const AGENT_TOOL_NAMES = ["search", "crawl", "browser_use"] as const;
+const CRAWL_BUDGET = 10; // shared between `read_webpage` and `read_webpage_rendered`
+const AGENT_TOOL_NAMES = ["search_web", "read_webpage", "read_webpage_rendered"] as const;
 
 type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
@@ -71,10 +72,10 @@ interface Budget {
 }
 
 function budgetExceededMessage(tool: AgentToolName): string {
-  if (tool === "search") {
+  if (tool === "search_web") {
     return "Error: Search budget exceeded (max 5 searches). Synthesize with current data.";
   }
-  return "Error: Crawl/browser budget exceeded (max 10). Synthesize with current data.";
+  return "Error: Read-webpage budget exceeded (max 10). Synthesize with current data.";
 }
 
 async function runToolCall(
@@ -85,13 +86,13 @@ async function runToolCall(
 ): Promise<{ content: string }> {
   try {
     const result = await executeToolCall(toolName, input, { userId });
-    if ((toolName === "crawl" || toolName === "browser_use") && isBlocked(result)) {
+    if ((toolName === "read_webpage" || toolName === "read_webpage_rendered") && isBlocked(result)) {
       return { content: blockedHint(url ?? "the website") };
     }
     return { content: result };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if ((toolName === "crawl" || toolName === "browser_use") && isBlocked(message)) {
+    if ((toolName === "read_webpage" || toolName === "read_webpage_rendered") && isBlocked(message)) {
       return { content: blockedHint(url ?? "the website") };
     }
     return { content: `${toolName} error: ${message}` };
@@ -107,27 +108,30 @@ async function dispatchToolCalls(
   const results: ContentBlock[] = [];
 
   for (const call of toolCalls) {
-    if (call.name === "search") {
+    if (call.name === "search_web") {
       if (budget.search >= SEARCH_BUDGET) {
-        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("search") });
+        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("search_web") });
         continue;
       }
       budget.search++;
       const query = typeof call.input.query === "string" ? call.input.query : "";
       onStatus(`Searching for: "${query}"...`);
-      const { content } = await runToolCall("search", undefined, { query }, userId);
+      // `search_web` (SearXNG/Tavily) returns structured JSON
+      // `{ results: [{ rank, title, url, snippet }] }` and accepts an optional
+      // `maxResults`; the raw JSON string is fed straight back to the model.
+      const { content } = await runToolCall("search_web", undefined, { query }, userId);
       results.push({ type: "tool_result", toolUseId: call.id, content });
       continue;
     }
 
-    if (call.name === "crawl" || call.name === "browser_use") {
+    if (call.name === "read_webpage" || call.name === "read_webpage_rendered") {
       if (budget.crawl >= CRAWL_BUDGET) {
-        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("crawl") });
+        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("read_webpage") });
         continue;
       }
       budget.crawl++;
       const url = typeof call.input.url === "string" ? call.input.url : "";
-      onStatus(call.name === "crawl" ? `Crawling: ${url}...` : `Browser Rendering: ${url}...`);
+      onStatus(call.name === "read_webpage" ? `Reading: ${url}...` : `Browser Rendering: ${url}...`);
       const { content } = await runToolCall(call.name, url, { url }, userId);
       results.push({ type: "tool_result", toolUseId: call.id, content });
       continue;
