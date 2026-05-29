@@ -11,7 +11,7 @@ import {
   primaryKey,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -601,6 +601,11 @@ export const headcountPlans = pgTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /** Categories granted "for session" in this conversation, e.g. { write: true }. */
+    sessionGrants: jsonb("session_grants")
+      .$type<Record<string, boolean>>()
+      .notNull()
+      .default({}),
     name: text("name"),
     employeeType: headcountEmployeeTypeEnum("employee_type")
       .notNull()
@@ -972,6 +977,11 @@ export const aiConversations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title"),
+    /** Categories granted "for session" in this conversation, e.g. { write: true }. */
+    sessionGrants: jsonb("session_grants")
+      .$type<Record<string, boolean>>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -1074,6 +1084,44 @@ export const aiMessages = pgTable(
       table.conversationId,
       table.createdAt
     ),
+  ]
+);
+
+// ── AI Pending Actions (a paused assistant turn awaiting permission) ─────────
+
+export const aiPendingActions = pgTable(
+  "ai_pending_actions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    /** Correlates the SSE permission_request/paused event with this row. */
+    pauseId: text("pause_id").notNull(),
+    /**
+     * The active scenario the paused turn operates in. Resume MUST run approved
+     * write/delete tools against THIS scenario (loaded scoped to companyId), not
+     * getDefaultScenario — otherwise a pause inside a non-default scenario writes
+     * overrides to the wrong overlay (scenario-safety; spec §5).
+     */
+    scenarioId: text("scenario_id").notNull(),
+    /** Raw assistant tool-use content blocks for the paused turn. */
+    assistantBlocks: jsonb("assistant_blocks").notNull(),
+    /** tool_result blocks for tools already executed (auto-allowed/denied). */
+    completedResults: jsonb("completed_results").notNull().default([]),
+    /** Actions awaiting a user decision: [{ requestId, tool, category, ... }]. */
+    pending: jsonb("pending").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  },
+  (table) => [
+    index("ai_pending_actions_conversation_idx").on(table.conversationId),
+    // At most one UNRESOLVED pending batch per conversation.
+    uniqueIndex("ai_pending_actions_active_idx")
+      .on(table.conversationId)
+      .where(sql`${table.resolvedAt} IS NULL`),
   ]
 );
 
@@ -1672,6 +1720,7 @@ export const aiToolAuditLogs = pgTable(
     toolName: text("tool_name").notNull(),
     input: jsonb("input").notNull(),
     status: aiToolAuditLogStatusEnum("status").notNull(),
+    permissionDecision: aiToolPermissionDecisionEnum("permission_decision"),
     result: jsonb("result"),
     durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
