@@ -6,17 +6,17 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc, gte } from "drizzle-orm";
-import { chatStream, type ChatMessage } from "@burnless/ai";
+import { eq, and, asc } from "drizzle-orm";
+import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
-import { executeToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
+import { buildChatSSEResponse } from "@/lib/chat-stream";
 
 const chatSchema = z.object({
   message: z.string().min(1),
@@ -46,8 +46,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!aiCheck.allowed) {
     return errorResponse(aiCheck.reason!, 403);
   }
-  const creditWarning = aiCheck.creditStatus?.warning;
-  const writeMode = aiCheck.writeMode ?? "full";
 
   // Get or create conversation
   let conversationId = body.conversationId;
@@ -76,6 +74,19 @@ export const POST = withErrorHandler(async (request: Request) => {
       .returning();
     conversationId = conv!.id;
   }
+
+  // Per-user permission defaults (fall back to builtin) + this conversation's grants.
+  const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
+  const defaults: PermissionDefaults = savedDefaults
+    ? {
+        read: savedDefaults.readMode,
+        write: savedDefaults.writeMode,
+        delete: savedDefaults.deleteMode,
+        web_search: savedDefaults.webSearchMode,
+        browser_use: savedDefaults.browserUseMode,
+      }
+    : BUILTIN_PERMISSION_DEFAULTS;
+  const sessionGrants = await getSessionGrants(conversationId);
 
   // Save user message
   await db.insert(aiMessages).values({
@@ -130,121 +141,22 @@ export const POST = withErrorHandler(async (request: Request) => {
   // Load company's custom AI provider config (if any)
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
 
-  // Stream response as SSE
-  const encoder = new TextEncoder();
-  let fullResponse = "";
+  const creditWarning = aiCheck.creditStatus?.warning
+    ? `${aiCheck.creditStatus.percentUsed}% of monthly credits used`
+    : undefined;
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      // Send conversationId immediately so client can track it even if stream fails
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ type: "conversation_id", conversationId })}\n\n`)
-      );
-
-      try {
-        const aiFlags = await getAiFlags(ctx.companyId);
-        const chunks = chatStream({
-          messages,
-          financialContext: contextText,
-          companionName: aiFlags.companionName,
-          providerConfig,
-          onToolCall: async (toolName, input) => {
-            return executeToolCall(toolName, input, {
-              companyId: ctx.companyId,
-              scenarioId: scenario.id,
-              userId: ctx.userId,
-              conversationId: conversationId!,
-              writeMode,
-            });
-          },
-        });
-
-        for await (const chunk of chunks) {
-          if (chunk.type === "text" && chunk.content) {
-            fullResponse += chunk.content;
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "text", content: chunk.content })}\n\n`)
-            );
-          } else if (chunk.type === "thinking" && chunk.content) {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "thinking", content: chunk.content })}\n\n`)
-            );
-          } else if (chunk.type === "tool_use") {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "tool_use", tool: chunk.toolName })}\n\n`)
-            );
-          } else if (chunk.type === "tool_result") {
-            // Send tool result data for inline visualizations
-            let parsedResult: Record<string, unknown> | null = null;
-            try {
-              parsedResult = chunk.toolResult ? JSON.parse(chunk.toolResult) : null;
-            } catch {
-              // non-JSON result, skip
-            }
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "tool_result", tool: chunk.toolName, data: parsedResult })}\n\n`)
-            );
-          } else if (chunk.type === "done") {
-            // Strip any leaked thinking tags (defense for non-Anthropic providers)
-            const cleanResponse = fullResponse
-              .replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "")
-              .trim();
-
-            // Save assistant response and update conversation timestamp
-            if (cleanResponse) {
-              await db.insert(aiMessages).values({
-                conversationId: conversationId!,
-                role: "assistant",
-                content: cleanResponse,
-              });
-              await db
-                .update(aiConversations)
-                .set({ updatedAt: new Date() })
-                .where(eq(aiConversations.id, conversationId!));
-            }
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "done", conversationId })}\n\n`)
-            );
-          }
-        }
-      } catch (error) {
-        // Save partial response on error so history isn't lost
-        if (fullResponse) {
-          const cleanPartial = fullResponse
-            .replace(/<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi, "")
-            .trim();
-          if (cleanPartial) {
-            await db.insert(aiMessages).values({
-              conversationId: conversationId!,
-              role: "assistant",
-              content: cleanPartial,
-            }).catch(() => {}); // best-effort
-            await db
-              .update(aiConversations)
-              .set({ updatedAt: new Date() })
-              .where(eq(aiConversations.id, conversationId!))
-              .catch(() => {});
-          }
-        }
-        const message = error instanceof Error ? error.message : "AI error";
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "error", content: message })}\n\n`)
-        );
-      } finally {
-        controller.close();
-      }
-    },
+  const aiFlags = await getAiFlags(ctx.companyId);
+  return buildChatSSEResponse({
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    scenarioId: scenario.id,
+    conversationId,
+    messages,
+    financialContext: contextText,
+    companionName: aiFlags.companionName,
+    providerConfig,
+    defaults,
+    sessionGrants,
+    creditWarning,
   });
-
-  const headers: Record<string, string> = {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-  };
-  if (creditWarning && aiCheck.creditStatus) {
-    headers["X-AI-Credit-Warning"] = `${aiCheck.creditStatus.percentUsed}% of monthly credits used`;
-  }
-
-  return new Response(stream, { headers });
 });

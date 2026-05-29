@@ -72,6 +72,10 @@ const { mockGetOverrideCount } = vi.hoisted(() => ({
   mockGetOverrideCount: vi.fn(),
 }));
 
+const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
+  mockBuildChatSSEResponse: vi.fn(),
+}));
+
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -92,6 +96,8 @@ vi.mock("@burnless/db", () => ({
     update: mockUpdate,
   },
   getOverrideCount: mockGetOverrideCount,
+  getPermissionDefaults: vi.fn().mockResolvedValue(null),
+  getSessionGrants: vi.fn().mockResolvedValue({}),
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -121,10 +127,23 @@ vi.mock("@/lib/ai-feature-flags", () => ({
 
 vi.mock("@burnless/ai", () => ({
   chatStream: mockChatStream,
+  resolvePermission: vi.fn(() => "allow"),
+  categorizeToolName: vi.fn(() => "read"),
+  BUILTIN_PERMISSION_DEFAULTS: {
+    read: "always",
+    write: "ask",
+    delete: "ask",
+    web_search: "always",
+    browser_use: "ask",
+  },
 }));
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
+}));
+
+vi.mock("@/lib/chat-stream", () => ({
+  buildChatSSEResponse: mockBuildChatSSEResponse,
 }));
 
 vi.mock("@/lib/build-ai-context", () => ({
@@ -155,18 +174,6 @@ function makeRequest(body: Record<string, unknown>) {
   });
 }
 
-async function readStream(response: Response): Promise<string[]> {
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  const events: string[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    events.push(decoder.decode(value));
-  }
-  return events;
-}
-
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("POST /api/chat", () => {
@@ -183,7 +190,6 @@ describe("POST /api/chat", () => {
     mockCheckAiFeatureAllowed.mockResolvedValue({
       allowed: true,
       creditStatus: null,
-      writeMode: "full",
     });
 
     // Default: DB chain setup
@@ -226,6 +232,17 @@ describe("POST /api/chat", () => {
 
     // Default: override count
     mockGetOverrideCount.mockResolvedValue(0);
+
+    // Default: shared SSE responder returns a basic streaming response
+    mockBuildChatSSEResponse.mockImplementation(
+      () =>
+        new Response("data: {}\n\n", {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+          },
+        })
+    );
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -322,71 +339,52 @@ describe("POST /api/chat", () => {
     expect(body.error).toContain("scenario");
   });
 
-  it("returns streaming response with correct headers", async () => {
-    // Mock chatStream to yield a simple text + done
-    async function* fakeStream() {
-      yield { type: "text" as const, content: "Your burn rate is $50K/mo." };
-      yield { type: "done" as const };
-    }
-    mockChatStream.mockReturnValue(fakeStream());
-
-    // DB: insert conversation returns id
+  it("delegates to the shared SSE responder", async () => {
+    // DB: insert conversation returns id for the freshly created conversation
     mockReturning.mockResolvedValue([
-      { id: "conv1", companyId: "c1", userId: "u1" },
+      { id: "new-conv", companyId: "c1", userId: "u1" },
     ]);
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ message: "What is my burn rate?" }));
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("Content-Type")).toBe("text/event-stream");
-    expect(res.headers.get("Cache-Control")).toBe("no-cache");
+    expect(mockBuildChatSSEResponse).toHaveBeenCalledOnce();
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    expect(params.companyId).toBe("c1");
+    expect(params.userId).toBe("u1");
+    expect(params.conversationId).toBe("new-conv"); // freshly created conversation
   });
 
-  it("streams conversation_id event first", async () => {
-    async function* fakeStream() {
-      yield { type: "text" as const, content: "Hello" };
-      yield { type: "done" as const };
-    }
-    mockChatStream.mockReturnValue(fakeStream());
+  it("passes the conversation message history to the responder", async () => {
     mockReturning.mockResolvedValue([
       { id: "conv1", companyId: "c1", userId: "u1" },
     ]);
 
     const { POST } = await import("../route");
-    const res = await POST(makeRequest({ message: "Hi" }));
-    const events = await readStream(res);
+    await POST(makeRequest({ message: "Hi" }));
 
-    // First event should contain conversation_id
-    expect(events[0]).toContain("conversation_id");
-    expect(events[0]).toContain("conv1");
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    expect(Array.isArray(params.messages)).toBe(true);
+    expect(params.financialContext).toContain("$500K cash");
+    expect(params.companionName).toBe("Aria");
   });
 
-  it("includes credit warning header when credits >= 80% used", async () => {
+  it("includes credit warning when credits >= 80% used", async () => {
     mockCheckAiFeatureAllowed.mockResolvedValue({
       allowed: true,
       creditStatus: { percentUsed: 85, warning: true },
-      writeMode: "full",
     });
-
-    async function* fakeStream() {
-      yield { type: "text" as const, content: "Ok" };
-      yield { type: "done" as const };
-    }
-    mockChatStream.mockReturnValue(fakeStream());
     mockReturning.mockResolvedValue([{ id: "conv1" }]);
 
     const { POST } = await import("../route");
-    const res = await POST(makeRequest({ message: "Test" }));
+    await POST(makeRequest({ message: "Test" }));
 
-    expect(res.headers.get("X-AI-Credit-Warning")).toContain("85%");
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    expect(params.creditWarning).toContain("85%");
   });
 
   it("creates new conversation when conversationId not provided", async () => {
-    async function* fakeStream() {
-      yield { type: "done" as const };
-    }
-    mockChatStream.mockReturnValue(fakeStream());
     mockReturning.mockResolvedValue([{ id: "new-conv" }]);
 
     const { POST } = await import("../route");
@@ -397,10 +395,6 @@ describe("POST /api/chat", () => {
   });
 
   it("passes scenarioId to scenario lookup when provided", async () => {
-    async function* fakeStream() {
-      yield { type: "done" as const };
-    }
-    mockChatStream.mockReturnValue(fakeStream());
     mockReturning.mockResolvedValue([{ id: "conv1" }]);
 
     // where() calls in order:
