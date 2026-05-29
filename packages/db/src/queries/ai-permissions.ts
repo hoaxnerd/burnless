@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../index";
-import { aiPermissionDefaults } from "../schema";
+import { aiPermissionDefaults, aiConversations } from "../schema";
 
 // ── Per-user permission defaults ─────────────────────────────────────────────
 
@@ -42,4 +42,39 @@ export async function upsertPermissionDefaults(
       target: [aiPermissionDefaults.userId, aiPermissionDefaults.companyId],
       set: { ...patch, updatedAt: new Date() },
     });
+}
+
+// ── Conversation session grants ──────────────────────────────────────────────
+
+/** Read the session-grant map for a conversation ({} if none). */
+export async function getSessionGrants(
+  conversationId: string
+): Promise<Record<string, boolean>> {
+  const [row] = await db
+    .select({ grants: aiConversations.sessionGrants })
+    .from(aiConversations)
+    .where(eq(aiConversations.id, conversationId))
+    .limit(1);
+  return row?.grants ?? {};
+}
+
+/** Grant a category "for session" — merges into the existing map. */
+export async function grantSessionPermission(
+  conversationId: string,
+  category: string
+): Promise<void> {
+  const current = await getSessionGrants(conversationId);
+  const next = { ...current, [category]: true };
+  await db
+    .update(aiConversations)
+    .set({ sessionGrants: next })
+    .where(eq(aiConversations.id, conversationId));
+}
+
+/** Clear all session grants for a conversation. */
+export async function resetSessionGrants(conversationId: string): Promise<void> {
+  await db
+    .update(aiConversations)
+    .set({ sessionGrants: {} })
+    .where(eq(aiConversations.id, conversationId));
 }
