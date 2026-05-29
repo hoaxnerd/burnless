@@ -601,11 +601,6 @@ export const headcountPlans = pgTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    /** Categories granted "for session" in this conversation, e.g. { write: true }. */
-    sessionGrants: jsonb("session_grants")
-      .$type<Record<string, boolean>>()
-      .notNull()
-      .default({}),
     name: text("name"),
     employeeType: headcountEmployeeTypeEnum("employee_type")
       .notNull()
