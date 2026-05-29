@@ -19,12 +19,12 @@ describe("SYSTEM_PROMPT", () => {
   });
 
   it("references available tools", () => {
-    expect(SYSTEM_PROMPT).toContain("suggest_cost_cuts");
-    expect(SYSTEM_PROMPT).toContain("forecast_revenue");
-    expect(SYSTEM_PROMPT).toContain("benchmark_metrics");
-    expect(SYSTEM_PROMPT).toContain("model_dilution");
-    expect(SYSTEM_PROMPT).toContain("generate_report_narrative");
-    expect(SYSTEM_PROMPT).toContain("categorize_transactions");
+    expect(SYSTEM_PROMPT).toContain("get_expense_analysis");
+    expect(SYSTEM_PROMPT).toContain("get_revenue_projection");
+    expect(SYSTEM_PROMPT).toContain("get_metric_benchmarks");
+    expect(SYSTEM_PROMPT).toContain("get_dilution_projection");
+    expect(SYSTEM_PROMPT).toContain("get_report_data");
+    expect(SYSTEM_PROMPT).toContain("get_transaction_categories");
   });
 });
 
