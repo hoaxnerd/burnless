@@ -164,6 +164,19 @@ export const aiWriteModeEnum = pgEnum("ai_write_mode", [
   "read_only",
 ]);
 
+export const aiPermissionModeEnum = pgEnum("ai_permission_mode", [
+  "ask",
+  "session",
+  "always",
+]);
+
+export const aiToolPermissionDecisionEnum = pgEnum("ai_tool_permission_decision", [
+  "auto",
+  "granted_once",
+  "granted_session",
+  "denied",
+]);
+
 export const headcountEmployeeTypeEnum = pgEnum("headcount_employee_type", [
   "full_time",
   "part_time",
@@ -1821,6 +1834,41 @@ export const userPreferencesRelations = relations(
       references: [companies.id],
     }),
   })
+);
+
+// ── AI Permission Defaults (per-user, per-company tool permission settings) ──
+
+export const aiPermissionDefaults = pgTable(
+  "ai_permission_defaults",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    readMode: aiPermissionModeEnum("read_mode").notNull().default("always"),
+    writeMode: aiPermissionModeEnum("write_mode").notNull().default("ask"),
+    // Delete never offers "always" (enforced in app + resolver); column reuses the
+    // shared enum but only "ask" / "session" are ever written.
+    deleteMode: aiPermissionModeEnum("delete_mode").notNull().default("ask"),
+    webSearchMode: aiPermissionModeEnum("web_search_mode").notNull().default("always"),
+    browserUseMode: aiPermissionModeEnum("browser_use_mode").notNull().default("ask"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("ai_permission_defaults_user_company_idx").on(
+      table.userId,
+      table.companyId
+    ),
+  ]
 );
 
 // ── AI Usage Logs (cost tracking per feature) ───────────────────────────────
