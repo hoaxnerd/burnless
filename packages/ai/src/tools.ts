@@ -557,7 +557,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_funding_round_investor",
+    name: "create_funding_round_investor",
     description:
       "Add an investor record to an existing funding round. Tracks individual LP/investor participation within a round for cap-table detail.",
     inputSchema: {
@@ -584,7 +584,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "mark_grant_milestone_hit",
+    name: "update_grant_milestone",
     description:
       "Record that a grant milestone has been achieved. Sets the hitDate on the milestone inside the grant round's parameters. Only valid for rounds with roundType='grant'.",
     inputSchema: {

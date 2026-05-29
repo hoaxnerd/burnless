@@ -290,7 +290,7 @@ describe("deleteFundingRound", () => {
   });
 });
 
-// ── add_funding_round_investor ────────────────────────────────────────────────
+// ── create_funding_round_investor ─────────────────────────────────────────────
 
 describe("addFundingRoundInvestor", () => {
   it("inserts investor and returns investorId", async () => {
@@ -339,7 +339,7 @@ describe("addFundingRoundInvestor", () => {
   });
 });
 
-// ── mark_grant_milestone_hit ──────────────────────────────────────────────────
+// ── update_grant_milestone ────────────────────────────────────────────────────
 
 describe("markGrantMilestoneHit", () => {
   it("sets hitDate on the correct milestone", async () => {

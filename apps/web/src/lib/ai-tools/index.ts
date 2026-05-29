@@ -39,18 +39,18 @@ const fundingSchemas: Record<string, z.ZodType> = {
   create_funding_round: CreateFundingRoundSchema,
   update_funding_round: UpdateFundingRoundSchema,
   delete_funding_round: DeleteFundingRoundSchema,
-  add_funding_round_investor: AddFundingRoundInvestorSchema,
-  mark_grant_milestone_hit: MarkGrantMilestoneHitSchema,
-  model_dilution: ModelDilutionSchema,
+  create_funding_round_investor: AddFundingRoundInvestorSchema,
+  update_grant_milestone: MarkGrantMilestoneHitSchema,
+  get_dilution_projection: ModelDilutionSchema,
 };
 
 const fundingHandlers: Record<string, ToolHandler> = {
   create_funding_round: createFundingRound,
   update_funding_round: updateFundingRound,
   delete_funding_round: deleteFundingRound,
-  add_funding_round_investor: addFundingRoundInvestor,
-  mark_grant_milestone_hit: markGrantMilestoneHit,
-  model_dilution: modelDilution,
+  create_funding_round_investor: addFundingRoundInvestor,
+  update_grant_milestone: markGrantMilestoneHit,
+  get_dilution_projection: modelDilution,
 };
 
 const toolSchemas: Record<string, z.ZodType> = {
@@ -81,7 +81,7 @@ const toolHandlers: Record<string, ToolHandler> = {
 const MUTATION_TOOLS = new Set([
   // Create
   "create_scenario", "create_headcount", "create_department", "create_revenue_stream",
-  "create_funding_round", "add_funding_round_investor", "mark_grant_milestone_hit",
+  "create_funding_round", "create_funding_round_investor", "update_grant_milestone",
   "create_forecast_line", "create_account",
   "create_salary_change", "create_bonus", "create_equity_grant",
   // Update
@@ -118,8 +118,8 @@ const MUTATION_CACHE_TAGS: Record<string, string[]> = {
   create_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
   update_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
   delete_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  add_funding_round_investor: ["funding-rounds", "cap-table"],
-  mark_grant_milestone_hit: ["funding-rounds", "scenario-overrides", "cap-table"],
+  create_funding_round_investor: ["funding-rounds", "cap-table"],
+  update_grant_milestone: ["funding-rounds", "scenario-overrides", "cap-table"],
   create_forecast_line: ["forecast-lines", "scenario-overrides"],
   update_forecast_line: ["forecast-lines", "scenario-overrides"],
   delete_forecast_line: ["forecast-lines", "scenario-overrides"],
