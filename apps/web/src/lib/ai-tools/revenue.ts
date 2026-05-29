@@ -129,13 +129,13 @@ async function deleteRevenueStream(
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const revenueSchemas: Record<string, z.ZodType> = {
-  add_revenue_stream: addRevenueStreamSchema,
+  create_revenue_stream: addRevenueStreamSchema,
   update_revenue_stream: updateRevenueStreamSchema,
   delete_revenue_stream: deleteRevenueStreamSchema,
 };
 
 export const revenueHandlers: Record<string, ToolHandler> = {
-  add_revenue_stream: addRevenueStream,
+  create_revenue_stream: addRevenueStream,
   update_revenue_stream: updateRevenueStream,
   delete_revenue_stream: deleteRevenueStream,
 };

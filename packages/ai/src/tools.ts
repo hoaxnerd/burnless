@@ -87,7 +87,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_headcount",
+    name: "create_headcount",
     description:
       "Add a headcount plan entry to the current scenario. Canonical engine fields: title, name (individual hire name), employeeType (full_time | part_time | contractor), count (FTE — supports fractions like 0.5), salary (annual), hourlyRate (for contractors / part-time hourly), hoursPerWeek (40 = full-time baseline), startDate, endDate, departmentId, benefitsRate (legacy fallback), and parameters.benefitsBreakdown with the four fractions { statutoryEmployerContributionsCost, insuranceBenefitsCost, retirementContributionsCost, otherBenefitsCost }.",
     inputSchema: {
@@ -250,9 +250,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_revenue_stream",
+    name: "create_revenue_stream",
     description:
-      "Add a revenue stream to the current scenario — supports 7 types: subscription (SaaS MRR), one_time, usage_based, services, marketplace, ecommerce, hardware. Requires startDate (ISO YYYY-MM-DD). Optional endDate (ISO YYYY-MM-DD, or null for open-ended). Parameter field names match engine canonical names: subscription={startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate, expansionRate, priceGrowthRate, pricingModel, seatsPerCustomer, tiers}; one_time={unitsPerMonth, pricePerUnit, unitGrowthRate}; usage_based={activeUsers, avgUsagePerUser, pricePerUnit, userGrowthRate, usageGrowthRate, pricingModel, tiers}; services={hoursPerMonth, hourlyRate, hoursGrowthRate, rateIncreaseRate}; marketplace={startingGmv, takeRate, gmvGrowthRate}; ecommerce={ordersPerMonth, averageOrderValue, orderGrowthRate, aovGrowthRate}; hardware={unitsPerMonth, pricePerUnit, unitGrowthRate, priceGrowthRate}.",
+      "Add a revenue stream to the current scenario — supports 7 types: subscription (SaaS MRR), one_time, usage_based, services, marketplace, ecommerce, hardware. Requires startDate (ISO YYYY-MM-DD). Optional endDate (ISO YYYY-MM-DD, or null for open-ended). Parameter field names match engine canonical names: subscription={startingCustomers, monthlyPrice, newCustomersPerMonth, monthlyChurnRate, expansionRate, priceGrowthRate, pricingModel, seatsPerCustomer, tiers}; one_time={unitsPerMonth, pricePerUnit, unitGrowthRate}; usage_based={activeUsers, avgUsagePerUser, pricePerUnit, userGrowthRate, usageGrowthRate, pricingModel, tiers}; services={hoursPerMonth, hourlyRate, hoursGrowthRate, rateIncreaseRate}; marketplace={startingGmv, takeRate, gmvGrowthRate}; ecommerce={ordersPerMonth, averageOrderValue, orderGrowthRate, aovGrowthRate}; hardware={unitsPerMonth, pricePerUnit, unitGrowthRate, priceGrowthRate}. Use this for subscription, usage-based, services, marketplace, e-commerce, and hardware revenue models. For a simple account-level revenue projection, use create_forecast_line on a revenue account instead.",
     inputSchema: {
       type: "object",
       properties: {
@@ -922,7 +922,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_salary_change",
+    name: "create_salary_change",
     description:
       "Add a salary change record for an existing headcount entry. The change takes effect on `effectiveDate` and persists until superseded by a later change. Use this for raises, promotions, or compensation revisions instead of mutating headcount.salary directly.",
     inputSchema: {
@@ -940,7 +940,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_bonus",
+    name: "create_bonus",
     description:
       "Add a one-time bonus payout for an existing headcount entry. Bonuses emit in the `payoutMonth` exactly — not prorated, not recurring. Multiple bonuses in the same month sum.",
     inputSchema: {
@@ -960,7 +960,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "add_equity_grant",
+    name: "create_equity_grant",
     description:
       "Add an equity grant for an existing headcount entry. Vesting schedule is a list of milestones (cliff, monthly, quarterly, annual, or milestone) with date and shares vested. Sum of vested shares should not exceed total shares granted.",
     inputSchema: {

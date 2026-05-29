@@ -468,27 +468,27 @@ async function addEquityGrant(
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const headcountSchemas: Record<string, z.ZodType> = {
-  add_headcount: addHeadcountSchema,
+  create_headcount: addHeadcountSchema,
   update_headcount: updateHeadcountSchema,
   delete_headcount: deleteHeadcountSchema,
   create_department: createDepartmentSchema,
   update_department: updateDepartmentSchema,
   delete_department: deleteDepartmentSchema,
-  add_salary_change: addSalaryChangeSchema,
-  add_bonus: addBonusSchema,
-  add_equity_grant: addEquityGrantSchema,
+  create_salary_change: addSalaryChangeSchema,
+  create_bonus: addBonusSchema,
+  create_equity_grant: addEquityGrantSchema,
 };
 
 export const headcountHandlers: Record<string, ToolHandler> = {
-  add_headcount: addHeadcount,
+  create_headcount: addHeadcount,
   update_headcount: updateHeadcount,
   delete_headcount: deleteHeadcount,
   create_department: createDepartment,
   update_department: updateDepartment,
   delete_department: deleteDepartment,
-  add_salary_change: addSalaryChange,
-  add_bonus: addBonus,
-  add_equity_grant: addEquityGrant,
+  create_salary_change: addSalaryChange,
+  create_bonus: addBonus,
+  create_equity_grant: addEquityGrant,
 };
 
 // `headcount` is exported for back-compat; not used here directly.
