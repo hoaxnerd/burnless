@@ -5,7 +5,7 @@
  * Provider-agnostic: works with Anthropic, OpenAI, or any registered provider.
  */
 
-import type { ChatMessage, StreamChunk, ToolCallResult } from "./types";
+import type { ChatMessage, StreamChunk, ToolCallResult, PauseState, PendingToolUse } from "./types";
 import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
 import {
@@ -36,6 +36,10 @@ interface ChatOptions {
   messages: ChatMessage[];
   financialContext: string;
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
+  /** Decide whether a tool may run without prompting. Default: everything "allow". */
+  resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask";
+  /** Persist a paused turn; returns a pauseId echoed in the permission_request/paused chunks. */
+  onPause?: (state: PauseState) => Promise<string>;
   /** AI feature name for model routing. Defaults to "chat". */
   feature?: string;
   /** Configured companion name for the system prompt. */
@@ -183,20 +187,55 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
         (b): b is ContentBlock & { type: "tool_use" } => b.type === "tool_use"
       );
 
-      messages.push({ role: "assistant", content: lastResponse.content });
+      const completedResults: ContentBlock[] = [];
+      const pending: PendingToolUse[] = [];
 
-      const resultBlocks: ContentBlock[] = [];
       for (const toolUse of toolUseBlocks) {
-        const result = await options.onToolCall(toolUse.name, toolUse.input);
+        const decision = options.resolvePermission
+          ? options.resolvePermission(toolUse.name, toolUse.input)
+          : "allow";
+
+        if (decision === "ask") {
+          pending.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
+          continue;
+        }
+
+        // Auto-allowed → execute now, with live status.
+        yield { type: "tool_status", toolName: toolUse.name, phase: "running" };
+        let result: string;
+        try {
+          result = await options.onToolCall(toolUse.name, toolUse.input);
+          yield { type: "tool_status", toolName: toolUse.name, phase: "done" };
+        } catch (err) {
+          result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+          yield { type: "tool_status", toolName: toolUse.name, phase: "error" };
+        }
         yield { type: "tool_result", toolName: toolUse.name, toolResult: result };
-        resultBlocks.push({
-          type: "tool_result",
-          toolUseId: toolUse.id,
-          content: result,
-        });
+        completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: result });
       }
 
-      messages.push({ role: "user", content: resultBlocks });
+      // Persist the assistant turn (it contains every tool_use id).
+      // NOTE: any assistant text streamed before the tool calls is shown live but is
+      // NOT separately persisted to aiMessages on pause (the `done` save never runs).
+      // The model still sees it on resume via the persisted assistantBlocks; do not
+      // "fix" this into a duplicate-save.
+      messages.push({ role: "assistant", content: lastResponse.content });
+
+      if (pending.length > 0) {
+        let pauseId: string | undefined;
+        if (options.onPause) {
+          pauseId = await options.onPause({
+            assistantBlocks: lastResponse.content,
+            completedResults,
+            pending,
+          });
+        }
+        yield { type: "permission_request", actions: pending, pauseId };
+        yield { type: "paused", pauseId };
+        return;
+      }
+
+      messages.push({ role: "user", content: completedResults });
       continue;
     }
 
