@@ -11,6 +11,9 @@ export { buildFinancialSnapshot, formatContextForPrompt } from "./context";
 // Tool definitions
 export { getFinancialTools, financialTools } from "./tools";
 
+// Tool-name alias map (forward-compat for retired names in stored audit logs / history)
+export { TOOL_NAME_ALIASES, canonicalToolName } from "./tool-aliases";
+
 // Tool input Zod schemas
 export {
   ExpenseFrequencySchema,
