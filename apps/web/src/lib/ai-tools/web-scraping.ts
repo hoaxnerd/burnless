@@ -1,7 +1,7 @@
 /**
- * Web scraping tools — search, crawl, and a browser-rendering fallback for
+ * Web scraping tools — read a single page and a browser-rendering fallback for
  * pages that anti-bot defenses block. Centralized handlers for Jina AI's
- * Reader / Search APIs and Cloudflare Browser Rendering.
+ * Reader API and Cloudflare Browser Rendering.
  *
  * Each handler caps its output at MAX_RESULT_CHARS and appends a truncation
  * marker so the agent knows the content was cut. Without that marker the
@@ -22,10 +22,6 @@ const BROWSER_CDP_ENDPOINT = "wss://chrome.cloudflare.com/cdp";
 const USER_AGENT = "burnless/1.0";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
-
-export const searchSchema = z.object({
-  query: z.string().min(1, "Search query is required").max(500, "Query too long"),
-});
 
 export const crawlSchema = z.object({
   url: z.string().url("Must be a valid URL"),
@@ -50,7 +46,7 @@ function jinaHeaders(): Record<string, string> {
   return headers;
 }
 
-async function fetchJina(url: string, kind: "search" | "reader"): Promise<string> {
+async function fetchJina(url: string, kind: "reader"): Promise<string> {
   const res = await fetch(url, {
     headers: jinaHeaders(),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -62,11 +58,6 @@ async function fetchJina(url: string, kind: "search" | "reader"): Promise<string
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
-
-const handleSearch: ToolHandler = async (input) => {
-  const { query } = searchSchema.parse(input);
-  return fetchJina(`https://s.jina.ai/${encodeURIComponent(query)}`, "search");
-};
 
 const handleCrawl: ToolHandler = async (input) => {
   const { url } = crawlSchema.parse(input);
@@ -106,13 +97,11 @@ const handleBrowserUse: ToolHandler = async (input) => {
 // ── Exports ──────────────────────────────────────────────────────────────────
 
 export const webScrapingSchemas = {
-  search: searchSchema,
-  crawl: crawlSchema,
-  browser_use: browserUseSchema,
+  read_webpage: crawlSchema,
+  read_webpage_rendered: browserUseSchema,
 } satisfies Record<string, z.ZodType>;
 
 export const webScrapingHandlers = {
-  search: handleSearch,
-  crawl: handleCrawl,
-  browser_use: handleBrowserUse,
+  read_webpage: handleCrawl,
+  read_webpage_rendered: handleBrowserUse,
 } satisfies Record<string, ToolHandler>;

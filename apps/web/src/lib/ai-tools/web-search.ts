@@ -50,9 +50,9 @@ const handleWebSearch: ToolHandler = async (input) => {
 // ── Exports ──────────────────────────────────────────────────────────────────
 
 export const webSearchSchemas: Record<string, z.ZodType> = {
-  web_search: webSearchSchema,
+  search_web: webSearchSchema,
 };
 
 export const webSearchHandlers: Record<string, ToolHandler> = {
-  web_search: handleWebSearch,
+  search_web: handleWebSearch,
 };
