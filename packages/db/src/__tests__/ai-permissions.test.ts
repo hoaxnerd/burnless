@@ -13,6 +13,9 @@ import {
   getSessionGrants,
   grantSessionPermission,
   resetSessionGrants,
+  createPendingAction,
+  getActivePendingAction,
+  resolvePendingAction,
 } from "../queries/ai-permissions";
 import { createCompanyContext } from "./factories";
 import { getTestDb as _db } from "./setup";
@@ -84,5 +87,68 @@ describe("conversation session grants", () => {
   it("reset clears all grants", async () => {
     await resetSessionGrants(convId);
     expect(await getSessionGrants(convId)).toEqual({});
+  });
+});
+
+describe("pending actions", () => {
+  let convId: string;
+  let scenarioId: string;
+
+  beforeAll(async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "pending@test.burnless.app" },
+      company: { name: "Pending Co" },
+      scenario: { name: "S" },
+    });
+    scenarioId = ctx.scenario.id;
+    const [conv] = await _db()
+      .insert(aiConversations)
+      .values({ companyId: ctx.company.id, userId: ctx.user.id, title: "t" })
+      .returning();
+    convId = conv!.id;
+  });
+
+  it("creates and reads back the active pending batch", async () => {
+    const row = await createPendingAction({
+      conversationId: convId,
+      pauseId: "p1",
+      scenarioId,
+      assistantBlocks: [{ type: "tool_use", id: "t1", name: "create_scenario", input: {} }],
+      completedResults: [],
+      // Shape matches Plan 3's PendingToolUse exactly: { requestId, toolName, toolInput }.
+      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: {} }],
+    });
+    expect(row.id).toBeTruthy();
+    expect(row.scenarioId).toBe(scenarioId);
+    const active = await getActivePendingAction(convId);
+    expect(active?.pauseId).toBe("p1");
+  });
+
+  it("rejects a second active batch for the same conversation", async () => {
+    await expect(
+      createPendingAction({
+        conversationId: convId,
+        pauseId: "p2",
+        scenarioId,
+        assistantBlocks: [],
+        completedResults: [],
+        pending: [],
+      })
+    ).rejects.toThrow();
+  });
+
+  it("resolving frees the slot for a new batch", async () => {
+    const active = await getActivePendingAction(convId);
+    await resolvePendingAction(active!.id);
+    expect(await getActivePendingAction(convId)).toBeNull();
+    const row = await createPendingAction({
+      conversationId: convId,
+      pauseId: "p3",
+      scenarioId,
+      assistantBlocks: [],
+      completedResults: [],
+      pending: [],
+    });
+    expect(row.pauseId).toBe("p3");
   });
 });

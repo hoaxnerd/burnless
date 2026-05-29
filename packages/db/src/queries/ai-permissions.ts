@@ -1,6 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../index";
-import { aiPermissionDefaults, aiConversations } from "../schema";
+import {
+  aiPermissionDefaults,
+  aiConversations,
+  aiPendingActions,
+} from "../schema";
 
 // ── Per-user permission defaults ─────────────────────────────────────────────
 
@@ -77,4 +81,58 @@ export async function resetSessionGrants(conversationId: string): Promise<void> 
     .update(aiConversations)
     .set({ sessionGrants: {} })
     .where(eq(aiConversations.id, conversationId));
+}
+
+// ── Pending actions (paused turns) ───────────────────────────────────────────
+
+export interface NewPendingAction {
+  conversationId: string;
+  pauseId: string;
+  /** Active scenario the paused turn operates in (resume executes against this). */
+  scenarioId: string;
+  assistantBlocks: unknown;
+  completedResults: unknown;
+  pending: unknown;
+}
+
+/**
+ * Persist a paused assistant turn. Throws (unique-violation) if the conversation
+ * already has an unresolved pending batch — the single-active invariant.
+ */
+export async function createPendingAction(input: NewPendingAction) {
+  const [row] = await db
+    .insert(aiPendingActions)
+    .values({
+      conversationId: input.conversationId,
+      pauseId: input.pauseId,
+      scenarioId: input.scenarioId,
+      assistantBlocks: input.assistantBlocks,
+      completedResults: input.completedResults,
+      pending: input.pending,
+    })
+    .returning();
+  return row!;
+}
+
+/** Get the conversation's current unresolved pending batch, or null. */
+export async function getActivePendingAction(conversationId: string) {
+  const [row] = await db
+    .select()
+    .from(aiPendingActions)
+    .where(
+      and(
+        eq(aiPendingActions.conversationId, conversationId),
+        isNull(aiPendingActions.resolvedAt)
+      )
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** Mark a pending batch resolved (frees the single-active slot). */
+export async function resolvePendingAction(id: string): Promise<void> {
+  await db
+    .update(aiPendingActions)
+    .set({ resolvedAt: new Date() })
+    .where(eq(aiPendingActions.id, id));
 }
