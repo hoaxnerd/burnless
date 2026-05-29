@@ -1,5 +1,5 @@
 /**
- * Tests for the `update_expense` and `create_expense` AI tool handlers.
+ * Tests for the `update_forecast_line` and `create_forecast_line` AI tool handlers.
  *
  * Phase 1 §1.5 — covers the new top-level fields (vendor, notes, frequency,
  * departmentId, isOneTime, isRecurring) and Zod validation behavior.
@@ -61,12 +61,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("update_expense handler", () => {
+describe("update_forecast_line handler", () => {
   it("persists vendor, frequency=annual, and notes through scenarioUpdate", async () => {
     mockOwnedRow({ id: "fl-1", accountId: "acc-1", companyId: "co-1" });
     mockScenarioUpdate.mockResolvedValue({ id: "fl-1" });
 
-    const result = await forecastingHandlers.update_expense!(
+    const result = await forecastingHandlers.update_forecast_line!(
       {
         id: "fl-1",
         vendor: "Slack",
@@ -94,7 +94,7 @@ describe("update_expense handler", () => {
     mockOwnedRow({ id: "fl-1", accountId: "acc-1", companyId: "co-1" });
     mockScenarioUpdate.mockResolvedValue({ id: "fl-1" });
 
-    const result = await forecastingHandlers.update_expense!(
+    const result = await forecastingHandlers.update_forecast_line!(
       { id: "fl-1", isRecurring: null },
       ctx
     );
@@ -109,7 +109,7 @@ describe("update_expense handler", () => {
   it("rejects an invalid frequency value with a Zod error", async () => {
     mockOwnedRow({ id: "fl-1", accountId: "acc-1", companyId: "co-1" });
 
-    const result = await forecastingHandlers.update_expense!(
+    const result = await forecastingHandlers.update_forecast_line!(
       { id: "fl-1", frequency: "weekly" },
       ctx
     );
@@ -121,7 +121,7 @@ describe("update_expense handler", () => {
   });
 
   it("rejects when the required `id` is missing", async () => {
-    const result = await forecastingHandlers.update_expense!(
+    const result = await forecastingHandlers.update_forecast_line!(
       { frequency: "monthly" },
       ctx
     );
@@ -133,11 +133,11 @@ describe("update_expense handler", () => {
   });
 });
 
-describe("create_expense handler", () => {
+describe("create_forecast_line handler", () => {
   it("threads Phase-1 fields into the insert payload", async () => {
     mockScenarioInsert.mockResolvedValue({ id: "fl-new" });
 
-    const result = await forecastingHandlers.create_expense!(
+    const result = await forecastingHandlers.create_forecast_line!(
       {
         accountId: "acc-1",
         method: "fixed",
@@ -172,7 +172,7 @@ describe("create_expense handler", () => {
   it("defaults frequency=monthly and isOneTime=false when omitted", async () => {
     mockScenarioInsert.mockResolvedValue({ id: "fl-new" });
 
-    await forecastingHandlers.create_expense!(
+    await forecastingHandlers.create_forecast_line!(
       {
         accountId: "acc-1",
         method: "fixed",
@@ -189,7 +189,7 @@ describe("create_expense handler", () => {
   });
 
   it("rejects an invalid startDate format", async () => {
-    const result = await forecastingHandlers.create_expense!(
+    const result = await forecastingHandlers.create_forecast_line!(
       {
         accountId: "acc-1",
         method: "fixed",

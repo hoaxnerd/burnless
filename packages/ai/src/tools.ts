@@ -30,9 +30,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "create_expense",
+    name: "create_forecast_line",
     description:
-      "Add an expense to the current scenario — defines how a specific expense account is projected over time. Use when the user says 'add a Slack subscription expense' or 'plan our cloud spend'. Always operates on the active scenario from context. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
+      "Create a forecast line — a monthly projection rule for ANY account (revenue, COGS, operating expense, other income/expense). NOT an actual transaction; it defines how the account's amount evolves over time. For subscription/usage/services revenue prefer create_revenue_stream instead. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
       type: "object",
       properties: {
@@ -607,7 +607,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "update_expense",
+    name: "update_forecast_line",
     description:
       "Update an existing expense's method, parameters, dates, or metadata (vendor, notes, frequency, department, one-time/recurring flags). Use when the user says 'edit my Slack expense' or 'change the cloud spend growth rate'. Only fields supplied are patched. Method param shapes: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
     inputSchema: {
@@ -664,7 +664,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "delete_expense",
+    name: "delete_forecast_line",
     description:
       "Delete an expense and all its associated forecast values. Use this when the user says things like 'remove my Slack expense'.",
     inputSchema: {
