@@ -5,6 +5,7 @@
 
 import type { MonthlySeries, ComputedMetrics, ProfitAndLoss, CashFlowStatement } from "@burnless/engine";
 import type { Company, Scenario, Account, FundingRound } from "@burnless/types";
+import type { ContentBlock } from "./providers/types";
 
 // ── Financial context passed to the AI ──────────────────────────────────────
 
@@ -151,7 +152,8 @@ export interface FinancialSnapshot {
 
 export interface ChatMessage {
   role: "user" | "assistant";
-  content: string;
+  /** Plain text, or structured content blocks (used when resuming a paused turn). */
+  content: string | ContentBlock[];
 }
 
 export interface ChatRequest {
@@ -174,12 +176,43 @@ export interface ToolCallResult {
 
 // ── Streaming types ─────────────────────────────────────────────────────────
 
+export interface PendingToolUse {
+  /** The provider tool_use id — correlates the decision back to the call. */
+  requestId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+}
+
+export interface PauseState {
+  /** The assistant turn's raw content blocks (includes all tool_use). */
+  assistantBlocks: ContentBlock[];
+  /** tool_result blocks for tools already executed this turn (auto-allowed). */
+  completedResults: ContentBlock[];
+  /** Tools awaiting a user decision. */
+  pending: PendingToolUse[];
+}
+
 export interface StreamChunk {
-  type: "text" | "thinking" | "tool_use" | "tool_result" | "done" | "error";
+  type:
+    | "text"
+    | "thinking"
+    | "tool_use"
+    | "tool_status"
+    | "tool_result"
+    | "permission_request"
+    | "paused"
+    | "done"
+    | "error";
   content?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
   toolResult?: string;
+  /** For tool_status: lifecycle phase of an executing tool. */
+  phase?: "running" | "done" | "error";
+  /** For permission_request: the tools awaiting a decision. */
+  actions?: PendingToolUse[];
+  /** For permission_request/paused: correlates with the persisted pending batch. */
+  pauseId?: string;
 }
 
 // ── Tool definitions ────────────────────────────────────────────────────────
