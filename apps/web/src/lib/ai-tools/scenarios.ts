@@ -157,12 +157,12 @@ export const scenarioSchemas: Record<string, z.ZodType> = {
   create_scenario: createScenarioSchema,
   update_scenario: updateScenarioSchema,
   delete_scenario: deleteScenarioSchema,
-  compare_scenarios: compareScenarioSchema,
+  get_scenario_comparison: compareScenarioSchema,
 };
 
 export const scenarioHandlers: Record<string, ToolHandler> = {
   create_scenario: createScenario,
   update_scenario: updateScenario,
   delete_scenario: deleteScenario,
-  compare_scenarios: compareScenariosTool,
+  get_scenario_comparison: compareScenariosTool,
 };

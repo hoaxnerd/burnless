@@ -472,23 +472,23 @@ async function deleteAccount(
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const analyticsSchemas: Record<string, z.ZodType> = {
-  compute_metrics: computeMetricsSchema,
+  get_metrics: computeMetricsSchema,
   create_account: createAccountSchema,
   update_account: updateAccountSchema,
   delete_account: deleteAccountSchema,
-  categorize_transactions: categorizeTransactionsSchema,
-  generate_report_narrative: generateReportNarrativeSchema,
-  suggest_cost_cuts: suggestCostCutsSchema,
-  benchmark_metrics: benchmarkMetricsSchema,
+  get_transaction_categories: categorizeTransactionsSchema,
+  get_report_data: generateReportNarrativeSchema,
+  get_expense_analysis: suggestCostCutsSchema,
+  get_metric_benchmarks: benchmarkMetricsSchema,
 };
 
 export const analyticsHandlers: Record<string, ToolHandler> = {
-  compute_metrics: computeMetrics,
+  get_metrics: computeMetrics,
   create_account: createAccount,
   update_account: updateAccount,
   delete_account: deleteAccount,
-  categorize_transactions: categorizeTransactions,
-  generate_report_narrative: generateReportNarrative,
-  suggest_cost_cuts: suggestCostCuts,
-  benchmark_metrics: benchmarkMetrics,
+  get_transaction_categories: categorizeTransactions,
+  get_report_data: generateReportNarrative,
+  get_expense_analysis: suggestCostCuts,
+  get_metric_benchmarks: benchmarkMetrics,
 };

@@ -382,7 +382,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "compare_scenarios",
+    name: "get_scenario_comparison",
     description:
       "Compare two financial scenarios side-by-side, showing differences in revenue, expenses, cash, and key metrics.",
     inputSchema: {
@@ -401,7 +401,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "compute_metrics",
+    name: "get_metrics",
     description:
       "Compute all financial metrics for the active scenario over a time period. Returns MRR, ARR, burn rate, runway, growth rates, SaaS metrics, etc.",
     inputSchema: {
@@ -420,9 +420,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "generate_financial_statements",
+    name: "get_financial_statements",
     description:
-      "Generate P&L (Profit & Loss), Cash Flow Statement, and Balance Sheet for the active scenario.",
+      "Get the Profit & Loss statement and a cash-flow summary for the active scenario. (Balance sheet is not returned by this tool.)",
     inputSchema: {
       type: "object",
       properties: {
@@ -763,9 +763,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "categorize_transactions",
+    name: "get_transaction_categories",
     description:
-      "Analyze uncategorized or miscategorized transactions and suggest appropriate account categories based on the description, amount, and existing chart of accounts.",
+      "Return the supplied transactions alongside the company's chart of accounts so you (the model) can suggest a category per transaction. Read-only — it does not persist categorizations.",
     inputSchema: {
       type: "object",
       properties: {
@@ -788,9 +788,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "generate_report_narrative",
+    name: "get_report_data",
     description:
-      "Generate a written narrative for investor reports or board updates based on the current financial data. Returns formatted markdown text ready for a board deck or investor letter.",
+      "Assemble the financial data (metrics, P&L, recent trends) needed to write an investor-facing narrative. Read-only — it returns the data; you (the model) write the narrative from it.",
     inputSchema: {
       type: "object",
       properties: {
@@ -818,9 +818,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "suggest_cost_cuts",
+    name: "get_expense_analysis",
     description:
-      "Analyze current expenses in the active scenario and identify optimization opportunities — areas where spend could be reduced, renegotiated, or eliminated to extend runway.",
+      "Assemble the company's expense breakdown, burn, and runway so you (the model) can identify cost-reduction opportunities. Read-only — it returns data for analysis and does not change anything.",
     inputSchema: {
       type: "object",
       properties: {
@@ -838,7 +838,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "benchmark_metrics",
+    name: "get_metric_benchmarks",
     description:
       "Compare the company's key metrics against industry benchmarks for their stage and business model. Shows where the company is performing above, at, or below typical startups.",
     inputSchema: {
@@ -866,7 +866,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "model_dilution",
+    name: "get_dilution_projection",
     description:
       "Model equity dilution from a hypothetical funding round — shows pre/post ownership percentages, option pool impact, and effective valuation. Read-only calculation; does not create a round.",
     inputSchema: {
@@ -999,9 +999,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: "forecast_revenue",
+    name: "get_revenue_projection",
     description:
-      "Project future revenue for the active scenario based on historical trends with confidence intervals. Supports linear, exponential, and conservative growth models.",
+      "Read-only: statistically project (extrapolate) future revenue for the active scenario from historical trends, with optional confidence intervals. Does NOT modify any data. Supports linear, exponential, conservative, and auto growth models. To CHANGE the revenue model, use create_revenue_stream or create_forecast_line.",
     inputSchema: {
       type: "object",
       properties: {
