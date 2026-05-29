@@ -11,7 +11,8 @@ export interface ToolContext {
   scenarioId?: string;
   userId: string;
   conversationId?: string;
-  writeMode?: "full" | "confirm" | "read_only";
+  /** How this call was authorized — recorded in the audit log. */
+  permissionDecision?: "auto" | "granted_once" | "granted_session" | "denied";
 }
 
 // ── Validation primitives ────────────────────────────────────────────────────

@@ -188,6 +188,7 @@ function logToolAudit(
       toolName,
       input,
       status,
+      permissionDecision: context.permissionDecision ?? "auto",
       result: result as Record<string, unknown>,
       durationMs,
     })
@@ -222,35 +223,6 @@ export async function executeToolCall(
     return JSON.stringify(errorResult);
   }
 
-  // ── Guardrail enforcement ────────────────────────────────────────────────
-  const writeMode = context.writeMode ?? "full";
-  if (isMutationTool(toolName) && writeMode !== "full") {
-    const description = describeMutation(toolName, data);
-
-    if (writeMode === "read_only") {
-      const blockedResult = {
-        error: `Mutation blocked: AI write mode is set to "read_only". The user's settings prevent the AI from making changes to data. To ${description}, the user must change AI write mode to "full" or "confirm" in Settings > AI Features.`,
-        blocked: true,
-        action: description,
-      };
-      logToolAudit(context, toolName, input, "error", blockedResult, Math.round(performance.now() - startTime));
-      return JSON.stringify(blockedResult);
-    }
-
-    if (writeMode === "confirm") {
-      // Return a preview — the AI should present this to the user and ask for confirmation
-      const previewResult = {
-        requiresConfirmation: true,
-        action: description,
-        toolName,
-        input: data,
-        message: `I'd like to ${description}. This action requires your confirmation because AI write mode is set to "confirm". Please reply "yes" or "confirm" to proceed, or "no" to cancel.`,
-      };
-      logToolAudit(context, toolName, input, "success", previewResult, Math.round(performance.now() - startTime));
-      return JSON.stringify(previewResult);
-    }
-  }
-
   let result: string;
   try {
     result = await handler(data, context);
@@ -276,6 +248,27 @@ export async function executeToolCall(
   logToolAudit(context, toolName, input, "success", parsedResult, durationMs);
 
   return result;
+}
+
+/** Human-readable description of a tool action, e.g. `create forecast line "AWS"`. */
+export function describeToolAction(toolName: string, input: Record<string, unknown>): string {
+  return describeMutation(toolName, input);
+}
+
+/** Record an audit row for a tool the user explicitly denied (never executed). */
+export function logDeniedToolCall(
+  context: ToolContext,
+  toolName: string,
+  input: Record<string, unknown>
+): void {
+  logToolAudit(
+    { ...context, permissionDecision: "denied" },
+    toolName,
+    input,
+    "success",
+    { declined: true },
+    0
+  );
 }
 
 // Re-export types for consumers
