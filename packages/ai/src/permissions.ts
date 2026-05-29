@@ -1,0 +1,115 @@
+/**
+ * AI tool permission model (spec §3).
+ *
+ * Five categories; each tool maps to exactly one. The resolver is pure: it
+ * returns "allow" or "ask". An explicit "deny" is a runtime user action taken
+ * at the permission card (Plan 3), never produced here.
+ */
+
+export type PermissionCategory = "read" | "write" | "delete" | "web_search" | "browser_use";
+
+/** How a category behaves by default. `delete` never uses "always". */
+export type PermissionMode = "ask" | "session" | "always";
+
+export type PermissionDecision = "allow" | "ask";
+
+export interface PermissionDefaults {
+  read: PermissionMode;
+  write: PermissionMode;
+  delete: PermissionMode; // "always" is invalid for delete and is clamped to "ask"
+  web_search: PermissionMode;
+  browser_use: PermissionMode;
+}
+
+/** Builtin defaults applied when a user has no saved row. */
+export const BUILTIN_PERMISSION_DEFAULTS: PermissionDefaults = {
+  read: "always",
+  web_search: "always",
+  write: "ask",
+  delete: "ask",
+  browser_use: "ask",
+};
+
+// ── Tool → category map (single source of truth) ─────────────────────────────
+
+const WEB_SEARCH_TOOLS = new Set<string>(["search_web", "read_webpage"]);
+const BROWSER_TOOLS = new Set<string>(["read_webpage_rendered"]);
+
+const DELETE_TOOLS = new Set<string>([
+  "delete_forecast_line",
+  "delete_revenue_stream",
+  "delete_headcount",
+  "delete_department",
+  "delete_account",
+  "delete_scenario",
+  "delete_funding_round",
+]);
+
+const WRITE_TOOLS = new Set<string>([
+  "create_forecast_line",
+  "update_forecast_line",
+  "create_revenue_stream",
+  "update_revenue_stream",
+  "create_headcount",
+  "update_headcount",
+  "create_salary_change",
+  "create_bonus",
+  "create_equity_grant",
+  "create_department",
+  "update_department",
+  "create_account",
+  "update_account",
+  "create_scenario",
+  "update_scenario",
+  "create_funding_round",
+  "update_funding_round",
+  "create_funding_round_investor",
+  "update_grant_milestone",
+]);
+
+/** All tools that mutate data (write + delete). */
+export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+  ...WRITE_TOOLS,
+  ...DELETE_TOOLS,
+]);
+
+/** Classify a tool into its permission category. Unknown → read. */
+export function categorizeToolName(toolName: string): PermissionCategory {
+  if (WEB_SEARCH_TOOLS.has(toolName)) return "web_search";
+  if (BROWSER_TOOLS.has(toolName)) return "browser_use";
+  if (DELETE_TOOLS.has(toolName)) return "delete";
+  if (WRITE_TOOLS.has(toolName)) return "write";
+  return "read";
+}
+
+// ── Resolver ─────────────────────────────────────────────────────────────────
+
+export interface ResolvePermissionContext {
+  /** The user's saved per-category defaults. */
+  defaults: PermissionDefaults;
+  /** Categories granted "for session" in the current conversation. */
+  sessionGrants: Partial<Record<PermissionCategory, boolean>>;
+}
+
+/**
+ * Resolve whether a tool call may proceed without prompting.
+ * Returns "allow" (run it) or "ask" (pause for a permission card).
+ */
+export function resolvePermission(
+  toolName: string,
+  ctx: ResolvePermissionContext
+): PermissionDecision {
+  const category = categorizeToolName(toolName);
+
+  // 1. A session grant on this category short-circuits to allow.
+  if (ctx.sessionGrants[category]) return "allow";
+
+  // 2. The user's standing default.
+  const mode = ctx.defaults[category];
+  // Delete is destructive: a standing "always" is invalid and clamped to "ask".
+  if (category === "delete") return "ask";
+  if (mode === "always") return "allow";
+
+  // "session" (no grant yet) and "ask" both require prompting.
+  return "ask";
+}

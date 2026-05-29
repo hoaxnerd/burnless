@@ -148,3 +148,18 @@ export {
 
 // Funding tool schemas (canonical, single source of truth; roundType immutability enforced)
 export * from "./schemas/funding";
+
+// Permissions (tool categorization + pure resolver)
+export {
+  resolvePermission,
+  categorizeToolName,
+  BUILTIN_PERMISSION_DEFAULTS,
+  MUTATION_TOOL_NAMES,
+} from "./permissions";
+export type {
+  PermissionCategory,
+  PermissionMode,
+  PermissionDecision,
+  PermissionDefaults,
+  ResolvePermissionContext,
+} from "./permissions";
