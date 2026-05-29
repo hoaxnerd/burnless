@@ -78,3 +78,19 @@ export {
   listShareClasses,
   listOptionPools,
 } from "./funding";
+
+export {
+  getPermissionDefaults,
+  upsertPermissionDefaults,
+  getSessionGrants,
+  grantSessionPermission,
+  resetSessionGrants,
+  createPendingAction,
+  getActivePendingAction,
+  resolvePendingAction,
+} from "./ai-permissions";
+export type {
+  PermissionModeValue,
+  PermissionDefaultsPatch,
+  NewPendingAction,
+} from "./ai-permissions";
