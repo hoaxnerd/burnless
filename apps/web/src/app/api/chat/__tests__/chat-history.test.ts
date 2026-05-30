@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
-const { mockRequireCompanyAccess } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetActivePendingAction } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
+  mockGetActivePendingAction: vi.fn(),
 }));
 
 const {
@@ -49,6 +50,17 @@ vi.mock("@burnless/db", () => ({
     conversationId: "conversationId",
     createdAt: "createdAt",
   },
+  getActivePendingAction: mockGetActivePendingAction,
+}));
+
+// The route maps a persisted pending action to the permission-card payload on load
+// (Plan 4 §6.5 #3); mock the classifier + describer it uses.
+vi.mock("@burnless/ai", () => ({
+  categorizeToolName: vi.fn(() => "write"),
+}));
+
+vi.mock("@/lib/ai-tools", () => ({
+  describeToolAction: vi.fn((tool: string) => `do ${tool}`),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -82,6 +94,8 @@ describe("GET /api/chat/history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(CTX);
+    // No paused turn by default.
+    mockGetActivePendingAction.mockResolvedValue(null);
 
     // DB chain setup: select -> from -> where -> orderBy / limit
     mockSelect.mockReturnValue({ from: mockFrom });
@@ -195,5 +209,48 @@ describe("GET /api/chat/history", () => {
     expect(res.status).toBe(200);
     expect(body.data).toHaveLength(0);
     expect(body.pagination.hasMore).toBe(false);
+  });
+
+  it("includes the active pending permission for a conversation (restore-on-reload)", async () => {
+    // conv found
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    // messages query
+    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
+    mockOrderBy.mockResolvedValueOnce([]);
+    // an unresolved paused turn exists
+    mockGetActivePendingAction.mockResolvedValueOnce({
+      pauseId: "pause-1",
+      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
+    });
+
+    const { GET } = await import("../history/route");
+    const res = await GET(
+      makeRequest("http://localhost/api/chat/history?conversationId=conv1")
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingPermission).not.toBeNull();
+    expect(body.pendingPermission.pauseId).toBe("pause-1");
+    expect(body.pendingPermission.actions).toHaveLength(1);
+    expect(body.pendingPermission.actions[0].tool).toBe("create_scenario");
+    expect(body.pendingPermission.actions[0].category).toBe("write");
+    expect(body.pendingPermission.actions[0].input).toEqual({ name: "QA" });
+  });
+
+  it("returns null pendingPermission when no paused turn exists", async () => {
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
+    mockOrderBy.mockResolvedValueOnce([]);
+    // mockGetActivePendingAction defaults to null (beforeEach)
+
+    const { GET } = await import("../history/route");
+    const res = await GET(
+      makeRequest("http://localhost/api/chat/history?conversationId=conv1")
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingPermission).toBeNull();
   });
 });
