@@ -251,6 +251,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
               staleReason={cache.staleReason}
               canRefresh={cache.canRefresh}
               loading={cache.loading}
+              autoRegenerating={cache.autoRegenerating}
               onRefresh={cache.refresh}
             />
           </div>
