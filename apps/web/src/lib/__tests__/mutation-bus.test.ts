@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { subscribeMutation, publishMutation, domainFromUrl, MUTATION_SYNC_KEY } from "../mutation-bus";
+import { subscribeMutation, publishMutation, domainFromUrl, MUTATION_SYNC_KEY, resetMutationBusForTesting } from "../mutation-bus";
 
-beforeEach(() => { localStorage.clear(); });
+beforeEach(() => { localStorage.clear(); resetMutationBusForTesting(); });
 
 describe("mutation-bus", () => {
   it("delivers same-tab events to subscribers", () => {

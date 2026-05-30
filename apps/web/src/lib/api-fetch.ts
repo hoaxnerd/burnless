@@ -10,7 +10,7 @@
  * so reintroduces a second, drift-prone source (a stale server-rendered prop or
  * a per-tab sessionStorage value) and causes spurious 409 ScenarioSafetyErrors.
  */
-import { publishMutation, domainFromUrl } from "./mutation-bus";
+import { publishMutation, domainFromUrl, FINANCIAL_DOMAINS } from "./mutation-bus";
 
 const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
@@ -30,8 +30,12 @@ export async function apiFetch(
   const res = await fetch(url, { ...init, headers });
   try {
     const method = (init?.method ?? "GET").toUpperCase();
-    if (res.ok && MUTATING.has(method)) {
-      publishMutation({ domain: domainFromUrl(url), method, at: Date.now() });
+    const domain = domainFromUrl(url);
+    // Emit only financial-data mutations. Non-financial endpoints (notably the
+    // insights regen POST itself) map to "other" and are NOT emitted — this is what
+    // prevents the auto-regen from retriggering the badge/countdown in a loop.
+    if (res.ok && MUTATING.has(method) && FINANCIAL_DOMAINS.has(domain)) {
+      publishMutation({ domain, method, at: Date.now() });
     }
   } catch {
     // Emitting must never affect the response.

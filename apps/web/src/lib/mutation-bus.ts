@@ -17,6 +17,20 @@ export interface MutationEvent {
 
 export const MUTATION_SYNC_KEY = "burnless-mutation-sync";
 
+/**
+ * Domains that represent financial data changes — the ones that should restale AI
+ * insights and reset the grace countdown. Non-financial mutations (preferences,
+ * accounts/departments admin, the insights regen POST itself) map to "other" and must
+ * NOT reset the insight countdown, or the auto-regen would loop forever.
+ */
+export const FINANCIAL_DOMAINS = new Set([
+  "expenses",
+  "team",
+  "revenue",
+  "funding",
+  "scenario",
+]);
+
 type Handler = (e: MutationEvent) => void;
 const handlers = new Set<Handler>();
 let storageBound = false;
@@ -57,11 +71,20 @@ export function publishMutation(evt: MutationEvent): void {
   }
 }
 
+/** Test-only: clear subscribers so module-level state doesn't leak across tests. */
+export function resetMutationBusForTesting(): void {
+  handlers.clear();
+}
+
 export function domainFromUrl(url: string): string {
-  if (url.includes("/forecast-lines") || url.includes("/transactions")) return "expenses";
-  if (url.includes("/headcount")) return "team";
+  if (url.includes("/forecast-lines") || url.includes("/transactions") ||
+      url.includes("/import") || url.includes("/accounts")) return "expenses";
+  if (url.includes("/headcount") || url.includes("/departments")) return "team";
   if (url.includes("/revenue-streams")) return "revenue";
   if (url.includes("/funding-rounds")) return "funding";
   if (url.includes("/scenarios")) return "scenario";
+  // Non-financial (insights regen POST, chat, ai-config, preferences, …) → "other",
+  // which apiFetch does NOT emit. Critically this keeps the insights regen POST out of
+  // the bus, so auto-regen can't retrigger itself into an infinite loop.
   return "other";
 }

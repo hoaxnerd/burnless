@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { classifyError } from "@/components/ui/data-load-error";
-import { subscribeMutation } from "@/lib/mutation-bus";
+import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
 import { MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -89,6 +89,10 @@ export function useInsightCache<T = unknown>({
   // Optimistic countdown anchor (ms epoch when grace would settle). Set on each
   // mutation event; reconciled against server graceRemaining on the next fetchCached.
   const [graceUntil, setGraceUntil] = useState<number | null>(null);
+  // Single-flight guard: the auto-regen fires at most ONCE per stale episode. Reset
+  // when a new mutation arrives (new episode). Without this, the 1s ticker can fire
+  // refresh({auto}) several times before React tears the interval down.
+  const autoFiredRef = useRef(false);
   const [autoRegenerating, setAutoRegenerating] = useState(false);
 
   // Stale-while-revalidate: keep last good data visible during re-fetch
@@ -205,8 +209,15 @@ export function useInsightCache<T = unknown>({
       }
       setGraceRemaining(0);
       // Settle: only the visible tab regenerates; hidden tabs wait for focus.
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        setGraceUntil(null); // stop the ticker; one shot
+      // autoFiredRef guarantees one shot even if the interval ticks again before
+      // React tears it down.
+      if (
+        !autoFiredRef.current &&
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible"
+      ) {
+        autoFiredRef.current = true;
+        setGraceUntil(null); // stop the ticker
         void refresh({ auto: true });
       }
     };
@@ -219,7 +230,8 @@ export function useInsightCache<T = unknown>({
   useEffect(() => {
     const onActive = () => {
       if (typeof document === "undefined" || document.visibilityState !== "visible") return;
-      if (dataChanged && graceUntil !== null && graceUntil - Date.now() <= 0) {
+      if (!autoFiredRef.current && dataChanged && graceUntil !== null && graceUntil - Date.now() <= 0) {
+        autoFiredRef.current = true;
         setGraceUntil(null);
         void refresh({ auto: true });
       }
@@ -237,9 +249,14 @@ export function useInsightCache<T = unknown>({
     fetchCached();
   }, [fetchCached]);
 
-  // Live freshness: a mutation anywhere flips the badge instantly + slides grace.
+  // Live freshness: a FINANCIAL-data mutation flips the badge instantly + (re)starts
+  // the sliding grace. Non-financial events ("other" — incl. the insights regen POST)
+  // are ignored so auto-regen can't retrigger itself. Each event re-arms the
+  // single-flight guard (it's a fresh stale episode).
   useEffect(() => {
-    const off = subscribeMutation(() => {
+    const off = subscribeMutation((e) => {
+      if (!FINANCIAL_DOMAINS.has(e.domain)) return;
+      autoFiredRef.current = false;
       setDataChanged(true);
       setGraceUntil(Date.now() + MUTATION_GRACE_PERIOD_MS);
       setGraceRemaining(MUTATION_GRACE_PERIOD_MS);

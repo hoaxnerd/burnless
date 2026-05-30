@@ -26,4 +26,22 @@ describe("apiFetch mutation emit", () => {
     await apiFetch("/api/forecast-lines/1", { method: "DELETE" });
     expect(bus.publishMutation).not.toHaveBeenCalled();
   });
+
+  it("does NOT emit for the insights regen POST (prevents the auto-regen loop)", async () => {
+    await apiFetch("/api/insights", { method: "POST" });
+    expect(bus.publishMutation).not.toHaveBeenCalled();
+  });
+
+  it("does NOT emit for non-financial endpoints (preferences, chat)", async () => {
+    await apiFetch("/api/user-preferences", { method: "PATCH" });
+    await apiFetch("/api/chat", { method: "POST" });
+    expect(bus.publishMutation).not.toHaveBeenCalled();
+  });
+
+  it("emits for financial routes that map via other paths (accounts, imports)", async () => {
+    await apiFetch("/api/accounts", { method: "POST" });
+    expect(bus.publishMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ domain: "expenses", method: "POST" })
+    );
+  });
 });
