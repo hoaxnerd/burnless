@@ -113,12 +113,14 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
       const prevFlags = flags;
       const prevProvider = providerConfig;
 
-      if (patch.masterEnabled !== undefined || patch.dataMode || patch.writeMode || patch.features || patch.companionName) {
+      // NOTE: company-level writeMode is no longer enforced or surfaced (spec §3.5);
+      // per-user AI tool permissions govern instead. The DB column + API field remain
+      // but the UI does not read/write writeMode here.
+      if (patch.masterEnabled !== undefined || patch.dataMode || patch.features || patch.companionName) {
         setFlags((prev) => ({
           ...prev,
           ...(patch.masterEnabled !== undefined ? { masterEnabled: patch.masterEnabled } : {}),
           ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
-          ...(patch.writeMode ? { writeMode: patch.writeMode } : {}),
           ...(patch.companionName ? { companionName: patch.companionName } : {}),
           ...(patch.features ? { features: { ...prev.features, ...patch.features } } : {}),
         }));

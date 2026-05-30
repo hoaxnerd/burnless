@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Power, Database, Sparkles, Shield, Pencil, Key } from "lucide-react";
-import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode, type AiWriteMode } from "@burnless/ai";
+import { Power, Database, Sparkles, Pencil, Key } from "lucide-react";
+import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
 import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
+import { AiPermissionsPanel } from "@/app/(dashboard)/ai/_components/ai-permissions-panel";
 import { ProviderSection } from "./ai-provider-section";
 
 interface AiFeaturesTabProps {
@@ -17,12 +18,6 @@ const DATA_MODES: { value: AiDataMode; label: string; desc: string }[] = [
   { value: "full", label: "Full", desc: "Generate new AI content and show cached results" },
   { value: "show_cached", label: "Cached Only", desc: "Show previously generated AI data, no new LLM calls" },
   { value: "hide_all", label: "Hide All", desc: "Hide all AI-generated content entirely" },
-];
-
-const WRITE_MODES: { value: AiWriteMode; label: string; desc: string }[] = [
-  { value: "full", label: "Full Access", desc: "AI can create, update, and delete entries freely" },
-  { value: "confirm", label: "Confirm First", desc: "AI describes changes and asks for your confirmation before making them" },
-  { value: "read_only", label: "Read Only", desc: "AI can analyze and report but cannot modify any data" },
 ];
 
 export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: AiFeaturesTabProps) {
@@ -136,17 +131,13 @@ export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: A
         />
       )}
 
-      {/* AI Write Mode (Guardrails) */}
+      {/* AI Tool Permissions (per-user) */}
       {flags.masterEnabled && (
-        <RadioSection
-          icon={<Shield className="h-[18px] w-[18px] text-surface-600" />}
-          title="AI Write Access"
-          description="Control whether AI can create, update, or delete your data"
-          name="writeMode"
-          options={WRITE_MODES}
-          value={flags.writeMode ?? "full"}
-          onChange={(value) => updateFlags({ writeMode: value })}
-        />
+        <section className="rounded-2xl border border-surface-200 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-surface-800 mb-1">AI tool permissions</h3>
+          <p className="text-xs text-surface-500 mb-2">What the AI may do on its own in chat.</p>
+          <AiPermissionsPanel conversationId={null} />
+        </section>
       )}
 
       {/* AI Credits Status */}
