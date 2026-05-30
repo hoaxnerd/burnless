@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { getCompanyForAuthUser, getDashboardPreferences } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
+import { ChatSessionProvider } from "@/components/ai/chat-session-context";
 
 export default async function DashboardLayout({
   children,
@@ -38,7 +39,7 @@ export default async function DashboardLayout({
         initialSlotOverrides={initialSlotOverrides}
         initialPageLayouts={initialPageLayouts}
       >
-        {children}
+        <ChatSessionProvider>{children}</ChatSessionProvider>
       </DashboardShell>
     </Suspense>
   );

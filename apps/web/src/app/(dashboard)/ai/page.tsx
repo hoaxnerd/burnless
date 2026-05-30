@@ -19,14 +19,14 @@ import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
 import { InsightCard } from "./_components/insights-panel";
-import { readSseStream } from "./_components/sse";
 import { PermissionCard } from "./_components/permission-card";
 import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
 import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
-import type { Message, Insight, Conversation, PendingPermission } from "./_components/types";
+import type { Insight, Conversation, PendingPermission } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { useLocale } from "@/components/locale/locale-context";
+import { useChatSession } from "@/components/ai/chat-session-context";
 
 /* ─── AI Credits Configuration ────────────────────────────────────── */
 // AI credits ratio: how many cents equal 1 AI credit.
@@ -101,8 +101,6 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
 export default function AiCompanionPage() {
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -111,15 +109,18 @@ export default function AiCompanionPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
-  const { planLimit, checkResponse, clearLimit } = usePlanLimit();
+  const { planLimit, clearLimit } = usePlanLimit();
   const { activeScenarioId } = useScenario();
   const { companionName, credits } = useAiFlags();
   const { fmtDate } = useLocale();
+  const session = useChatSession();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledParamRef = useRef<string | null>(null);
   const { success } = useToast();
 
+  // The provider owns the streams; the page renders the slice for the current view.
+  const { messages, isLoading } = session.get(conversationId);
   const isEmptyState = messages.length === 0;
   const awaitingDecision = messages.some(
     (m) => m.pendingPermission && !m.pendingPermission.resolved
@@ -188,19 +189,16 @@ export default function AiCompanionPage() {
       const res = await apiFetch(`/api/chat/history?conversationId=${id}`);
       if (res.ok) {
         const data = await res.json();
-        setMessages(
-          data.messages
-            .filter((m: { role: string }) => m.role !== "system")
-            .map(
-              (m: { role: string; content: string; createdAt?: string }) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content,
-                createdAt: m.createdAt
-                  ? new Date(m.createdAt).getTime()
-                  : Date.now(),
-              })
-            )
-        );
+        const restoredMessages = data.messages
+          .filter((m: { role: string }) => m.role !== "system")
+          .map((m: { role: string; content: string; createdAt?: string }) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            createdAt: m.createdAt
+              ? new Date(m.createdAt).getTime()
+              : Date.now(),
+          }));
+        session.setMessages(id, restoredMessages);
         setConversationId(id);
         setActivePane(null);
         setMobileNavOpen(false);
@@ -211,7 +209,7 @@ export default function AiCompanionPage() {
   }
 
   function startNewConversation() {
-    setMessages([]);
+    session.setMessages(null, []);
     setConversationId(null);
     setActivePane(null);
     setMobileNavOpen(false);
@@ -225,83 +223,8 @@ export default function AiCompanionPage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   }
 
-  const setLast = useCallback((patch: (m: Message) => Message) => {
-    setMessages((prev) => {
-      const updated = [...prev];
-      const last = updated[updated.length - 1];
-      if (last) updated[updated.length - 1] = patch(last);
-      return updated;
-    });
-  }, []);
-
-  const applyChatEvent = useCallback(
-    (event: Record<string, unknown>) => {
-      const type = event.type as string;
-      if (type === "conversation_id" && event.conversationId) {
-        setConversationId(event.conversationId as string);
-      } else if (type === "thinking") {
-        setLast((m) => ({ ...m, thinking: (m.thinking ?? "") + (event.content as string) }));
-      } else if (type === "text") {
-        setLast((m) => ({ ...m, content: m.content + (event.content as string) }));
-      } else if (type === "tool_use") {
-        setLast((m) => ({ ...m, toolCalls: [...(m.toolCalls ?? []), event.tool as string] }));
-      } else if (type === "tool_status") {
-        setLast((m) => ({ ...m, toolStatus: { tool: event.tool as string, phase: event.phase as "running" | "done" | "error" } }));
-      } else if (type === "permission_request") {
-        setLast((m) => ({
-          ...m,
-          isStreaming: false,
-          toolStatus: null,
-          pendingPermission: {
-            pauseId: event.pauseId as string,
-            conversationId: event.conversationId as string,
-            actions: (event.actions as PendingPermission["actions"]) ?? [],
-          },
-        }));
-      } else if (type === "paused") {
-        setIsLoading(false);
-      } else if (type === "done") {
-        if (event.conversationId) setConversationId(event.conversationId as string);
-        setLast((m) => ({ ...m, isStreaming: false, toolStatus: null }));
-        fetchInsights();
-      } else if (type === "error") {
-        setLast((m) => ({ ...m, content: m.content + `\n\n*Error: ${event.content}*`, isStreaming: false }));
-      }
-    },
-    [setLast]
-  );
-
-  const handlePermissionDecision = useCallback(
-    async (pending: PendingPermission, decisions: { requestId: string; decision: "once" | "session" | "deny" }[]) => {
-      // Mark the card resolved + reopen the same assistant message for continuation.
-      setLast((m) => ({
-        ...m,
-        pendingPermission: m.pendingPermission ? { ...m.pendingPermission, resolved: true } : null,
-        isStreaming: true,
-      }));
-      setIsLoading(true);
-      try {
-        const res = await apiFetch("/api/chat/resume", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversationId: pending.conversationId,
-            pauseId: pending.pauseId,
-            decisions,
-          }),
-        });
-        if (!res.ok) throw new Error("resume failed");
-        await readSseStream(res, (event) => applyChatEvent(event));
-      } catch {
-        setLast((m) => ({ ...m, content: m.content + "\n\n*Couldn't resume. Please try again.*", isStreaming: false }));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [applyChatEvent, setLast]
-  );
-
-  /* Send a message — can be called from form submit or template click */
+  /* Send a message — can be called from form submit or template click.
+     The provider owns the stream so the turn survives navigation. */
   async function handleSend(
     e: React.FormEvent | null,
     overrideMessage?: string
@@ -312,82 +235,25 @@ export default function AiCompanionPage() {
     if (!userMessage || isLoading) return;
 
     setInput("");
-    setIsLoading(true);
     clearLimit();
 
-    // Add user message
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: userMessage, createdAt: Date.now() },
-    ]);
-
-    // Add streaming placeholder
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-        toolCalls: [],
-        createdAt: Date.now(),
-      },
-    ]);
-
-    try {
-      const res = await apiFetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage,
-          conversationId,
-          scenarioId: activeScenarioId,
-        }),
-      });
-
-      if (!res.ok) {
-        // Check for plan limit before generic error handling
-        if (res.status === 403) {
-          const cloned = res.clone();
-          if (await checkResponse(cloned)) {
-            // Remove the streaming placeholder
-            setMessages((prev) => prev.slice(0, -1));
-            setIsLoading(false);
-            return;
-          }
-        }
-        const error = await res
-          .json()
-          .catch(() => ({ error: "Failed to connect to AI" }));
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1]!;
-          updated[updated.length - 1] = {
-            ...last,
-            content: `Sorry, I encountered an error: ${error.error ?? "Unknown error"}. Please try again.`,
-            isStreaming: false,
-          };
-          return updated;
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      await readSseStream(res, (event) => applyChatEvent(event));
-    } catch {
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1]!;
-        updated[updated.length - 1] = {
-          ...last,
-          content: "Sorry, I lost connection. Please try again.",
-          isStreaming: false,
-        };
-        return updated;
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await session.send(conversationId, userMessage, activeScenarioId, (id) => {
+      // Thread the server-assigned id so follow-ups + the rendered view track it.
+      setConversationId((cur) => cur ?? id);
+    });
+    fetchInsights();
   }
+
+  const handlePermissionDecision = useCallback(
+    async (
+      pending: PendingPermission,
+      decisions: { requestId: string; decision: "once" | "session" | "deny" }[]
+    ) => {
+      await session.decide(pending.conversationId, pending, decisions);
+      fetchInsights();
+    },
+    [session]
+  );
 
   function handleTemplateClick(prompt: string) {
     setInput(prompt);
