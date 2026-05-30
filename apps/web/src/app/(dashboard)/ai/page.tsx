@@ -5,26 +5,24 @@ import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   Sparkles,
-  MessageSquarePlus,
   BarChart3,
   GitBranch,
   Landmark,
   TrendingUp,
   Users,
   FileText,
-  Zap,
-  Lightbulb,
-  History,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
 import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
-import { MobileHistoryCard } from "./_components/conversation-sidebar";
-import { InsightsPanel, InsightCard } from "./_components/insights-panel";
+import { InsightCard } from "./_components/insights-panel";
 import { readSseStream } from "./_components/sse";
 import { PermissionCard } from "./_components/permission-card";
+import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
+import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
 import type { Message, Insight, Conversation, PendingPermission } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
@@ -108,7 +106,8 @@ export default function AiCompanionPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [sidePanel, setSidePanel] = useState<"history" | "insights" | null>(null);
+  const [activePane, setActivePane] = useState<AiPane | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [, setTick] = useState(0);
@@ -203,7 +202,8 @@ export default function AiCompanionPage() {
             )
         );
         setConversationId(id);
-        setSidePanel(null);
+        setActivePane(null);
+        setMobileNavOpen(false);
       }
     } catch {
       /* non-critical */
@@ -213,7 +213,8 @@ export default function AiCompanionPage() {
   function startNewConversation() {
     setMessages([]);
     setConversationId(null);
-    setSidePanel(null);
+    setActivePane(null);
+    setMobileNavOpen(false);
     inputRef.current?.focus();
   }
 
@@ -393,6 +394,32 @@ export default function AiCompanionPage() {
     inputRef.current?.focus();
   }
 
+  function selectPane(pane: AiPane) {
+    setActivePane((cur) => (cur === pane ? null : pane));
+    if (pane === "history") loadConversations();
+    setMobileNavOpen(false);
+  }
+
+  const paneContent =
+    activePane === "history" ? (
+      <HistoryPaneContent
+        conversations={conversations}
+        loading={historyLoading}
+        onLoad={loadConversation}
+        fmtDate={fmtDate}
+      />
+    ) : activePane === "insights" ? (
+      <div className="p-3 space-y-3">
+        {insights.length === 0 ? (
+          <p className="text-sm text-surface-400 px-1">No insights yet</p>
+        ) : (
+          insights.map((ins, i) => <InsightCard key={i} insight={ins} />)
+        )}
+      </div>
+    ) : activePane === "settings" ? (
+      <AiPermissionsPanel conversationId={conversationId} />
+    ) : null;
+
   return (
     <div className="flex flex-col lg:flex-row h-full">
       <div className="flex flex-1 flex-col min-w-0 lg:mr-4">
@@ -410,130 +437,15 @@ export default function AiCompanionPage() {
               Your personal CFO that understands your numbers
             </p>
           </div>
-          {/* Desktop: credits + buttons with labels */}
-          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <div className="flex items-center gap-1.5 mr-2 text-xs text-surface-400">
-              <Zap className="h-3 w-3 text-accent-500" />
-              {credits ? (
-                <span>
-                  {credits.remaining.toLocaleString()}
-                  {" / "}
-                  {credits.total.toLocaleString()}
-                  {" credits"}
-                </span>
-              ) : (
-                <span>Loading credits...</span>
-              )}
-            </div>
-            <button
-              onClick={startNewConversation}
-              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm text-white hover:bg-brand-700 transition-colors"
-            >
-              <MessageSquarePlus className="h-4 w-4" />
-              New Chat
-            </button>
-            <button
-              onClick={() => {
-                if (sidePanel !== "insights") setSidePanel("insights");
-                else setSidePanel(null);
-              }}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                sidePanel === "insights"
-                  ? "bg-brand-50 text-brand-600 border-brand-200"
-                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
-              }`}
-            >
-              <Lightbulb className="h-4 w-4" />
-              Insights
-            </button>
-            <button
-              onClick={() => {
-                if (sidePanel !== "history") {
-                  setSidePanel("history");
-                  loadConversations();
-                } else {
-                  setSidePanel(null);
-                }
-              }}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                sidePanel === "history"
-                  ? "bg-brand-50 text-brand-600 border-brand-200"
-                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
-              }`}
-            >
-              <History className="h-4 w-4" />
-              History
-            </button>
-          </div>
-
-          {/* Mobile: credits + icon-only buttons, centered and equally spaced */}
-          <div className="flex lg:hidden items-center justify-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-1 text-[11px] text-surface-400 mr-1">
-              <Zap className="h-3 w-3 text-accent-500" />
-              {credits ? (
-                <span>
-                  {credits.remaining.toLocaleString()}
-                  /{credits.total.toLocaleString()}
-                </span>
-              ) : (
-                <span>&hellip;</span>
-              )}
-            </div>
-            <button
-              onClick={startNewConversation}
-              className="flex items-center justify-center h-9 w-9 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors"
-              title="New Chat"
-            >
-              <MessageSquarePlus className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => {
-                if (sidePanel !== "insights") setSidePanel("insights");
-                else setSidePanel(null);
-              }}
-              className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-colors ${
-                sidePanel === "insights"
-                  ? "bg-brand-50 text-brand-600 border-brand-200"
-                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
-              }`}
-              title="Insights"
-            >
-              <Lightbulb className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => {
-                if (sidePanel !== "history") {
-                  setSidePanel("history");
-                  loadConversations();
-                } else {
-                  setSidePanel(null);
-                }
-              }}
-              className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-colors ${
-                sidePanel === "history"
-                  ? "bg-brand-50 text-brand-600 border-brand-200"
-                  : "border-surface-300 text-surface-600 hover:bg-surface-50"
-              }`}
-              title="History"
-            >
-              <History className="h-4 w-4" />
-            </button>
-          </div>
+          {/* Mobile: hamburger opens the AI sidebar drawer */}
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="lg:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-surface-300 text-surface-600"
+            aria-label="Open AI menu"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
         </div>
-
-        {/* Mobile: inline panel for history or insights (only one at a time) */}
-        {sidePanel === "history" && (
-          <MobileHistoryCard
-            conversations={conversations}
-            onLoadConversation={loadConversation}
-            loading={historyLoading}
-          />
-        )}
-        {sidePanel === "insights" && (
-          <div className="lg:hidden">
-            <InsightsPanel insights={insights} />
-          </div>
-        )}
 
         {/* ─── Empty State / Template Cards ─────────────────── */}
         {isEmptyState ? (
@@ -641,59 +553,55 @@ export default function AiCompanionPage() {
           </>
         )}
       </div>
-      {/* Desktop right sidebar — shows either history or insights */}
-      {sidePanel && (
-        <div className="hidden lg:flex flex-col w-80 flex-shrink-0 rounded-2xl border border-surface-200 bg-surface-0 overflow-hidden">
-          {sidePanel === "insights" && (
-            <>
-              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-surface-100">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-surface-700">Insights & Alerts</h2>
-              </div>
-              <div className="flex-1 overflow-auto p-3 space-y-3">
-                {insights.length === 0 ? (
-                  <p className="text-sm text-surface-400 px-1">No insights yet</p>
-                ) : (
-                  insights.map((insight, i) => (
-                    <InsightCard key={i} insight={insight} />
-                  ))
-                )}
-              </div>
-            </>
-          )}
-          {sidePanel === "history" && (
-            <>
-              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-surface-100">
-                <History className="h-4 w-4 text-surface-500" />
-                <h2 className="text-sm font-semibold text-surface-700">History</h2>
-              </div>
-              <div className="flex-1 overflow-auto p-3 max-h-[70vh]">
-                {historyLoading ? (
-                  <div className="flex items-center gap-2 px-1 py-3 text-sm text-surface-400">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-surface-300 border-t-brand-500" />
-                    Loading conversations...
-                  </div>
-                ) : conversations.length === 0 ? (
-                  <p className="text-sm text-surface-400 px-1">No conversations yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {conversations.map((conv) => (
-                      <button
-                        key={conv.id}
-                        onClick={() => loadConversation(conv.id)}
-                        className="w-full text-left rounded-lg px-3 py-2 text-sm text-surface-700 hover:bg-surface-100 transition-colors"
-                      >
-                        {conv.title ?? "Untitled conversation"}
-                        <span className="ml-2 text-xs text-surface-400">
-                          {fmtDate(conv.updatedAt)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+      <AiSidebar
+        credits={credits}
+        companionName={companionName}
+        activePane={activePane}
+        onSelectPane={selectPane}
+        onNewChat={startNewConversation}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      >
+        {paneContent}
+      </AiSidebar>
+    </div>
+  );
+}
+
+function HistoryPaneContent({
+  conversations,
+  loading,
+  onLoad,
+  fmtDate,
+}: {
+  conversations: Conversation[];
+  loading: boolean;
+  onLoad: (id: string) => void;
+  fmtDate: (date: Date | string, options?: Intl.DateTimeFormatOptions) => string;
+}) {
+  return (
+    <div className="p-3">
+      {loading ? (
+        <div className="flex items-center gap-2 px-1 py-3 text-sm text-surface-400">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-surface-300 border-t-brand-500" />
+          Loading conversations...
+        </div>
+      ) : conversations.length === 0 ? (
+        <p className="text-sm text-surface-400 px-1">No conversations yet</p>
+      ) : (
+        <div className="space-y-1">
+          {conversations.map((conv) => (
+            <button
+              key={conv.id}
+              onClick={() => onLoad(conv.id)}
+              className="w-full text-left rounded-lg px-3 py-2 text-sm text-surface-700 hover:bg-surface-100 transition-colors"
+            >
+              {conv.title ?? "Untitled conversation"}
+              <span className="ml-2 text-xs text-surface-400">
+                {fmtDate(conv.updatedAt)}
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>
