@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
 import { db, importBatches, transactions } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -58,11 +57,9 @@ export const DELETE = withErrorHandler(async (
     .set({ status: "rolled_back", rolledBackAt: new Date() })
     .where(eq(importBatches.id, batchId));
 
-  // Rolling back an import deletes transactions, which feed expense/actuals compute.
-  // Mirror the transactions route's invalidation + tracking so router.refresh()
-  // and the insight badge reflect the rollback.
-  revalidateTag("forecast-lines");
-  revalidateTag("scenario-overrides");
+  // Rolling back deletes transactions (uncached — see transactions route), so
+  // router.refresh() reflects it without a cache tag. trackDataMutation restales
+  // the insight badge/countdown.
   await trackDataMutation(ctx.companyId, "expenses");
 
   return NextResponse.json({

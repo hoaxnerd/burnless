@@ -2,20 +2,23 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
+/**
+ * Regression guard — cache-invalidation ⟹ mutation-tracking.
+ *
+ * Invariant: any API route that calls `revalidateTag` (i.e. it mutates cached
+ * compute data) MUST also call `trackDataMutation` (so the AI-insight badge,
+ * sliding grace countdown, and cross-tab freshness signal fire for that change).
+ *
+ * This is the defensible direction: it caught the real funding-route leaks
+ * (cap-table edits invalidated caches but never bumped lastMutationTime, so the
+ * insight countdown silently never started). It deliberately does NOT require the
+ * inverse — a route may legitimately call `trackDataMutation` WITHOUT
+ * `revalidateTag` when it mutates UNCACHED data (e.g. transactions/import-rollback:
+ * `getTransactions` is uncached, so router.refresh() already shows fresh data).
+ * The revalidateTag↔tag pairing for cached entities is covered separately by
+ * `src/lib/__tests__/cache-invalidation.test.ts`.
+ */
 const API = path.resolve(__dirname, "../app/api");
-const MUTATING = /export\s+const\s+(POST|PATCH|PUT|DELETE)\b/;
-
-// Routes that intentionally do NOT touch financial compute caches / insights.
-const ALLOWLIST = new Set([
-  "user-preferences", "dashboard-preferences", "merchant-mappings",
-  "integrations", "company", "insights", "auth", "two-factor",
-  "ai", "ai-usage", "webhooks", "cron", "health", "export", "privacy",
-  "invite-codes", "chat", "feedback", "weekly-digest", "data-room",
-  // Non-financial mutation surfaces (auth/admin/AI-config/billing/consent/onboarding
-  // bootstrap/export logs/digest). None feed live financial compute caches or the
-  // insight badge, so they intentionally skip revalidateTag + trackDataMutation.
-  "admin", "ai-features", "billing", "digest", "exports", "onboarding", "users",
-]);
 
 function routeFiles(dir: string): string[] {
   const out: string[] = [];
@@ -27,30 +30,19 @@ function routeFiles(dir: string): string[] {
   return out;
 }
 
-function isAllowlisted(file: string): boolean {
-  const rel = path.relative(API, file);
-  const top = rel.split(path.sep)[0]!;
-  return ALLOWLIST.has(top);
-}
-
 describe("mutation invalidation parity", () => {
-  it("every financial mutation route calls BOTH revalidateTag and trackDataMutation", () => {
+  it("every route that calls revalidateTag also calls trackDataMutation", () => {
     const offenders: string[] = [];
     for (const file of routeFiles(API)) {
-      if (isAllowlisted(file)) continue;
       const src = readFileSync(file, "utf8");
-      if (!MUTATING.test(src)) continue;
-      const hasTag = src.includes("revalidateTag");
-      const hasTrack = src.includes("trackDataMutation");
-      if (!hasTag || !hasTrack) {
-        offenders.push(
-          `${path.relative(API, file)} — ${hasTag ? "" : "missing revalidateTag "}${hasTrack ? "" : "missing trackDataMutation"}`.trim()
-        );
+      if (!src.includes("revalidateTag")) continue; // only cache-invalidating routes
+      if (!src.includes("trackDataMutation")) {
+        offenders.push(path.relative(API, file));
       }
     }
     expect(
       offenders,
-      "Financial mutation routes must invalidate caches AND track mutations (both drive live freshness). Fix or allowlist:"
+      "Routes that invalidate a cache MUST also trackDataMutation so insights/freshness fire. Add trackDataMutation to:"
     ).toEqual([]);
   });
 });
