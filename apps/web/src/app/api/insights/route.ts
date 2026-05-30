@@ -22,6 +22,7 @@ import { buildAiContext } from "@/lib/build-ai-context";
 import { logger } from "@/lib/logger";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { checkInsightFreshness, MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
+import { acquireRegenLock } from "@/lib/insight-regen-lock";
 
 const VALID_PAGES = ["dashboard", "expenses", "revenue", "scenarios", "funding", "team", "reports"] as const;
 type PageType = (typeof VALID_PAGES)[number];
@@ -118,11 +119,13 @@ export const POST = withErrorHandler(async (request: Request) => {
   let page: PageType = "dashboard";
   let pageData: Record<string, unknown> | undefined;
   let forceRefresh = false;
+  let auto = false;
 
   try {
     const body = await request.json();
     scenarioId = body.scenarioId;
     forceRefresh = body.forceRefresh === true;
+    auto = body.auto === true;
     if (body.page && VALID_PAGES.includes(body.page)) {
       page = body.page;
     }
@@ -133,8 +136,40 @@ export const POST = withErrorHandler(async (request: Request) => {
     // No body is fine — use defaults
   }
 
+  // Auto-regen path (client fires this when the grace countdown settles).
+  // Defense-in-depth: regenerate only if data actually changed AND grace elapsed,
+  // and dedupe across tabs so a stale episode regenerates exactly once.
+  if (auto && !forceRefresh) {
+    const cacheType = page === "expenses" ? ("expense" as const) : page === "scenarios" ? ("scenario" as const) : page;
+    const [existing] = await db
+      .select()
+      .from(aiInsightCache)
+      .where(and(eq(aiInsightCache.companyId, ctx.companyId), eq(aiInsightCache.type, cacheType)))
+      .limit(1);
+    const freshness = await checkInsightFreshness(ctx.companyId, existing?.updatedAt ?? null);
+    if (!freshness.needsRegeneration) {
+      return NextResponse.json({
+        insights: existing?.content ?? [],
+        cached: true,
+        page,
+        skippedReason: "auto_not_due",
+        graceRemaining: freshness.graceRemaining,
+      });
+    }
+    const gotLock = await acquireRegenLock(ctx.companyId, page);
+    if (!gotLock) {
+      return NextResponse.json({
+        insights: existing?.content ?? [],
+        cached: true,
+        page,
+        skippedReason: "regen_locked",
+      });
+    }
+    // genuinely stale + lock held → fall through to generation
+  }
+
   // Check grace period — unless user explicitly forced a refresh
-  if (!forceRefresh) {
+  if (!forceRefresh && !auto) {
     const cacheType = page === "expenses" ? "expense" as const : page === "scenarios" ? "scenario" as const : page;
     const cached = await db
       .select()
