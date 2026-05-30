@@ -27,6 +27,7 @@ import { BrandLogo } from "@/components/brand-logo";
 
 import { AiFeatureProvider, useAiFlags } from "@/components/ai/ai-feature-context";
 import { ScenarioProvider } from "@/components/scenarios/scenario-context";
+import { DataFreshnessProvider } from "@/components/data-freshness/data-freshness-provider";
 import { ScenarioBanner } from "@/components/scenarios/scenario-banner";
 import { ThemeProvider } from "@/components/ui/theme-toggle";
 import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
@@ -97,6 +98,7 @@ export function DashboardShell({
     <AiFeatureProvider>
     <KeyboardShortcutsProvider onToggleAI={navigateToAi}>
     <ScenarioProvider>
+    <DataFreshnessProvider>
     <InitialLayoutsProvider layouts={(initialPageLayouts ?? {}) as Record<string, { layout: never[]; closedWidgets?: string[] }>}>
     <MetricsProvider initialSlotOverrides={initialSlotOverrides as Record<string, import("@burnless/engine").CardContent> | null | undefined}>
       <DashboardContent
@@ -109,6 +111,7 @@ export function DashboardShell({
       </DashboardContent>
     </MetricsProvider>
     </InitialLayoutsProvider>
+    </DataFreshnessProvider>
     </ScenarioProvider>
     </KeyboardShortcutsProvider>
     </AiFeatureProvider>
