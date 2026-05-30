@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { classifyError } from "@/components/ui/data-load-error";
+import { subscribeMutation } from "@/lib/mutation-bus";
+import { MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,8 @@ export interface InsightCacheState<T = unknown> {
   staleReason: string | null;
   /** Whether the LLM generation is taking >5s */
   slow: boolean;
+  /** Whether an auto-regeneration (grace-settle triggered) is in progress */
+  autoRegenerating: boolean;
   /** Whether the hook is still working on getting initial data (fetch + auto-generate) */
   settling: boolean;
   /** Whether the AI budget has been exceeded */
@@ -41,7 +45,7 @@ export interface InsightCacheState<T = unknown> {
   /** Fetch cached data only — never triggers LLM generation */
   fetchCached: () => Promise<void>;
   /** Force-refresh: triggers LLM generation, bypasses grace period */
-  refresh: () => Promise<void>;
+  refresh: (opts?: { auto?: boolean }) => Promise<void>;
 }
 
 interface UseInsightCacheOptions {
@@ -82,6 +86,10 @@ export function useInsightCache<T = unknown>({
   const [canRefresh, setCanRefresh] = useState(true);
   const [staleReason, setStaleReason] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
+  // Optimistic countdown anchor (ms epoch when grace would settle). Set on each
+  // mutation event; reconciled against server graceRemaining on the next fetchCached.
+  const [graceUntil, setGraceUntil] = useState<number | null>(null);
+  const [autoRegenerating, setAutoRegenerating] = useState(false);
 
   // Stale-while-revalidate: keep last good data visible during re-fetch
   const previousDataRef = useRef<T[]>([]);
@@ -105,6 +113,9 @@ export function useInsightCache<T = unknown>({
           setStale(json.stale ?? false);
           setDataChanged(json.dataChanged ?? false);
           setGraceRemaining(json.graceRemaining ?? null);
+          setGraceUntil(
+            json.graceRemaining != null ? Date.now() + json.graceRemaining : null
+          );
           setCanRefresh(json.canRefresh ?? true);
           setStaleReason(json.staleReason ?? null);
         }
@@ -120,7 +131,7 @@ export function useInsightCache<T = unknown>({
     }
   }, [page]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ auto = false }: { auto?: boolean } = {}) => {
     if (budgetExceeded) {
       if (previousDataRef.current.length > 0) {
         setRefreshError(true);
@@ -134,6 +145,7 @@ export function useInsightCache<T = unknown>({
     setError(false);
     setRefreshError(false);
     setSlow(false);
+    if (auto) setAutoRegenerating(true);
 
     const controller = new AbortController();
     const slowTimer = setTimeout(() => setSlow(true), 5000);
@@ -143,7 +155,7 @@ export function useInsightCache<T = unknown>({
       const res = await apiFetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, scenarioId, pageData, forceRefresh: true }),
+        body: JSON.stringify({ page, scenarioId, pageData, ...(auto ? { auto: true } : { forceRefresh: true }) }),
         signal: controller.signal,
       });
 
@@ -158,6 +170,7 @@ export function useInsightCache<T = unknown>({
       setStale(false);
       setDataChanged(false);
       setGraceRemaining(null);
+      setGraceUntil(null);
       setCanRefresh(true);
       setStaleReason(null);
     } catch (err) {
@@ -175,27 +188,64 @@ export function useInsightCache<T = unknown>({
     } finally {
       setLoading(false);
       setSlow(false);
+      setAutoRegenerating(false);
       clearTimeout(slowTimer);
       clearTimeout(abortTimer);
     }
   }, [page, scenarioId, pageData, budgetExceeded]);
 
-  // Auto-refresh: when grace period just expired, schedule a re-fetch
+  // Tick the countdown every second; when it settles, fire ONE visible-tab auto-regen.
   useEffect(() => {
-    if (!dataChanged || loading) return;
-    if (graceRemaining !== null && graceRemaining > 0) {
-      // Grace still active — schedule a re-fetch when it expires
-      const timer = setTimeout(() => {
-        fetchCached();
-      }, graceRemaining + autoRefreshDelayMs);
-      return () => clearTimeout(timer);
-    }
-  }, [dataChanged, graceRemaining, loading, fetchCached, autoRefreshDelayMs]);
+    if (!dataChanged || graceUntil === null) return;
+    const tick = () => {
+      const remaining = graceUntil - Date.now();
+      if (remaining > 0) {
+        setGraceRemaining(remaining);
+        return;
+      }
+      setGraceRemaining(0);
+      // Settle: only the visible tab regenerates; hidden tabs wait for focus.
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        setGraceUntil(null); // stop the ticker; one shot
+        void refresh({ auto: true });
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [dataChanged, graceUntil, refresh]);
+
+  // A backgrounded tab that missed settle regenerates when it next becomes visible.
+  useEffect(() => {
+    const onActive = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+      if (dataChanged && graceUntil !== null && graceUntil - Date.now() <= 0) {
+        setGraceUntil(null);
+        void refresh({ auto: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onActive);
+    window.addEventListener("focus", onActive);
+    return () => {
+      document.removeEventListener("visibilitychange", onActive);
+      window.removeEventListener("focus", onActive);
+    };
+  }, [dataChanged, graceUntil, refresh]);
 
   // On mount: fetch cached
   useEffect(() => {
     fetchCached();
   }, [fetchCached]);
+
+  // Live freshness: a mutation anywhere flips the badge instantly + slides grace.
+  useEffect(() => {
+    const off = subscribeMutation(() => {
+      setDataChanged(true);
+      setGraceUntil(Date.now() + MUTATION_GRACE_PERIOD_MS);
+      setGraceRemaining(MUTATION_GRACE_PERIOD_MS);
+    });
+    return off;
+  }, []);
 
   // Auto-generate: if cache is empty after initial fetch and AI is enabled,
   // trigger generation so first-time visitors see insights without manual refresh
@@ -228,6 +278,7 @@ export function useInsightCache<T = unknown>({
     canRefresh,
     staleReason,
     slow,
+    autoRegenerating,
     settling,
     budgetExceeded,
     fetchCached,
