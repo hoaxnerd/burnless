@@ -12,6 +12,7 @@ import {
 } from "@/lib/api-helpers";
 import { getActiveScenario } from "@/lib/scenario-middleware";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 const PatchBody = z.object({
   hitDate: z.string().nullable(),
@@ -64,5 +65,6 @@ export const PATCH = withErrorHandler(async (
   revalidateTag("funding-rounds");
   revalidateTag("scenario-overrides");
   revalidateTag("cap-table");
+  await trackDataMutation(ctx.companyId, "funding");
   return NextResponse.json({ milestone: updated.find((m) => m.id === milestoneId) });
 });

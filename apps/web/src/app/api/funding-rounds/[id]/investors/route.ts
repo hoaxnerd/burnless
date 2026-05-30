@@ -11,6 +11,7 @@ import {
   withErrorHandler,
 } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 
 const PostBody = z.object({
   name: z.string().min(1),
@@ -65,5 +66,6 @@ export const POST = withErrorHandler(async (
   revalidateTag("funding-rounds");
   revalidateTag("scenario-overrides");
   revalidateTag("cap-table");
+  await trackDataMutation(ctx.companyId, "funding");
   return NextResponse.json({ investor: inserted }, { status: 201 });
 });
