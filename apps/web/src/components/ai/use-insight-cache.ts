@@ -55,8 +55,6 @@ interface UseInsightCacheOptions {
   scenarioId?: string;
   /** Additional page-specific data */
   pageData?: Record<string, unknown>;
-  /** Auto-refresh interval in ms after grace period expires (default: 30000 = 30s) */
-  autoRefreshDelayMs?: number;
   /** Whether AI insights feature is enabled (used for auto-generation on first visit) */
   aiEnabled?: boolean;
   /** Whether the AI budget has been exceeded — blocks all LLM calls */
@@ -69,7 +67,6 @@ export function useInsightCache<T = unknown>({
   page,
   scenarioId,
   pageData,
-  autoRefreshDelayMs = 30_000,
   aiEnabled = false,
   budgetExceeded = false,
 }: UseInsightCacheOptions): InsightCacheState<T> {
