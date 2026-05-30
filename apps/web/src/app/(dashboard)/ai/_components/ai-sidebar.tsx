@@ -28,11 +28,14 @@ const NAV: { id: AiPane; label: string; icon: React.ReactNode }[] = [
 
 export function AiSidebar(props: AiSidebarProps) {
   const { mobileOpen, onMobileClose } = props;
-  // Persist desktop collapse across reloads (lazy init reads localStorage on mount,
-  // SSR-safe because the value is only read in the browser).
-  const [collapsed, setCollapsed] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("ai_sidebar_collapsed") === "1"
-  );
+  // Persist desktop collapse across reloads. Initialize false so the first client
+  // render matches the SSR HTML (no localStorage on the server) — then read the
+  // saved value in an effect after mount. A lazy initializer that reads
+  // localStorage would diverge from SSR and cause a hydration mismatch.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("ai_sidebar_collapsed") === "1");
+  }, []);
 
   // Mobile drawer a11y: Escape closes it.
   useEffect(() => {
