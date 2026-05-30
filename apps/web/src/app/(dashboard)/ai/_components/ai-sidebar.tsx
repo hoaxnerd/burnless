@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import {
   MessageSquarePlus, Lightbulb, History, Settings as SettingsIcon,
   Zap, X, PanelLeftClose, PanelLeftOpen,
@@ -26,16 +26,36 @@ const NAV: { id: AiPane; label: string; icon: React.ReactNode }[] = [
   { id: "settings", label: "Settings", icon: <SettingsIcon className="h-4 w-4" /> },
 ];
 
+const SIDEBAR_COLLAPSE_KEY = "ai_sidebar_collapsed";
+const SIDEBAR_COLLAPSE_EVENT = "ai-sidebar-collapse";
+
+// Read desktop-collapse from localStorage via useSyncExternalStore: the server
+// snapshot is always false (matching the SSR HTML), so there is no hydration
+// mismatch, and there is no setState-inside-an-effect (which a lazy useState
+// initializer or an effect would each introduce — the former a hydration error,
+// the latter a react-compiler lint error).
+function subscribeCollapsed(callback: () => void) {
+  window.addEventListener(SIDEBAR_COLLAPSE_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(SIDEBAR_COLLAPSE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+function getCollapsedSnapshot() {
+  return localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1";
+}
+function getCollapsedServerSnapshot() {
+  return false;
+}
+
 export function AiSidebar(props: AiSidebarProps) {
   const { mobileOpen, onMobileClose } = props;
-  // Persist desktop collapse across reloads. Initialize false so the first client
-  // render matches the SSR HTML (no localStorage on the server) — then read the
-  // saved value in an effect after mount. A lazy initializer that reads
-  // localStorage would diverge from SSR and cause a hydration mismatch.
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => {
-    setCollapsed(localStorage.getItem("ai_sidebar_collapsed") === "1");
-  }, []);
+  const collapsed = useSyncExternalStore(
+    subscribeCollapsed,
+    getCollapsedSnapshot,
+    getCollapsedServerSnapshot
+  );
 
   // Mobile drawer a11y: Escape closes it.
   useEffect(() => {
@@ -48,11 +68,9 @@ export function AiSidebar(props: AiSidebarProps) {
   }, [mobileOpen, onMobileClose]);
 
   function toggleCollapsed() {
-    setCollapsed((c) => {
-      const next = !c;
-      localStorage.setItem("ai_sidebar_collapsed", next ? "1" : "0");
-      return next;
-    });
+    const next = !collapsed;
+    localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? "1" : "0");
+    window.dispatchEvent(new Event(SIDEBAR_COLLAPSE_EVENT));
   }
 
   const inner = (mobile: boolean) => (
