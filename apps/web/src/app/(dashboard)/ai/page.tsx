@@ -117,6 +117,7 @@ export default function AiCompanionPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledParamRef = useRef<string | null>(null);
+  const autoloadedRef = useRef(false);
   const { success } = useToast();
 
   // The provider owns the streams; the page renders the slice for the current view.
@@ -158,6 +159,20 @@ export default function AiCompanionPage() {
   }, [messages, scrollToBottom]);
   useEffect(() => {
     fetchInsights();
+  }, []);
+
+  // #2: auto-load the most recent conversation on mount. Guarded so it runs once
+  // and never clobbers an in-progress draft.
+  useEffect(() => {
+    if (autoloadedRef.current || conversationId || messages.length > 0) return;
+    autoloadedRef.current = true;
+    (async () => {
+      const res = await apiFetch("/api/chat/history");
+      if (!res.ok) return;
+      const list = (await res.json()).data ?? [];
+      if (list[0]?.id) loadConversation(list[0].id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchInsights() {
