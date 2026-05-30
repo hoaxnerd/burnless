@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { db, transactions } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
@@ -71,5 +72,10 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (row) await logAudit(ctx, "transaction", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "expenses");
+  // Transactions feed expense/actuals compute (compute-expenses reads forecast-lines
+  // + transactions). Mirror the forecast-lines route's invalidation so router.refresh()
+  // serves fresh data after a transaction edit.
+  revalidateTag("forecast-lines");
+  revalidateTag("scenario-overrides");
   return NextResponse.json(row, { status: 201 });
 });
