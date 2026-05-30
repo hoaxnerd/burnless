@@ -39,7 +39,6 @@ describe("<EquityGrantsList>", () => {
     render(
       <EquityGrantsList
         headcountId="h1"
-        scenarioId="s1"
         grants={[
           { id: "b", grantDate: "2026-12-01", shares: 1000, grantType: "iso" },
           { id: "a", grantDate: "2026-03-01", shares: 500, grantType: "rsu" },
@@ -52,7 +51,7 @@ describe("<EquityGrantsList>", () => {
   });
 
   it("renders empty state when no grants", () => {
-    render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
+    render(<EquityGrantsList headcountId="h1" grants={[]} />);
     expect(screen.getByText("No equity grants recorded.")).toBeTruthy();
   });
 
@@ -63,7 +62,7 @@ describe("<EquityGrantsList>", () => {
       json: async () => ({}),
     });
 
-    render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
+    render(<EquityGrantsList headcountId="h1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
     fireEvent.change(screen.getByLabelText("Grant date"), {
@@ -115,7 +114,7 @@ describe("<EquityGrantsList>", () => {
       json: async () => ({}),
     });
 
-    render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
+    render(<EquityGrantsList headcountId="h1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
     fireEvent.change(screen.getByLabelText("Grant date"), {
@@ -143,7 +142,6 @@ describe("<EquityGrantsList>", () => {
     render(
       <EquityGrantsList
         headcountId="h1"
-        scenarioId="s1"
         grants={[{ id: "a", grantDate: "2026-01-01", shares: 1000, grantType: "iso" }]}
       />,
     );
@@ -165,7 +163,7 @@ describe("<EquityGrantsList>", () => {
       json: async () => ({ error: "fail" }),
     });
 
-    render(<EquityGrantsList headcountId="h1" scenarioId="s1" grants={[]} />);
+    render(<EquityGrantsList headcountId="h1" grants={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-equity-grant"));
     fireEvent.change(screen.getByLabelText("Grant date"), {

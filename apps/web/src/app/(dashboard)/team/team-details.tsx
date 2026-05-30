@@ -82,7 +82,6 @@ const deptColors = [
 interface TeamRosterProps {
   departmentBreakdown: DepartmentGroup[];
   totalMonthlyCost: number;
-  scenarioId: string;
   departments: Department[];
   companyBenefitsRates: BenefitsBreakdown;
   currency: CurrencyCode;
@@ -91,7 +90,6 @@ interface TeamRosterProps {
 export function TeamRoster({
   departmentBreakdown,
   totalMonthlyCost,
-  scenarioId,
   departments,
   companyBenefitsRates,
   currency,
@@ -190,7 +188,6 @@ export function TeamRoster({
       {/* Edit modal */}
       {editingHire && (
         <HeadcountForm
-          scenarioId={scenarioId}
           departments={departments}
           companyBenefitsRates={companyBenefitsRates}
           edit={editingHire}
@@ -329,17 +326,14 @@ export function TeamRoster({
                                 <div className="px-3 pb-3 space-y-3 border-t border-surface-100 pt-3 mt-1">
                                   <SalaryChangesList
                                     headcountId={member.id}
-                                    scenarioId={scenarioId}
                                     changes={member.salaryChanges}
                                   />
                                   <BonusesList
                                     headcountId={member.id}
-                                    scenarioId={scenarioId}
                                     bonuses={member.bonuses}
                                   />
                                   <EquityGrantsList
                                     headcountId={member.id}
-                                    scenarioId={scenarioId}
                                     grants={member.equityGrants}
                                   />
                                 </div>
@@ -372,7 +366,6 @@ export function TeamRoster({
 
 interface PlannedHiresSectionProps {
   plannedHires: PlannedHire[];
-  scenarioId: string;
   departments: Department[];
   companyBenefitsRates: BenefitsBreakdown;
   currency: CurrencyCode;
@@ -380,7 +373,6 @@ interface PlannedHiresSectionProps {
 
 export function PlannedHiresSection({
   plannedHires,
-  scenarioId,
   departments,
   companyBenefitsRates,
   currency,
@@ -475,7 +467,6 @@ export function PlannedHiresSection({
       {/* Edit modal */}
       {editingHire && (
         <HeadcountForm
-          scenarioId={scenarioId}
           departments={departments}
           companyBenefitsRates={companyBenefitsRates}
           edit={editingHire}

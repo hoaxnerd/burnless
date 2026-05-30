@@ -39,7 +39,6 @@ describe("<BonusesList>", () => {
     render(
       <BonusesList
         headcountId="h1"
-        scenarioId="s1"
         bonuses={[
           { id: "b", payoutMonth: "2026-12-01", amount: 5000, type: "performance" },
           { id: "a", payoutMonth: "2026-03-01", amount: 2000, type: "signing" },
@@ -52,7 +51,7 @@ describe("<BonusesList>", () => {
   });
 
   it("renders empty state when no bonuses", () => {
-    render(<BonusesList headcountId="h1" scenarioId="s1" bonuses={[]} />);
+    render(<BonusesList headcountId="h1" bonuses={[]} />);
     expect(screen.getByText("No bonuses recorded.")).toBeTruthy();
   });
 
@@ -63,7 +62,7 @@ describe("<BonusesList>", () => {
       json: async () => ({}),
     });
 
-    render(<BonusesList headcountId="h1" scenarioId="s1" bonuses={[]} />);
+    render(<BonusesList headcountId="h1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
     fireEvent.change(screen.getByLabelText("Payout month"), {
@@ -106,7 +105,6 @@ describe("<BonusesList>", () => {
     render(
       <BonusesList
         headcountId="h1"
-        scenarioId="s1"
         bonuses={[{ id: "a", payoutMonth: "2026-01-01", amount: 1000, type: "signing" }]}
       />,
     );
@@ -128,7 +126,7 @@ describe("<BonusesList>", () => {
       json: async () => ({ error: "nope" }),
     });
 
-    render(<BonusesList headcountId="h1" scenarioId="s1" bonuses={[]} />);
+    render(<BonusesList headcountId="h1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
     fireEvent.change(screen.getByLabelText("Payout month"), {

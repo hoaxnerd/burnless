@@ -18,11 +18,10 @@ export interface Bonus {
 
 interface Props {
   headcountId: string;
-  scenarioId: string;
   bonuses: Bonus[];
 }
 
-export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
+export function BonusesList({ headcountId, bonuses }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [payoutMonth, setPayoutMonth] = useState("");
@@ -55,7 +54,6 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Scenario-Id": scenarioId,
         },
         body: JSON.stringify({
           payoutMonth,
@@ -80,7 +78,6 @@ export function BonusesList({ headcountId, scenarioId, bonuses }: Props) {
     if (!window.confirm("Delete this bonus?")) return;
     const res = await apiFetch(`/api/headcount/${headcountId}/bonuses/${id}`, {
       method: "DELETE",
-      headers: { "X-Scenario-Id": scenarioId },
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

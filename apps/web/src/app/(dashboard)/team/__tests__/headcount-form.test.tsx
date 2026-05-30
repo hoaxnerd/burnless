@@ -39,14 +39,13 @@ describe("<HeadcountForm>", () => {
   });
 
   it("renders Add hire title in add mode", () => {
-    render(<HeadcountForm scenarioId="" departments={departments} open={true} />);
+    render(<HeadcountForm departments={departments} open={true} />);
     expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Add hire");
   });
 
   it("renders Edit hire title in edit mode", () => {
     render(
       <HeadcountForm
-        scenarioId=""
         departments={departments}
         open={true}
         edit={{
@@ -67,7 +66,7 @@ describe("<HeadcountForm>", () => {
   });
 
   it("changing employeeType to contractor reveals contractor fields and hides full-time fields", () => {
-    render(<HeadcountForm scenarioId="" departments={departments} open={true} />);
+    render(<HeadcountForm departments={departments} open={true} />);
     expect(screen.getByTestId("full-time-fields")).toBeTruthy();
     expect(screen.queryByTestId("contractor-fields")).toBeNull();
 
@@ -78,7 +77,7 @@ describe("<HeadcountForm>", () => {
   });
 
   it("changing to part_time reveals part-time fields", () => {
-    render(<HeadcountForm scenarioId="" departments={departments} open={true} />);
+    render(<HeadcountForm departments={departments} open={true} />);
     fireEvent.change(screen.getByTestId("employee-type-select"), { target: { value: "part_time" } });
     expect(screen.getByTestId("part-time-fields")).toBeTruthy();
     expect(screen.queryByTestId("full-time-fields")).toBeNull();
@@ -86,7 +85,7 @@ describe("<HeadcountForm>", () => {
   });
 
   it("changing back to full_time restores full-time fields", () => {
-    render(<HeadcountForm scenarioId="" departments={departments} open={true} />);
+    render(<HeadcountForm departments={departments} open={true} />);
     fireEvent.change(screen.getByTestId("employee-type-select"), { target: { value: "contractor" } });
     fireEvent.change(screen.getByTestId("employee-type-select"), { target: { value: "full_time" } });
     expect(screen.getByTestId("full-time-fields")).toBeTruthy();
@@ -97,7 +96,6 @@ describe("<HeadcountForm>", () => {
     const defaults = { insuranceBenefitsCost: 0.05 };
     render(
       <HeadcountForm
-        scenarioId=""
         departments={departments}
         companyBenefitsRates={defaults}
         open={true}
@@ -114,7 +112,7 @@ describe("<HeadcountForm>", () => {
   });
 
   it("validates and surfaces errors for missing salary on full_time", async () => {
-    render(<HeadcountForm scenarioId="" departments={departments} open={true} />);
+    render(<HeadcountForm departments={departments} open={true} />);
     // Default salary=0, full_time → should fail validation
     fireEvent.change(screen.getByTestId("employee-type-select"), { target: { value: "full_time" } });
     // Title is empty by default → also fails
@@ -130,7 +128,6 @@ describe("<HeadcountForm>", () => {
 
     render(
       <HeadcountForm
-        scenarioId="s-1"
         departments={departments}
         open={true}
         edit={{
@@ -171,7 +168,6 @@ describe("<HeadcountForm>", () => {
 
     render(
       <HeadcountForm
-        scenarioId="s-1"
         departments={departments}
         open={true}
         companyBenefitsRates={{ insuranceBenefitsCost: 0.05 }}

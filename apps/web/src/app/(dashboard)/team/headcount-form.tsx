@@ -39,7 +39,6 @@ export interface EditableHeadcount {
 }
 
 interface Props {
-  scenarioId: string;
   departments: Department[];
   companyBenefitsRates?: BenefitsBreakdown;
   edit?: EditableHeadcount;
@@ -65,7 +64,6 @@ function toNumOrNull(v: string | number | null | undefined): number | null {
  * Task 22 will wire this into the team page and remove the legacy forms.
  */
 export function HeadcountForm({
-  scenarioId,
   departments,
   companyBenefitsRates,
   edit,
@@ -136,7 +134,7 @@ export function HeadcountForm({
       const res = await apiFetch(url, {
         method,
         body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json", "X-Scenario-Id": scenarioId },
+        headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

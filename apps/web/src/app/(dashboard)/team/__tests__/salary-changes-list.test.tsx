@@ -39,7 +39,6 @@ describe("<SalaryChangesList>", () => {
     render(
       <SalaryChangesList
         headcountId="h1"
-        scenarioId="s1"
         changes={[
           { id: "b", effectiveDate: "2026-06-01", newSalary: 110_000 },
           { id: "a", effectiveDate: "2026-01-01", newSalary: 100_000 },
@@ -52,7 +51,7 @@ describe("<SalaryChangesList>", () => {
   });
 
   it("renders empty state when no changes", () => {
-    render(<SalaryChangesList headcountId="h1" scenarioId="s1" changes={[]} />);
+    render(<SalaryChangesList headcountId="h1" changes={[]} />);
     expect(screen.getByText("No salary changes recorded.")).toBeTruthy();
   });
 
@@ -63,7 +62,7 @@ describe("<SalaryChangesList>", () => {
       json: async () => ({}),
     });
 
-    render(<SalaryChangesList headcountId="h1" scenarioId="s1" changes={[]} />);
+    render(<SalaryChangesList headcountId="h1" changes={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-salary-change"));
     fireEvent.change(screen.getByLabelText("Effective date"), {
@@ -102,7 +101,6 @@ describe("<SalaryChangesList>", () => {
     render(
       <SalaryChangesList
         headcountId="h1"
-        scenarioId="s1"
         changes={[{ id: "a", effectiveDate: "2026-01-01", newSalary: 100_000 }]}
       />,
     );
@@ -124,7 +122,7 @@ describe("<SalaryChangesList>", () => {
       json: async () => ({ error: "boom" }),
     });
 
-    render(<SalaryChangesList headcountId="h1" scenarioId="s1" changes={[]} />);
+    render(<SalaryChangesList headcountId="h1" changes={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-salary-change"));
     fireEvent.change(screen.getByLabelText("Effective date"), {

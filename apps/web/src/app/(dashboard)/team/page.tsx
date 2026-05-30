@@ -235,7 +235,6 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
           </p>
         </div>
         <HeadcountForm
-          scenarioId={scenarioId}
           departments={departments.map((d) => ({ id: d.id, name: d.name }))}
           companyBenefitsRates={companyBenefitsRates}
         />

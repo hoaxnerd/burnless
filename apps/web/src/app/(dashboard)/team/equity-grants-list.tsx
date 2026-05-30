@@ -23,11 +23,10 @@ export interface EquityGrant {
 
 interface Props {
   headcountId: string;
-  scenarioId: string;
   grants: EquityGrant[];
 }
 
-export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
+export function EquityGrantsList({ headcountId, grants }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [grantDate, setGrantDate] = useState("");
@@ -62,7 +61,6 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Scenario-Id": scenarioId,
         },
         body: JSON.stringify({
           grantDate,
@@ -90,7 +88,6 @@ export function EquityGrantsList({ headcountId, scenarioId, grants }: Props) {
       `/api/headcount/${headcountId}/equity-grants/${id}`,
       {
         method: "DELETE",
-        headers: { "X-Scenario-Id": scenarioId },
       },
     );
     if (!res.ok) {

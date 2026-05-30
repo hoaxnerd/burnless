@@ -170,7 +170,6 @@ export function TeamView({
       <TeamRoster
         departmentBreakdown={departmentBreakdown}
         totalMonthlyCost={totalMonthlyCost}
-        scenarioId={scenarioId}
         departments={departments}
         companyBenefitsRates={companyBenefitsRates}
         currency={currency}
@@ -179,7 +178,6 @@ export function TeamView({
     "planned-hires": (
       <PlannedHiresSection
         plannedHires={plannedHires}
-        scenarioId={scenarioId}
         departments={departments}
         companyBenefitsRates={companyBenefitsRates}
         currency={currency}

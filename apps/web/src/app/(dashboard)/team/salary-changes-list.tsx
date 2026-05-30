@@ -15,11 +15,10 @@ export interface SalaryChange {
 
 interface Props {
   headcountId: string;
-  scenarioId: string;
   changes: SalaryChange[];
 }
 
-export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
+export function SalaryChangesList({ headcountId, changes }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState("");
@@ -52,7 +51,6 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Scenario-Id": scenarioId,
         },
         body: JSON.stringify({
           effectiveDate,
@@ -78,7 +76,6 @@ export function SalaryChangesList({ headcountId, scenarioId, changes }: Props) {
       `/api/headcount/${headcountId}/salary-changes/${id}`,
       {
         method: "DELETE",
-        headers: { "X-Scenario-Id": scenarioId },
       },
     );
     if (!res.ok) {
