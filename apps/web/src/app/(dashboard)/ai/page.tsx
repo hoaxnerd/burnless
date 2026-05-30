@@ -213,7 +213,20 @@ export default function AiCompanionPage() {
               ? new Date(m.createdAt).getTime()
               : Date.now(),
           }));
-        session.setMessages(id, restoredMessages);
+        // #3: re-show a pending permission card persisted server-side.
+        if (data.pendingPermission) {
+          session.setMessages(id, [
+            ...restoredMessages,
+            {
+              role: "assistant",
+              content: "",
+              pendingPermission: data.pendingPermission as PendingPermission,
+              createdAt: Date.now(),
+            },
+          ]);
+        } else {
+          session.setMessages(id, restoredMessages);
+        }
         setConversationId(id);
         setActivePane(null);
         setMobileNavOpen(false);

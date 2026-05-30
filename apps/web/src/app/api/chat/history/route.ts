@@ -7,10 +7,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { db } from "@burnless/db";
+import { db, getActivePendingAction } from "@burnless/db";
 import { aiConversations, aiMessages } from "@burnless/db";
 import { eq, and, desc, asc, lt } from "drizzle-orm";
+import { categorizeToolName } from "@burnless/ai";
 import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { describeToolAction } from "@/lib/ai-tools";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 export const GET = withErrorHandler(async (request: Request) => {
@@ -42,7 +44,30 @@ export const GET = withErrorHandler(async (request: Request) => {
       .where(eq(aiMessages.conversationId, conversationId))
       .orderBy(asc(aiMessages.createdAt));
 
-    return NextResponse.json({ conversationId, messages });
+    // Ownership was verified above; surface any persisted pending permission
+    // batch so the client can re-show the approval card after a reload.
+    const pendingRow = await getActivePendingAction(conversationId);
+    const pendingPermission = pendingRow
+      ? {
+          pauseId: pendingRow.pauseId,
+          conversationId,
+          actions: (
+            pendingRow.pending as {
+              requestId: string;
+              toolName: string;
+              toolInput: Record<string, unknown>;
+            }[]
+          ).map((a) => ({
+            requestId: a.requestId,
+            tool: a.toolName,
+            category: categorizeToolName(a.toolName),
+            description: describeToolAction(a.toolName, a.toolInput),
+            input: a.toolInput,
+          })),
+        }
+      : null;
+
+    return NextResponse.json({ conversationId, messages, pendingPermission });
   }
 
   // List conversations with cursor-based pagination
