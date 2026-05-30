@@ -58,6 +58,7 @@ interface ChatMessageListProps {
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   isLoading?: boolean;
   companionName?: string;
+  renderAfterMessage?: (m: Message, i: number) => React.ReactNode;
 }
 
 export function ChatMessageList({
@@ -67,6 +68,7 @@ export function ChatMessageList({
   messagesEndRef,
   isLoading,
   companionName = "Financial Companion",
+  renderAfterMessage,
 }: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
@@ -168,6 +170,8 @@ export function ChatMessageList({
                     </button>
                   )}
                 </div>
+
+                {renderAfterMessage?.(msg, i)}
               </div>
 
               {/* User avatar */}

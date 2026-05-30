@@ -23,7 +23,9 @@ import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
 import { MobileHistoryCard } from "./_components/conversation-sidebar";
 import { InsightsPanel, InsightCard } from "./_components/insights-panel";
-import type { Message, Insight, Conversation } from "./_components/types";
+import { readSseStream } from "./_components/sse";
+import { PermissionCard } from "./_components/permission-card";
+import type { Message, Insight, Conversation, PendingPermission } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { useLocale } from "@/components/locale/locale-context";
@@ -120,6 +122,9 @@ export default function AiCompanionPage() {
   const { success } = useToast();
 
   const isEmptyState = messages.length === 0;
+  const awaitingDecision = messages.some(
+    (m) => m.pendingPermission && !m.pendingPermission.resolved
+  );
 
   // ?prompt= pre-fills input without sending; ?send= pre-fills and auto-submits
   useEffect(() => {
@@ -219,6 +224,82 @@ export default function AiCompanionPage() {
     setTimeout(() => setCopiedIndex(null), 2000);
   }
 
+  const setLast = useCallback((patch: (m: Message) => Message) => {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last) updated[updated.length - 1] = patch(last);
+      return updated;
+    });
+  }, []);
+
+  const applyChatEvent = useCallback(
+    (event: Record<string, unknown>) => {
+      const type = event.type as string;
+      if (type === "conversation_id" && event.conversationId) {
+        setConversationId(event.conversationId as string);
+      } else if (type === "thinking") {
+        setLast((m) => ({ ...m, thinking: (m.thinking ?? "") + (event.content as string) }));
+      } else if (type === "text") {
+        setLast((m) => ({ ...m, content: m.content + (event.content as string) }));
+      } else if (type === "tool_use") {
+        setLast((m) => ({ ...m, toolCalls: [...(m.toolCalls ?? []), event.tool as string] }));
+      } else if (type === "tool_status") {
+        setLast((m) => ({ ...m, toolStatus: { tool: event.tool as string, phase: event.phase as "running" | "done" | "error" } }));
+      } else if (type === "permission_request") {
+        setLast((m) => ({
+          ...m,
+          isStreaming: false,
+          toolStatus: null,
+          pendingPermission: {
+            pauseId: event.pauseId as string,
+            conversationId: event.conversationId as string,
+            actions: (event.actions as PendingPermission["actions"]) ?? [],
+          },
+        }));
+      } else if (type === "paused") {
+        setIsLoading(false);
+      } else if (type === "done") {
+        if (event.conversationId) setConversationId(event.conversationId as string);
+        setLast((m) => ({ ...m, isStreaming: false, toolStatus: null }));
+        fetchInsights();
+      } else if (type === "error") {
+        setLast((m) => ({ ...m, content: m.content + `\n\n*Error: ${event.content}*`, isStreaming: false }));
+      }
+    },
+    [setLast]
+  );
+
+  const handlePermissionDecision = useCallback(
+    async (pending: PendingPermission, decisions: { requestId: string; decision: "once" | "session" | "deny" }[]) => {
+      // Mark the card resolved + reopen the same assistant message for continuation.
+      setLast((m) => ({
+        ...m,
+        pendingPermission: m.pendingPermission ? { ...m.pendingPermission, resolved: true } : null,
+        isStreaming: true,
+      }));
+      setIsLoading(true);
+      try {
+        const res = await apiFetch("/api/chat/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId: pending.conversationId,
+            pauseId: pending.pauseId,
+            decisions,
+          }),
+        });
+        if (!res.ok) throw new Error("resume failed");
+        await readSseStream(res, (event) => applyChatEvent(event));
+      } catch {
+        setLast((m) => ({ ...m, content: m.content + "\n\n*Couldn't resume. Please try again.*", isStreaming: false }));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [applyChatEvent, setLast]
+  );
+
   /* Send a message — can be called from form submit or template click */
   async function handleSend(
     e: React.FormEvent | null,
@@ -290,94 +371,7 @@ export default function AiCompanionPage() {
         return;
       }
 
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6);
-
-          try {
-            const event = JSON.parse(jsonStr);
-
-            if (event.type === "conversation_id") {
-              // Server sends conversationId as first event for reliable tracking
-              if (event.conversationId) {
-                setConversationId(event.conversationId);
-              }
-            } else if (event.type === "thinking") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1]!;
-                updated[updated.length - 1] = {
-                  ...last,
-                  thinking: (last.thinking ?? "") + event.content,
-                };
-                return updated;
-              });
-            } else if (event.type === "text") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1]!;
-                updated[updated.length - 1] = {
-                  ...last,
-                  content: last.content + event.content,
-                };
-                return updated;
-              });
-            } else if (event.type === "tool_use") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1]!;
-                updated[updated.length - 1] = {
-                  ...last,
-                  toolCalls: [...(last.toolCalls ?? []), event.tool],
-                };
-                return updated;
-              });
-            } else if (event.type === "done") {
-              if (event.conversationId) {
-                setConversationId(event.conversationId);
-              }
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1]!;
-                updated[updated.length - 1] = {
-                  ...last,
-                  isStreaming: false,
-                };
-                return updated;
-              });
-              // Refresh insights after tool use
-              fetchInsights();
-            } else if (event.type === "error") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1]!;
-                updated[updated.length - 1] = {
-                  ...last,
-                  content: last.content + `\n\n*Error: ${event.content}*`,
-                  isStreaming: false,
-                };
-                return updated;
-              });
-            }
-          } catch {
-            // Ignore malformed SSE
-          }
-        }
-      }
+      await readSseStream(res, (event) => applyChatEvent(event));
     } catch {
       setMessages((prev) => {
         const updated = [...prev];
@@ -605,7 +599,7 @@ export default function AiCompanionPage() {
               {/* Chat input in empty state */}
               <ChatInput
                 input={input}
-                isLoading={isLoading}
+                isLoading={isLoading || awaitingDecision}
                 inputRef={inputRef}
                 onInputChange={setInput}
                 onSubmit={(e) => handleSend(e)}
@@ -621,6 +615,16 @@ export default function AiCompanionPage() {
               messagesEndRef={messagesEndRef}
               isLoading={isLoading}
               companionName={companionName}
+              renderAfterMessage={(m) =>
+                m.pendingPermission ? (
+                  <div className="mt-2">
+                    <PermissionCard
+                      pending={m.pendingPermission}
+                      onDecide={(decisions) => handlePermissionDecision(m.pendingPermission!, decisions)}
+                    />
+                  </div>
+                ) : null
+              }
             />
             {planLimit && (
               <div className="mx-4 mb-3">
@@ -629,7 +633,7 @@ export default function AiCompanionPage() {
             )}
             <ChatInput
               input={input}
-              isLoading={isLoading || !!planLimit}
+              isLoading={isLoading || !!planLimit || awaitingDecision}
               inputRef={inputRef}
               onInputChange={setInput}
               onSubmit={(e) => handleSend(e)}
