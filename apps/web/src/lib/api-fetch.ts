@@ -10,6 +10,10 @@
  * so reintroduces a second, drift-prone source (a stale server-rendered prop or
  * a per-tab sessionStorage value) and causes spurious 409 ScenarioSafetyErrors.
  */
+import { publishMutation, domainFromUrl } from "./mutation-bus";
+
+const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+
 export async function apiFetch(
   url: string,
   init?: RequestInit
@@ -23,7 +27,16 @@ export async function apiFetch(
   } else {
     headers.delete("X-Scenario-Id");
   }
-  return fetch(url, { ...init, headers });
+  const res = await fetch(url, { ...init, headers });
+  try {
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (res.ok && MUTATING.has(method)) {
+      publishMutation({ domain: domainFromUrl(url), method, at: Date.now() });
+    }
+  } catch {
+    // Emitting must never affect the response.
+  }
+  return res;
 }
 
 function getCookieScenarioId(): string | null {
