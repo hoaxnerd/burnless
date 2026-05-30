@@ -5,17 +5,16 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { DataFreshnessProvider } from "../data-freshness-provider";
-import { publishMutation, MUTATION_SYNC_KEY } from "@/lib/mutation-bus";
+import { publishMutation, MUTATION_SYNC_KEY, resetMutationBusForTesting } from "@/lib/mutation-bus";
 
-beforeEach(() => { refresh.mockClear(); vi.useFakeTimers(); });
+beforeEach(() => { refresh.mockClear(); resetMutationBusForTesting(); vi.useFakeTimers(); });
 
 describe("DataFreshnessProvider", () => {
-  it("debounces a same-tab refresh", () => {
+  it("does NOT refresh on a same-tab event (the component owns same-tab refresh)", () => {
     render(<DataFreshnessProvider><div /></DataFreshnessProvider>);
     act(() => { publishMutation({ domain: "expenses", method: "PATCH", at: 1 }); });
-    expect(refresh).not.toHaveBeenCalled(); // debounced
-    act(() => { vi.advanceTimersByTime(350); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("does NOT refresh a cross-tab event immediately; refreshes on focus", () => {

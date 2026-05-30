@@ -4,28 +4,24 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeMutation } from "@/lib/mutation-bus";
 
-const DEBOUNCE_MS = 300;
-
 /**
- * Subscribes to the mutation bus and keeps the rendered RSC fresh:
- *   - same-tab mutation  → debounced router.refresh() (coalesces edit bursts)
- *   - cross-tab mutation → mark dirty, refresh on next focus/visibility
- * Insight staleness is handled separately by use-insight-cache subscribing to the
- * same bus.
+ * Cross-tab freshness. Same-tab refresh is owned by the mutating component itself
+ * (it already calls router.refresh() immediately after its apiFetch), so this provider
+ * deliberately does NOT refresh on same-tab events — that would double the RSC recompute.
+ *
+ * Its job is the genuinely-new capability: when ANOTHER tab mutates financial data, mark
+ * this tab dirty and refresh it the moment it next becomes active (focus/visibility) —
+ * the focus-reconcile pattern from scenario-context.tsx. Insight staleness is handled
+ * separately by use-insight-cache subscribing to the same bus.
  */
 export function DataFreshnessProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const dirtyRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const unsub = subscribeMutation((e) => {
-      if (e.crossTab) {
-        dirtyRef.current = true;
-        return;
-      }
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => router.refresh(), DEBOUNCE_MS);
+      // Only cross-tab events; same-tab is the mutating component's responsibility.
+      if (e.crossTab) dirtyRef.current = true;
     });
 
     const onActive = () => {
@@ -40,7 +36,6 @@ export function DataFreshnessProvider({ children }: { children: React.ReactNode 
 
     return () => {
       unsub();
-      if (timerRef.current) clearTimeout(timerRef.current);
       document.removeEventListener("visibilitychange", onActive);
       window.removeEventListener("focus", onActive);
     };
