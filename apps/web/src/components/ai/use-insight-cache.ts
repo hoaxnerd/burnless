@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { captureException } from "@/lib/error-reporting";
 import { classifyError } from "@/components/ui/data-load-error";
 import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
-import { MUTATION_GRACE_PERIOD_MS } from "@/lib/data-mutation-tracker";
+import { MUTATION_GRACE_PERIOD_MS } from "@/lib/insight-grace";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

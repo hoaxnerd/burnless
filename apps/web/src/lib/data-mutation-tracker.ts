@@ -15,11 +15,14 @@
 
 import { getRedis } from "./redis";
 import { invalidateInsights, type MutationSource } from "./insight-invalidation";
+import { MUTATION_GRACE_PERIOD_MS } from "./insight-grace";
 
 const REDIS_PREFIX = "burnless:data-modified:";
 
-/** Grace period before insights should regenerate after a data change. */
-export const MUTATION_GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes
+// Re-export the client-safe grace constant so existing server importers keep working
+// via "@/lib/data-mutation-tracker". The definition lives in ./insight-grace (no
+// server-only imports) so client components can read it without bundling redis.
+export { MUTATION_GRACE_PERIOD_MS };
 
 // In-memory fallback when Redis is unavailable
 const memoryStore = new Map<string, number>();
