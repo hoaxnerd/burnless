@@ -1,6 +1,7 @@
 "use client";
 import type { UiBlockClient } from "../types";
 import { GenMetricCard, type GenMetricCardProps } from "./metric-card";
+import { GenLineChart, type GenLineChartProps } from "./line-chart";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -16,6 +17,8 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
   switch (component) {
     case "metric_card":
       return <GenMetricCard {...(props as unknown as GenMetricCardProps)} />;
+    case "line_chart":
+      return <GenLineChart {...(props as unknown as GenLineChartProps)} />;
     // component cases are added by each component task below.
     default:
       return (

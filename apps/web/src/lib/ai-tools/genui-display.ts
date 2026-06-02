@@ -4,6 +4,7 @@
  * Data-bound handlers compute REAL numbers via existing compute helpers.
  */
 import { z } from "zod";
+import { seriesToArray, type MonthlySeries } from "@burnless/engine";
 import { computeDashboardData } from "../compute-dashboard";
 import { getDefaultScenario } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
@@ -84,5 +85,84 @@ genuiDisplayHandlers.show_metric_card = async (input, context) => {
   return JSON.stringify({
     render: { component: "metric_card", props },
     modelResult: `[metric_card shown: ${spec.label} = ${value}]`,
+  });
+};
+
+// ── show_line_chart ─────────────────────────────────────────────────────────
+
+type MetricArray = Array<{ month: string; value: number }>;
+type DashboardLike = Record<string, unknown>;
+
+/**
+ * Each chartable series resolves to a `{ month, value }[]`. Sources differ:
+ * "metric" reads a ComputedMetrics MetricValue[] field; "series" reads a
+ * top-level MonthlySeries (Map) and flattens it via the engine helper.
+ */
+const LINE_SERIES_SPECS: Record<
+  string,
+  { kind: "metric" | "series"; key: string; label: string }
+> = {
+  revenue: { kind: "series", key: "totalRevenue", label: "Revenue" },
+  cash: { kind: "series", key: "cashPosition", label: "Cash" },
+  headcount_cost: { kind: "series", key: "headcountCostSeries", label: "Headcount cost" },
+  mrr: { kind: "metric", key: "mrr", label: "MRR" },
+  net_burn: { kind: "metric", key: "netBurnRate", label: "Net burn" },
+};
+
+genuiDisplaySchemas.show_line_chart = z.object({
+  series: z.enum(["mrr", "revenue", "net_burn", "cash", "headcount_cost"]).optional(),
+  months: z.number().int().min(1).max(36).optional(),
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_line_chart = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const series = typeof input.series === "string" ? input.series : "revenue";
+  const months =
+    typeof input.months === "number" && Number.isFinite(input.months)
+      ? Math.min(36, Math.max(1, Math.floor(input.months)))
+      : 12;
+  const spec = LINE_SERIES_SPECS[series] ?? LINE_SERIES_SPECS.revenue!;
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const emptyEnvelope = JSON.stringify({
+    render: {
+      component: "line_chart",
+      props: {
+        title: spec.label,
+        format: "currency",
+        data: [],
+        lines: [{ dataKey: "value", label: spec.label }],
+      },
+    },
+    modelResult: `[line_chart: no data for ${series}]`,
+  });
+  if (!scenarioId) return emptyEnvelope;
+
+  const dash = (await computeDashboardData(ctx.companyId, scenarioId)) as unknown as DashboardLike;
+  let points: MetricArray;
+  if (spec.kind === "metric") {
+    points = ((dash.metrics as Record<string, MetricArray> | undefined)?.[spec.key] ?? []).map(
+      (p) => ({ month: p.month, value: p.value })
+    );
+  } else {
+    const map = dash[spec.key] as MonthlySeries | undefined;
+    points = map ? seriesToArray(map) : [];
+  }
+
+  // Trim to the last `months` points (series are chronologically sorted).
+  const data = points.slice(-months);
+
+  return JSON.stringify({
+    render: {
+      component: "line_chart",
+      props: {
+        title: spec.label,
+        format: "currency",
+        data,
+        lines: [{ dataKey: "value", label: spec.label }],
+      },
+    },
+    modelResult: `[line_chart shown: ${spec.label}, ${data.length} months]`,
   });
 };

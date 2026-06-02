@@ -34,6 +34,32 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["metric"],
     },
   },
+  {
+    name: "show_line_chart",
+    description:
+      "Display a monthly time series inline as a line chart. Use when the user asks to chart or trend a value over time (revenue, MRR, net burn, cash, headcount cost). Numbers are computed server-side — you only choose the series and how many recent months to show.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        series: {
+          type: "string",
+          enum: ["mrr", "revenue", "net_burn", "cash", "headcount_cost"],
+          description: "Which monthly series to chart. Defaults to revenue.",
+        },
+        months: {
+          type: "integer",
+          minimum: 1,
+          maximum: 36,
+          description: "How many of the most recent months to show. Defaults to 12.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */
