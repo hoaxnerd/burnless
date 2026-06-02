@@ -28,6 +28,18 @@ describe("SYSTEM_PROMPT", () => {
   });
 });
 
+describe("generative UI guidance", () => {
+  it("instructs the model on display tools", () => {
+    expect(SYSTEM_PROMPT).toContain("show_metric_card");
+    expect(SYSTEM_PROMPT).toContain("show_line_chart");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("instead of describing numbers");
+  });
+  it("instructs the model on input forms", () => {
+    expect(SYSTEM_PROMPT).toContain("request_input_form");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("propose");
+  });
+});
+
 describe("buildSystemMessage", () => {
   it("prepends system prompt to financial context", () => {
     const result = buildSystemMessage("MRR: $10,000");
