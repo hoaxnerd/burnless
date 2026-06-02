@@ -274,6 +274,13 @@
       "when": 1780094933186,
       "tag": "0041_ai_permissions_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1780181333186,
+      "tag": "0042_ai_pending_action_kind",
+      "breakpoints": true
     }
   ]
 }
