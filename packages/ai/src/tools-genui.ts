@@ -193,6 +193,21 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["scenarioA", "scenarioB"],
     },
   },
+  {
+    name: "show_burn_breakdown",
+    description:
+      "Display where the monthly cash burn is going, inline as a bar chart broken down by expense category. Use when the user asks to break down their burn, see what they're spending on, or understand where the money goes each month. Numbers are computed server-side (scenario-aware) — you only request the breakdown.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

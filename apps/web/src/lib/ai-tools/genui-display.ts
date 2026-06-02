@@ -308,6 +308,50 @@ genuiDisplayHandlers.show_bar_chart = async (input, context) => {
   return envelope(data);
 };
 
+// ── show_burn_breakdown ─────────────────────────────────────────────────────
+
+/**
+ * Latest-month expense burn grouped by category. Reuses the `bar_chart`
+ * renderer (component name is "bar_chart") — only the handler + tool def are
+ * new. `subcategoryBreakdown.amount` is the current-month per-category spend
+ * (computeExpenseDetails sums `currentAmount`), which is exactly the monthly
+ * burn split the user asks for.
+ */
+genuiDisplaySchemas.show_burn_breakdown = z.object({
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_burn_breakdown = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+  const title = "Burn breakdown";
+
+  const envelope = (data: CategoryDatum[]) =>
+    JSON.stringify({
+      render: {
+        component: "bar_chart",
+        props: {
+          title,
+          format: "currency",
+          data,
+          bars: [{ dataKey: "value", label: "Monthly", color: chartColors.brand }],
+        },
+      },
+      modelResult: data.length
+        ? `[burn_breakdown shown: ${title}, ${data.length} categories]`
+        : `[burn_breakdown: no expense data]`,
+    });
+
+  if (!scenarioId) return envelope([]);
+
+  const details = await computeExpenseDetails(ctx.companyId, scenarioId);
+  const data: CategoryDatum[] = (details.subcategoryBreakdown ?? [])
+    .map((b) => ({ label: b.subcategory, value: b.amount }))
+    .filter((d) => d.value > 0);
+
+  return envelope(data);
+};
+
 // ── show_area_chart ─────────────────────────────────────────────────────────
 
 /**

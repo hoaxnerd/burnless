@@ -380,6 +380,24 @@ describe("show_cap_table", () => {
   });
 });
 
+describe("show_burn_breakdown", () => {
+  it("emits a bar_chart envelope of real latest-month expense categories", async () => {
+    const out = await genuiDisplayHandlers.show_burn_breakdown!({}, ctx);
+    const parsed = JSON.parse(out);
+    // Reuses the bar_chart renderer — the component name is "bar_chart".
+    expect(parsed.render.component).toBe("bar_chart");
+    expect(parsed.render.props.title).toBe("Burn breakdown");
+    expect(parsed.render.props.format).toBe("currency");
+    expect(parsed.render.props.data.length).toBeGreaterThanOrEqual(1);
+    // Each datum is { label, value } sourced from subcategoryBreakdown.
+    expect(parsed.render.props.data[0]).toEqual({ label: "Payroll", value: 90000 });
+    expect(parsed.render.props.bars).toHaveLength(1);
+    expect(parsed.render.props.bars[0].dataKey).toBe("value");
+    expect(typeof parsed.render.props.bars[0].color).toBe("string");
+    expect(parsed.modelResult).toMatch(/burn_breakdown/);
+  });
+});
+
 describe("show_scenario_diff", () => {
   it("returns a scenario_diff envelope with both names and real per-metric deltas", async () => {
     const out = await genuiDisplayHandlers.show_scenario_diff!(
