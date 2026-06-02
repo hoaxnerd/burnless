@@ -18,6 +18,7 @@ import {
 } from "./providers";
 import { getProviderForFeature } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
+import { isInputTool, buildInputFormSpec, type InputRequestState } from "./generative-ui";
 
 /** Resolve the provider: use explicit config override if present, else routing. */
 function resolveProvider(options: ChatOptions): LlmProvider | null {
@@ -40,6 +41,8 @@ interface ChatOptions {
   resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask";
   /** Persist a paused turn; returns a pauseId echoed in the permission_request/paused chunks. */
   onPause?: (state: PauseState) => Promise<string>;
+  /** Persist a turn paused to collect form input; returns a pauseId echoed in the input_request/paused chunks. */
+  onInputRequest?: (state: InputRequestState) => Promise<string>;
   /** AI feature name for model routing. Defaults to "chat". */
   feature?: string;
   /** Configured companion name for the system prompt. */
@@ -189,8 +192,14 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
 
       const completedResults: ContentBlock[] = [];
       const pending: PendingToolUse[] = [];
+      const inputRequests: PendingToolUse[] = [];
 
       for (const toolUse of toolUseBlocks) {
+        if (isInputTool(toolUse.name)) {
+          inputRequests.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
+          continue;
+        }
+
         const decision = options.resolvePermission
           ? options.resolvePermission(toolUse.name, toolUse.input)
           : "allow";
@@ -220,6 +229,41 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       // The model still sees it on resume via the persisted assistantBlocks; do not
       // "fix" this into a duplicate-save.
       messages.push({ role: "assistant", content: lastResponse.content });
+
+      // Input request takes precedence and is exclusive: a turn pauses for EITHER
+      // input OR permission, never both (spec §7). Same-turn permission/extra-input
+      // tools are deferred with a contract-safe tool_result so the provider's
+      // "every tool_use needs a tool_result" rule still holds on resume.
+      if (inputRequests.length > 0) {
+        for (const p of pending) {
+          completedResults.push({
+            type: "tool_result",
+            toolUseId: p.requestId,
+            content: JSON.stringify({ deferred: true, message: "Collecting your input first; I'll revisit this." }),
+          });
+        }
+        const first = inputRequests[0]!;
+        for (const extra of inputRequests.slice(1)) {
+          completedResults.push({
+            type: "tool_result",
+            toolUseId: extra.requestId,
+            content: JSON.stringify({ deferred: true, message: "One input request at a time." }),
+          });
+        }
+        const spec = buildInputFormSpec(first.toolName, first.toolInput);
+        let pauseId: string | undefined;
+        if (options.onInputRequest) {
+          pauseId = await options.onInputRequest({
+            assistantBlocks: lastResponse.content,
+            completedResults,
+            inputToolUseId: first.requestId,
+            spec,
+          });
+        }
+        yield { type: "input_request", pauseId, spec };
+        yield { type: "paused", pauseId };
+        return;
+      }
 
       if (pending.length > 0) {
         let pauseId: string | undefined;
