@@ -162,6 +162,12 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       : m.content,
   }));
 
+  // Track whether the turn produced ANY visible output (text or an executed
+  // tool). Some providers (e.g. small models on flaky multi-tool turns) return an
+  // empty completion — without this we'd render a blank assistant bubble.
+  let yieldedText = false;
+  let ranTool = false;
+
   // Capped to prevent runaway tool loops
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const events = provider.stream({
@@ -174,6 +180,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
 
     for await (const event of events) {
       if (event.type === "text_delta") {
+        if (event.text) yieldedText = true;
         yield { type: "text", content: event.text };
       } else if (event.type === "thinking_delta") {
         yield { type: "thinking", content: event.text };
@@ -210,6 +217,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
         }
 
         // Auto-allowed → execute now, with live status.
+        ranTool = true;
         yield { type: "tool_status", toolName: toolUse.name, phase: "running" };
         let result: string;
         try {
@@ -283,6 +291,15 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       continue;
     }
 
+    // Terminal (no tool use this turn). If the whole turn produced nothing
+    // visible — no text and no executed tool — emit a friendly fallback instead
+    // of a blank bubble (guards against flaky empty provider completions).
+    if (!yieldedText && !ranTool) {
+      yield {
+        type: "text",
+        content: "I wasn't able to generate a response just now — please try asking again.",
+      };
+    }
     yield { type: "done" };
     return;
   }
