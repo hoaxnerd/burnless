@@ -18,6 +18,7 @@ import { getScenarioForCompany } from "@burnless/db";
 import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
+import { computeRevenueDetails } from "../compute-revenue";
 import { computeCapTableForCompany } from "../compute-cap-table";
 import { getDefaultScenario, getFundingRounds } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
@@ -686,4 +687,109 @@ genuiDisplayHandlers.show_funding_summary = async (input, context) => {
 
   const totalRaised = rounds.reduce((s, r) => s + r.amount, 0);
   return envelope(rounds, totalRaised);
+};
+
+// ── show_data_table ─────────────────────────────────────────────────────────
+
+type TableColumn = { key: string; label: string; format?: FormatHint };
+type TableRow = Record<string, unknown>;
+
+/** Latest-month value of a StatementLineItem-style values array, or null. */
+function latestStatementValue(
+  values: Array<{ month: string; value: number }> | undefined
+): number | null {
+  return latest(values);
+}
+
+const DATA_TABLE_TITLES = {
+  pl_summary: "P&L summary",
+  revenue_streams: "Revenue streams",
+  expenses: "Expenses",
+} as const;
+
+genuiDisplaySchemas.show_data_table = z.object({
+  dataset: z.enum(["pl_summary", "revenue_streams", "expenses"]).optional(),
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_data_table = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const dataset =
+    input.dataset === "revenue_streams" || input.dataset === "expenses"
+      ? input.dataset
+      : "pl_summary";
+  const title = DATA_TABLE_TITLES[dataset];
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (columns: TableColumn[], rows: TableRow[]) =>
+    JSON.stringify({
+      render: { component: "data_table", props: { title, columns, rows } },
+      modelResult: rows.length
+        ? `[data_table shown: ${title}, ${rows.length} rows]`
+        : `[data_table: no data for ${dataset}]`,
+    });
+
+  if (!scenarioId) return envelope([], []);
+
+  if (dataset === "revenue_streams") {
+    const details = await computeRevenueDetails(ctx.companyId, scenarioId);
+    const columns: TableColumn[] = [
+      { key: "name", label: "Stream" },
+      { key: "type", label: "Type" },
+      { key: "amount", label: "Monthly revenue", format: "currency" },
+    ];
+    const rows: TableRow[] = (details.streamBreakdown ?? []).map((s) => ({
+      name: s.name,
+      type: s.type,
+      amount: s.currentRevenue,
+    }));
+    return envelope(columns, rows);
+  }
+
+  if (dataset === "expenses") {
+    const details = await computeExpenseDetails(ctx.companyId, scenarioId);
+    const columns: TableColumn[] = [
+      { key: "category", label: "Category" },
+      { key: "amount", label: "Monthly cost", format: "currency" },
+      { key: "share", label: "Share", format: "percent" },
+    ];
+    const rows: TableRow[] = (details.subcategoryBreakdown ?? []).map((b) => ({
+      category: b.subcategory,
+      amount: b.amount,
+      share: b.percentage,
+    }));
+    return envelope(columns, rows);
+  }
+
+  // pl_summary: latest-month value of each P&L statement line.
+  const dash = (await computeDashboardData(ctx.companyId, scenarioId)) as unknown as {
+    profitAndLoss?: Record<string, { name: string; values?: Array<{ month: string; value: number }> }>;
+  };
+  const pl = dash.profitAndLoss;
+  const columns: TableColumn[] = [
+    { key: "line", label: "Line item" },
+    { key: "amount", label: "Amount", format: "currency" },
+  ];
+  const PL_LINES = [
+    "revenue",
+    "cogs",
+    "grossProfit",
+    "operatingExpenses",
+    "operatingIncome",
+    "otherIncome",
+    "otherExpenses",
+    "netIncome",
+  ];
+  const rows: TableRow[] = [];
+  if (pl) {
+    for (const key of PL_LINES) {
+      const item = pl[key];
+      if (!item) continue;
+      const amount = latestStatementValue(item.values);
+      if (amount === null) continue;
+      rows.push({ line: item.name, amount });
+    }
+  }
+
+  return envelope(columns, rows);
 };

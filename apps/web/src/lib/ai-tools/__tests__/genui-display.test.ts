@@ -82,6 +82,19 @@ vi.mock("../../compute-dashboard", () => ({
         ["2026-05", 120000],
         ["2026-06", 130000],
       ]),
+      // P&L statement — each line a StatementLineItem { name, values:[{month,value}] }.
+      profitAndLoss: {
+        revenue: { name: "Revenue", values: [{ month: "2026-05", value: 48000 }, { month: "2026-06", value: 50000 }] },
+        cogs: { name: "COGS", values: [{ month: "2026-06", value: 8000 }] },
+        grossProfit: { name: "Gross profit", values: [{ month: "2026-06", value: 42000 }] },
+        operatingExpenses: { name: "Operating expenses", values: [{ month: "2026-06", value: 124000 }] },
+        operatingIncome: { name: "Operating income", values: [{ month: "2026-06", value: -82000 }] },
+        otherIncome: { name: "Other income", values: [] },
+        otherExpenses: { name: "Other expenses", values: [] },
+        netIncome: { name: "Net income", values: [{ month: "2026-06", value: -82000 }] },
+        grossMargin: [{ month: "2026-06", value: 84 }],
+        netMargin: [{ month: "2026-06", value: -164 }],
+      },
       // Per-revenue-type breakdown (RevenueByType) — each value a MonthlySeries Map.
       revenueByType: {
         subscriptionRevenue: new Map([
@@ -140,6 +153,14 @@ vi.mock("../../data", () => ({
       isProjected: true,
     },
   ]),
+}));
+vi.mock("../../compute-revenue", () => ({
+  computeRevenueDetails: vi.fn(async () => ({
+    streamBreakdown: [
+      { id: "r1", name: "Pro plan", type: "subscription", currentRevenue: 42000 },
+      { id: "r2", name: "Consulting", type: "services", currentRevenue: 8000 },
+    ],
+  })),
 }));
 vi.mock("../../compute-cap-table", () => ({
   computeCapTableForCompany: vi.fn(async () => ({
@@ -500,5 +521,63 @@ describe("show_scenario_diff", () => {
     expect(headcount!.format).toBe("number");
 
     expect(parsed.modelResult).toMatch(/scenario_diff/);
+  });
+});
+
+describe("show_data_table", () => {
+  it("returns a data_table of the P&L summary with a revenue row and currency columns", async () => {
+    const out = await genuiDisplayHandlers.show_data_table!({ dataset: "pl_summary" }, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("data_table");
+    expect(parsed.render.props.title).toMatch(/P&L|summary/i);
+
+    const columns = parsed.render.props.columns as Array<{ key: string; label: string; format?: string }>;
+    expect(columns.length).toBeGreaterThanOrEqual(2);
+    // An amount column routes numbers through the currency formatter.
+    const amountCol = columns.find((c) => c.format === "currency");
+    expect(amountCol).toBeTruthy();
+
+    const rows = parsed.render.props.rows as Array<Record<string, unknown>>;
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    // The Revenue line shows its latest-month value (50000 from the mock).
+    const revenueRow = rows.find((r) => String(r[columns[0]!.key]).toLowerCase() === "revenue");
+    expect(revenueRow).toBeTruthy();
+    expect(revenueRow![amountCol!.key]).toBe(50000);
+    expect(parsed.modelResult).toMatch(/data_table/);
+  });
+
+  it("returns a data_table of revenue streams with real per-stream amounts", async () => {
+    const out = await genuiDisplayHandlers.show_data_table!({ dataset: "revenue_streams" }, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("data_table");
+    const rows = parsed.render.props.rows as Array<Record<string, unknown>>;
+    expect(rows.length).toBe(2);
+    const amountCol = (parsed.render.props.columns as Array<{ key: string; format?: string }>).find(
+      (c) => c.format === "currency"
+    )!;
+    const pro = rows.find((r) => r.name === "Pro plan");
+    expect(pro).toBeTruthy();
+    expect(pro![amountCol.key]).toBe(42000);
+  });
+
+  it("returns a data_table of expense categories with real amounts", async () => {
+    const out = await genuiDisplayHandlers.show_data_table!({ dataset: "expenses" }, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("data_table");
+    const rows = parsed.render.props.rows as Array<Record<string, unknown>>;
+    expect(rows.length).toBe(3);
+    const amountCol = (parsed.render.props.columns as Array<{ key: string; format?: string }>).find(
+      (c) => c.format === "currency"
+    )!;
+    const payroll = rows.find((r) => String(Object.values(r)[0]) === "Payroll");
+    expect(payroll).toBeTruthy();
+    expect(payroll![amountCol.key]).toBe(90000);
+  });
+
+  it("defaults to the pl_summary dataset when none is given", async () => {
+    const out = await genuiDisplayHandlers.show_data_table!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("data_table");
+    expect(parsed.render.props.title).toMatch(/P&L|summary/i);
   });
 });

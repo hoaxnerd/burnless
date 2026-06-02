@@ -9,6 +9,7 @@ import { GenRunway, type GenRunwayProps } from "./runway";
 import { GenCapTable, type GenCapTableProps } from "./cap-table";
 import { GenScenarioDiff, type GenScenarioDiffProps } from "./scenario-diff";
 import { GenFundingSummary, type GenFundingSummaryProps } from "./funding-summary";
+import { GenDataTable, type GenDataTableProps } from "./data-table";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -40,6 +41,8 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
       return <GenScenarioDiff {...(props as unknown as GenScenarioDiffProps)} />;
     case "funding_summary":
       return <GenFundingSummary {...(props as unknown as GenFundingSummaryProps)} />;
+    case "data_table":
+      return <GenDataTable {...(props as unknown as GenDataTableProps)} />;
     // component cases are added by each component task below.
     default:
       return (

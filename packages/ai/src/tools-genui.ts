@@ -223,6 +223,26 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_data_table",
+    description:
+      "Display a structured dataset inline as a table. Choose `pl_summary` for a profit-and-loss summary (each P&L line with its latest-month amount), `revenue_streams` for per-stream monthly revenue, or `expenses` for a per-category cost breakdown. Use when the user asks to see numbers laid out in a table or asks for a P&L / revenue / expense summary. Numbers are computed server-side (scenario-aware) — you only choose the dataset.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dataset: {
+          type: "string",
+          enum: ["pl_summary", "revenue_streams", "expenses"],
+          description: "Which dataset to tabulate. Defaults to pl_summary.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */
