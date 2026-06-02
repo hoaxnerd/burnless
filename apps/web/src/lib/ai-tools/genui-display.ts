@@ -238,3 +238,65 @@ genuiDisplayHandlers.show_bar_chart = async (input, context) => {
 
   return envelope(data);
 };
+
+// ── show_area_chart ─────────────────────────────────────────────────────────
+
+/**
+ * Area series both read a top-level MonthlySeries (Map) from the dashboard:
+ *  - cash_runway      → cashPosition, shown as-is (balance over time).
+ *  - cumulative_revenue → totalRevenue, transformed into a running sum.
+ */
+const AREA_SERIES_SPECS: Record<
+  string,
+  { key: string; label: string; cumulative: boolean }
+> = {
+  cash_runway: { key: "cashPosition", label: "Cash runway", cumulative: false },
+  cumulative_revenue: { key: "totalRevenue", label: "Cumulative revenue", cumulative: true },
+};
+
+genuiDisplaySchemas.show_area_chart = z.object({
+  series: z.enum(["cash_runway", "cumulative_revenue"]).optional(),
+  months: z.number().int().min(1).max(36).optional(),
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_area_chart = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const series = input.series === "cumulative_revenue" ? "cumulative_revenue" : "cash_runway";
+  const months =
+    typeof input.months === "number" && Number.isFinite(input.months)
+      ? Math.min(36, Math.max(1, Math.floor(input.months)))
+      : 18;
+  const spec = AREA_SERIES_SPECS[series]!;
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (data: MetricArray) =>
+    JSON.stringify({
+      render: {
+        component: "area_chart",
+        props: { title: spec.label, format: "currency", data, color: chartColors.brand },
+      },
+      modelResult: data.length
+        ? `[area_chart shown: ${spec.label}, ${data.length} months]`
+        : `[area_chart: no data for ${series}]`,
+    });
+
+  if (!scenarioId) return envelope([]);
+
+  const dash = (await computeDashboardData(ctx.companyId, scenarioId)) as unknown as DashboardLike;
+  const map = dash[spec.key] as MonthlySeries | undefined;
+  // seriesToArray returns chronologically-sorted {month, value}[].
+  let points: MetricArray = map ? seriesToArray(map) : [];
+
+  if (spec.cumulative) {
+    let running = 0;
+    points = points.map((p) => {
+      running += p.value;
+      return { month: p.month, value: running };
+    });
+  }
+
+  // Trim to the last `months` points (series are chronologically sorted).
+  const data = points.slice(-months);
+  return envelope(data);
+};

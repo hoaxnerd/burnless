@@ -169,3 +169,61 @@ describe("show_bar_chart", () => {
     expect(parsed.render.props.data[0].label).toBe("Payroll");
   });
 });
+
+describe("show_area_chart", () => {
+  it("returns an area_chart of the cash position series (cash_runway)", async () => {
+    const out = await genuiDisplayHandlers.show_area_chart!(
+      { series: "cash_runway", months: 18 },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("area_chart");
+    expect(parsed.render.props.format).toBe("currency");
+    // Two cash points in the mock, chronologically sorted.
+    expect(parsed.render.props.data).toEqual([
+      { month: "2026-05", value: 900000 },
+      { month: "2026-06", value: 818000 },
+    ]);
+    expect(typeof parsed.render.props.color).toBe("string");
+    expect(parsed.modelResult).toMatch(/area_chart/);
+  });
+
+  it("returns a monotonically increasing cumulative revenue series", async () => {
+    const out = await genuiDisplayHandlers.show_area_chart!(
+      { series: "cumulative_revenue", months: 12 },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("area_chart");
+    const data = parsed.render.props.data as Array<{ month: string; value: number }>;
+    // Running sum of totalRevenue: 40000, 82000, 126000, 172000, 220000, 270000.
+    expect(data[0]).toEqual({ month: "2026-01", value: 40000 });
+    expect(data[data.length - 1]).toEqual({ month: "2026-06", value: 270000 });
+    // Cumulative sum is non-decreasing.
+    for (let i = 1; i < data.length; i++) {
+      expect(data[i]!.value).toBeGreaterThanOrEqual(data[i - 1]!.value);
+    }
+    // Months stay chronologically ordered.
+    for (let i = 1; i < data.length; i++) {
+      expect(data[i]!.month > data[i - 1]!.month).toBe(true);
+    }
+  });
+
+  it("trims cumulative revenue to the last `months` points", async () => {
+    const out = await genuiDisplayHandlers.show_area_chart!(
+      { series: "cumulative_revenue", months: 2 },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.props.data).toHaveLength(2);
+    // Last two cumulative points are preserved.
+    expect(parsed.render.props.data[1]).toEqual({ month: "2026-06", value: 270000 });
+  });
+
+  it("defaults to cash_runway over 18 months", async () => {
+    const out = await genuiDisplayHandlers.show_area_chart!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("area_chart");
+    expect(parsed.render.props.data[0].month).toBe("2026-05");
+  });
+});

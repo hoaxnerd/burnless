@@ -81,6 +81,33 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_area_chart",
+    description:
+      "Display a cumulative or balance-over-time series inline as a filled area chart. Use when the user wants to see cash balance running down over time (cash runway) or revenue accumulating (cumulative revenue). Numbers are computed server-side — you only choose the series and how many recent months to show.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        series: {
+          type: "string",
+          enum: ["cash_runway", "cumulative_revenue"],
+          description:
+            "Which area series to show. 'cash_runway' is the cash balance per month; 'cumulative_revenue' is revenue summed from the start. Defaults to cash_runway.",
+        },
+        months: {
+          type: "integer",
+          minimum: 1,
+          maximum: 36,
+          description: "How many of the most recent months to show. Defaults to 18.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */
