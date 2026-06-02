@@ -422,6 +422,9 @@ export default function AiCompanionPage() {
               isLoading={isLoading}
               companionName={companionName}
               onActionPrompt={(prompt) => handleSend(null, prompt)}
+              onInputSubmit={(pending, data) =>
+                session.submitInput(pending.conversationId, pending, data)
+              }
               renderAfterMessage={(m) =>
                 m.pendingPermission ? (
                   <div className="mt-2">

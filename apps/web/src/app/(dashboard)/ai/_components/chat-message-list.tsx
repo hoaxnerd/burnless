@@ -3,7 +3,8 @@ import { Bot, User, Copy, Check, Sparkles, ChevronRight, Brain } from "lucide-re
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
 import { GenerativeBlocks } from "./generative/generative-block";
-import type { Message } from "./types";
+import { InputFormCard } from "./generative/input-form-card";
+import type { Message, PendingInput } from "./types";
 
 /** Strip model thinking tags (e.g. <think>...</think>) from response text — fallback defense. */
 function stripThinkingTags(text: string): string {
@@ -62,6 +63,8 @@ interface ChatMessageListProps {
   renderAfterMessage?: (m: Message, i: number) => React.ReactNode;
   /** Triggered by interactive display blocks (e.g. suggested_actions) to send a follow-up turn. */
   onActionPrompt?: (prompt: string) => void;
+  /** Triggered when the user submits a paused input form (genui). */
+  onInputSubmit?: (pending: PendingInput, data: Record<string, unknown>) => void;
 }
 
 export function ChatMessageList({
@@ -73,6 +76,7 @@ export function ChatMessageList({
   companionName = "Financial Companion",
   renderAfterMessage,
   onActionPrompt,
+  onInputSubmit,
 }: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
@@ -150,6 +154,15 @@ export function ChatMessageList({
                 {/* Generative-UI display blocks (assistant only) */}
                 {!isUser && msg.uiBlocks && msg.uiBlocks.length > 0 && (
                   <GenerativeBlocks blocks={msg.uiBlocks} onAction={onActionPrompt} />
+                )}
+
+                {/* Paused input form (assistant only) */}
+                {!isUser && msg.pendingInput && (
+                  <InputFormCard
+                    pending={msg.pendingInput}
+                    disabled={!!isLoading}
+                    onSubmit={(data) => onInputSubmit?.(msg.pendingInput!, data)}
+                  />
                 )}
 
                 {/* Timestamp + copy button row */}
