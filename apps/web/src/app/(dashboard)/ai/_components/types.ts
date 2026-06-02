@@ -9,6 +9,10 @@ export interface Message {
   toolStatus?: { tool: string; phase: "running" | "done" | "error" } | null;
   /** A paused tool batch awaiting the user's decision. */
   pendingPermission?: PendingPermission | null;
+  /** Inline rendered display components for this message (genui). */
+  uiBlocks?: UiBlockClient[];
+  /** A form-input request paused on this message (genui). */
+  pendingInput?: PendingInput | null;
 }
 
 export interface Insight {
@@ -49,3 +53,32 @@ export interface PendingPermission {
 }
 
 export type PermissionDecisionKind = "once" | "session" | "deny";
+
+/** A rendered generative-UI display block (mirrors @burnless/ai UiBlock). */
+export interface UiBlockClient {
+  id: string;
+  component: string;
+  props: Record<string, unknown>;
+}
+
+export interface PendingInputField {
+  name: string;
+  type: "currency" | "percent" | "number" | "integer" | "text" | "select" | "date" | "date_range";
+  label: string;
+  placeholder?: string;
+  hint?: string;
+  required?: boolean;
+  defaultValue?: unknown;
+  options?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+/** A turn paused awaiting form input. */
+export interface PendingInput {
+  pauseId: string;
+  conversationId: string;
+  spec: { title: string; description?: string; submitLabel?: string; fields: PendingInputField[] };
+  resolved?: boolean;
+}
