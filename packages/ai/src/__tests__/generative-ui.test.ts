@@ -71,3 +71,22 @@ describe("package exports", () => {
     expect(pkg.INPUT_TOOL_NAMES).toBeInstanceOf(Set);
   });
 });
+
+describe("input form presets", () => {
+  it("registers preset input tool names", () => {
+    for (const n of ["request_revenue_stream", "request_headcount", "request_forecast_line"]) {
+      expect(INPUT_TOOL_NAMES.has(n)).toBe(true);
+      expect(isInputTool(n)).toBe(true);
+    }
+  });
+  it("expands request_revenue_stream to a fixed field set with model-proposed defaults", () => {
+    const spec = buildInputFormSpec("request_revenue_stream", { defaults: { name: "Pro Plan", monthlyAmount: 4900 } });
+    expect(spec.fields.map((f) => f.name)).toContain("name");
+    expect(spec.fields.map((f) => f.name)).toContain("monthlyAmount");
+    const amount = spec.fields.find((f) => f.name === "monthlyAmount")!;
+    expect(amount.type).toBe("currency");
+    expect(amount.defaultValue).toBe(4900);
+    const name = spec.fields.find((f) => f.name === "name")!;
+    expect(name.defaultValue).toBe("Pro Plan");
+  });
+});

@@ -88,6 +88,9 @@ export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
 /** Input tool names. request_* presets are added in Plan 4. */
 export const INPUT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   "request_input_form",
+  "request_revenue_stream",
+  "request_headcount",
+  "request_forecast_line",
 ]);
 
 export function isDisplayTool(toolName: string): boolean {
@@ -127,9 +130,53 @@ function coerceField(raw: unknown): FormField | null {
 }
 
 /**
+ * Preset field-sets. Field `name`s map to the matching create tool's args
+ * (create_revenue_stream / create_headcount / create_forecast_line) so the
+ * model's follow-up write call is mechanical.
+ */
+const PRESET_FIELDS: Record<string, FormField[]> = {
+  request_revenue_stream: [
+    { name: "name", type: "text", label: "Stream name", required: true, placeholder: "e.g. Pro Plan" },
+    { name: "type", type: "select", label: "Type", required: true,
+      options: [
+        { value: "subscription", label: "Subscription" },
+        { value: "one_time", label: "One-time" },
+        { value: "usage_based", label: "Usage-based" },
+        { value: "services", label: "Services" },
+      ] },
+    { name: "monthlyAmount", type: "currency", label: "Monthly amount", required: true, min: 0 },
+    { name: "startDate", type: "date", label: "Start date", required: true },
+  ],
+  request_headcount: [
+    { name: "title", type: "text", label: "Role title", required: true, placeholder: "e.g. Senior Engineer" },
+    { name: "salary", type: "currency", label: "Annual salary", required: true, min: 0 },
+    { name: "startDate", type: "date", label: "Start date", required: true },
+    { name: "count", type: "integer", label: "Headcount", required: true, min: 1, defaultValue: 1 },
+  ],
+  request_forecast_line: [
+    { name: "name", type: "text", label: "Line name", required: true },
+    { name: "method", type: "select", label: "Method", required: true,
+      options: [
+        { value: "fixed", label: "Fixed" },
+        { value: "growth_rate", label: "Growth rate" },
+        { value: "per_unit", label: "Per unit" },
+        { value: "percentage_of", label: "Percentage of" },
+      ] },
+    { name: "amount", type: "currency", label: "Base amount", required: true, min: 0 },
+    { name: "startDate", type: "date", label: "Start date", required: true },
+  ],
+};
+
+function applyDefaults(fields: FormField[], defaults: Record<string, unknown> | undefined): FormField[] {
+  if (!defaults) return fields.map((f) => ({ ...f }));
+  return fields.map((f) => (defaults[f.name] !== undefined ? { ...f, defaultValue: defaults[f.name] } : { ...f }));
+}
+
+/**
  * Build the form spec for an input tool from the model's tool input.
  * `request_input_form` is a passthrough (model supplies the whole spec).
- * Preset tools (request_revenue_stream, …) are registered in Plan 4.
+ * Preset tools (request_revenue_stream, …) expand to a fixed field-set with
+ * model-proposed `defaults` applied.
  */
 export function buildInputFormSpec(
   toolName: string,
@@ -144,6 +191,22 @@ export function buildInputFormSpec(
       description: typeof input.description === "string" ? input.description : undefined,
       submitLabel: typeof input.submitLabel === "string" ? input.submitLabel : undefined,
       fields,
+    };
+  }
+  const preset = PRESET_FIELDS[toolName];
+  if (preset) {
+    const defaults = (input.defaults && typeof input.defaults === "object")
+      ? (input.defaults as Record<string, unknown>) : undefined;
+    const TITLES: Record<string, string> = {
+      request_revenue_stream: "Add a revenue stream",
+      request_headcount: "Add a hire",
+      request_forecast_line: "Add a forecast line",
+    };
+    return {
+      title: typeof input.title === "string" ? input.title : TITLES[toolName]!,
+      description: typeof input.description === "string" ? input.description : undefined,
+      submitLabel: typeof input.submitLabel === "string" ? input.submitLabel : "Save",
+      fields: applyDefaults(preset, defaults),
     };
   }
   throw new Error(`unknown input tool: ${toolName}`);
