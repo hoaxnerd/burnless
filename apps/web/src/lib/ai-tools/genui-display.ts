@@ -19,7 +19,9 @@ import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
 import { computeRevenueDetails } from "../compute-revenue";
-import { computeCapTableForCompany } from "../compute-cap-table";
+// Use the UNCACHED inner compute: the cached computeCapTableForCompany wraps
+// unstable_cache, whose inner getCompany()/headers() throws inside the SSE stream.
+import { computeCapTableInner } from "../compute-cap-table";
 import { getDefaultScenario, getFundingRounds } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
 
@@ -498,8 +500,8 @@ genuiDisplayHandlers.show_cap_table = async (input, context) => {
         : `[cap_table: no data]`,
     });
 
-  // computeCapTableForCompany accepts a nullable scenarioId (null ⇒ base).
-  const capTable = await computeCapTableForCompany(ctx.companyId, scenarioId);
+  // computeCapTableInner accepts a nullable scenarioId (null ⇒ base).
+  const capTable = await computeCapTableInner(ctx.companyId, scenarioId);
   const rows: CapTableRowProps[] = capTable.rows.map((r) => ({
     holder: r.holder,
     shares: r.shares,

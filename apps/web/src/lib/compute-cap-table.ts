@@ -50,7 +50,15 @@ export function buildOptionPoolsWithGranted(
   }));
 }
 
-async function computeCapTableInner(
+/**
+ * Uncached cap-table compute. Use from dynamic/streaming contexts (e.g. the AI
+ * display tool `show_cap_table`) where the `unstable_cache` wrapper throws — its
+ * inner `getCompany()` reads `headers()`, illegal inside a cache scope unless
+ * React `cache()` already resolved it earlier in the request (true on a page
+ * render, false inside the SSE chat stream). The cached
+ * `computeCapTableForCompany` below remains the page path.
+ */
+export async function computeCapTableInner(
   companyId: string,
   scenarioId: string | null,
 ): Promise<CapTable> {

@@ -163,7 +163,8 @@ vi.mock("../../compute-revenue", () => ({
   })),
 }));
 vi.mock("../../compute-cap-table", () => ({
-  computeCapTableForCompany: vi.fn(async () => ({
+  // Handler uses the UNCACHED inner compute (cache wrapper throws in SSE stream).
+  computeCapTableInner: vi.fn(async () => ({
     rows: [
       { holder: "Founders", shareClass: "Common", shares: 8_000_000, ownershipPercent: 0.8 },
       { holder: "Series A", shareClass: "Preferred", shares: 1_500_000, ownershipPercent: 0.15 },
