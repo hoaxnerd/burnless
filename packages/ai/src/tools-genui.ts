@@ -297,6 +297,35 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["columns", "rows"],
     },
   },
+  {
+    name: "show_checklist",
+    description:
+      "Display a checklist you author yourself, inline — e.g. a prep list, action items, or steps to verify. Mark items already done with checked:true. You author every item as text; this shows no financial data on its own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short heading for the checklist." },
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string", description: "Checklist item text." },
+              checked: {
+                type: "boolean",
+                description: "Whether this item is already done. Defaults to false.",
+              },
+            },
+            required: ["text"],
+          },
+          description: "1–20 checklist items.",
+        },
+      },
+      required: ["items"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

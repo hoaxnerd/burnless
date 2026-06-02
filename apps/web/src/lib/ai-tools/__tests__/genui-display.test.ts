@@ -623,3 +623,32 @@ describe("show_comparison_table", () => {
     expect(parsed.modelResult).toMatch(/comparison_table/);
   });
 });
+
+describe("show_checklist", () => {
+  it("echoes model-authored title and items as props (no data access)", async () => {
+    const out = await genuiDisplayHandlers.show_checklist!(
+      {
+        title: "Fundraising prep",
+        items: [
+          { text: "Update the pitch deck", checked: true },
+          { text: "Build the data room" },
+          { text: "Line up reference customers", checked: false },
+        ],
+      },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("checklist");
+    expect(parsed.render.props.title).toBe("Fundraising prep");
+    expect(parsed.render.props.items).toHaveLength(3);
+    expect(parsed.render.props.items[0]).toMatchObject({
+      text: "Update the pitch deck",
+      checked: true,
+    });
+    expect(parsed.render.props.items[1]).toMatchObject({
+      text: "Build the data room",
+      checked: false,
+    });
+    expect(parsed.modelResult).toMatch(/checklist/);
+  });
+});

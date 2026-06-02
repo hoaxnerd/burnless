@@ -12,6 +12,7 @@ import { GenFundingSummary, type GenFundingSummaryProps } from "./funding-summar
 import { GenDataTable, type GenDataTableProps } from "./data-table";
 import { GenCallout, type GenCalloutProps } from "./callout";
 import { GenComparisonTable, type GenComparisonTableProps } from "./comparison-table";
+import { GenChecklist, type GenChecklistProps } from "./checklist";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -54,6 +55,8 @@ export function GenerativeBlock({ component, props, onAction: _onAction }: Gener
       return <GenCallout {...(props as unknown as GenCalloutProps)} />;
     case "comparison_table":
       return <GenComparisonTable {...(props as unknown as GenComparisonTableProps)} />;
+    case "checklist":
+      return <GenChecklist {...(props as unknown as GenChecklistProps)} />;
     // component cases are added by each component task below.
     default:
       return (

@@ -846,3 +846,38 @@ genuiDisplayHandlers.show_comparison_table = async (input) => {
     modelResult: `[comparison_table shown: ${columns.length} columns, ${rows.length} rows]`,
   });
 };
+
+// ── show_checklist ─────────────────────────────────────────────────────────────
+
+genuiDisplaySchemas.show_checklist = z.object({
+  title: z.string().max(120).optional(),
+  items: z
+    .array(
+      z.object({
+        text: z.string().min(1).max(300),
+        checked: z.boolean().optional(),
+      })
+    )
+    .min(1)
+    .max(20),
+});
+
+genuiDisplayHandlers.show_checklist = async (input) => {
+  const rawItems = Array.isArray(input.items) ? input.items : [];
+  // Normalize each item: every item carries an explicit boolean `checked`.
+  const items = rawItems.map((it) => {
+    const r = (it ?? {}) as Record<string, unknown>;
+    return {
+      text: typeof r.text === "string" ? r.text : String(r.text ?? ""),
+      checked: r.checked === true,
+    };
+  });
+  const p = {
+    title: typeof input.title === "string" ? input.title : null,
+    items,
+  };
+  return JSON.stringify({
+    render: { component: "checklist", props: p },
+    modelResult: `[checklist shown: ${items.length} items]`,
+  });
+};
