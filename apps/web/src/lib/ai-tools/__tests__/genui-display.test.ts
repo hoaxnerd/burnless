@@ -582,3 +582,16 @@ describe("show_data_table", () => {
     expect(parsed.render.props.title).toMatch(/P&L|summary/i);
   });
 });
+
+describe("show_callout", () => {
+  it("echoes model-authored content as props (no data access)", async () => {
+    const out = await genuiDisplayHandlers.show_callout!(
+      { severity: "warning", title: "Runway is short", body: "You have under 6 months." },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("callout");
+    expect(parsed.render.props).toMatchObject({ severity: "warning", title: "Runway is short" });
+    expect(parsed.modelResult).toMatch(/callout/);
+  });
+});

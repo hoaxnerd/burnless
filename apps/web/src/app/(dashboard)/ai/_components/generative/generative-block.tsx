@@ -10,6 +10,7 @@ import { GenCapTable, type GenCapTableProps } from "./cap-table";
 import { GenScenarioDiff, type GenScenarioDiffProps } from "./scenario-diff";
 import { GenFundingSummary, type GenFundingSummaryProps } from "./funding-summary";
 import { GenDataTable, type GenDataTableProps } from "./data-table";
+import { GenCallout, type GenCalloutProps } from "./callout";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -48,6 +49,8 @@ export function GenerativeBlock({ component, props, onAction: _onAction }: Gener
       return <GenFundingSummary {...(props as unknown as GenFundingSummaryProps)} />;
     case "data_table":
       return <GenDataTable {...(props as unknown as GenDataTableProps)} />;
+    case "callout":
+      return <GenCallout {...(props as unknown as GenCalloutProps)} />;
     // component cases are added by each component task below.
     default:
       return (

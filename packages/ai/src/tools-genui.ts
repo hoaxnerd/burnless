@@ -243,6 +243,24 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_callout",
+    description:
+      "Display a highlighted note (info/success/warning/critical) inline. Use to emphasize a takeaway, risk, or recommendation. You author the text; this shows no financial data on its own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        severity: {
+          type: "string",
+          enum: ["info", "success", "warning", "critical"],
+          description: "Visual tone.",
+        },
+        title: { type: "string", description: "Short heading." },
+        body: { type: "string", description: "1–3 sentence message." },
+      },
+      required: ["severity", "body"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

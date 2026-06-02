@@ -795,3 +795,28 @@ genuiDisplayHandlers.show_data_table = async (input, context) => {
 
   return envelope(columns, rows);
 };
+
+// ── Presentational tools (Plan 3) ────────────────────────────────────────────
+// These author model-supplied content. Pure validate-and-echo: no DB, no
+// compute. They keep the (input, context) signature to satisfy ToolHandler but
+// ignore context.
+
+// ── show_callout ─────────────────────────────────────────────────────────────
+
+genuiDisplaySchemas.show_callout = z.object({
+  severity: z.enum(["info", "success", "warning", "critical"]),
+  title: z.string().max(120).optional(),
+  body: z.string().min(1).max(800),
+});
+
+genuiDisplayHandlers.show_callout = async (input) => {
+  const p = {
+    severity: input.severity,
+    title: input.title ?? null,
+    body: input.body,
+  };
+  return JSON.stringify({
+    render: { component: "callout", props: p },
+    modelResult: `[callout shown: ${input.severity}]`,
+  });
+};
