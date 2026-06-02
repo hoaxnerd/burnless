@@ -6,6 +6,7 @@
 import type { MonthlySeries, ComputedMetrics, ProfitAndLoss, CashFlowStatement } from "@burnless/engine";
 import type { Company, Scenario, Account, FundingRound } from "@burnless/types";
 import type { ContentBlock } from "./providers/types";
+import type { InputFormSpec } from "./generative-ui";
 
 // ── Financial context passed to the AI ──────────────────────────────────────
 
@@ -200,6 +201,7 @@ export interface StreamChunk {
     | "tool_status"
     | "tool_result"
     | "permission_request"
+    | "input_request"
     | "paused"
     | "done"
     | "error";
@@ -211,8 +213,10 @@ export interface StreamChunk {
   phase?: "running" | "done" | "error";
   /** For permission_request: the tools awaiting a decision. */
   actions?: PendingToolUse[];
-  /** For permission_request/paused: correlates with the persisted pending batch. */
+  /** For permission_request/input_request/paused: correlates the persisted batch. */
   pauseId?: string;
+  /** For input_request: the form to render. */
+  spec?: InputFormSpec;
 }
 
 // ── Tool definitions ────────────────────────────────────────────────────────

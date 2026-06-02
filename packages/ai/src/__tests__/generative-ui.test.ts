@@ -46,3 +46,17 @@ describe("generative-ui tool sets", () => {
     expect(() => buildInputFormSpec("not_a_form", {})).toThrow(/unknown input tool/i);
   });
 });
+
+import type { StreamChunk } from "../types";
+
+describe("StreamChunk input_request shape", () => {
+  it("accepts an input_request chunk with a spec", () => {
+    const chunk: StreamChunk = {
+      type: "input_request",
+      pauseId: "p1",
+      spec: { title: "T", fields: [] },
+    };
+    expect(chunk.type).toBe("input_request");
+    expect(chunk.spec?.title).toBe("T");
+  });
+});
