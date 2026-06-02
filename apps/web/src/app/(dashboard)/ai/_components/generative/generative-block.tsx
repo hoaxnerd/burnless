@@ -13,6 +13,7 @@ import { GenDataTable, type GenDataTableProps } from "./data-table";
 import { GenCallout, type GenCalloutProps } from "./callout";
 import { GenComparisonTable, type GenComparisonTableProps } from "./comparison-table";
 import { GenChecklist, type GenChecklistProps } from "./checklist";
+import { GenSuggestedActions, type GenSuggestedActionsProps } from "./suggested-actions";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -29,7 +30,7 @@ export interface GenerativeBlockProps {
  * Unknown names render a safe fallback (never throw — the model may emit a
  * component this client build doesn't know yet).
  */
-export function GenerativeBlock({ component, props, onAction: _onAction }: GenerativeBlockProps) {
+export function GenerativeBlock({ component, props, onAction }: GenerativeBlockProps) {
   switch (component) {
     case "metric_card":
       return <GenMetricCard {...(props as unknown as GenMetricCardProps)} />;
@@ -57,6 +58,10 @@ export function GenerativeBlock({ component, props, onAction: _onAction }: Gener
       return <GenComparisonTable {...(props as unknown as GenComparisonTableProps)} />;
     case "checklist":
       return <GenChecklist {...(props as unknown as GenChecklistProps)} />;
+    case "suggested_actions": {
+      const p = props as unknown as GenSuggestedActionsProps;
+      return <GenSuggestedActions actions={p.actions} onAction={onAction} />;
+    }
     // component cases are added by each component task below.
     default:
       return (

@@ -326,6 +326,34 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["items"],
     },
   },
+  {
+    name: "show_suggested_actions",
+    description:
+      "Display a row of suggested next-step buttons you author yourself, inline. Each action has a label and a follow-up prompt that is sent as a new message when the user clicks it. Use to offer the user 1–5 concrete next things to explore. You author every label and prompt; this shows no financial data on its own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        actions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string", description: "Button text shown to the user." },
+              prompt: {
+                type: "string",
+                description: "The follow-up message sent as a new chat turn when clicked.",
+              },
+            },
+            required: ["label", "prompt"],
+          },
+          description: "1–5 suggested actions, each a { label, prompt }.",
+        },
+      },
+      required: ["actions"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

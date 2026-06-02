@@ -652,3 +652,25 @@ describe("show_checklist", () => {
     expect(parsed.modelResult).toMatch(/checklist/);
   });
 });
+
+describe("show_suggested_actions", () => {
+  it("echoes model-authored actions as props (no data access)", async () => {
+    const out = await genuiDisplayHandlers.show_suggested_actions!(
+      {
+        actions: [
+          { label: "Show my runway", prompt: "What is my runway?" },
+          { label: "Break down burn", prompt: "Break down my burn by category" },
+        ],
+      },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("suggested_actions");
+    expect(parsed.render.props.actions).toHaveLength(2);
+    expect(parsed.render.props.actions[0]).toMatchObject({
+      label: "Show my runway",
+      prompt: "What is my runway?",
+    });
+    expect(parsed.modelResult).toMatch(/suggested_actions/);
+  });
+});

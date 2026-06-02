@@ -881,3 +881,35 @@ genuiDisplayHandlers.show_checklist = async (input) => {
     modelResult: `[checklist shown: ${items.length} items]`,
   });
 };
+
+// ── show_suggested_actions (interactive) ──────────────────────────────────────
+// The renderer wires each button's onClick to the dispatcher `onAction`, which
+// sends `prompt` as a new chat turn. Handler is pure echo (no DB, no compute).
+
+genuiDisplaySchemas.show_suggested_actions = z.object({
+  actions: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(120),
+        prompt: z.string().min(1).max(600),
+      })
+    )
+    .min(1)
+    .max(5),
+});
+
+genuiDisplayHandlers.show_suggested_actions = async (input) => {
+  const rawActions = Array.isArray(input.actions) ? input.actions : [];
+  const actions = rawActions.map((a) => {
+    const r = (a ?? {}) as Record<string, unknown>;
+    return {
+      label: typeof r.label === "string" ? r.label : String(r.label ?? ""),
+      prompt: typeof r.prompt === "string" ? r.prompt : String(r.prompt ?? ""),
+    };
+  });
+  const p = { actions };
+  return JSON.stringify({
+    render: { component: "suggested_actions", props: p },
+    modelResult: `[suggested_actions shown: ${actions.length} actions]`,
+  });
+};
