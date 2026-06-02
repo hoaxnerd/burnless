@@ -6,7 +6,7 @@ import {
   INPUT_TOOL_NAMES,
   DISPLAY_TOOL_NAMES,
 } from "../generative-ui";
-import { categorizeToolName } from "../permissions";
+import { categorizeToolName, resolvePermission } from "../permissions";
 
 describe("generative-ui tool sets", () => {
   it("recognizes the generic input tool", () => {
@@ -18,6 +18,22 @@ describe("generative-ui tool sets", () => {
   it("display/input tools all classify as read (no permission card)", () => {
     for (const name of [...DISPLAY_TOOL_NAMES, ...INPUT_TOOL_NAMES]) {
       expect(categorizeToolName(name)).toBe("read");
+    }
+  });
+
+  it("no display/input tool resolves to 'ask' under default permissions", () => {
+    const ctx = {
+      defaults: {
+        read: "always",
+        write: "ask",
+        delete: "ask",
+        web_search: "always",
+        browser_use: "ask",
+      } as const,
+      sessionGrants: {},
+    };
+    for (const name of [...DISPLAY_TOOL_NAMES, ...INPUT_TOOL_NAMES]) {
+      expect(resolvePermission(name, ctx)).toBe("allow");
     }
   });
 
