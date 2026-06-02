@@ -32,6 +32,7 @@ import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
+import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...analyticsSchemas,
   ...webSearchSchemas,
   ...webScrapingSchemas,
+  ...genuiDisplaySchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -73,6 +75,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...analyticsHandlers,
   ...webSearchHandlers,
   ...webScrapingHandlers,
+  ...genuiDisplayHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────

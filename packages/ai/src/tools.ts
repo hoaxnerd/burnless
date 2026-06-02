@@ -7,6 +7,7 @@
  */
 
 import type { ToolDefinition } from "./providers";
+import { GENUI_DISPLAY_TOOLS, GENUI_INPUT_TOOLS } from "./tools-genui";
 
 /** Tool definitions for the AI assistant's function-calling capability. */
 const FINANCIAL_TOOLS: ToolDefinition[] = [
@@ -1050,6 +1051,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["url"],
     },
   },
+  ...GENUI_DISPLAY_TOOLS,
+  ...GENUI_INPUT_TOOLS,
 ];
 
 /**
