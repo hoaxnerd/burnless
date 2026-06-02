@@ -4,7 +4,13 @@
  * Data-bound handlers compute REAL numbers via existing compute helpers.
  */
 import { z } from "zod";
-import { seriesToArray, sum, type MonthlySeries } from "@burnless/engine";
+import {
+  monthKey,
+  parseMonthKey,
+  seriesToArray,
+  sum,
+  type MonthlySeries,
+} from "@burnless/engine";
 import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
@@ -357,4 +363,62 @@ genuiDisplayHandlers.show_area_chart = async (input, context) => {
   // Trim to the last `months` points (series are chronologically sorted).
   const data = points.slice(-months);
   return envelope(data);
+};
+
+// ── show_runway ─────────────────────────────────────────────────────────────
+
+/**
+ * Derive the projected cash-out month: the latest cash month plus `ceil(runway)`
+ * months. Returns null when either input is missing/non-finite. Uses the engine
+ * month helpers so the offset stays calendar-correct.
+ */
+function deriveZeroCashMonth(
+  latestCashMonth: string | null,
+  runwayMonths: number | null
+): string | null {
+  if (!latestCashMonth || runwayMonths === null || !Number.isFinite(runwayMonths)) return null;
+  const offset = Math.max(0, Math.ceil(runwayMonths));
+  const d = parseMonthKey(latestCashMonth);
+  d.setMonth(d.getMonth() + offset);
+  return monthKey(d);
+}
+
+genuiDisplaySchemas.show_runway = z.object({
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_runway = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (props: {
+    runwayMonths: number | null;
+    netBurn: number | null;
+    cash: number | null;
+    zeroCashMonth: string | null;
+  }) =>
+    JSON.stringify({
+      render: { component: "runway", props: { ...props, format: "currency" as FormatHint } },
+      modelResult:
+        props.runwayMonths === null
+          ? `[runway: no data]`
+          : `[runway shown: ${props.runwayMonths} months, cash-out ${props.zeroCashMonth ?? "n/a"}]`,
+    });
+
+  if (!scenarioId) {
+    return envelope({ runwayMonths: null, netBurn: null, cash: null, zeroCashMonth: null });
+  }
+
+  const dash = (await computeDashboardData(ctx.companyId, scenarioId)) as unknown as DashboardLike;
+  const metrics = dash.metrics as Record<string, MetricArray> | undefined;
+  const runwayMonths = latest(metrics?.cashRunwayMonths);
+  const netBurn = latest(metrics?.netBurnRate);
+
+  const cashMap = dash.cashPosition as MonthlySeries | undefined;
+  const cashPoints = cashMap ? seriesToArray(cashMap) : [];
+  const latestCash = cashPoints.length ? cashPoints[cashPoints.length - 1]! : null;
+  const cash = latestCash ? latestCash.value : null;
+  const zeroCashMonth = deriveZeroCashMonth(latestCash?.month ?? null, runwayMonths);
+
+  return envelope({ runwayMonths, netBurn, cash, zeroCashMonth });
 };

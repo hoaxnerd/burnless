@@ -5,6 +5,7 @@ import { GenKpiGrid, type GenKpiGridProps } from "./kpi-grid";
 import { GenLineChart, type GenLineChartProps } from "./line-chart";
 import { GenBarChart, type GenBarChartProps } from "./bar-chart";
 import { GenAreaChart, type GenAreaChartProps } from "./area-chart";
+import { GenRunway, type GenRunwayProps } from "./runway";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -28,6 +29,8 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
       return <GenBarChart {...(props as unknown as GenBarChartProps)} />;
     case "area_chart":
       return <GenAreaChart {...(props as unknown as GenAreaChartProps)} />;
+    case "runway":
+      return <GenRunway {...(props as unknown as GenRunwayProps)} />;
     // component cases are added by each component task below.
     default:
       return (

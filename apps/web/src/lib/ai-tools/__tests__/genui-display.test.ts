@@ -262,3 +262,21 @@ describe("show_area_chart", () => {
     expect(parsed.render.props.data[0].month).toBe("2026-05");
   });
 });
+
+describe("show_runway", () => {
+  it("returns a runway envelope with real runway, burn, cash, and a derived cash-out month", async () => {
+    const out = await genuiDisplayHandlers.show_runway!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("runway");
+    // Latest cashRunwayMonths from the mock.
+    expect(parsed.render.props.runwayMonths).toBe(14.2);
+    // Latest netBurnRate from the mock.
+    expect(parsed.render.props.netBurn).toBe(82000);
+    // Latest cashPosition value from the mock Map.
+    expect(parsed.render.props.cash).toBe(818000);
+    // Cash-out = latest cash month (2026-06) + ceil(14.2)=15 months → 2027-09.
+    expect(parsed.render.props.zeroCashMonth).toBe("2027-09");
+    expect(parsed.render.props.format).toBe("currency");
+    expect(parsed.modelResult).toMatch(/runway/);
+  });
+});

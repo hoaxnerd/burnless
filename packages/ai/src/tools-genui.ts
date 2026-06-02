@@ -144,6 +144,21 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_runway",
+    description:
+      "Display a focused runway summary card inline: months of runway remaining, current net burn, cash on hand, and the projected cash-out month. Use when the user asks specifically about runway, how long the cash lasts, or when they run out of money. Numbers are computed server-side — you only request the card.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */
