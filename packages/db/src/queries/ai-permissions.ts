@@ -88,6 +88,8 @@ export async function resetSessionGrants(conversationId: string): Promise<void> 
 export interface NewPendingAction {
   conversationId: string;
   pauseId: string;
+  /** Why the turn paused. Defaults to "permission". */
+  kind?: "permission" | "input";
   /** Active scenario the paused turn operates in (resume executes against this). */
   scenarioId: string;
   assistantBlocks: unknown;
@@ -105,6 +107,7 @@ export async function createPendingAction(input: NewPendingAction) {
     .values({
       conversationId: input.conversationId,
       pauseId: input.pauseId,
+      kind: input.kind ?? "permission",
       scenarioId: input.scenarioId,
       assistantBlocks: input.assistantBlocks,
       completedResults: input.completedResults,

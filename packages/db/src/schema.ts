@@ -1084,6 +1084,11 @@ export const aiMessages = pgTable(
 
 // ── AI Pending Actions (a paused assistant turn awaiting permission) ─────────
 
+export const aiPendingActionKindEnum = pgEnum("ai_pending_action_kind", [
+  "permission",
+  "input",
+]);
+
 export const aiPendingActions = pgTable(
   "ai_pending_actions",
   {
@@ -1095,6 +1100,8 @@ export const aiPendingActions = pgTable(
       .references(() => aiConversations.id, { onDelete: "cascade" }),
     /** Correlates the SSE permission_request/paused event with this row. */
     pauseId: text("pause_id").notNull(),
+    /** Why the turn paused: a permission decision, or a form-input request. */
+    kind: aiPendingActionKindEnum("kind").notNull().default("permission"),
     /**
      * The active scenario the paused turn operates in. Resume MUST run approved
      * write/delete tools against THIS scenario (loaded scoped to companyId), not
