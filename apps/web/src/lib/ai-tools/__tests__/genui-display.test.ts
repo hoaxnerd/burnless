@@ -595,3 +595,31 @@ describe("show_callout", () => {
     expect(parsed.modelResult).toMatch(/callout/);
   });
 });
+
+describe("show_comparison_table", () => {
+  it("echoes model-authored columns and rows as props (no data access)", async () => {
+    const out = await genuiDisplayHandlers.show_comparison_table!(
+      {
+        title: "Hire now vs in 6 months",
+        columns: [
+          { key: "factor", label: "Factor" },
+          { key: "now", label: "Hire now" },
+          { key: "later", label: "Hire in 6 months" },
+        ],
+        rows: [
+          { factor: "Runway impact", now: "Shorter", later: "Preserved" },
+          { factor: "Velocity", now: "Faster", later: "Slower" },
+        ],
+      },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("comparison_table");
+    expect(parsed.render.props.title).toBe("Hire now vs in 6 months");
+    expect(parsed.render.props.columns).toHaveLength(3);
+    expect(parsed.render.props.columns[0]).toMatchObject({ key: "factor", label: "Factor" });
+    expect(parsed.render.props.rows).toHaveLength(2);
+    expect(parsed.render.props.rows[0]).toMatchObject({ factor: "Runway impact", now: "Shorter" });
+    expect(parsed.modelResult).toMatch(/comparison_table/);
+  });
+});

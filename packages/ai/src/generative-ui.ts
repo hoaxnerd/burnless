@@ -79,6 +79,7 @@ export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   // Plan 3 (presentational): show_callout, show_comparison_table, show_checklist,
   //   show_suggested_actions, show_progress_steps
   "show_callout",
+  "show_comparison_table",
 ]);
 
 /** Input tool names. request_* presets are added in Plan 4. */

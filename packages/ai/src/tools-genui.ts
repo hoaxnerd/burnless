@@ -261,6 +261,42 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["severity", "body"],
     },
   },
+  {
+    name: "show_comparison_table",
+    description:
+      "Display a side-by-side comparison you author yourself, inline as a table — e.g. options, approaches, or trade-offs across 2–6 columns. Use to lay out a qualitative comparison (hire now vs later, build vs buy, plan A vs plan B). You author every cell as text; this shows no financial data on its own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short heading for the table." },
+        columns: {
+          type: "array",
+          minItems: 2,
+          maxItems: 6,
+          items: {
+            type: "object",
+            properties: {
+              key: { type: "string", description: "Stable column key referenced by each row." },
+              label: { type: "string", description: "Column header text." },
+            },
+            required: ["key", "label"],
+          },
+          description: "2–6 columns; each row is keyed by these column keys.",
+        },
+        rows: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          items: {
+            type: "object",
+            description: "An object keyed by the column keys; values are display strings.",
+          },
+          description: "1–20 rows; each is an object mapping column key → cell text.",
+        },
+      },
+      required: ["columns", "rows"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

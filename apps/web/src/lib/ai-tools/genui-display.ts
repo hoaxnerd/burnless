@@ -820,3 +820,29 @@ genuiDisplayHandlers.show_callout = async (input) => {
     modelResult: `[callout shown: ${input.severity}]`,
   });
 };
+
+// ── show_comparison_table ─────────────────────────────────────────────────────
+
+genuiDisplaySchemas.show_comparison_table = z.object({
+  title: z.string().max(120).optional(),
+  columns: z
+    .array(z.object({ key: z.string().min(1).max(60), label: z.string().min(1).max(120) }))
+    .min(2)
+    .max(6),
+  // Rows are objects keyed by column key; cell values are model-authored strings.
+  rows: z.array(z.record(z.string())).min(1).max(20),
+});
+
+genuiDisplayHandlers.show_comparison_table = async (input) => {
+  const columns = Array.isArray(input.columns) ? input.columns : [];
+  const rows = Array.isArray(input.rows) ? input.rows : [];
+  const p = {
+    title: typeof input.title === "string" ? input.title : null,
+    columns,
+    rows,
+  };
+  return JSON.stringify({
+    render: { component: "comparison_table", props: p },
+    modelResult: `[comparison_table shown: ${columns.length} columns, ${rows.length} rows]`,
+  });
+};
