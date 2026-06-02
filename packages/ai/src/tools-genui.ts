@@ -354,6 +354,36 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["actions"],
     },
   },
+  {
+    name: "show_progress_steps",
+    description:
+      "Display a sequence of steps you author yourself, inline as a vertical stepper — e.g. a process, a roadmap, or stages toward a goal. Mark each step done/active/pending to show where things stand. You author every step label as text; this shows no financial data on its own.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        steps: {
+          type: "array",
+          minItems: 1,
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string", description: "Step text shown to the user." },
+              status: {
+                type: "string",
+                enum: ["done", "active", "pending"],
+                description:
+                  "Where this step stands: 'done' (completed), 'active' (in progress), or 'pending' (not started).",
+              },
+            },
+            required: ["label", "status"],
+          },
+          description: "1–12 ordered steps, each a { label, status }.",
+        },
+      },
+      required: ["steps"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

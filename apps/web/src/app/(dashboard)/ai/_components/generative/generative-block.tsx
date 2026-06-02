@@ -14,6 +14,7 @@ import { GenCallout, type GenCalloutProps } from "./callout";
 import { GenComparisonTable, type GenComparisonTableProps } from "./comparison-table";
 import { GenChecklist, type GenChecklistProps } from "./checklist";
 import { GenSuggestedActions, type GenSuggestedActionsProps } from "./suggested-actions";
+import { GenProgressSteps, type GenProgressStepsProps } from "./progress-steps";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -62,6 +63,8 @@ export function GenerativeBlock({ component, props, onAction }: GenerativeBlockP
       const p = props as unknown as GenSuggestedActionsProps;
       return <GenSuggestedActions actions={p.actions} onAction={onAction} />;
     }
+    case "progress_steps":
+      return <GenProgressSteps {...(props as unknown as GenProgressStepsProps)} />;
     // component cases are added by each component task below.
     default:
       return (

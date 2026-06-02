@@ -674,3 +674,30 @@ describe("show_suggested_actions", () => {
     expect(parsed.modelResult).toMatch(/suggested_actions/);
   });
 });
+
+describe("show_progress_steps", () => {
+  it("echoes model-authored steps as props (no data access)", async () => {
+    const out = await genuiDisplayHandlers.show_progress_steps!(
+      {
+        steps: [
+          { label: "Prep the data room", status: "done" },
+          { label: "Run partner meetings", status: "active" },
+          { label: "Sign the term sheet", status: "pending" },
+        ],
+      },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("progress_steps");
+    expect(parsed.render.props.steps).toHaveLength(3);
+    expect(parsed.render.props.steps[0]).toMatchObject({
+      label: "Prep the data room",
+      status: "done",
+    });
+    expect(parsed.render.props.steps[1]).toMatchObject({
+      label: "Run partner meetings",
+      status: "active",
+    });
+    expect(parsed.modelResult).toMatch(/progress_steps/);
+  });
+});

@@ -913,3 +913,38 @@ genuiDisplayHandlers.show_suggested_actions = async (input) => {
     modelResult: `[suggested_actions shown: ${actions.length} actions]`,
   });
 };
+
+// ── show_progress_steps ───────────────────────────────────────────────────────
+// A model-authored vertical stepper. Pure echo (no DB, no compute).
+
+genuiDisplaySchemas.show_progress_steps = z.object({
+  steps: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(200),
+        status: z.enum(["done", "active", "pending"]),
+      })
+    )
+    .min(1)
+    .max(12),
+});
+
+genuiDisplayHandlers.show_progress_steps = async (input) => {
+  const rawSteps = Array.isArray(input.steps) ? input.steps : [];
+  const steps = rawSteps.map((s) => {
+    const r = (s ?? {}) as Record<string, unknown>;
+    const status =
+      r.status === "done" || r.status === "active" || r.status === "pending"
+        ? r.status
+        : "pending";
+    return {
+      label: typeof r.label === "string" ? r.label : String(r.label ?? ""),
+      status,
+    };
+  });
+  const p = { steps };
+  return JSON.stringify({
+    render: { component: "progress_steps", props: p },
+    modelResult: `[progress_steps shown: ${steps.length} steps]`,
+  });
+};
