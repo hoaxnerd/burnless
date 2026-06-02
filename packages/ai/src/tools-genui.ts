@@ -388,3 +388,102 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
 
 /** Input (form) tools. Populated by Plan 4. */
 export const GENUI_INPUT_TOOLS: ToolDefinition[] = [];
+
+GENUI_INPUT_TOOLS.push(
+  {
+    name: "request_input_form",
+    description:
+      "Pause and show the user a form to collect structured data when you need values you don't have. Define the fields yourself. Pre-fill `defaultValue` with your PROPOSED values and offer `options` for choices — the user edits or accepts. The submission comes back to you as a tool result; you then decide whether to call a write tool (which will ask the user's permission). Collecting input does NOT save anything.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Form heading." },
+        description: { type: "string", description: "Optional sub-text." },
+        submitLabel: { type: "string", description: "Submit button label." },
+        fields: {
+          type: "array",
+          description: "Fields to collect.",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              type: {
+                type: "string",
+                enum: [
+                  "currency",
+                  "percent",
+                  "number",
+                  "integer",
+                  "text",
+                  "select",
+                  "date",
+                  "date_range",
+                ],
+              },
+              label: { type: "string" },
+              placeholder: { type: "string" },
+              hint: { type: "string" },
+              required: { type: "boolean" },
+              defaultValue: { description: "Your proposed value." },
+              options: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { value: { type: "string" }, label: { type: "string" } },
+                  required: ["value", "label"],
+                },
+              },
+              min: { type: "number" },
+              max: { type: "number" },
+              step: { type: "number" },
+            },
+            required: ["name", "type", "label"],
+          },
+        },
+      },
+      required: ["title", "fields"],
+    },
+  },
+  {
+    name: "request_revenue_stream",
+    description:
+      "Show a ready-made form to collect a new revenue stream (name, type, monthly amount, start date). Pass `defaults` to pre-fill your proposed values. After submission, call create_revenue_stream with the returned data.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        defaults: { type: "object", description: "Proposed field values keyed by field name." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "request_headcount",
+    description:
+      "Show a ready-made form to collect a new hire (role title, salary, start date, count). Pass `defaults` to pre-fill. After submission, call create_headcount.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        defaults: { type: "object" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "request_forecast_line",
+    description:
+      "Show a ready-made form to collect a forecast line (name, method, base amount, start date). Pass `defaults` to pre-fill. After submission, call create_forecast_line.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        defaults: { type: "object" },
+      },
+      required: [],
+    },
+  },
+);
