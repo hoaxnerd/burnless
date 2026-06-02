@@ -76,7 +76,11 @@ test.describe("AI generative UI — authenticated", () => {
     const amount = page.getByLabel(/monthly amount/i).first();
     await amount.fill("4900");
 
-    const submit = page.getByRole("button", { name: /create|submit/i }).last();
+    // The revenue preset's submit button reads "Save" (its default submitLabel);
+    // tolerate the generic labels too in case the model overrides it.
+    const submit = page
+      .getByRole("button", { name: /save|create|submit/i })
+      .last();
     await submit.click();
 
     // The form moves to a resolved state (button reads "Submitted") and the
