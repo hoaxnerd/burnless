@@ -60,6 +60,8 @@ interface ChatMessageListProps {
   isLoading?: boolean;
   companionName?: string;
   renderAfterMessage?: (m: Message, i: number) => React.ReactNode;
+  /** Triggered by interactive display blocks (e.g. suggested_actions) to send a follow-up turn. */
+  onActionPrompt?: (prompt: string) => void;
 }
 
 export function ChatMessageList({
@@ -70,6 +72,7 @@ export function ChatMessageList({
   isLoading,
   companionName = "Financial Companion",
   renderAfterMessage,
+  onActionPrompt,
 }: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
@@ -146,7 +149,7 @@ export function ChatMessageList({
 
                 {/* Generative-UI display blocks (assistant only) */}
                 {!isUser && msg.uiBlocks && msg.uiBlocks.length > 0 && (
-                  <GenerativeBlocks blocks={msg.uiBlocks} />
+                  <GenerativeBlocks blocks={msg.uiBlocks} onAction={onActionPrompt} />
                 )}
 
                 {/* Timestamp + copy button row */}

@@ -421,6 +421,7 @@ export default function AiCompanionPage() {
               messagesEndRef={messagesEndRef}
               isLoading={isLoading}
               companionName={companionName}
+              onActionPrompt={(prompt) => handleSend(null, prompt)}
               renderAfterMessage={(m) =>
                 m.pendingPermission ? (
                   <div className="mt-2">

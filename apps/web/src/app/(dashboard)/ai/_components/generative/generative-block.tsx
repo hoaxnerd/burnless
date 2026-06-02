@@ -14,6 +14,11 @@ import { GenDataTable, type GenDataTableProps } from "./data-table";
 export interface GenerativeBlockProps {
   component: string;
   props: Record<string, unknown>;
+  /**
+   * Optional callback for interactive display components (e.g. suggested_actions)
+   * to trigger a follow-up chat turn. Display-only components ignore it.
+   */
+  onAction?: (prompt: string) => void;
 }
 
 /**
@@ -21,7 +26,7 @@ export interface GenerativeBlockProps {
  * Unknown names render a safe fallback (never throw — the model may emit a
  * component this client build doesn't know yet).
  */
-export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
+export function GenerativeBlock({ component, props, onAction: _onAction }: GenerativeBlockProps) {
   switch (component) {
     case "metric_card":
       return <GenMetricCard {...(props as unknown as GenMetricCardProps)} />;
@@ -54,11 +59,22 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
 }
 
 /** Render all display blocks attached to a message. */
-export function GenerativeBlocks({ blocks }: { blocks: UiBlockClient[] }) {
+export function GenerativeBlocks({
+  blocks,
+  onAction,
+}: {
+  blocks: UiBlockClient[];
+  onAction?: (prompt: string) => void;
+}) {
   return (
     <>
       {blocks.map((b) => (
-        <GenerativeBlock key={b.id} component={b.component} props={b.props} />
+        <GenerativeBlock
+          key={b.id}
+          component={b.component}
+          props={b.props}
+          onAction={onAction}
+        />
       ))}
     </>
   );
