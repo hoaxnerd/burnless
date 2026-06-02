@@ -174,6 +174,25 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_scenario_diff",
+    description:
+      "Display a side-by-side comparison of two scenarios inline as a table: each key metric (revenue, expenses, net income, cash, headcount) for scenario A vs scenario B with the delta. Use when the user asks to compare two scenarios, see what changed between plans, or weigh one scenario against another. Numbers are computed server-side — you only choose the two scenario ids.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioA: {
+          type: "string",
+          description: "Id of the first (baseline) scenario to compare.",
+        },
+        scenarioB: {
+          type: "string",
+          description: "Id of the second scenario to compare against the first.",
+        },
+      },
+      required: ["scenarioA", "scenarioB"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

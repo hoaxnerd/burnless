@@ -1,51 +1,107 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../../compute-dashboard", () => ({
-  computeDashboardData: vi.fn(async () => ({
-    metrics: {
-      cashRunwayMonths: [{ month: "2026-06", value: 14.2 }],
-      netBurnRate: [
-        { month: "2026-04", value: 80000 },
-        { month: "2026-05", value: 81000 },
-        { month: "2026-06", value: 82000 },
-      ],
-      mrr: [
-        { month: "2026-04", value: 46000 },
-        { month: "2026-05", value: 48000 },
-        { month: "2026-06", value: 50000 },
-      ],
-    },
-    // Top-level MonthlySeries (Map<"YYYY-MM", number>) — what computeDashboardData
-    // really returns for revenue/cash/headcount cost.
-    totalRevenue: new Map([
-      ["2026-01", 40000],
-      ["2026-02", 42000],
-      ["2026-03", 44000],
-      ["2026-04", 46000],
-      ["2026-05", 48000],
-      ["2026-06", 50000],
-    ]),
-    cashPosition: new Map([
-      ["2026-05", 900000],
-      ["2026-06", 818000],
-    ]),
-    headcountCostSeries: new Map([
-      ["2026-05", 120000],
-      ["2026-06", 130000],
-    ]),
-    // Per-revenue-type breakdown (RevenueByType) — each value a MonthlySeries Map.
-    revenueByType: {
-      subscriptionRevenue: new Map([
-        ["2026-05", 40000],
-        ["2026-06", 42000],
+  // Default ("s1") dashboard. The scenario_diff test uses a second scenario
+  // ("s2") whose totals differ — the mock branches on the scenarioId arg so the
+  // engine diff produces non-zero deltas without disturbing the other tests.
+  computeDashboardData: vi.fn(async (_companyId: string, scenarioId: string) => {
+    if (scenarioId === "s2") {
+      return {
+        metrics: {
+          cashRunwayMonths: [{ month: "2026-06", value: 9.5 }],
+          netBurnRate: [{ month: "2026-06", value: 95000 }],
+          mrr: [{ month: "2026-06", value: 60000 }],
+        },
+        totalRevenue: new Map([
+          ["2026-05", 58000],
+          ["2026-06", 60000],
+        ]),
+        totalExpenses: new Map([
+          ["2026-05", 150000],
+          ["2026-06", 155000],
+        ]),
+        netIncome: new Map([
+          ["2026-05", -92000],
+          ["2026-06", -95000],
+        ]),
+        cashPosition: new Map([
+          ["2026-05", 700000],
+          ["2026-06", 605000],
+        ]),
+        headcountSeries: new Map([
+          ["2026-05", 12],
+          ["2026-06", 14],
+        ]),
+        headcountCostSeries: new Map([
+          ["2026-05", 140000],
+          ["2026-06", 150000],
+        ]),
+      };
+    }
+    return {
+      metrics: {
+        cashRunwayMonths: [{ month: "2026-06", value: 14.2 }],
+        netBurnRate: [
+          { month: "2026-04", value: 80000 },
+          { month: "2026-05", value: 81000 },
+          { month: "2026-06", value: 82000 },
+        ],
+        mrr: [
+          { month: "2026-04", value: 46000 },
+          { month: "2026-05", value: 48000 },
+          { month: "2026-06", value: 50000 },
+        ],
+      },
+      // Top-level MonthlySeries (Map<"YYYY-MM", number>) — what computeDashboardData
+      // really returns for revenue/cash/headcount cost.
+      totalRevenue: new Map([
+        ["2026-01", 40000],
+        ["2026-02", 42000],
+        ["2026-03", 44000],
+        ["2026-04", 46000],
+        ["2026-05", 48000],
+        ["2026-06", 50000],
       ]),
-      oneTimeRevenue: new Map([["2026-06", 5000]]),
-      usageRevenue: new Map([["2026-06", 3000]]),
-      servicesRevenue: new Map(),
-      marketplaceRevenue: new Map(),
-      ecommerceRevenue: new Map(),
-      hardwareRevenue: new Map(),
-    },
+      totalExpenses: new Map([
+        ["2026-05", 129000],
+        ["2026-06", 132000],
+      ]),
+      netIncome: new Map([
+        ["2026-05", -81000],
+        ["2026-06", -82000],
+      ]),
+      cashPosition: new Map([
+        ["2026-05", 900000],
+        ["2026-06", 818000],
+      ]),
+      headcountSeries: new Map([
+        ["2026-05", 10],
+        ["2026-06", 11],
+      ]),
+      headcountCostSeries: new Map([
+        ["2026-05", 120000],
+        ["2026-06", 130000],
+      ]),
+      // Per-revenue-type breakdown (RevenueByType) — each value a MonthlySeries Map.
+      revenueByType: {
+        subscriptionRevenue: new Map([
+          ["2026-05", 40000],
+          ["2026-06", 42000],
+        ]),
+        oneTimeRevenue: new Map([["2026-06", 5000]]),
+        usageRevenue: new Map([["2026-06", 3000]]),
+        servicesRevenue: new Map(),
+        marketplaceRevenue: new Map(),
+        ecommerceRevenue: new Map(),
+        hardwareRevenue: new Map(),
+      },
+    };
+  }),
+}));
+vi.mock("@burnless/db", () => ({
+  getScenarioForCompany: vi.fn(async (scenarioId: string) => ({
+    id: scenarioId,
+    name: scenarioId === "s2" ? "Aggressive hiring" : "Base plan",
   })),
 }));
 vi.mock("../../compute-expenses", () => ({
@@ -321,5 +377,45 @@ describe("show_cap_table", () => {
     );
     expect(totalPct).toBeCloseTo(100, 5);
     expect(parsed.modelResult).toMatch(/cap_table/);
+  });
+});
+
+describe("show_scenario_diff", () => {
+  it("returns a scenario_diff envelope with both names and real per-metric deltas", async () => {
+    const out = await genuiDisplayHandlers.show_scenario_diff!(
+      { scenarioA: "s1", scenarioB: "s2" },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("scenario_diff");
+    expect(parsed.render.props.aName).toBe("Base plan");
+    expect(parsed.render.props.bName).toBe("Aggressive hiring");
+
+    const rows = parsed.render.props.rows as Array<{
+      label: string;
+      a: number;
+      b: number;
+      delta: number;
+      format: string;
+    }>;
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+
+    // Revenue row uses the latest-month values from each scenario.
+    const revenue = rows.find((r) => r.label === "Revenue");
+    expect(revenue).toBeTruthy();
+    expect(revenue!.a).toBe(50000);
+    expect(revenue!.b).toBe(60000);
+    expect(revenue!.delta).toBe(10000);
+    expect(revenue!.format).toBe("currency");
+
+    // Headcount uses the number format (not currency).
+    const headcount = rows.find((r) => r.label === "Headcount");
+    expect(headcount).toBeTruthy();
+    expect(headcount!.a).toBe(11);
+    expect(headcount!.b).toBe(14);
+    expect(headcount!.delta).toBe(3);
+    expect(headcount!.format).toBe("number");
+
+    expect(parsed.modelResult).toMatch(/scenario_diff/);
   });
 });

@@ -5,12 +5,16 @@
  */
 import { z } from "zod";
 import {
+  compareScenarios,
   monthKey,
   parseMonthKey,
   seriesToArray,
   sum,
+  type ComparisonLine,
   type MonthlySeries,
+  type ScenarioData,
 } from "@burnless/engine";
+import { getScenarioForCompany } from "@burnless/db";
 import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
@@ -461,4 +465,120 @@ genuiDisplayHandlers.show_cap_table = async (input, context) => {
   }));
 
   return envelope(rows, capTable.totalFullyDiluted);
+};
+
+// ── show_scenario_diff ──────────────────────────────────────────────────────
+
+/**
+ * Wrap a dashboard's aggregate MonthlySeries into the engine `ScenarioData`
+ * shape so `compareScenarios` can diff two scenarios with the same math the
+ * /scenarios/compare route uses. Only aggregates matter here (no account-level
+ * detail), so `accounts` is left empty.
+ */
+function dashboardToScenarioData(
+  id: string,
+  name: string,
+  dash: Record<string, unknown>
+): ScenarioData {
+  const series = (key: string): MonthlySeries =>
+    (dash[key] as MonthlySeries | undefined) ?? new Map();
+  return {
+    id,
+    name,
+    accounts: new Map(),
+    aggregates: {
+      revenue: series("totalRevenue"),
+      expenses: series("totalExpenses"),
+      netIncome: series("netIncome"),
+      cashPosition: series("cashPosition"),
+      headcount: series("headcountSeries"),
+    },
+  };
+}
+
+/** Latest-month value of a comparison side, or null when the series is empty. */
+function latestComparisonValue(
+  side: ComparisonLine["baseValues"]
+): number | null {
+  return side.length ? side[side.length - 1]!.value : null;
+}
+
+type ScenarioDiffRow = {
+  label: string;
+  a: number | null;
+  b: number | null;
+  delta: number | null;
+  format: FormatHint;
+};
+
+/** Diff lines surfaced in the table, with their display format. */
+const SCENARIO_DIFF_LINES: Array<{
+  key: keyof Pick<
+    import("@burnless/engine").ScenarioComparison,
+    "revenue" | "expenses" | "netIncome" | "cashPosition" | "headcount"
+  >;
+  label: string;
+  format: FormatHint;
+}> = [
+  { key: "revenue", label: "Revenue", format: "currency" },
+  { key: "expenses", label: "Expenses", format: "currency" },
+  { key: "netIncome", label: "Net income", format: "currency" },
+  { key: "cashPosition", label: "Cash", format: "currency" },
+  { key: "headcount", label: "Headcount", format: "number" },
+];
+
+genuiDisplaySchemas.show_scenario_diff = z.object({
+  scenarioA: z.string(),
+  scenarioB: z.string(),
+});
+
+genuiDisplayHandlers.show_scenario_diff = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const scenarioA = typeof input.scenarioA === "string" ? input.scenarioA : "";
+  const scenarioB = typeof input.scenarioB === "string" ? input.scenarioB : "";
+
+  const envelope = (
+    aName: string,
+    bName: string,
+    rows: ScenarioDiffRow[]
+  ) =>
+    JSON.stringify({
+      render: { component: "scenario_diff", props: { aName, bName, rows } },
+      modelResult: rows.length
+        ? `[scenario_diff shown: ${aName} vs ${bName}, ${rows.length} metrics]`
+        : `[scenario_diff: no data]`,
+    });
+
+  if (!scenarioA || !scenarioB) return envelope("", "", []);
+
+  // Verify both scenarios belong to the company before computing.
+  const [recA, recB] = await Promise.all([
+    getScenarioForCompany(scenarioA, ctx.companyId),
+    getScenarioForCompany(scenarioB, ctx.companyId),
+  ]);
+  if (!recA || !recB) {
+    return envelope(recA?.name ?? "Scenario A", recB?.name ?? "Scenario B", []);
+  }
+
+  const [dashA, dashB] = await Promise.all([
+    computeDashboardData(ctx.companyId, scenarioA) as unknown as Promise<DashboardLike>,
+    computeDashboardData(ctx.companyId, scenarioB) as unknown as Promise<DashboardLike>,
+  ]);
+
+  // Reuse the engine diff (same math the /scenarios/compare route runs).
+  const comparison = compareScenarios(
+    dashboardToScenarioData(recA.id, recA.name, dashA),
+    dashboardToScenarioData(recB.id, recB.name, dashB)
+  );
+
+  const rows: ScenarioDiffRow[] = SCENARIO_DIFF_LINES.map(({ key, label, format }) => {
+    const line = comparison[key];
+    const a = latestComparisonValue(line.baseValues);
+    const b = latestComparisonValue(line.compareValues);
+    const delta =
+      a !== null && b !== null ? Math.round((b - a) * 100) / 100 : null;
+    return { label, a, b, delta, format };
+  });
+
+  return envelope(recA.name, recB.name, rows);
 };
