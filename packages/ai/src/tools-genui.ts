@@ -159,6 +159,21 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_cap_table",
+    description:
+      "Display the company cap table inline as a table: each holder's share class, shares, and fully-diluted ownership percentage, plus total shares. Use when the user asks about ownership, equity splits, the cap table, dilution, or who owns the company. Numbers are computed server-side (scenario-aware) — you only request the table.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

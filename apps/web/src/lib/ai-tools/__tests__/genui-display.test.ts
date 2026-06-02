@@ -60,6 +60,22 @@ vi.mock("../../compute-expenses", () => ({
 vi.mock("../../data", () => ({
   getDefaultScenario: vi.fn(async () => ({ id: "s1" })),
 }));
+vi.mock("../../compute-cap-table", () => ({
+  computeCapTableForCompany: vi.fn(async () => ({
+    rows: [
+      { holder: "Founders", shareClass: "Common", shares: 8_000_000, ownershipPercent: 0.8 },
+      { holder: "Series A", shareClass: "Preferred", shares: 1_500_000, ownershipPercent: 0.15 },
+      { holder: "Option pool", shareClass: "Options", shares: 500_000, ownershipPercent: 0.05 },
+    ],
+    totalFullyDiluted: 10_000_000,
+    totals: {
+      commonStock: 8_000_000,
+      preferredStock: 1_500_000,
+      safeOverhang: 0,
+      optionPoolOverhang: 500_000,
+    },
+  })),
+}));
 
 import { genuiDisplayHandlers } from "../genui-display";
 
@@ -278,5 +294,32 @@ describe("show_runway", () => {
     expect(parsed.render.props.zeroCashMonth).toBe("2027-09");
     expect(parsed.render.props.format).toBe("currency");
     expect(parsed.modelResult).toMatch(/runway/);
+  });
+});
+
+describe("show_cap_table", () => {
+  it("returns a cap_table envelope with rows summing to ~100% and total shares", async () => {
+    const out = await genuiDisplayHandlers.show_cap_table!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("cap_table");
+    expect(parsed.render.props.totalShares).toBe(10_000_000);
+    expect(parsed.render.props.rows).toHaveLength(3);
+    // ownershipPercent (0-1 from the engine) is mapped to 0-100 for the percent formatter.
+    const founders = parsed.render.props.rows.find(
+      (r: { holder: string }) => r.holder === "Founders"
+    );
+    expect(founders).toEqual({
+      holder: "Founders",
+      shares: 8_000_000,
+      pctOwnership: 80,
+      shareClass: "Common",
+    });
+    // Percentages sum to ~100.
+    const totalPct = parsed.render.props.rows.reduce(
+      (s: number, r: { pctOwnership: number }) => s + r.pctOwnership,
+      0
+    );
+    expect(totalPct).toBeCloseTo(100, 5);
+    expect(parsed.modelResult).toMatch(/cap_table/);
   });
 });

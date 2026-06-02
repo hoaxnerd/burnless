@@ -14,6 +14,7 @@ import {
 import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
+import { computeCapTableForCompany } from "../compute-cap-table";
 import { getDefaultScenario } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
 
@@ -421,4 +422,43 @@ genuiDisplayHandlers.show_runway = async (input, context) => {
   const zeroCashMonth = deriveZeroCashMonth(latestCash?.month ?? null, runwayMonths);
 
   return envelope({ runwayMonths, netBurn, cash, zeroCashMonth });
+};
+
+// ── show_cap_table ──────────────────────────────────────────────────────────
+
+type CapTableRowProps = {
+  holder: string;
+  shares: number;
+  pctOwnership: number; // 0-100 (engine emits 0-1; mapped here for the percent fmt)
+  shareClass: string;
+};
+
+genuiDisplaySchemas.show_cap_table = z.object({
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_cap_table = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (rows: CapTableRowProps[], totalShares: number) =>
+    JSON.stringify({
+      render: { component: "cap_table", props: { rows, totalShares } },
+      modelResult: rows.length
+        ? `[cap_table shown: ${rows.length} holders, ${totalShares} fully-diluted shares]`
+        : `[cap_table: no data]`,
+    });
+
+  // computeCapTableForCompany accepts a nullable scenarioId (null ⇒ base).
+  const capTable = await computeCapTableForCompany(ctx.companyId, scenarioId);
+  const rows: CapTableRowProps[] = capTable.rows.map((r) => ({
+    holder: r.holder,
+    shares: r.shares,
+    // Engine emits ownershipPercent on a 0-1 fully-diluted basis; the percent
+    // format hint expects 0-100.
+    pctOwnership: r.ownershipPercent * 100,
+    shareClass: r.shareClass,
+  }));
+
+  return envelope(rows, capTable.totalFullyDiluted);
 };
