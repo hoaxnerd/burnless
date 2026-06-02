@@ -60,3 +60,14 @@ describe("StreamChunk input_request shape", () => {
     expect(chunk.spec?.title).toBe("T");
   });
 });
+
+import * as pkg from "../index";
+describe("package exports", () => {
+  it("re-exports the generative-ui surface", () => {
+    expect(typeof pkg.isInputTool).toBe("function");
+    expect(typeof pkg.isDisplayTool).toBe("function");
+    expect(typeof pkg.buildInputFormSpec).toBe("function");
+    expect(pkg.DISPLAY_TOOL_NAMES).toBeInstanceOf(Set);
+    expect(pkg.INPUT_TOOL_NAMES).toBeInstanceOf(Set);
+  });
+});

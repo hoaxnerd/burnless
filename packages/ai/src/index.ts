@@ -149,6 +149,9 @@ export {
 // Funding tool schemas (canonical, single source of truth; roundType immutability enforced)
 export * from "./schemas/funding";
 
+// Generative UI (display/input tool sets + form-spec builder + types)
+export * from "./generative-ui";
+
 // Permissions (tool categorization + pure resolver)
 export {
   resolvePermission,
