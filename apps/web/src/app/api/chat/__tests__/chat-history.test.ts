@@ -253,4 +253,69 @@ describe("GET /api/chat/history", () => {
     expect(res.status).toBe(200);
     expect(body.pendingPermission).toBeNull();
   });
+
+  // ── Genui reload restore (Plan 4 Task 5) ──────────────────────────────────
+
+  it("returns pendingInput (and null pendingPermission) for an active input pause", async () => {
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
+    mockOrderBy.mockResolvedValueOnce([]);
+    // an unresolved input pause exists
+    mockGetActivePendingAction.mockResolvedValueOnce({
+      pauseId: "pause-in",
+      kind: "input",
+      pending: {
+        inputToolUseId: "tu-1",
+        spec: {
+          title: "Add a revenue stream",
+          fields: [{ name: "name", type: "text", label: "Name", required: true }],
+        },
+      },
+    });
+
+    const { GET } = await import("../history/route");
+    const res = await GET(
+      makeRequest("http://localhost/api/chat/history?conversationId=conv1")
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingPermission).toBeNull();
+    expect(body.pendingInput).not.toBeNull();
+    expect(body.pendingInput.pauseId).toBe("pause-in");
+    expect(body.pendingInput.conversationId).toBe("conv1");
+    expect(body.pendingInput.spec.title).toBe("Add a revenue stream");
+    expect(body.pendingInput.spec.fields).toHaveLength(1);
+  });
+
+  it("rehydrates uiBlocks from stored message metadata", async () => {
+    const messages = [
+      { id: "m1", conversationId: "conv1", role: "user", content: "show me MRR", createdAt: new Date(), metadata: null },
+      {
+        id: "m2",
+        conversationId: "conv1",
+        role: "assistant",
+        content: "Here it is",
+        createdAt: new Date(),
+        metadata: { uiBlocks: [{ id: "b1", component: "MetricCard", props: { value: 42 } }] },
+      },
+    ];
+
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
+    mockOrderBy.mockResolvedValueOnce(messages);
+
+    const { GET } = await import("../history/route");
+    const res = await GET(
+      makeRequest("http://localhost/api/chat/history?conversationId=conv1")
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].uiBlocks).toBeUndefined();
+    expect(body.messages[1].uiBlocks).toEqual([
+      { id: "b1", component: "MetricCard", props: { value: 42 } },
+    ]);
+  });
 });

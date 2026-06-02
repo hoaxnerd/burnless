@@ -22,7 +22,13 @@ import { InsightCard } from "./_components/insights-panel";
 import { PermissionCard } from "./_components/permission-card";
 import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
 import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
-import type { Insight, Conversation, PendingPermission } from "./_components/types";
+import type {
+  Insight,
+  Conversation,
+  PendingPermission,
+  PendingInput,
+  UiBlockClient,
+} from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { useLocale } from "@/components/locale/locale-context";
@@ -206,13 +212,22 @@ export default function AiCompanionPage() {
         const data = await res.json();
         const restoredMessages = data.messages
           .filter((m: { role: string }) => m.role !== "system")
-          .map((m: { role: string; content: string; createdAt?: string }) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-            createdAt: m.createdAt
-              ? new Date(m.createdAt).getTime()
-              : Date.now(),
-          }));
+          .map(
+            (m: {
+              role: string;
+              content: string;
+              createdAt?: string;
+              uiBlocks?: UiBlockClient[];
+            }) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              createdAt: m.createdAt
+                ? new Date(m.createdAt).getTime()
+                : Date.now(),
+              // Re-render persisted genui display blocks after reload (spec §6/§8).
+              ...(m.uiBlocks ? { uiBlocks: m.uiBlocks } : {}),
+            })
+          );
         // #3: re-show a pending permission card persisted server-side.
         if (data.pendingPermission) {
           session.setMessages(id, [
@@ -224,6 +239,25 @@ export default function AiCompanionPage() {
               createdAt: Date.now(),
             },
           ]);
+        } else if (data.pendingInput) {
+          // Re-show a pending input form persisted server-side, mirroring the
+          // permission restore: attach it to the last assistant message.
+          const msgs = [...restoredMessages];
+          const lastIdx = msgs.length - 1;
+          if (lastIdx >= 0 && msgs[lastIdx].role === "assistant") {
+            msgs[lastIdx] = {
+              ...msgs[lastIdx],
+              pendingInput: data.pendingInput as PendingInput,
+            };
+          } else {
+            msgs.push({
+              role: "assistant",
+              content: "",
+              pendingInput: data.pendingInput as PendingInput,
+              createdAt: Date.now(),
+            });
+          }
+          session.setMessages(id, msgs);
         } else {
           session.setMessages(id, restoredMessages);
         }

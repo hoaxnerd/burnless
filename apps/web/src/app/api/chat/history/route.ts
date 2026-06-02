@@ -38,36 +38,55 @@ export const GET = withErrorHandler(async (request: Request) => {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
-    const messages = await db
+    const rows = await db
       .select()
       .from(aiMessages)
       .where(eq(aiMessages.conversationId, conversationId))
       .orderBy(asc(aiMessages.createdAt));
 
-    // Ownership was verified above; surface any persisted pending permission
-    // batch so the client can re-show the approval card after a reload.
-    const pendingRow = await getActivePendingAction(conversationId);
-    const pendingPermission = pendingRow
-      ? {
-          pauseId: pendingRow.pauseId,
-          conversationId,
-          actions: (
-            pendingRow.pending as {
-              requestId: string;
-              toolName: string;
-              toolInput: Record<string, unknown>;
-            }[]
-          ).map((a) => ({
-            requestId: a.requestId,
-            tool: a.toolName,
-            category: categorizeToolName(a.toolName),
-            description: describeToolAction(a.toolName, a.toolInput),
-            input: a.toolInput,
-          })),
-        }
-      : null;
+    // Rehydrate genui display blocks persisted on `metadata.uiBlocks` so reload
+    // re-renders the inline components (spec §6/§8).
+    const messages = rows.map((row) => {
+      const uiBlocks = (row.metadata as { uiBlocks?: unknown[] } | null)?.uiBlocks;
+      return uiBlocks ? { ...row, uiBlocks } : row;
+    });
 
-    return NextResponse.json({ conversationId, messages, pendingPermission });
+    // Ownership was verified above; surface any persisted pending batch so the
+    // client can re-show the right card after a reload. A turn pauses for one of
+    // two reasons (kind): "permission" (a write/tool approval) or "input" (a form
+    // the model asked the user to fill). Branch on kind so reload restores the
+    // matching card.
+    const pendingRow = await getActivePendingAction(conversationId);
+    const pendingPermission =
+      pendingRow && pendingRow.kind !== "input"
+        ? {
+            pauseId: pendingRow.pauseId,
+            conversationId,
+            actions: (
+              pendingRow.pending as {
+                requestId: string;
+                toolName: string;
+                toolInput: Record<string, unknown>;
+              }[]
+            ).map((a) => ({
+              requestId: a.requestId,
+              tool: a.toolName,
+              category: categorizeToolName(a.toolName),
+              description: describeToolAction(a.toolName, a.toolInput),
+              input: a.toolInput,
+            })),
+          }
+        : null;
+    const pendingInput =
+      pendingRow && pendingRow.kind === "input"
+        ? {
+            pauseId: pendingRow.pauseId,
+            conversationId,
+            spec: (pendingRow.pending as { spec: unknown }).spec,
+          }
+        : null;
+
+    return NextResponse.json({ conversationId, messages, pendingPermission, pendingInput });
   }
 
   // List conversations with cursor-based pagination
