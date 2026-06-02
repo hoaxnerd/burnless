@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Bot, User, Copy, Check, Sparkles, ChevronRight, Brain } from "lucide-react";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
+import { GenerativeBlocks } from "./generative/generative-block";
 import type { Message } from "./types";
 
 /** Strip model thinking tags (e.g. <think>...</think>) from response text — fallback defense. */
@@ -142,6 +143,11 @@ export function ChatMessageList({
                     <span className="inline-block ml-0.5 w-2 h-4 bg-accent-500 animate-pulse rounded-sm align-text-bottom" />
                   )}
                 </div>
+
+                {/* Generative-UI display blocks (assistant only) */}
+                {!isUser && msg.uiBlocks && msg.uiBlocks.length > 0 && (
+                  <GenerativeBlocks blocks={msg.uiBlocks} />
+                )}
 
                 {/* Timestamp + copy button row */}
                 <div
