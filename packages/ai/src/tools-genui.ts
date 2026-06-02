@@ -60,6 +60,27 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_bar_chart",
+    description:
+      "Display a categorical breakdown inline as a bar chart. Use when the user asks to compare amounts across categories rather than over time — expenses by category, or revenue by stream type. Numbers are computed server-side — you only choose the dimension.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dimension: {
+          type: "string",
+          enum: ["expense_by_category", "revenue_by_stream"],
+          description:
+            "What to break down. 'expense_by_category' shows current expense totals per category; 'revenue_by_stream' shows revenue per stream type. Defaults to expense_by_category.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

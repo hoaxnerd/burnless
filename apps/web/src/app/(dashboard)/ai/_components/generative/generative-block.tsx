@@ -2,6 +2,7 @@
 import type { UiBlockClient } from "../types";
 import { GenMetricCard, type GenMetricCardProps } from "./metric-card";
 import { GenLineChart, type GenLineChartProps } from "./line-chart";
+import { GenBarChart, type GenBarChartProps } from "./bar-chart";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -19,6 +20,8 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
       return <GenMetricCard {...(props as unknown as GenMetricCardProps)} />;
     case "line_chart":
       return <GenLineChart {...(props as unknown as GenLineChartProps)} />;
+    case "bar_chart":
+      return <GenBarChart {...(props as unknown as GenBarChartProps)} />;
     // component cases are added by each component task below.
     default:
       return (

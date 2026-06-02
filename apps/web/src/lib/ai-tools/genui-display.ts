@@ -4,8 +4,10 @@
  * Data-bound handlers compute REAL numbers via existing compute helpers.
  */
 import { z } from "zod";
-import { seriesToArray, type MonthlySeries } from "@burnless/engine";
+import { seriesToArray, sum, type MonthlySeries } from "@burnless/engine";
+import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
+import { computeExpenseDetails } from "../compute-expenses";
 import { getDefaultScenario } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
 
@@ -165,4 +167,74 @@ genuiDisplayHandlers.show_line_chart = async (input, context) => {
     },
     modelResult: `[line_chart shown: ${spec.label}, ${data.length} months]`,
   });
+};
+
+// ── show_bar_chart ──────────────────────────────────────────────────────────
+
+type CategoryDatum = { label: string; value: number };
+
+/** RevenueByType field → human label, for the revenue_by_stream dimension. */
+const REVENUE_TYPE_LABELS: Array<{ key: string; label: string }> = [
+  { key: "subscriptionRevenue", label: "Subscription" },
+  { key: "oneTimeRevenue", label: "One-time" },
+  { key: "usageRevenue", label: "Usage" },
+  { key: "servicesRevenue", label: "Services" },
+  { key: "marketplaceRevenue", label: "Marketplace" },
+  { key: "ecommerceRevenue", label: "E-commerce" },
+  { key: "hardwareRevenue", label: "Hardware" },
+];
+
+const BAR_DIMENSIONS = {
+  expense_by_category: "Expenses by category",
+  revenue_by_stream: "Revenue by stream",
+} as const;
+
+genuiDisplaySchemas.show_bar_chart = z.object({
+  dimension: z.enum(["expense_by_category", "revenue_by_stream"]).optional(),
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_bar_chart = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const dimension =
+    input.dimension === "revenue_by_stream" ? "revenue_by_stream" : "expense_by_category";
+  const title = BAR_DIMENSIONS[dimension];
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (data: CategoryDatum[]) =>
+    JSON.stringify({
+      render: {
+        component: "bar_chart",
+        props: {
+          title,
+          format: "currency",
+          data,
+          bars: [{ dataKey: "value", label: "Amount", color: chartColors.brand }],
+        },
+      },
+      modelResult: data.length
+        ? `[bar_chart shown: ${title}, ${data.length} categories]`
+        : `[bar_chart: no data for ${dimension}]`,
+    });
+
+  if (!scenarioId) return envelope([]);
+
+  let data: CategoryDatum[] = [];
+  if (dimension === "expense_by_category") {
+    const details = await computeExpenseDetails(ctx.companyId, scenarioId);
+    data = (details.subcategoryBreakdown ?? [])
+      .map((b) => ({ label: b.subcategory, value: b.amount }))
+      .filter((d) => d.value > 0);
+  } else {
+    const dash = await computeDashboardData(ctx.companyId, scenarioId);
+    const byType = (dash as unknown as { revenueByType?: Record<string, MonthlySeries> })
+      .revenueByType;
+    data = REVENUE_TYPE_LABELS.map(({ key, label }) => {
+      const series = byType?.[key];
+      const total = series ? sum([...series.values()]) : 0;
+      return { label, value: total };
+    }).filter((d) => d.value > 0);
+  }
+
+  return envelope(data);
 };

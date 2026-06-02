@@ -33,6 +33,28 @@ vi.mock("../../compute-dashboard", () => ({
       ["2026-05", 120000],
       ["2026-06", 130000],
     ]),
+    // Per-revenue-type breakdown (RevenueByType) — each value a MonthlySeries Map.
+    revenueByType: {
+      subscriptionRevenue: new Map([
+        ["2026-05", 40000],
+        ["2026-06", 42000],
+      ]),
+      oneTimeRevenue: new Map([["2026-06", 5000]]),
+      usageRevenue: new Map([["2026-06", 3000]]),
+      servicesRevenue: new Map(),
+      marketplaceRevenue: new Map(),
+      ecommerceRevenue: new Map(),
+      hardwareRevenue: new Map(),
+    },
+  })),
+}));
+vi.mock("../../compute-expenses", () => ({
+  computeExpenseDetails: vi.fn(async () => ({
+    subcategoryBreakdown: [
+      { subcategory: "Payroll", amount: 90000 },
+      { subcategory: "Marketing", amount: 25000 },
+      { subcategory: "Software", amount: 12000 },
+    ],
   })),
 }));
 vi.mock("../../data", () => ({
@@ -102,5 +124,48 @@ describe("show_line_chart", () => {
       month: "2026-06",
       value: 50000,
     });
+  });
+});
+
+describe("show_bar_chart", () => {
+  it("returns a bar_chart envelope of real expense category totals", async () => {
+    const out = await genuiDisplayHandlers.show_bar_chart!(
+      { dimension: "expense_by_category" },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("bar_chart");
+    expect(parsed.render.props.format).toBe("currency");
+    expect(parsed.render.props.data.length).toBeGreaterThanOrEqual(1);
+    // Each datum is { label, value } from subcategoryBreakdown.
+    expect(parsed.render.props.data[0]).toEqual({ label: "Payroll", value: 90000 });
+    expect(parsed.render.props.bars).toHaveLength(1);
+    expect(parsed.render.props.bars[0].dataKey).toBe("value");
+    expect(typeof parsed.render.props.bars[0].color).toBe("string");
+    expect(parsed.modelResult).toMatch(/bar_chart/);
+  });
+
+  it("returns a bar_chart envelope of revenue grouped by stream type", async () => {
+    const out = await genuiDisplayHandlers.show_bar_chart!(
+      { dimension: "revenue_by_stream" },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("bar_chart");
+    expect(parsed.render.props.format).toBe("currency");
+    // Only non-zero revenue types appear; subscription sums 40000+42000=82000.
+    const sub = parsed.render.props.data.find(
+      (d: { label: string; value: number }) => d.label === "Subscription"
+    );
+    expect(sub).toBeTruthy();
+    expect(sub.value).toBe(82000);
+    expect(parsed.render.props.bars[0].dataKey).toBe("value");
+  });
+
+  it("defaults to expense_by_category when dimension is omitted", async () => {
+    const out = await genuiDisplayHandlers.show_bar_chart!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("bar_chart");
+    expect(parsed.render.props.data[0].label).toBe("Payroll");
   });
 });
