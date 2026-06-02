@@ -19,7 +19,7 @@ import { chartColors } from "@/components/charts/chart-theme";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
 import { computeCapTableForCompany } from "../compute-cap-table";
-import { getDefaultScenario } from "../data";
+import { getDefaultScenario, getFundingRounds } from "../data";
 import { latest, requireCompanyId, type ToolHandler } from "./types";
 
 export const genuiDisplaySchemas: Record<string, z.ZodType> = {};
@@ -625,4 +625,65 @@ genuiDisplayHandlers.show_scenario_diff = async (input, context) => {
   });
 
   return envelope(recA.name, recB.name, rows);
+};
+
+// ── show_funding_summary ────────────────────────────────────────────────────
+
+type FundingRoundProps = {
+  name: string;
+  type: string;
+  amount: number;
+  date: string; // YYYY-MM-DD (serializable)
+  isProjected: boolean;
+};
+
+/** Coerce a numeric/string amount to a finite number, defaulting to 0. */
+function toAmount(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Serialize a Date (or ISO/date string) to a YYYY-MM-DD day key. */
+function toDateKey(raw: unknown): string {
+  const d = raw instanceof Date ? raw : new Date(String(raw));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+genuiDisplaySchemas.show_funding_summary = z.object({
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_funding_summary = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (rounds: FundingRoundProps[], totalRaised: number) =>
+    JSON.stringify({
+      render: {
+        component: "funding_summary",
+        props: { rounds, totalRaised, format: "currency" as FormatHint },
+      },
+      modelResult: rounds.length
+        ? `[funding_summary shown: ${rounds.length} rounds, ${totalRaised} total raised]`
+        : `[funding_summary: no funding rounds]`,
+    });
+
+  if (!scenarioId) return envelope([], 0);
+
+  // Scenario-aware list of rounds (overrides merged when scenarioId is set).
+  const raw = await getFundingRounds(ctx.companyId, scenarioId);
+  const rounds: FundingRoundProps[] = raw
+    .map((r) => ({
+      name: String(r.name),
+      type: String(r.type),
+      amount: toAmount(r.amount),
+      date: toDateKey(r.date),
+      isProjected: Boolean(r.isProjected),
+    }))
+    // Chronological order (oldest → newest) for a top-down timeline.
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const totalRaised = rounds.reduce((s, r) => s + r.amount, 0);
+  return envelope(rounds, totalRaised);
 };

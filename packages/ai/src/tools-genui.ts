@@ -208,6 +208,21 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: "show_funding_summary",
+    description:
+      "Display the company's funding history inline as a timeline of rounds: each round's name, type, amount, and date, plus the total raised. Projected/planned rounds are shown distinctly. Use when the user asks about their funding rounds, how much they've raised, their cap-raising history, or upcoming rounds. Numbers are computed server-side (scenario-aware) — you only request the summary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */

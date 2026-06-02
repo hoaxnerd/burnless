@@ -115,6 +115,31 @@ vi.mock("../../compute-expenses", () => ({
 }));
 vi.mock("../../data", () => ({
   getDefaultScenario: vi.fn(async () => ({ id: "s1" })),
+  // Scenario-aware funding rounds. `amount` arrives as a numeric string from the
+  // DB driver — the handler must coerce it. Mixed historical + projected rounds.
+  getFundingRounds: vi.fn(async () => [
+    {
+      name: "Seed",
+      type: "seed",
+      amount: "1500000.00",
+      date: new Date("2024-03-01"),
+      isProjected: false,
+    },
+    {
+      name: "Series A",
+      type: "series_a",
+      amount: "8000000.00",
+      date: new Date("2025-09-01"),
+      isProjected: false,
+    },
+    {
+      name: "Series B (planned)",
+      type: "series_b",
+      amount: "20000000.00",
+      date: new Date("2027-01-01"),
+      isProjected: true,
+    },
+  ]),
 }));
 vi.mock("../../compute-cap-table", () => ({
   computeCapTableForCompany: vi.fn(async () => ({
@@ -395,6 +420,46 @@ describe("show_burn_breakdown", () => {
     expect(parsed.render.props.bars[0].dataKey).toBe("value");
     expect(typeof parsed.render.props.bars[0].color).toBe("string");
     expect(parsed.modelResult).toMatch(/burn_breakdown/);
+  });
+});
+
+describe("show_funding_summary", () => {
+  it("returns a funding_summary envelope with totalRaised = sum of round amounts", async () => {
+    const out = await genuiDisplayHandlers.show_funding_summary!({}, ctx);
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("funding_summary");
+    expect(parsed.render.props.format).toBe("currency");
+
+    const rounds = parsed.render.props.rounds as Array<{
+      name: string;
+      type: string;
+      amount: number;
+      date: string;
+      isProjected: boolean;
+    }>;
+    expect(rounds).toHaveLength(3);
+
+    // Amounts coerced from numeric strings to numbers, ordered chronologically.
+    expect(rounds[0]).toMatchObject({ name: "Seed", amount: 1_500_000, isProjected: false });
+    expect(rounds[2]).toMatchObject({
+      name: "Series B (planned)",
+      amount: 20_000_000,
+      isProjected: true,
+    });
+
+    // totalRaised = sum of all round amounts (1.5M + 8M + 20M).
+    expect(parsed.render.props.totalRaised).toBe(29_500_000);
+    expect(parsed.modelResult).toMatch(/funding_summary/);
+  });
+
+  it("flags projected rounds and reports the raised count in the model result", async () => {
+    const out = await genuiDisplayHandlers.show_funding_summary!({}, ctx);
+    const parsed = JSON.parse(out);
+    const rounds = parsed.render.props.rounds as Array<{ isProjected: boolean }>;
+    // Two historical (raised) rounds, one projected.
+    expect(rounds.filter((r) => !r.isProjected)).toHaveLength(2);
+    expect(rounds.filter((r) => r.isProjected)).toHaveLength(1);
+    expect(parsed.modelResult).toMatch(/3 rounds/);
   });
 });
 
