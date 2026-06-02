@@ -1,6 +1,7 @@
 "use client";
 import type { UiBlockClient } from "../types";
 import { GenMetricCard, type GenMetricCardProps } from "./metric-card";
+import { GenKpiGrid, type GenKpiGridProps } from "./kpi-grid";
 import { GenLineChart, type GenLineChartProps } from "./line-chart";
 import { GenBarChart, type GenBarChartProps } from "./bar-chart";
 import { GenAreaChart, type GenAreaChartProps } from "./area-chart";
@@ -19,6 +20,8 @@ export function GenerativeBlock({ component, props }: GenerativeBlockProps) {
   switch (component) {
     case "metric_card":
       return <GenMetricCard {...(props as unknown as GenMetricCardProps)} />;
+    case "kpi_grid":
+      return <GenKpiGrid {...(props as unknown as GenKpiGridProps)} />;
     case "line_chart":
       return <GenLineChart {...(props as unknown as GenLineChartProps)} />;
     case "bar_chart":

@@ -35,6 +35,42 @@ export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "show_kpi_grid",
+    description:
+      "Display several key metrics together inline as a compact grid of cards. Use when the user asks about multiple metrics at once or wants an at-a-glance summary (e.g. runway + MRR + burn). Numbers are computed server-side — you only choose which 2–8 metrics to include.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        metrics: {
+          type: "array",
+          minItems: 2,
+          maxItems: 8,
+          items: {
+            type: "string",
+            enum: [
+              "runway",
+              "net_burn",
+              "mrr",
+              "arr",
+              "cash",
+              "gross_margin",
+              "ltv",
+              "cac",
+              "ltv_cac",
+              "churn",
+            ],
+          },
+          description: "Which 2–8 metrics to show in the grid.",
+        },
+        scenarioId: {
+          type: "string",
+          description: "Optional scenario id; defaults to the active scenario.",
+        },
+      },
+      required: ["metrics"],
+    },
+  },
+  {
     name: "show_line_chart",
     description:
       "Display a monthly time series inline as a line chart. Use when the user asks to chart or trend a value over time (revenue, MRR, net burn, cash, headcount cost). Numbers are computed server-side — you only choose the series and how many recent months to show.",

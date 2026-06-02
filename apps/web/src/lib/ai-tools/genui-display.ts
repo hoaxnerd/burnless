@@ -90,6 +90,64 @@ genuiDisplayHandlers.show_metric_card = async (input, context) => {
   });
 };
 
+// ── show_kpi_grid ───────────────────────────────────────────────────────────
+
+const KPI_METRIC_ENUM = [
+  "runway",
+  "net_burn",
+  "mrr",
+  "arr",
+  "cash",
+  "gross_margin",
+  "ltv",
+  "cac",
+  "ltv_cac",
+  "churn",
+] as const;
+
+genuiDisplaySchemas.show_kpi_grid = z.object({
+  metrics: z.array(z.enum(KPI_METRIC_ENUM)).min(2).max(8),
+  scenarioId: z.string().optional(),
+});
+
+genuiDisplayHandlers.show_kpi_grid = async (input, context) => {
+  const ctx = requireCompanyId(context);
+  const requested = Array.isArray(input.metrics)
+    ? input.metrics.map((m) => String(m)).filter((m) => METRIC_SPECS[m])
+    : [];
+  const scenarioId = await resolveScenarioId(ctx, input.scenarioId);
+
+  const envelope = (items: Array<{ label: string; value: number | null; format: FormatHint; unit?: string }>) =>
+    JSON.stringify({
+      render: { component: "kpi_grid", props: { items } },
+      modelResult: items.length
+        ? `[kpi_grid shown: ${items.map((i) => i.label).join(", ")}]`
+        : `[kpi_grid: no data]`,
+    });
+
+  if (!scenarioId || requested.length === 0) return envelope([]);
+
+  const dash = await computeDashboardData(ctx.companyId, scenarioId);
+  const metricsByKey = dash.metrics as unknown as Record<
+    string,
+    Array<{ month: string; value: number }>
+  >;
+
+  const items = requested.map((metric) => {
+    const spec = METRIC_SPECS[metric]!;
+    const value = latest(metricsByKey[spec.key]);
+    const item: { label: string; value: number | null; format: FormatHint; unit?: string } = {
+      label: spec.label,
+      value,
+      format: spec.format,
+    };
+    if (spec.unit) item.unit = spec.unit;
+    return item;
+  });
+
+  return envelope(items);
+};
+
 // ── show_line_chart ─────────────────────────────────────────────────────────
 
 type MetricArray = Array<{ month: string; value: number }>;

@@ -170,6 +170,41 @@ describe("show_bar_chart", () => {
   });
 });
 
+describe("show_kpi_grid", () => {
+  it("returns a kpi_grid envelope with real values for each requested metric", async () => {
+    const out = await genuiDisplayHandlers.show_kpi_grid!(
+      { metrics: ["runway", "mrr"] },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("kpi_grid");
+    expect(parsed.render.props.items).toHaveLength(2);
+    const runway = parsed.render.props.items.find(
+      (i: { label: string }) => i.label === "Runway"
+    );
+    const mrr = parsed.render.props.items.find(
+      (i: { label: string }) => i.label === "MRR"
+    );
+    expect(runway).toEqual({ label: "Runway", value: 14.2, format: "number", unit: "months" });
+    expect(mrr.value).toBe(50000);
+    expect(mrr.format).toBe("currency");
+    expect(parsed.modelResult).toMatch(/kpi_grid/);
+  });
+
+  it("preserves the requested metric order and skips unknown metrics", async () => {
+    const out = await genuiDisplayHandlers.show_kpi_grid!(
+      { metrics: ["mrr", "net_burn"] },
+      ctx
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.props.items.map((i: { label: string }) => i.label)).toEqual([
+      "MRR",
+      "Net burn",
+    ]);
+    expect(parsed.render.props.items[1].value).toBe(82000);
+  });
+});
+
 describe("show_area_chart", () => {
   it("returns an area_chart of the cash position series (cash_runway)", async () => {
     const out = await genuiDisplayHandlers.show_area_chart!(

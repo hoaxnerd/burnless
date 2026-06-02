@@ -66,6 +66,7 @@ export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   //   show_bar_chart, show_area_chart, show_data_table, show_runway,
   //   show_cap_table, show_scenario_diff, show_burn_breakdown, show_funding_summary
   "show_metric_card",
+  "show_kpi_grid",
   "show_line_chart",
   "show_bar_chart",
   "show_area_chart",
