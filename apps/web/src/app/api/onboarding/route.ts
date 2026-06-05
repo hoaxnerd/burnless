@@ -37,7 +37,7 @@ import { applyOnboardingSuggestions } from "@/lib/onboarding-imports";
 const DEFAULT_ACCOUNTS = [
   { name: "Revenue", type: "income", category: "revenue", isSystem: true },
   { name: "Cost of Goods Sold", type: "expense", category: "cogs", isSystem: true },
-  { name: "Salaries & Payroll", type: "expense", category: "operating_expense", isSystem: false },
+  { name: "Salaries & Payroll", type: "expense", category: "operating_expense", isSystem: false, coversHeadcount: true },
   { name: "Cloud Infrastructure", type: "expense", category: "operating_expense", isSystem: false },
   { name: "Marketing", type: "expense", category: "operating_expense", isSystem: false },
   { name: "Office & Admin", type: "expense", category: "operating_expense", isSystem: false },

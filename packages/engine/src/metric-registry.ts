@@ -134,9 +134,9 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
   // Phase 2 D §1.4 D6: netBurnRate excludes debt principal (financing item); includes interestExpense (operating item)
   {
     slug: "netBurnRate",
-    name: "Monthly Burn",
-    description: "Net operating cash consumed per month after revenue; includes interest expense but excludes debt principal repayments (financing item)",
-    formula: "max(0, Total Expenses + Interest Expense − Total Revenue)",
+    name: "Net Burn",
+    description: "Net cash consumed per month after revenue (gross burn − revenue, floored at 0); includes interest expense but excludes debt principal repayments (financing item)",
+    formula: "max(0, Gross Burn − Total Revenue)",
     dependsOn: ["totalRevenue", "burnRate"],
     category: "cash",
     tier: "core",
@@ -732,17 +732,18 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
 
   {
     slug: "burnRate",
-    name: "Gross Burn Rate",
-    description: "Total monthly expenses before revenue",
-    formula: "Sum of all expenses",
+    name: "Gross Burn",
+    description: "Total cash out per month before revenue (operating expenses + debt interest)",
+    formula: "Total Expenses + Interest Expense",
     dependsOn: [],
     category: "cash",
-    tier: "advanced",
+    tier: "core",
     format: "currency",
     direction: "lower_better",
     icon: "Flame",
     color: "orange",
     href: "/expenses",
+    aiContext: { include: "both" },
   },
 
   // ── Expense Mix (totalOpex parent + components, umbrella §1.4) ───────────

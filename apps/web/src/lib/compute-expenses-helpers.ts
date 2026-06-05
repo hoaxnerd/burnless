@@ -10,6 +10,8 @@
  * the Next.js server or hitting Postgres.
  */
 
+import { ratioChange } from "@burnless/engine";
+
 export type ExpenseFrequency = "monthly" | "quarterly" | "annual";
 
 export interface AnomalyContextLine {
@@ -63,7 +65,7 @@ export function shouldFlagAnomaly(
     if (currentMonth === dayAfterKey) return false;
   }
   if (prevAmount <= 0) return false;
-  const change = (currentAmount - prevAmount) / prevAmount;
+  const change = ratioChange(currentAmount, prevAmount) ?? 0;
   return Math.abs(change) > ANOMALY_THRESHOLD;
 }
 

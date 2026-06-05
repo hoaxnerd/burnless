@@ -13,6 +13,9 @@ import {
   categorizeTransaction,
   seriesToArray,
   monthKey,
+  ratioChange,
+  pctOfTotal,
+  dSum,
   type ForecastLineInput,
   type HeadcountPlanInput,
 } from "@burnless/engine";
@@ -207,7 +210,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     // Frequency-aware baseline (monthly → t-1, quarterly → t-3, annual → t-12).
     const currentAmount = Number(values.get(currentMonth) ?? 0);
     const prevAmount = getAnomalyBaseline(ctx, currentMonth, values);
-    const changePercent = prevAmount > 0 ? (currentAmount - prevAmount) / prevAmount : 0;
+    const changePercent = ratioChange(currentAmount, prevAmount) ?? 0;
 
     // Derive subcategory from account name
     const { subcategory, confidence, source } = deriveSubcategory(account.name, account.category);
@@ -271,7 +274,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       endDate: null,
       frequency: "monthly",
     };
-    const hcChange = hcPrev > 0 ? (hcCurrent - hcPrev) / hcPrev : 0;
+    const hcChange = ratioChange(hcCurrent, hcPrev) ?? 0;
     lineItems.push({
       id: "headcount-synthetic",
       accountId: "headcount",
@@ -311,16 +314,16 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     subcatMap.set(item.subcategory, existing);
   }
 
-  const totalMonthlyCost = lineItems.reduce((sum, i) => sum + i.currentAmount, 0);
-  const totalPrevMonthlyCost = lineItems.reduce((sum, i) => sum + i.prevAmount, 0);
+  const totalMonthlyCost = dSum(lineItems.map((i) => i.currentAmount));
+  const totalPrevMonthlyCost = dSum(lineItems.map((i) => i.prevAmount));
 
   const subcategoryBreakdown: SubcategoryBreakdown[] = Array.from(subcatMap.entries())
     .map(([subcategory, data]) => ({
       subcategory,
       amount: data.amount,
-      percentage: totalMonthlyCost > 0 ? (data.amount / totalMonthlyCost) * 100 : 0,
+      percentage: pctOfTotal(data.amount, totalMonthlyCost),
       prevAmount: data.prevAmount,
-      changePercent: data.prevAmount > 0 ? (data.amount - data.prevAmount) / data.prevAmount : 0,
+      changePercent: ratioChange(data.amount, data.prevAmount) ?? 0,
       itemCount: data.items,
       isAnomaly: data.hasAnomaly,
     }))

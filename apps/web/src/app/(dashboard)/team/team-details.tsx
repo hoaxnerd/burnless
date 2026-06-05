@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
+import { pctOfTotal } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { CurrencyCode } from "@burnless/types";
 import { HeadcountForm, type EditableHeadcount } from "./headcount-form";
@@ -207,7 +208,7 @@ export function TeamRoster({
             .sort((a, b) => b.monthlyCost - a.monthlyCost)
             .map((dept, i) => {
               const color = deptColors[i % deptColors.length]!;
-              const pct = totalMonthlyCost > 0 ? (dept.monthlyCost / totalMonthlyCost) * 100 : 0;
+              const pct = pctOfTotal(dept.monthlyCost, totalMonthlyCost);
               const barWidth = (dept.monthlyCost / maxDeptCost) * 100;
               const isExpanded = expandedDepts.has(dept.department);
 

@@ -2,6 +2,7 @@
 
 import { TrendingDown, AlertTriangle, RotateCw, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { ratioToPct, pctOfTotal, dSum } from "@burnless/engine";
 import { AiGate } from "@/components/ai/ai-gate";
 import { formatCompactCurrency } from "@/components/charts";
 import type { SubcategoryBreakdown, ExpenseLineItem } from "@/lib/compute-expenses";
@@ -28,7 +29,7 @@ function generateInsights(
     insights.push({
       type: "warning",
       title: `${anomalies.length} expense${anomalies.length > 1 ? "s" : ""} spiked this month`,
-      message: `${worst.accountName} increased ${(worst.changePercent * 100).toFixed(0)}% MoM — from ${formatCompactCurrency(worst.prevAmount)} to ${formatCompactCurrency(worst.currentAmount)}. Review for unexpected charges.`,
+      message: `${worst.accountName} increased ${ratioToPct(worst.changePercent).toFixed(0)}% MoM — from ${formatCompactCurrency(worst.prevAmount)} to ${formatCompactCurrency(worst.currentAmount)}. Review for unexpected charges.`,
       icon: "alert",
     });
   }
@@ -41,9 +42,9 @@ function generateInsights(
       title: `${largest.subcategory} is your #1 spend category`,
       message: `At ${formatCompactCurrency(largest.amount)}/mo (${largest.percentage.toFixed(0)}% of total), this is your largest expense bucket. ${
         largest.changePercent > 0.05
-          ? `It grew ${(largest.changePercent * 100).toFixed(0)}% from last month.`
+          ? `It grew ${ratioToPct(largest.changePercent).toFixed(0)}% from last month.`
           : largest.changePercent < -0.05
-            ? `Good news — it decreased ${Math.abs(largest.changePercent * 100).toFixed(0)}% from last month.`
+            ? `Good news — it decreased ${Math.abs(ratioToPct(largest.changePercent)).toFixed(0)}% from last month.`
             : "It's been stable month-over-month."
       }`,
       icon: "trend",
@@ -52,9 +53,9 @@ function generateInsights(
 
   // Recurring expense summary
   const recurringItems = lineItems.filter((i) => i.isRecurring);
-  const recurringTotal = recurringItems.reduce((sum, i) => sum + i.currentAmount, 0);
+  const recurringTotal = dSum(recurringItems.map((i) => i.currentAmount));
   if (recurringItems.length >= 2) {
-    const pct = totalMonthly > 0 ? (recurringTotal / totalMonthly * 100).toFixed(0) : "0";
+    const pct = totalMonthly > 0 ? pctOfTotal(recurringTotal, totalMonthly).toFixed(0) : "0";
     insights.push({
       type: "neutral",
       title: `${recurringItems.length} recurring expenses totaling ${formatCompactCurrency(recurringTotal)}/mo`,

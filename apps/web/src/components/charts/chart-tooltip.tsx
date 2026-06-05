@@ -1,5 +1,6 @@
 "use client";
 
+import { pctChange } from "@burnless/engine";
 import { tooltipStyle, formatMonth, formatCompactCurrency } from "./chart-theme";
 
 /**
@@ -30,7 +31,7 @@ interface MoMTooltipProps {
 
 function computeMoMDelta(current: number, previous: number): string | null {
   if (previous === 0) return current > 0 ? "+∞" : null;
-  const delta = ((current - previous) / Math.abs(previous)) * 100;
+  const delta = pctChange(current, previous) ?? 0;
   if (!isFinite(delta)) return null;
   const sign = delta >= 0 ? "+" : "";
   return `${sign}${delta.toFixed(1)}%`;

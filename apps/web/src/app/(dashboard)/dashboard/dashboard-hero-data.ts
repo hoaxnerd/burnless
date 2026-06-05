@@ -6,6 +6,7 @@ import {
   getMetricMissingDataHint,
   getMetricDef,
   isMetricDataAvailable,
+  pctChange as pctChangeValue,
   type ComputedMetrics,
 } from "@burnless/engine";
 import { type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
@@ -126,7 +127,7 @@ export function buildHeroSwapCards(
         swapChange = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
       }
     } else if (swapPrevVal !== 0) {
-      const pct = ((swapCurrentVal - swapPrevVal) / Math.abs(swapPrevVal)) * 100;
+      const pct = pctChangeValue(swapCurrentVal, swapPrevVal) ?? 0;
       if (pct !== 0 && Number.isFinite(pct)) {
         swapChange = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
       }

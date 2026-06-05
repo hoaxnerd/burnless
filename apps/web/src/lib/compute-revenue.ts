@@ -6,7 +6,9 @@ import { cache } from "react";
 import {
   computeRevenueStream,
   seriesToArray,
-  monthKey,
+  pctChange,
+  ratioChange,
+  pctOfTotal,
   type RevenueStreamInput,
   type MetricValue,
 } from "@burnless/engine";
@@ -72,15 +74,15 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
   const targetYear = year ?? now.getFullYear();
   const periodStart = new Date(targetYear, 0, 1);
   const periodEnd = new Date(targetYear, 11, 1);
-  const currentMonth = monthKey(new Date(now.getFullYear(), now.getMonth(), 1));
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
   const [streams, dashData] = await Promise.all([
     getRevenueStreams(scenarioId),
     computeDashboardData(companyId, scenarioId, year),
   ]);
 
-  const { metrics, totalRevenue } = dashData;
+  // Phase A: reuse the dashboard's snapped horizon so revenue growth/anomaly
+  // metrics read the same "as of" month as the headline KPIs.
+  const { metrics, totalRevenue, currentMonth, prevMonth } = dashData;
   const hasSaaS = streams.some((s) => s.type === "subscription");
 
   // Per-stream revenue computation
@@ -101,7 +103,7 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
     const series = seriesToArray(values);
     const current = Number(values.get(currentMonth) ?? 0);
     const prev = Number(values.get(prevMonth) ?? 0);
-    const change = prev > 0 ? (current - prev) / prev : 0;
+    const change = ratioChange(current, prev) ?? 0;
 
     streamBreakdowns.push({
       id: stream.id,
@@ -111,7 +113,7 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
       currentRevenue: current,
       prevRevenue: prev,
       changePercent: change,
-      percentage: currentTotal > 0 ? (current / currentTotal) * 100 : 0,
+      percentage: pctOfTotal(current, currentTotal),
       monthlySeries: series,
     });
   }
@@ -139,10 +141,10 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
   // Growth metrics
   const currentMrr = findMetricValue(metrics.mrr, currentMonth);
   const prevMrr = findMetricValue(metrics.mrr, prevMonth);
-  const mrrGrowth = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
+  const mrrGrowth = pctChange(currentMrr, prevMrr) ?? 0;
   const currentRev = Number(totalRevenue.get(currentMonth) ?? 0);
   const prevRev = Number(totalRevenue.get(prevMonth) ?? 0);
-  const revGrowth = prevRev > 0 ? ((currentRev - prevRev) / prevRev) * 100 : 0;
+  const revGrowth = pctChange(currentRev, prevRev) ?? 0;
 
   const quickRatio = findMetricValue(metrics.saasQuickRatio, currentMonth);
 

@@ -226,6 +226,7 @@ async function seed() {
       | "equity";
     isSystem: boolean;
     sortOrder: number;
+    coversHeadcount?: boolean;
   }> = [
     // Income
     {
@@ -277,6 +278,7 @@ async function seed() {
       category: "operating_expense",
       isSystem: true,
       sortOrder: 20,
+      coversHeadcount: true,
     },
     {
       id: IDS.acctMarketing,

@@ -120,6 +120,27 @@ export function applySalaryChanges(
   return salary;
 }
 
+/**
+ * Reconcile headcount-plan cost with personnel ACTUALS to prevent double-counting.
+ *
+ * When a company books real payroll to a `coversHeadcount` financial account AND
+ * maintains a headcount plan, both would otherwise be summed into expenses. This
+ * returns a copy of the plan cost with the value zeroed in every month that has
+ * personnel actuals — so closed months use actuals and forecast months use the
+ * plan, and personnel is counted exactly once. A no-op when the set is empty
+ * (headcount-plan-only companies are unaffected).
+ */
+export function reconcileHeadcountWithActuals(
+  headcountCost: MonthlySeries,
+  personnelActualMonths: Set<string>,
+): MonthlySeries {
+  const out: MonthlySeries = new Map(headcountCost);
+  for (const month of personnelActualMonths) {
+    if (out.has(month)) out.set(month, 0);
+  }
+  return out;
+}
+
 // ── Core headcount functions ─────────────────────────────────────────────────
 
 const FULL_TIME_BASELINE_HPW = 40;

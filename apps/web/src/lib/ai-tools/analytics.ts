@@ -23,6 +23,7 @@ export const createAccountSchema = z.object({
   name: nameString,
   type: z.enum(["income", "expense", "asset", "liability", "equity"]),
   category: z.enum(["revenue", "cogs", "operating_expense", "other_income", "other_expense", "asset", "liability", "equity"]),
+  coversHeadcount: z.boolean().optional(),
 });
 
 export const updateAccountSchema = z.object({
@@ -163,6 +164,7 @@ async function createAccount(
     name: data.name,
     type: data.type,
     category: data.category,
+    coversHeadcount: data.coversHeadcount ?? false,
   }, ctx.scenarioId ?? null);
 
   return JSON.stringify({

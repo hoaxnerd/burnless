@@ -6,6 +6,7 @@
 
 import {
   monthKey,
+  pctChange as pctChangeValue,
 } from "@burnless/engine";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { computeDashboardData } from "./compute-dashboard";
@@ -66,8 +67,7 @@ function findMetric(
 }
 
 function pctChange(current: number, previous: number): number {
-  if (previous === 0) return 0;
-  return ((current - previous) / Math.abs(previous)) * 100;
+  return pctChangeValue(current, previous) ?? 0;
 }
 
 

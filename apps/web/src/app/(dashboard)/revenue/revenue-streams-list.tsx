@@ -1,5 +1,6 @@
 "use client";
 
+import { ratioToPct } from "@burnless/engine";
 import { AreaChartWidget, chartColors } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
@@ -164,7 +165,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const churn = params.monthlyChurnRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        {fmtCurrency(Number(price))}/mo &middot; {Number(customers)} customers &middot; {(Number(churn) * 100).toFixed(1)}% churn
+        {fmtCurrency(Number(price))}/mo &middot; {Number(customers)} customers &middot; {ratioToPct(Number(churn)).toFixed(1)}% churn
       </span>
     );
   }
@@ -200,7 +201,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const takeRate = params.takeRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        GMV {fmtCurrency(Number(gmv))} &times; {(Number(takeRate) * 100).toFixed(1)}% take rate
+        GMV {fmtCurrency(Number(gmv))} &times; {ratioToPct(Number(takeRate)).toFixed(1)}% take rate
       </span>
     );
   }

@@ -5,12 +5,24 @@
 // Decimal utilities (for consumers who need precise arithmetic)
 export { D, dRound2, dSum, dMul, dDiv, dAdd, dSub, dPow, Decimal } from "./decimal";
 
+// Single-source derived-arithmetic helpers (MoM %, share-of-total, rate→%, annualize).
+// All app-side financial display math must route through these.
+export {
+  pctChange,
+  ratioChange,
+  pctOfTotal,
+  ratioToPct,
+  annualize,
+} from "./calc-helpers";
+
 // Utilities
 export {
   toDate,
   monthRange,
   monthKey,
   parseMonthKey,
+  previousMonthKey,
+  projectActualsForward,
   round2,
   isActiveInMonth,
   proratedFraction,
@@ -58,6 +70,7 @@ export {
   computeRevenueStream,
   computeTotalRevenue,
   computeSubscriptionDetail,
+  computeSubscriptionDetailForStream,
   selectTier,
   type RevenueStreamInput,
   type SubscriptionParams,
@@ -75,6 +88,7 @@ export {
 export {
   computeHeadcountPlanCost,
   computeAllHeadcountCosts,
+  reconcileHeadcountWithActuals,
   type HeadcountPlanInput,
   type HeadcountCostBreakdown,
 } from "./headcount";
@@ -168,6 +182,9 @@ export {
   computeSafeConversion,
   computeConvertibleNote,
   computeGrant,
+  computeDilution,
+  type DilutionInput,
+  type DilutionResult,
   type CapTable,
   type CapTableRow,
   type CapTableInput,

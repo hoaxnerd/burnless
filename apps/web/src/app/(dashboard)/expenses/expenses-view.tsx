@@ -14,7 +14,7 @@ import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
-import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, type ResolvedSlotData } from "@burnless/engine";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, pctOfTotal, type ResolvedSlotData } from "@burnless/engine";
 import type { ExpenseDetails } from "@/lib/compute-expenses";
 
 interface MetricPoint {
@@ -273,7 +273,7 @@ export function ExpensesView({
                   <tbody>
                     {budgetCompareData.map((row) => {
                       const variance = row.budget - row.actual;
-                      const pct = row.budget > 0 ? ((variance / row.budget) * 100).toFixed(1) : "0.0";
+                      const pct = row.budget > 0 ? pctOfTotal(variance, row.budget).toFixed(1) : "0.0";
                       const isGood = variance >= 0;
                       return (
                         <tr key={row.month} className="border-b border-surface-100 hover:bg-surface-50 transition-colors">

@@ -15,6 +15,7 @@ import {
   isMetricDataAvailable,
   getMetricMissingDataHint,
   DEFAULT_SECONDARY_METRICS,
+  pctChange,
   type ComputedMetrics,
 } from "@burnless/engine";
 import { useMetrics } from "@/components/providers/metrics-context";
@@ -135,7 +136,7 @@ export function CustomizableMetrics({
             change = `${diff >= 0 ? "+" : ""}${Number.isInteger(diff) ? diff : diff.toFixed(1)}`;
           }
         } else if (prevVal !== 0) {
-          const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
+          const pct = pctChange(currentVal, prevVal) ?? 0;
           if (pct !== 0 && Number.isFinite(pct)) {
             change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
           }

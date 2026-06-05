@@ -297,6 +297,49 @@ export function computeFundingImpact(input: FundingImpactInput): FundingImpact {
 
 // --- Task 10: Debt schedule ---
 
+export interface DilutionInput {
+  /** New capital being raised in this round. */
+  raiseAmount: number;
+  /** Pre-money valuation. */
+  preMoney: number;
+  /** Founders' ownership BEFORE this round, as a 0-100 percentage. */
+  foundersOwnershipPct: number;
+}
+
+export interface DilutionResult {
+  /** Post-money valuation (pre-money + raise). */
+  postMoney: number;
+  /** Dilution introduced by this round, as a 0-100 percentage. */
+  dilutionPct: number;
+  /** Founders' ownership AFTER the round, as a 0-100 percentage. */
+  newFoundersOwnershipPct: number;
+}
+
+/**
+ * Model a single dilutive raise (the interactive funding "dilution calculator").
+ * Pure function — the only place this math is defined. UI widgets must call this
+ * rather than computing post-money / dilution inline.
+ */
+export function computeDilution(input: DilutionInput): DilutionResult {
+  const postMoney = D(input.preMoney).plus(input.raiseAmount);
+  if (postMoney.lte(0)) {
+    return {
+      postMoney: 0,
+      dilutionPct: 0,
+      newFoundersOwnershipPct: input.foundersOwnershipPct,
+    };
+  }
+  const dilution = D(input.raiseAmount).div(postMoney).mul(100);
+  const newFounders = D(input.foundersOwnershipPct).mul(
+    D(1).minus(dilution.div(100)),
+  );
+  return {
+    postMoney: postMoney.toNumber(),
+    dilutionPct: dilution.toNumber(),
+    newFoundersOwnershipPct: newFounders.toNumber(),
+  };
+}
+
 export interface DebtComputeInput {
   principal: number;
   debtParams: DebtParams;

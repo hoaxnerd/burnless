@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { getCompany, getActiveScenario, getServerScenarioId } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
-import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import { seriesToArray, METRIC_REGISTRY, annualize } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
@@ -57,9 +57,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
   const revenueTimeline = seriesToArray(data.totalRevenue);
   const mrrTimeline = data.metrics.mrr;
 
-  const { currentMonth } = data;
-  const now = new Date();
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const { currentMonth, prevMonth } = data;
   const g = revenueDetails.growthMetrics;
   const fc = (v: number) => formatCurrency(v, companyCurrency(company), undefined, { compact: true });
 
@@ -133,7 +131,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           slotId: "metric-1",
           content: { type: "metric", slug: "annualRunRate" },
           label: "Annual Run Rate",
-          value: fc(g.currentRevenue * 12),
+          value: fc(annualize(g.currentRevenue)),
           description: "Based on current monthly",
           hasData: g.currentRevenue > 0,
           metricStyle: { icon: "TrendingUp", color: "violet", href: "/revenue" },

@@ -18,6 +18,7 @@ import {
   type MonthlySeries,
   monthRange,
   monthKey,
+  parseMonthKey,
   round2,
   addSeries,
   isActiveInMonth,
@@ -347,6 +348,56 @@ export function computeSubscriptionDetail(
   }
 
   return details;
+}
+
+/**
+ * Subscription MRR detail gated to the stream's active window.
+ *
+ * `computeSubscriptionDetail` takes only `params` and has no knowledge of the
+ * stream's start/end dates, so on its own it accrues MRR across the entire
+ * period — leaking MRR for subscriptions that haven't started yet (or have
+ * ended). This wrapper applies the SAME activity gate + proration that
+ * `computeRevenueStream` applies, so MRR matches the subscription's revenue
+ * month-for-month. MRR/ARR consumers must use this, not the raw detail.
+ */
+export function computeSubscriptionDetailForStream(
+  stream: RevenueStreamInput,
+  periodStart: Date,
+  periodEnd: Date,
+): SubscriptionDetail[] {
+  const raw = computeSubscriptionDetail(
+    stream.parameters as unknown as SubscriptionParams,
+    periodStart,
+    periodEnd,
+  );
+  return raw.map((d) => {
+    const month = parseMonthKey(d.month);
+    if (!isActiveInMonth(month, stream.startDate, stream.endDate)) {
+      return {
+        month: d.month,
+        customers: 0,
+        newCustomers: 0,
+        churnedCustomers: 0,
+        mrr: 0,
+        newMrr: 0,
+        expansionMrr: 0,
+        churnedMrr: 0,
+        netNewMrr: 0,
+      };
+    }
+    const f = proratedFraction(month, stream.startDate, stream.endDate);
+    return {
+      month: d.month,
+      customers: d.customers,
+      newCustomers: d.newCustomers,
+      churnedCustomers: d.churnedCustomers,
+      mrr: round2(d.mrr * f),
+      newMrr: round2(d.newMrr * f),
+      expansionMrr: round2(d.expansionMrr * f),
+      churnedMrr: round2(d.churnedMrr * f),
+      netNewMrr: round2(d.netNewMrr * f),
+    };
+  });
 }
 
 // ── Individual revenue type calculations ─────────────────────────────────────

@@ -325,23 +325,23 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: dRound2(netNewArr.div(priorQtrSpend)) };
   });
 
-  // Cash metrics
-  const expenses = seriesToArray(input.totalExpenses);
-  const grossBurnRate = expenses.map((v) => ({
-    month: v.month,
-    value: v.value,
-  }));
-
-  const netBurnRate = months.map((m) => {
-    const rev = D(input.revenue.get(m) ?? 0);
+  // Cash metrics — gross and net burn are distinct, coherent stats:
+  //   gross burn = total cash out before revenue (operating expenses + debt interest)
+  //   net burn   = max(0, gross burn − revenue)   — a profitable month has 0 net burn
+  // Phase 2 D §1.4 D6: interest is an operating expense (P&L line) and belongs in burn;
+  // principal is financing (cash flow only) and is added to the runway denominator instead.
+  // interestExpense arrives as a separate series from FundingImpact (the engine doesn't
+  // route interest through the accounts pipeline, to keep the boundary explicit).
+  const grossBurnRate = months.map((m) => {
     const exp = D(input.totalExpenses.get(m) ?? 0);
     const interest = D(input.interestExpense?.get(m) ?? 0);
-    // Phase 2 D §1.4 D6: interest is operating expense (P&L line); principal is financing
-    // (cash flow only). totalExpenses contains operating accounts; interestExpense arrives
-    // as a separate series from FundingImpact (engine doesn't route interest into the
-    // accounts pipeline to keep the boundary explicit).
-    const operatingBurn = exp.plus(interest).minus(rev);
-    return { month: m, value: dRound2(dMax(0, operatingBurn)) };
+    return { month: m, value: dRound2(exp.plus(interest)) };
+  });
+
+  const netBurnRate = months.map((m, i) => {
+    const rev = D(input.revenue.get(m) ?? 0);
+    const gross = D(grossBurnRate[i]?.value ?? 0);
+    return { month: m, value: dRound2(dMax(0, gross.minus(rev))) };
   });
 
   const cashPos = seriesToArray(input.cashPosition);

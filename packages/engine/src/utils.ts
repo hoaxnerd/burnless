@@ -43,6 +43,42 @@ export function parseMonthKey(key: string): Date {
   return new Date(y, m - 1, 1);
 }
 
+/** The month immediately before `key` (YYYY-MM), rolling across year boundaries. */
+export function previousMonthKey(key: string): string {
+  const d = parseMonthKey(key);
+  return monthKey(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+}
+
+/**
+ * Phase B carry-forward: extend a transaction-only account's actuals across the
+ * forecast horizon so categories don't read 0 past the last imported month
+ * (which would otherwise skew Gross Margin to 100% and make expenses look thin).
+ *
+ * Months at or before the last actual are preserved verbatim — gaps between
+ * actuals are NOT interpolated. Every horizon month *after* the last actual is
+ * filled with the trailing average of the last `trailingMonths` actual values
+ * (a stable projection that tolerates a single noisy month). Leading months
+ * before the first actual are left absent. The input series is not mutated.
+ *
+ * Month keys are "YYYY-MM" so lexicographic string comparison is chronological.
+ */
+export function projectActualsForward(
+  actuals: MonthlySeries,
+  horizonMonths: string[],
+  trailingMonths = 3,
+): MonthlySeries {
+  const result = new Map(actuals);
+  const actualKeys = Array.from(actuals.keys()).sort();
+  if (actualKeys.length === 0) return result;
+  const lastActual = actualKeys[actualKeys.length - 1]!;
+  const tail = actualKeys.slice(-trailingMonths);
+  const avg = tail.reduce((s, k) => s + (actuals.get(k) ?? 0), 0) / tail.length;
+  for (const m of horizonMonths) {
+    if (m > lastActual) result.set(m, avg);
+  }
+  return result;
+}
+
 /** Round to 2 decimal places (round half away from zero — standard financial rounding). */
 export function round2(n: number): number {
   if (n == null || Number.isNaN(n)) return 0;

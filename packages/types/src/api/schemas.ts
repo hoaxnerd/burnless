@@ -35,6 +35,7 @@ export const createAccountSchema = z.object({
   parentId: z.string().nullable().default(null),
   isSystem: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
+  coversHeadcount: z.boolean().default(false),
 });
 
 export const updateAccountSchema = z.object({
@@ -43,6 +44,7 @@ export const updateAccountSchema = z.object({
   category: accountCategoryEnum.optional(),
   parentId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
+  coversHeadcount: z.boolean().optional(),
 });
 
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;

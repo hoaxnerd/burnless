@@ -10,6 +10,7 @@ import {
   getMetricDef,
   getMetricMissingDataHint,
   isMetricDataAvailable,
+  pctChange,
   type ComputedMetrics,
   type ResolvedSlotData,
 } from "@burnless/engine";
@@ -72,7 +73,7 @@ export function buildSlotMetricCard(
       }
     } else {
       // Show as "+12.5%" (percentage change)
-      const pct = ((currentVal - prevVal) / Math.abs(prevVal)) * 100;
+      const pct = pctChange(currentVal, prevVal) ?? 0;
       if (pct !== 0 && Number.isFinite(pct)) {
         change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
         changeLabel = "vs last month";

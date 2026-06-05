@@ -357,6 +357,12 @@ export const financialAccounts = pgTable(
     parentId: text("parent_id"),
     isSystem: boolean("is_system").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
+    // When true, transactions on this account ARE personnel cost that the
+    // headcount plan also models. The compute layer then uses these actuals in
+    // months where they exist and suppresses the headcount-plan cost for those
+    // months, so payroll isn't double-counted (actuals in closed months, plan
+    // in forecast months). See `reconcileHeadcountWithActuals`.
+    coversHeadcount: boolean("covers_headcount").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

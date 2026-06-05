@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
+import { ratioToPct } from "@burnless/engine";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, Modal } from "@/components/ui";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
@@ -164,7 +165,7 @@ export function RevenueStreamBreakdown({
                         {formatCompactCurrency(stream.currentRevenue)}
                       </span>
                       <span className={`text-[10px] font-medium ${changeColor}`}>
-                        {changeIcon}{Math.abs(stream.changePercent * 100).toFixed(0)}%
+                        {changeIcon}{Math.abs(ratioToPct(stream.changePercent)).toFixed(0)}%
                       </span>
                       {/* Edit/delete actions — visible on hover */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

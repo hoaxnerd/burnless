@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { getCompany, getActiveScenario, getServerScenarioId, getAccounts, getDepartments } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
-import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import { seriesToArray, METRIC_REGISTRY, pctChange, pctOfTotal } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { aggregateBudgetTimeline } from "@/lib/budget-timeline";
@@ -84,16 +84,14 @@ async function ExpensesContent({ companyId, scenarioId, company }: { companyId: 
     );
   }
 
-  const { currentMonth, totalExpenses, totalOpex, totalCogs } = data;
+  const { currentMonth, prevMonth, totalExpenses, totalOpex, totalCogs } = data;
   const totalExpenseAmount = totalExpenses.get(currentMonth) ?? 0;
   const opexAmount = totalOpex.get(currentMonth) ?? 0;
   const cogsAmount = totalCogs.get(currentMonth) ?? 0;
   const personnelCost = data.headcountCostSeries.get(currentMonth) ?? 0;
 
-  const now = new Date();
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const prevTotal = totalExpenses.get(prevMonth) ?? 0;
-  const changePercent = prevTotal > 0 ? ((totalExpenseAmount - prevTotal) / prevTotal * 100) : null;
+  const changePercent = pctChange(totalExpenseAmount, prevTotal);
 
   // Budget = sum of forecasted line items (the "plan"); actuals come from
   // totalExpenses. A null timeline tells the view to hide the overlay; we
@@ -107,7 +105,7 @@ async function ExpensesContent({ companyId, scenarioId, company }: { companyId: 
     totalMonthly: totalExpenseAmount,
     changePercent: changePercent ? Number(changePercent) : null,
     personnelCost,
-    personnelPercent: totalExpenseAmount > 0 ? (personnelCost / totalExpenseAmount * 100) : 0,
+    personnelPercent: pctOfTotal(personnelCost, totalExpenseAmount),
     opexAmount: Math.max(0, opexAmount - personnelCost),
     cogsAmount,
     anomalyCount,

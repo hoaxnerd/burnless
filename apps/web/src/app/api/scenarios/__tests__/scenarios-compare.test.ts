@@ -39,20 +39,23 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), isNull: vi.fn() }));
 
+// buildScenarioData delegates to the shared compute (computeFinancials) + the data
+// layer; stub both so this stays a validation/shape test.
+vi.mock("@/lib/compute-financials", () => ({
+  computeFinancials: vi.fn().mockReturnValue({
+    totalRevenue: new Map(),
+    totalExpenses: new Map(),
+    netIncome: new Map(),
+    cashPosition: new Map(),
+    headcountSeries: new Map(),
+  }),
+}));
+vi.mock("@/lib/data", () => ({
+  getTransactions: vi.fn().mockResolvedValue([]),
+  getForecastValues: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@burnless/engine", () => ({
-  computeAllForecastLines: vi.fn().mockReturnValue([]),
-  aggregateByAccount: vi.fn().mockReturnValue(new Map()),
-  computeTotalRevenue: vi.fn().mockReturnValue(new Map()),
-  computeAllHeadcountCosts: vi
-    .fn()
-    .mockReturnValue({ totalCost: new Map(), headcount: new Map() }),
-  D: vi.fn((v: number) => ({
-    plus: vi.fn().mockReturnThis(),
-    minus: vi.fn().mockReturnThis(),
-    toNumber: vi.fn().mockReturnValue(v ?? 0),
-  })),
-  dRound2: vi.fn((v: unknown) => (typeof v === "object" && v !== null && "toNumber" in v ? (v as { toNumber: () => number }).toNumber() : Number(v ?? 0))),
-  monthKey: vi.fn((d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`),
   // The engine's compareScenarios returns the scenario *name* as a string
   // (ScenarioComparison.baseScenario: string). The API route wraps it into
   // `{ id, name }` using the DB scenario record. Keep this mock honest to
@@ -93,6 +96,7 @@ vi.mock("@burnless/engine", () => ({
   }),
   addSeries: vi.fn().mockReturnValue(new Map()),
   subtractSeries: vi.fn().mockReturnValue(new Map()),
+  dSum: vi.fn((vals: number[]) => (Array.isArray(vals) ? vals.reduce((s, v) => s + Number(v), 0) : 0)),
 }));
 
 import { GET } from "../compare/route";

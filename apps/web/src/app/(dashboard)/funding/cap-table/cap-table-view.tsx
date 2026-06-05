@@ -1,5 +1,6 @@
 "use client";
 
+import { ratioToPct } from "@burnless/engine";
 import type { CapTable } from "@burnless/engine";
 
 export function CapTableView({ capTable }: { capTable: CapTable }) {
@@ -36,7 +37,7 @@ export function CapTableView({ capTable }: { capTable: CapTable }) {
               <td className="p-2">{r.holder}</td>
               <td className="p-2">{r.shareClass}</td>
               <td className="p-2 text-right">{r.shares.toLocaleString()}</td>
-              <td className="p-2 text-right">{(r.ownershipPercent * 100).toFixed(2)}%</td>
+              <td className="p-2 text-right">{ratioToPct(r.ownershipPercent).toFixed(2)}%</td>
             </tr>
           ))}
         </tbody>
@@ -49,7 +50,7 @@ function Stat({ label, pct }: { label: string; pct: number }) {
   return (
     <div className="p-3 border rounded">
       <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-semibold">{(pct * 100).toFixed(1)}%</div>
+      <div className="text-2xl font-semibold">{ratioToPct(pct).toFixed(1)}%</div>
     </div>
   );
 }

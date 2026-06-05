@@ -12,8 +12,9 @@ import {
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import {
   seriesToArray,
-  monthKey,
+  parseMonthKey,
   DEFAULT_HERO_CARDS,
+  pctChange,
 } from "@burnless/engine";
 import { HeroCardGrid } from "./hero-card-grid";
 import { HeroCardSlot } from "./hero-card-slot";
@@ -59,7 +60,7 @@ export default async function DashboardPage() {
       getDashboardPreferences().catch(() => null),
     ]);
 
-  const { metrics, hasData, currentMonth } = data;
+  const { metrics, hasData, currentMonth, prevMonth } = data;
 
   /* ── Current values (guard against NaN/Infinity from engine) ───── */
   const safeNum = (v: number | undefined, fallback: number) => {
@@ -72,8 +73,7 @@ export default async function DashboardPage() {
   const currentMrr = safeNum(metrics.mrr.find((m) => m.month === currentMonth)?.value, 0);
 
   /* ── Previous month values (for MoM change) ────────────────────── */
-  const now = new Date();
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  // prevMonth is derived from the snapped currentMonth (data.prevMonth).
   const _prevCash = safeNum(metrics.cashPosition.find((m) => m.month === prevMonth)?.value, data.startingCash);
   const _prevBurn = safeNum(metrics.netBurnRate.find((m) => m.month === prevMonth)?.value, 0);
   const prevMrr = safeNum(metrics.mrr.find((m) => m.month === prevMonth)?.value, 0);
@@ -117,8 +117,10 @@ export default async function DashboardPage() {
   /* ── Pinned secondary metrics ───────────────────────────────────── */
 
   /* ── Board Meeting Mode data ──────────────────────────────────── */
-  const mrrGrowthPct = prevMrr > 0 ? ((currentMrr - prevMrr) / prevMrr) * 100 : 0;
-  const monthLabel = new Date(now.getFullYear(), now.getMonth(), 1)
+  const mrrGrowthPct = pctChange(currentMrr, prevMrr) ?? 0;
+  // Label the snapped "as of" month (parseMonthKey(currentMonth)), not the raw
+  // calendar month, so the board header matches the KPI data it summarizes.
+  const monthLabel = parseMonthKey(currentMonth)
     .toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const boardData = {
     companyName: company.name,

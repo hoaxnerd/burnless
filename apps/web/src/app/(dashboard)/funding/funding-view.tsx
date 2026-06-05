@@ -10,7 +10,7 @@ import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
 import { SwappableMetricCard } from "@/components/ui/swappable-metric-card";
 import { useMetrics } from "@/components/providers/metrics-context";
-import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents } from "@burnless/engine";
+import { CATEGORY_META, getMetricDef, getMetricDependencyTree, getMetricDependents, computeDilution } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import type { CurrencyCode } from "@burnless/types";
 
@@ -60,11 +60,13 @@ export function FundingView({
   const [calcPreMoney, setCalcPreMoney] = useState(8_000_000);
 
   const calcDilution = useMemo(() => {
-    const postMoney = calcPreMoney + calcRaiseAmount;
-    if (postMoney <= 0) return { dilution: 0, postMoney: 0, newOwnership: foundersOwnership };
-    const dilution = (calcRaiseAmount / postMoney) * 100;
-    const newOwnership = foundersOwnership * (1 - dilution / 100);
-    return { dilution, postMoney, newOwnership };
+    // Single source: the dilution math lives in the engine (computeDilution).
+    const r = computeDilution({
+      raiseAmount: calcRaiseAmount,
+      preMoney: calcPreMoney,
+      foundersOwnershipPct: foundersOwnership,
+    });
+    return { dilution: r.dilutionPct, postMoney: r.postMoney, newOwnership: r.newFoundersOwnershipPct };
   }, [calcRaiseAmount, calcPreMoney, foundersOwnership]);
 
   // ── Context wiring ──────────────────────────────────────────────────────

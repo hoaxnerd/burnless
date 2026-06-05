@@ -3,6 +3,7 @@
  * Analyzes metric data and surfaces actionable insights without user prompting.
  */
 
+import { pctChange } from "@burnless/engine";
 import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
 
 export type AlertSeverity = "critical" | "warning" | "info" | "celebration";
@@ -80,7 +81,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
 
   // ── Warning: Burn rate accelerating ────────────────────────────────
   if (prevBurn > 0 && burn > 0) {
-    const burnChange = ((burn - prevBurn) / prevBurn) * 100;
+    const burnChange = pctChange(burn, prevBurn) ?? 0;
     if (burnChange > 15) {
       alerts.push({
         id: "burn-accelerating",
@@ -95,7 +96,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
 
   // ── Warning: MRR declining ─────────────────────────────────────────
   if (prevMrr > 0 && mrr < prevMrr) {
-    const mrrDecline = ((prevMrr - mrr) / prevMrr) * 100;
+    const mrrDecline = -(pctChange(mrr, prevMrr) ?? 0);
     if (mrrDecline > 5) {
       alerts.push({
         id: "mrr-declining",
@@ -139,7 +140,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
 
   // ── Celebration: Burn rate improving ────────────────────────────────
   if (prevBurn > 0 && burn > 0 && burn < prevBurn) {
-    const burnImprovement = ((prevBurn - burn) / prevBurn) * 100;
+    const burnImprovement = -(pctChange(burn, prevBurn) ?? 0);
     if (burnImprovement > 10) {
       alerts.push({
         id: "burn-improving",

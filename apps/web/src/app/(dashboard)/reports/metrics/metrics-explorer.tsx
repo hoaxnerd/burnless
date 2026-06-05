@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { pctChange } from "@burnless/engine";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
 import { AreaChartWidget, chartColors, formatPercent, formatNumber } from "@/components/charts";
 import { useLocale } from "@/components/locale/locale-context";
@@ -197,7 +198,7 @@ export function MetricsExplorer({
 
 function TrendIndicator({ current, previous }: { current: number; previous: number }) {
   if (previous === 0) return null;
-  const change = ((current - previous) / Math.abs(previous)) * 100;
+  const change = pctChange(current, previous) ?? 0;
   const isPositive = change >= 0;
 
   return (

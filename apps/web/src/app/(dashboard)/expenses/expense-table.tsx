@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
+import { ratioToPct } from "@burnless/engine";
 import { formatCompactCurrency } from "@/components/charts";
 import { Modal } from "@/components/ui";
 import { ExpenseFormModal } from "./expense-form-modal";
@@ -505,7 +506,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                         {item.categorySource === "rule" && !overrides[item.id] && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600"
-                            title={`AI categorized (${Math.round(item.subcategoryConfidence * 100)}% confidence)`}
+                            title={`AI categorized (${Math.round(ratioToPct(item.subcategoryConfidence))}% confidence)`}
                           >
                             <Sparkles className="h-2.5 w-2.5" /> AI
                           </span>
@@ -533,7 +534,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     <td className="px-4 py-3 text-right">
                       <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
                         <span className="sr-only">{changeLabel}</span>
-                        {changeIcon} {Math.abs(item.changePercent * 100).toFixed(0)}%
+                        {changeIcon} {Math.abs(ratioToPct(item.changePercent)).toFixed(0)}%
                       </span>
                     </td>
                     <td className="px-4 py-3">

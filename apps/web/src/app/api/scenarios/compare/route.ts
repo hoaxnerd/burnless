@@ -3,23 +3,9 @@ import { db, scenarios, getResolvedData } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
-import {
-  computeAllForecastLines,
-  aggregateByAccount,
-  computeTotalRevenue,
-  computeAllHeadcountCosts,
-  compareScenarios,
-  type ForecastLineInput,
-  type RevenueStreamInput,
-  type HeadcountPlanInput,
-  type ScenarioData,
-  type MonthlySeries,
-  addSeries,
-  subtractSeries,
-  monthKey,
-  D,
-  dRound2,
-} from "@burnless/engine";
+import { getTransactions, getForecastValues } from "@/lib/data";
+import { computeFinancials } from "@/lib/compute-financials";
+import { compareScenarios, type ScenarioData } from "@burnless/engine";
 
 /**
  * GET /api/scenarios/compare?baseId=xxx&compareId=yyy[&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD]
@@ -147,97 +133,42 @@ async function buildScenarioData(
   periodStart: Date,
   periodEnd: Date
 ): Promise<ScenarioData> {
-  // Resolve all entity types with scenario overlay (null = base data)
+  // Resolve all entity types with scenario overlay (null = base data), plus the
+  // actuals + forecast-value overrides the shared compute needs.
   const data = await getResolvedData(companyId, scenarioId);
+  const [transactions, forecastValues] = await Promise.all([
+    getTransactions(companyId),
+    getForecastValues(data.forecastLines.map((l) => l.id)),
+  ]);
 
-  const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
-    id: fl.id,
-    accountId: fl.accountId,
-    method: fl.method,
-    parameters: (fl.parameters ?? {}) as Record<string, unknown>,
-    startDate: fl.startDate,
-    endDate: fl.endDate,
-  }));
-  const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
-  const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
-
-  const revInputs: RevenueStreamInput[] = data.revenueStreams.map((rs) => ({
-    id: rs.id,
-    name: rs.name,
-    type: rs.type,
-    parameters: (rs.parameters ?? {}) as Record<string, unknown>,
-    startDate: rs.startDate,
-    endDate: rs.endDate,
-  }));
-  const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
-
-  const hcInputs: HeadcountPlanInput[] = data.headcountPlans.map((hp) => ({
-    id: hp.id,
-    departmentId: hp.departmentId,
-    title: hp.title,
-    name: hp.name ?? null,
-    employeeType: hp.employeeType,
-    count: Number(hp.count),
-    salary: Number(hp.salary),
-    hourlyRate: hp.hourlyRate == null ? null : Number(hp.hourlyRate),
-    hoursPerWeek: hp.hoursPerWeek == null ? null : Number(hp.hoursPerWeek),
-    startDate: hp.startDate,
-    endDate: hp.endDate,
-    benefitsRate: Number(hp.benefitsRate),
-    benefitsBreakdown: (hp.parameters as { benefitsBreakdown?: HeadcountPlanInput["benefitsBreakdown"] } | null)?.benefitsBreakdown,
-  }));
-  const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
-
-  const accountMap = new Map(data.financialAccounts.map((a) => [a.id, a]));
-  let totalRevenue = new Map(revenueValues);
-  let totalCogs: MonthlySeries = new Map();
-  let totalOpex: MonthlySeries = new Map();
-  let totalOtherIncome: MonthlySeries = new Map();
-  let totalOtherExpense: MonthlySeries = new Map();
-
-  for (const [accountId, values] of accountForecasts) {
-    const account = accountMap.get(accountId);
-    if (!account) continue;
-    if (account.category === "revenue") totalRevenue = addSeries(totalRevenue, values);
-    else if (account.category === "cogs") totalCogs = addSeries(totalCogs, values);
-    else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
-    else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, values);
-    else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, values);
-  }
-  totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
-  const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
-  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
-
-  // Cash position from resolved funding rounds
-  const funding = data.fundingRounds;
-  const startingCash = funding
-    .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
-    .reduce((sum, r) => sum + Number(r.amount), 0);
-  const futureFunding: MonthlySeries = new Map();
-  for (const r of funding) {
-    const rDate = new Date(r.date);
-    if (r.isProjected || rDate >= periodStart) {
-      const key = monthKey(rDate);
-      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
-    }
-  }
-  const cashPosition: MonthlySeries = new Map();
-  let runningCash = D(startingCash);
-  for (const m of Array.from(netIncome.keys()).sort()) {
-    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
-    cashPosition.set(m, dRound2(runningCash));
-  }
+  // Route through the SAME compute the dashboard uses (computeFinancials), so a
+  // scenario comparison reflects transaction actuals, Phase B carry-forward,
+  // coversHeadcount reconciliation, and funding impact — never diverging from the
+  // dashboard's revenue / expenses / net income / cash / headcount.
+  const fin = computeFinancials({
+    accounts: data.financialAccounts,
+    forecastLines: data.forecastLines,
+    forecastValues,
+    revenueStreams: data.revenueStreams,
+    headcountPlans: data.headcountPlans,
+    fundingRounds: data.fundingRounds,
+    transactions,
+    periodStart,
+    periodEnd,
+  });
 
   return {
     id: scenarioId ?? "base",
+    // Per-account series feed only compareScenarios' `accountComparisons`, which
+    // this route does not serialize — the response uses the aggregates below.
+    accounts: new Map(),
     name,
-    accounts: accountForecasts,
     aggregates: {
-      revenue: totalRevenue,
-      expenses: totalExpenses,
-      netIncome,
-      cashPosition,
-      headcount: headcountCosts.headcount,
+      revenue: fin.totalRevenue,
+      expenses: fin.totalExpenses,
+      netIncome: fin.netIncome,
+      cashPosition: fin.cashPosition,
+      headcount: fin.headcountSeries,
     },
   };
 }

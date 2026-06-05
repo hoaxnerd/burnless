@@ -1,8 +1,11 @@
 export { formatCurrency } from "@burnless/types";
+import { pctChange as pctChangeValue } from "@burnless/engine";
 
+/** Formatted MoM percent string (e.g. "+10.5%"); null when there's no baseline.
+ *  The numeric change comes from the engine — this only formats it. */
 export function pctChange(current: number, previous: number): string | null {
-  if (previous === 0) return null;
-  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  const pct = pctChangeValue(current, previous);
+  if (pct === null) return null;
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
 }
 

@@ -1,0 +1,11 @@
+-- Add financial_accounts.covers_headcount (Phase 5 #5: prevent salary double-count).
+-- When true, transactions on this account are personnel cost the headcount plan
+-- also models; the compute layer uses actuals in months that have them and
+-- suppresses the headcount-plan cost there. See reconcileHeadcountWithActuals.
+--
+-- NOTE: drizzle-kit generate is currently blocked by pre-existing malformed
+-- snapshot meta (0017/0018 collision, 0041/0042 malformed), so this migration is
+-- hand-authored. It is idempotent (IF NOT EXISTS) and applied by the PGLite test
+-- runner and dev db:push; reconcile the drizzle journal/meta separately before
+-- relying on prod db:migrate.
+ALTER TABLE "financial_accounts" ADD COLUMN IF NOT EXISTS "covers_headcount" boolean DEFAULT false NOT NULL;

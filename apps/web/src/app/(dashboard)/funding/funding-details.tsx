@@ -8,6 +8,7 @@ import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { FundingRoundForm } from "./funding-round-form";
 import { Modal } from "@/components/ui";
+import { dSum } from "@burnless/engine";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
@@ -77,7 +78,7 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
       }
     });
 
-    const usedPercent = segments.reduce((sum, s) => sum + s.percent, 0);
+    const usedPercent = dSum(segments.map((s) => s.percent));
     if (usedPercent < 100) {
       segments.push({ label: "Option Pool", percent: 100 - usedPercent, color: "#d1d5db" });
     }

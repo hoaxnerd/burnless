@@ -36,18 +36,16 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 
-vi.mock("@burnless/engine", () => ({
-  computeAllForecastLines: vi.fn().mockReturnValue([]),
-  aggregateByAccount: vi.fn().mockReturnValue(new Map()),
-  computeTotalRevenue: vi.fn().mockReturnValue(new Map()),
-  computeSubscriptionDetail: vi.fn().mockReturnValue([]),
-  computeAllHeadcountCosts: vi.fn().mockReturnValue({ totalCost: new Map(), headcount: new Map() }),
-  computeAllMetrics: vi.fn().mockReturnValue({ cashPosition: 0, netBurnRate: 0, cashRunwayMonths: 0, mrr: 0 }),
-  addSeries: vi.fn().mockReturnValue(new Map()),
-  subtractSeries: vi.fn().mockReturnValue(new Map()),
-  monthKey: vi.fn().mockReturnValue("2026-01"),
-  D: vi.fn().mockReturnValue({ plus: vi.fn().mockReturnValue({ plus: vi.fn() }) }),
-  dRound2: vi.fn().mockReturnValue(0),
+// The route delegates to the shared compute (computeFinancials) + the data layer;
+// stub both so this stays a validation/wiring test.
+vi.mock("@/lib/compute-financials", () => ({
+  computeFinancials: vi.fn().mockReturnValue({
+    metrics: { cashPosition: [], netBurnRate: [], cashRunwayMonths: [], mrr: [] },
+  }),
+}));
+vi.mock("@/lib/data", () => ({
+  getTransactions: vi.fn().mockResolvedValue([]),
+  getForecastValues: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));

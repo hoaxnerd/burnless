@@ -1,35 +1,21 @@
 import { NextResponse } from "next/server";
-import { db, fundingRounds, getResolvedData, resolveEntities } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { getResolvedData } from "@burnless/db";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { parseDateRange } from "@/lib/date-validation";
 import { getActiveScenario } from "@/lib/scenario-middleware";
-import {
-  computeAllForecastLines,
-  aggregateByAccount,
-  computeTotalRevenue,
-  computeSubscriptionDetail,
-  computeAllHeadcountCosts,
-  computeAllMetrics,
-  type ForecastLineInput,
-  type RevenueStreamInput,
-  type HeadcountPlanInput,
-  type SubscriptionParams,
-  type MetricsInput,
-  type MonthlySeries,
-  addSeries,
-  subtractSeries,
-  monthKey,
-  D,
-  dRound2,
-} from "@burnless/engine";
+import { getTransactions, getForecastValues } from "@/lib/data";
+import { computeFinancials } from "@/lib/compute-financials";
 
 /**
  * GET /api/metrics?startDate=2026-01&endDate=2026-12
  *
  * Returns all computed financial and SaaS metrics.
  * Scenario ID comes from the X-Scenario-Id header via getActiveScenario.
+ *
+ * Routes through `computeFinancials` — the SAME compute the dashboard uses — so
+ * metrics here include transaction actuals, Phase B carry-forward, coversHeadcount
+ * reconciliation, and funding impact, and never diverge from the dashboard.
  */
 export const GET = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "heavy");
@@ -47,129 +33,25 @@ export const GET = withErrorHandler(async (request: Request) => {
   if ("error" in dateRange) return errorResponse(dateRange.error, 400);
   const { periodStart, periodEnd } = dateRange;
 
-  // Resolve all entity types (base + scenario overrides)
+  // Resolve all entity types (base + scenario overrides), plus the actuals +
+  // forecast-value overrides the shared compute needs.
   const data = await getResolvedData(ctx.companyId, scenarioId);
+  const [transactions, forecastValues] = await Promise.all([
+    getTransactions(ctx.companyId),
+    getForecastValues(data.forecastLines.map((l) => l.id)),
+  ]);
 
-  // Compute forecasts
-  const forecastInputs: ForecastLineInput[] = data.forecastLines.map((fl) => ({
-    id: fl.id,
-    accountId: fl.accountId,
-    method: fl.method,
-    parameters: (fl.parameters ?? {}) as Record<string, unknown>,
-    startDate: fl.startDate,
-    endDate: fl.endDate,
-  }));
-  const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
-  const accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
-
-  // Revenue from streams
-  const revInputs: RevenueStreamInput[] = data.revenueStreams.map((rs) => ({
-    id: rs.id,
-    name: rs.name,
-    type: rs.type,
-    parameters: (rs.parameters ?? {}) as Record<string, unknown>,
-    startDate: rs.startDate,
-    endDate: rs.endDate,
-  }));
-  const revenueValues = computeTotalRevenue(revInputs, periodStart, periodEnd);
-
-  // Subscription details for SaaS metrics
-  const subscriptionStreams = data.revenueStreams.filter((rs) => rs.type === "subscription");
-  const subscriptionDetails = subscriptionStreams.flatMap((rs) =>
-    computeSubscriptionDetail(
-      (rs.parameters ?? {}) as unknown as SubscriptionParams,
-      periodStart,
-      periodEnd
-    )
-  );
-
-  // Headcount
-  const hcInputs: HeadcountPlanInput[] = data.headcountPlans.map((hp) => ({
-    id: hp.id,
-    departmentId: hp.departmentId,
-    title: hp.title,
-    name: hp.name ?? null,
-    employeeType: hp.employeeType,
-    count: Number(hp.count),
-    salary: Number(hp.salary),
-    hourlyRate: hp.hourlyRate == null ? null : Number(hp.hourlyRate),
-    hoursPerWeek: hp.hoursPerWeek == null ? null : Number(hp.hoursPerWeek),
-    startDate: hp.startDate,
-    endDate: hp.endDate,
-    benefitsRate: Number(hp.benefitsRate),
-    benefitsBreakdown: (hp.parameters as { benefitsBreakdown?: HeadcountPlanInput["benefitsBreakdown"] } | null)?.benefitsBreakdown,
-  }));
-  const headcountCosts = computeAllHeadcountCosts(hcInputs, periodStart, periodEnd);
-
-  // Aggregate by category
-  const accountMap = new Map(data.financialAccounts.map((a) => [a.id, a]));
-  let totalRevenue = new Map(revenueValues);
-  let totalCogs: MonthlySeries = new Map();
-  let totalOpex: MonthlySeries = new Map();
-  let totalOtherIncome: MonthlySeries = new Map();
-  let totalOtherExpense: MonthlySeries = new Map();
-
-  for (const [accountId, values] of accountForecasts) {
-    const account = accountMap.get(accountId);
-    if (!account) continue;
-    switch (account.category) {
-      case "revenue":
-        totalRevenue = addSeries(totalRevenue, values);
-        break;
-      case "cogs":
-        totalCogs = addSeries(totalCogs, values);
-        break;
-      case "operating_expense":
-        totalOpex = addSeries(totalOpex, values);
-        break;
-      case "other_income":
-        totalOtherIncome = addSeries(totalOtherIncome, values);
-        break;
-      case "other_expense":
-        totalOtherExpense = addSeries(totalOtherExpense, values);
-        break;
-    }
-  }
-
-  // Add headcount to opex
-  totalOpex = addSeries(totalOpex, headcountCosts.totalCost);
-
-  const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
-  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
-
-  // Funding rounds (resolved through scenario overlay)
-  const fundingResolved = data.fundingRounds;
-  const startingCash = fundingResolved
-    .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
-    .reduce((sum, r) => sum + Number(r.amount), 0);
-  const futureFunding: MonthlySeries = new Map();
-  for (const r of fundingResolved) {
-    const rDate = new Date(r.date);
-    if (r.isProjected || rDate >= periodStart) {
-      const key = monthKey(rDate);
-      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
-    }
-  }
-  const cashPosition: MonthlySeries = new Map();
-  let runningCash = D(startingCash);
-  const sortedMonths = Array.from(netIncome.keys()).sort();
-  for (const m of sortedMonths) {
-    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
-    cashPosition.set(m, dRound2(runningCash));
-  }
-
-  const metricsInput: MetricsInput = {
-    revenue: totalRevenue,
-    subscriptionDetails,
-    totalExpenses,
-    cogs: totalCogs,
-    operatingExpenses: totalOpex,
-    cashPosition,
-    netIncome,
-    headcount: headcountCosts.headcount,
-  };
-
-  const metrics = computeAllMetrics(metricsInput);
+  const { metrics } = computeFinancials({
+    accounts: data.financialAccounts,
+    forecastLines: data.forecastLines,
+    forecastValues,
+    revenueStreams: data.revenueStreams,
+    headcountPlans: data.headcountPlans,
+    fundingRounds: data.fundingRounds,
+    transactions,
+    periodStart,
+    periodEnd,
+  });
 
   return NextResponse.json({
     scenarioId: scenarioId ?? null,

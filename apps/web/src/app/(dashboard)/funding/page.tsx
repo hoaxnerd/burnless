@@ -4,7 +4,7 @@ export const revalidate = 0;
 import { Suspense } from "react";
 import { getCompany, getActiveScenario, getServerScenarioId, getFundingRounds } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import { monthKey, previousMonthKey, METRIC_REGISTRY, dSum } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
@@ -35,19 +35,14 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
 
   const currentMonth = data?.currentMonth ?? monthKey(new Date());
   const currentCash = data ? (data.metrics.cashPosition.find((m) => m.month === currentMonth)?.value ?? data.startingCash) : 0;
-  const currentBurn = data ? (data.metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0) : 0;
+  const currentGrossBurn = data ? (data.metrics.burnRate.find((m) => m.month === currentMonth)?.value ?? 0) : 0;
   const currentRunway = data ? (data.metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value ?? 0) : 0;
 
-  const totalRaised = fundingRounds
-    .filter((r) => !r.isProjected)
-    .reduce((sum, r) => sum + Number(r.amount), 0);
-
   const completedRounds = fundingRounds.filter((r) => !r.isProjected);
+  const totalRaised = dSum(completedRounds.map((r) => Number(r.amount)));
 
-  // Compute dilution for cap table
-  const totalDilution = fundingRounds
-    .filter((r) => !r.isProjected)
-    .reduce((sum, r) => sum + Number(r.dilutionPercent ?? 0), 0);
+  // Cap-table dilution (simplified ownership model).
+  const totalDilution = dSum(completedRounds.map((r) => Number(r.dilutionPercent ?? 0)));
   const foundersOwnership = Math.max(0, 100 - totalDilution);
 
   const roundsForDisplay = fundingRounds.map((r) => ({
@@ -61,8 +56,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
     isProjected: r.isProjected,
   }));
 
-  const now = new Date();
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const prevMonth = data?.prevMonth ?? previousMonthKey(currentMonth);
   const fc = (v: number) => formatCurrency(v, currency, undefined, { compact: true });
 
   const spark = (series: { month: string; value: number }[]) => {
@@ -102,9 +96,12 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
       slotId: "metric-2",
       content: { type: "metric", slug: "runway" },
       label: "Runway",
-      value: currentBurn > 0 && currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
-      description: currentBurn > 0 && currentCash > 0 ? `At ${fc(currentBurn)}/mo burn` : "Add funding & expenses",
-      hasData: currentBurn > 0 && currentCash > 0,
+      // Mirror the dashboard runway exactly (same engine value). \u221e shows when the
+      // engine derives unbounded runway \u2014 a genuinely profitable month where gross
+      // burn is covered by revenue \u2014 rather than being suppressed to "-- mo".
+      value: currentCash > 0 ? (currentRunway >= 999 ? "\u221e" : `${Math.round(currentRunway)} months`) : "-- mo",
+      description: currentCash > 0 ? (currentRunway >= 999 ? "Revenue covers burn" : `At ${fc(currentGrossBurn)}/mo gross burn`) : "Add funding & expenses",
+      hasData: currentCash > 0,
       sparkData: data ? spark(data.metrics.cashRunwayMonths) : undefined,
       metricStyle: { icon: "Clock", color: "blue", href: "/reports/runway" },
     },
@@ -137,7 +134,7 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
         totalRaised={totalRaised}
         completedRoundsCount={completedRounds.length}
         currentCash={currentCash}
-        currentBurn={currentBurn}
+        currentBurn={currentGrossBurn}
         currentRunway={currentRunway}
         foundersOwnership={foundersOwnership}
         totalDilution={totalDilution}

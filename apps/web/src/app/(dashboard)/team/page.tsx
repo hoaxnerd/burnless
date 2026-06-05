@@ -4,7 +4,7 @@ export const revalidate = 0;
 import { Suspense } from "react";
 import { getCompany, getActiveScenario, getServerScenarioId, getHeadcountPlans, getDepartments, getTeamChildEntitiesByHeadcount } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import { METRIC_REGISTRY, pctOfTotal } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
@@ -60,38 +60,39 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
 
   const deptMap = new Map(departments.map((d) => [d.id, d.name]));
 
+  // Phase A: read the snapped "as of" month from the engine pipeline so the Team
+  // page agrees with Dashboard/Expenses instead of recomputing the calendar month.
+  const { currentMonth, prevMonth } = data;
   const now = new Date();
-  const currentMonth = monthKey(new Date(now.getFullYear(), now.getMonth(), 1));
 
   // Split into current team and planned hires
   const currentTeam = plans.filter((p) => p.startDate <= now);
   const plannedHires = plans.filter((p) => p.startDate > now);
 
   const totalHeadcount = currentTeam.reduce((sum, p) => sum + Number(p.count), 0);
-  const totalMonthlyCost = currentTeam.reduce(
-    (sum, p) => sum + (Number(p.salary) * Number(p.count) * (1 + Number(p.benefitsRate))) / 12,
-    0
-  );
+  // Personnel cost comes from the engine (computeAllHeadcountCosts, surfaced via
+  // computeDashboardData) — never recomputed inline. This is the single source that
+  // correctly handles contractors (hourly), part-time hour-proration, and mid-month
+  // starts, so the Team page agrees with Expenses/Dashboard to the cent.
+  const totalMonthlyCost = data.headcountCostSeries.get(currentMonth) ?? 0;
 
-  const totalBurn = data.metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
-  const costPercentOfBurn = totalBurn > 0 ? (totalMonthlyCost / totalBurn * 100) : 0;
+  // "% of total burn" uses GROSS burn (total cash out) so it stays meaningful in a
+  // profitable month where net burn floors to 0.
+  const grossBurn = data.metrics.burnRate.find((m) => m.month === currentMonth)?.value ?? 0;
+  const costPercentOfBurn = pctOfTotal(totalMonthlyCost, grossBurn);
   const revPerEmployee = data.metrics.revenuePerEmployee.find((m) => m.month === currentMonth)?.value ?? 0;
 
-  // Group by department
+  // Group by department (keyed by id so we can read engine per-department costs).
   const deptGroups = new Map<string, typeof plans>();
   for (const plan of currentTeam) {
-    const deptName = deptMap.get(plan.departmentId) ?? "Other";
-    if (!deptGroups.has(deptName)) deptGroups.set(deptName, []);
-    deptGroups.get(deptName)!.push(plan);
+    if (!deptGroups.has(plan.departmentId)) deptGroups.set(plan.departmentId, []);
+    deptGroups.get(plan.departmentId)!.push(plan);
   }
 
-  const departmentBreakdown = Array.from(deptGroups.entries()).map(([dept, members]) => ({
-    department: dept,
+  const departmentBreakdown = Array.from(deptGroups.entries()).map(([deptId, members]) => ({
+    department: deptMap.get(deptId) ?? "Other",
     headcount: members.reduce((sum, m) => sum + Number(m.count), 0),
-    monthlyCost: members.reduce(
-      (sum, m) => sum + (Number(m.salary) * Number(m.count) * (1 + Number(m.benefitsRate))) / 12,
-      0
-    ),
+    monthlyCost: data.headcountCostByDepartment.get(deptId)?.get(currentMonth) ?? 0,
     members: members.map((m) => {
       const child = childEntities.get(m.id);
       return {
@@ -173,9 +174,6 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
       })),
     };
   });
-
-  const now2 = new Date();
-  const prevMonth = monthKey(new Date(now2.getFullYear(), now2.getMonth() - 1, 1));
 
   // Build resolved slot data for ALL engine metrics (swap targets)
   const allEngineSlots: ResolvedSlotData[] = METRIC_REGISTRY.map((def) =>

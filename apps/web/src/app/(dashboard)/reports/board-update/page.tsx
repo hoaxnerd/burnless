@@ -6,7 +6,7 @@ import { getCompany, getActiveScenario, getServerScenarioId, getFundingRounds } 
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { computeExpenseDetails } from "@/lib/compute-expenses";
-import { seriesToArray, monthKey, METRIC_REGISTRY } from "@burnless/engine";
+import { seriesToArray, monthKey, METRIC_REGISTRY, pctChange, pctOfTotal, dSum } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
@@ -45,11 +45,11 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
 
   const currentRev = totalRevenue.get(currentMonth) ?? 0;
   const prevRev = totalRevenue.get(prevMonth) ?? 0;
-  const revGrowth = prevRev > 0 ? ((currentRev - prevRev) / prevRev * 100) : 0;
+  const revGrowth = pctChange(currentRev, prevRev) ?? 0;
 
   const currentExp = totalExpenses.get(currentMonth) ?? 0;
   const prevExp = totalExpenses.get(prevMonth) ?? 0;
-  const expChange = prevExp > 0 ? ((currentExp - prevExp) / prevExp * 100) : 0;
+  const expChange = pctChange(currentExp, prevExp) ?? 0;
 
   const currentNet = netIncome.get(currentMonth) ?? 0;
   const currentCash = cashPosition.get(currentMonth) ?? 0;
@@ -59,7 +59,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
   const grossMargin = metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0;
 
   const g = revenueDetails.growthMetrics;
-  const totalFunding = funding.reduce((sum, r) => sum + Number(r.amount), 0);
+  const totalFunding = dSum(funding.map((r) => Number(r.amount)));
 
   const boardData = {
     companyName,
@@ -94,7 +94,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
     profitability: {
       grossMargin,
       netIncome: currentNet,
-      netMargin: currentRev > 0 ? (currentNet / currentRev * 100) : 0,
+      netMargin: pctOfTotal(currentNet, currentRev),
     },
     revenueTimeline: seriesToArray(totalRevenue),
     expenseTimeline: seriesToArray(totalExpenses),

@@ -1,5 +1,6 @@
 "use client";
 
+import { ratioToPct } from "@burnless/engine";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import { PercentageInput } from "@/components/forms/primitives";
 
@@ -44,13 +45,13 @@ export function BenefitsBreakdownEditor({ value, companyDefaults, onChange }: Pr
             min={0}
             max={1}
             step={0.1}
-            hint={`Default: ${((companyDefaults[key] ?? 0) * 100).toFixed(2)}%`}
+            hint={`Default: ${ratioToPct(companyDefaults[key] ?? 0).toFixed(2)}%`}
           />
         ))}
       </div>
       <div className="flex items-center justify-between">
         <div data-testid="breakdown-total" className="text-xs text-surface-500">
-          Total: {(total * 100).toFixed(2)}%
+          Total: {ratioToPct(total).toFixed(2)}%
         </div>
         <div className="flex gap-2">
           <button

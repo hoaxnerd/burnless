@@ -289,6 +289,7 @@ export interface Account {
   parentId: string | null;
   isSystem: boolean; // system-generated vs user-created
   sortOrder: number;
+  coversHeadcount: boolean; // transactions here are personnel cost the headcount plan also models
   createdAt: Date;
   updatedAt: Date;
 }
