@@ -57,6 +57,44 @@ export function buildExpenseBreakdown(
 }
 
 /**
+ * Per-month stacked breakdown for the expense category chart. Reuses the SAME
+ * `deriveSubcategory` grouping as `buildExpenseBreakdown` so the stacked chart,
+ * the single-month split, and the AI text all read one source. Every row carries
+ * every subcategory key (initialised to 0) so the chart has consistent keys.
+ *
+ * Returns only the per-month rows. The chart's top-6/Other `subcategories`
+ * selection is derived by the caller from the current-month breakdown so it
+ * matches the single-month split panel (rows still carry past-only keys; the
+ * chart only renders the caller's chosen `subcategories` set).
+ */
+export function buildExpenseMonthlyBySubcategory(
+  lines: BlendedExpenseLine[],
+): Record<string, unknown>[] {
+  // deriveSubcategory is regex-heavy (categorizeTransaction); compute each line's
+  // subcategory key ONCE and reuse it across every month.
+  const lineKeys = lines.map((line) => deriveSubcategory(line));
+  const months = new Set<string>();
+  const subcatSet = new Set<string>();
+  for (let i = 0; i < lines.length; i++) {
+    subcatSet.add(lineKeys[i]!);
+    for (const month of lines[i]!.values.keys()) months.add(month);
+  }
+  const subcategories = Array.from(subcatSet);
+  const sortedMonths = Array.from(months).sort();
+  return sortedMonths.map((month) => {
+    const row: Record<string, unknown> = { month };
+    for (const subcat of subcategories) row[subcat] = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const amt = lines[i]!.values.get(month);
+      if (amt == null) continue;
+      const key = lineKeys[i]!;
+      row[key] = (row[key] as number) + amt;
+    }
+    return row;
+  });
+}
+
+/**
  * @param total - the blended month total the rows reconcile to; pass a non-negative
  *   value (Σ rows === total).
  */

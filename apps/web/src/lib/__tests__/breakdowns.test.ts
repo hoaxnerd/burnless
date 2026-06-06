@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExpenseBreakdown, buildRevenueBreakdown } from "../breakdowns";
+import { buildExpenseBreakdown, buildExpenseMonthlyBySubcategory, buildRevenueBreakdown } from "../breakdowns";
 import type { BlendedExpenseLine, BlendedRevenueLine } from "../compute-financials";
 import type { MonthlySeries } from "@burnless/engine";
 
@@ -52,6 +52,21 @@ describe("buildExpenseBreakdown", () => {
     expect(total).toBeCloseTo(500, 2);
     const cogsRow = rows.find((r) => r.amount === 500);
     expect(cogsRow).toBeTruthy();
+  });
+});
+
+describe("buildExpenseMonthlyBySubcategory", () => {
+  it("buildExpenseMonthlyBySubcategory produces per-month rows keyed by subcategory", () => {
+    const lines: BlendedExpenseLine[] = [
+      { accountId: "headcount-cost", accountName: "Personnel Costs", category: "operating_expense",
+        values: new Map([["2026-05", 8000], ["2026-06", 9000]]) },
+      { accountId: "1", accountName: "AWS Hosting", category: "cogs",
+        values: new Map([["2026-05", 400], ["2026-06", 500]]) },
+    ];
+    const rows = buildExpenseMonthlyBySubcategory(lines);
+    expect(Object.keys(rows[0]!)).toContain("People");
+    expect(rows.find((r) => r.month === "2026-06")?.["People"]).toBe(9000);
+    expect(rows.length).toBe(2); // two months
   });
 });
 

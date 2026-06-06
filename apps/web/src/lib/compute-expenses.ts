@@ -8,14 +8,10 @@
 import { cache } from "react";
 import {
   computeAllForecastLines,
-  aggregateByAccount,
   computeAllHeadcountCosts,
   categorizeTransaction,
   seriesToArray,
-  monthKey,
   ratioChange,
-  pctOfTotal,
-  dSum,
   type ForecastLineInput,
   type HeadcountPlanInput,
 } from "@burnless/engine";
@@ -24,6 +20,8 @@ import {
   getForecastLines,
   getHeadcountPlans,
 } from "./data";
+import { computeDashboardData } from "./compute-dashboard";
+import { buildExpenseBreakdown, buildExpenseMonthlyBySubcategory } from "./breakdowns";
 import {
   shouldFlagAnomaly,
   getAnomalyBaseline,
@@ -132,6 +130,8 @@ const toIso = (d: Date | string | null | undefined): string | null =>
 
 // ── Main computation ─────────────────────────────────────────────────────────
 
+// NOTE: `year` only sets the forecast window for lineItems enrichment. The blended
+// breakdown + currentMonth always come from computeDashboardData at today's month.
 export const computeExpenseDetails = cache(async function computeExpenseDetails(
   companyId: string,
   scenarioId: string,
@@ -141,14 +141,18 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const targetYear = year ?? now.getFullYear();
   const periodStart = new Date(targetYear, 0, 1);
   const periodEnd = new Date(targetYear, 11, 1);
-  const currentMonth = monthKey(new Date(now.getFullYear(), now.getMonth(), 1));
-  const prevMonth = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
-  const [accounts, fLines, hcPlans] = await Promise.all([
+  const [accounts, fLines, hcPlans, dash] = await Promise.all([
     getAccounts(companyId),
     getForecastLines(scenarioId),
     getHeadcountPlans(scenarioId),
+    computeDashboardData(companyId, scenarioId),
   ]);
+
+  // Canonical "as of" months come from the dashboard so anomaly baselines and
+  // breakdown totals read the same month the headline KPIs do.
+  const currentMonth = dash.currentMonth;
+  const prevMonth = dash.prevMonth;
 
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
 
@@ -162,7 +166,6 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     endDate: fl.endDate ? new Date(fl.endDate) : null,
   }));
   const forecastResults = computeAllForecastLines(forecastInputs, periodStart, periodEnd);
-  const _accountForecasts = aggregateByAccount(forecastInputs, forecastResults);
 
   // Headcount costs
   const hcInputs: HeadcountPlanInput[] = hcPlans.map((hp) => ({
@@ -303,53 +306,35 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     });
   }
 
-  // Build subcategory breakdown
-  const subcatMap = new Map<string, { amount: number; prevAmount: number; items: number; hasAnomaly: boolean }>();
-  for (const item of lineItems) {
-    const existing = subcatMap.get(item.subcategory) ?? { amount: 0, prevAmount: 0, items: 0, hasAnomaly: false };
-    existing.amount += item.currentAmount;
-    existing.prevAmount += item.prevAmount;
-    existing.items += 1;
-    if (item.isAnomaly) existing.hasAnomaly = true;
-    subcatMap.set(item.subcategory, existing);
-  }
-
-  const totalMonthlyCost = dSum(lineItems.map((i) => i.currentAmount));
-  const totalPrevMonthlyCost = dSum(lineItems.map((i) => i.prevAmount));
-
-  const subcategoryBreakdown: SubcategoryBreakdown[] = Array.from(subcatMap.entries())
-    .map(([subcategory, data]) => ({
-      subcategory,
-      amount: data.amount,
-      percentage: pctOfTotal(data.amount, totalMonthlyCost),
-      prevAmount: data.prevAmount,
-      changePercent: ratioChange(data.amount, data.prevAmount) ?? 0,
-      itemCount: data.items,
-      isAnomaly: data.hasAnomaly,
-    }))
-    .sort((a, b) => b.amount - a.amount);
-
-  // Build monthly-by-subcategory for stacked chart
-  const allMonths = new Set<string>();
-  for (const item of lineItems) {
-    for (const pt of item.monthlySeries) allMonths.add(pt.month);
-  }
-  const sortedMonths = Array.from(allMonths).sort();
-  const subcategories = subcategoryBreakdown.map((s) => s.subcategory);
-
-  const monthlyBySubcategory = sortedMonths.map((month) => {
-    const row: Record<string, unknown> = { month };
-    for (const subcat of subcategories) {
-      row[subcat] = 0;
-    }
-    for (const item of lineItems) {
-      const pt = item.monthlySeries.find((p) => p.month === month);
-      if (pt) {
-        row[item.subcategory] = (row[item.subcategory] as number) + pt.value;
-      }
-    }
-    return row;
+  // Single-source: breakdown/totals reconcile to blended totalExpenses;
+  // lineItems/expenseMix remain forecast-line "plan detail".
+  const blendedTotal = dash.totalExpenses.get(currentMonth) ?? 0;
+  const blended = buildExpenseBreakdown(dash.expenseLines, currentMonth, blendedTotal);
+  const prevTotal = dash.totalExpenses.get(prevMonth) ?? 0;
+  const prevBySubcat = new Map(
+    buildExpenseBreakdown(dash.expenseLines, prevMonth, prevTotal).map((b) => [b.subcategory, b.amount]),
+  );
+  const subcategoryBreakdown: SubcategoryBreakdown[] = blended.map((b) => {
+    const items = lineItems.filter((i) => i.subcategory === b.subcategory);
+    const prevAmount = prevBySubcat.get(b.subcategory) ?? 0;
+    return {
+      subcategory: b.subcategory,
+      amount: b.amount,
+      percentage: b.share,
+      prevAmount,
+      changePercent: ratioChange(b.amount, prevAmount) ?? 0,
+      itemCount: items.length,
+      isAnomaly: items.some((i) => i.isAnomaly),
+    };
   });
+  const totalMonthlyCost = blendedTotal;
+  const totalPrevMonthlyCost = dash.totalExpenses.get(prevMonth) ?? 0;
+
+  // Stacked-chart series — blended per-month, same subcategory grouping.
+  const monthlyBySubcategory = buildExpenseMonthlyBySubcategory(dash.expenseLines);
+  // `subcategories` (chart's top-6/Other selection) is ordered by current-month
+  // spend, matching the split panel below.
+  const subcategories = subcategoryBreakdown.map((s) => s.subcategory);
 
   const anomalyCount = lineItems.filter((i) => i.isAnomaly).length;
   const recurringCount = lineItems.filter((i) => i.isRecurring).length;
