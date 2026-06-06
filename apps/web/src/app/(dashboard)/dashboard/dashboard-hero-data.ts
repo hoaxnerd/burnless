@@ -11,6 +11,7 @@ import {
 } from "@burnless/engine";
 import { type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
 import { formatCurrency, pctChange, sparkline } from "./dashboard-helpers";
+import { getMetricSubLabel } from "@/lib/build-slot-metrics";
 import { type CurrencyCode } from "@burnless/types";
 
 const DEFAULT_METRIC_STYLES: Record<string, { icon: string; color: string; href: string }> = {
@@ -84,7 +85,7 @@ export function buildHeroCards(
         changeLabel,
         description: !hasData
           ? (getMetricMissingDataHint(slug) ?? (def?.description))
-          : undefined,
+          : getMetricSubLabel(slug, metrics, currentMonth, currency, locale),
         sparkData,
         metricStyle,
         lowerIsBetter: slug === "netBurnRate",

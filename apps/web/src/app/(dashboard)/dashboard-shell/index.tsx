@@ -99,7 +99,7 @@ export function DashboardShell({
     <KeyboardShortcutsProvider onToggleAI={navigateToAi}>
     <ScenarioProvider>
     <DataFreshnessProvider>
-    <InitialLayoutsProvider layouts={(initialPageLayouts ?? {}) as Record<string, { layout: never[]; closedWidgets?: string[] }>}>
+    <InitialLayoutsProvider layouts={(initialPageLayouts ?? {}) as Record<string, import("@/lib/widget-order").StoredPageLayout>}>
     <MetricsProvider initialSlotOverrides={initialSlotOverrides as Record<string, import("@burnless/engine").CardContent> | null | undefined}>
       <DashboardContent
         commandPaletteOpen={commandPaletteOpen}

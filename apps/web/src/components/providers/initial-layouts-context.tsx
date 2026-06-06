@@ -9,14 +9,13 @@
  */
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { PageWidgetLayout } from "@/components/ui/page-grid";
+import type { StoredPageLayout } from "@/lib/widget-order";
 
-interface PageLayoutData {
-  layout: PageWidgetLayout[];
-  closedWidgets?: string[];
-}
-
-type InitialLayouts = Record<string, PageLayoutData>;
+/**
+ * Per-page server-fetched layout data. May be in the new `order` form or a
+ * legacy coordinate `layout` form — consumers resolve via deriveWidgetOrder().
+ */
+type InitialLayouts = Record<string, StoredPageLayout>;
 
 const InitialLayoutsCtx = createContext<InitialLayouts>({});
 

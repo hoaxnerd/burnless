@@ -111,6 +111,7 @@ export interface ComputedMetrics {
   operatingIncome: MetricValue[];
   netIncome: MetricValue[];
   ebitda: MetricValue[]; // simplified: operating income for startups
+  ebitdaMargin: MetricValue[]; // EBITDA / Total Revenue × 100
 
   // Growth
   revenueGrowthRate: MetricValue[];
@@ -400,12 +401,21 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: dRound2(burn.div(netNew)) };
   });
 
+  // EBITDA margin % — first-class metric. Rule of 40 reuses the *unrounded*
+  // figure below so its value is unchanged by exposing this metric.
+  const ebitdaMarginRaw = months.map((m, i) => {
+    const rev = D(input.revenue.get(m) ?? 0);
+    return rev.isZero() ? D(0) : D(ebitda[i]?.value ?? 0).div(rev).mul(100);
+  });
+  const ebitdaMargin = months.map((m, i) => ({
+    month: m,
+    value: dRound2(ebitdaMarginRaw[i]!),
+  }));
+
   // Rule of 40 = Revenue Growth % + EBITDA Margin %
   const ruleOf40 = months.map((m, i) => {
     const growthRate = D(revenueGrowthRate[i]?.value ?? 0);
-    const rev = D(input.revenue.get(m) ?? 0);
-    const ebitdaMargin = rev.isZero() ? D(0) : D(ebitda[i]?.value ?? 0).div(rev).mul(100);
-    return { month: m, value: dRound2(growthRate.plus(ebitdaMargin)) };
+    return { month: m, value: dRound2(growthRate.plus(ebitdaMarginRaw[i]!)) };
   });
 
   // ── Tier-1: MRR Decomposition ──────────────────────────────────────────────
@@ -553,6 +563,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     operatingIncome,
     netIncome: netIncomeValues,
     ebitda,
+    ebitdaMargin,
     revenueGrowthRate,
     mrrGrowthRate,
     customerGrowthRate,

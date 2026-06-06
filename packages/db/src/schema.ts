@@ -1204,18 +1204,24 @@ export const dashboardPreferences = pgTable(
       .default([]),
     /** Widget IDs the user has explicitly closed/hidden */
     closedWidgets: jsonb("closed_widgets").$type<string[]>().notNull().default([]),
-    /** Per-page layout overrides: { [pageId]: { layout: [...], closedWidgets: [...] } } */
+    /**
+     * Per-page layout overrides: { [pageId]: { order: [...], closedWidgets: [...] } }.
+     * `order` is the screen-independent widget order (current model). `layout`
+     * is the legacy coordinate form, retained for backward-compatible reads of
+     * rows written before the fluid-flow migration.
+     */
     pageLayouts: jsonb("page_layouts")
       .$type<
         Record<
           string,
           {
-            layout: Array<{
+            order?: string[];
+            layout?: Array<{
               widgetId: string;
               x?: number;
               y?: number;
-              w: number;
-              h: number;
+              w?: number;
+              h?: number;
               autoH?: boolean;
             }>;
             closedWidgets?: string[];

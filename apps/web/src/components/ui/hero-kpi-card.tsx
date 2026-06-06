@@ -368,17 +368,24 @@ export function HeroKpiCard({
               <AnimatedValue value={value} />
             </div>
 
-            {/* Change + Description */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {change && (
-                <span className={`text-xs font-semibold ${changeColor}`}>
-                  {change}
-                </span>
+            {/* Change row + description sub-line. Description renders on its own
+                line beneath the change (not gated on `!change`), so a card can
+                show both its MoM % and a clarifying sub-label (e.g. MRR's
+                "ARR … · …% of revenue"). */}
+            <div className="flex flex-col gap-0.5">
+              {(change || changeLabel) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {change && (
+                    <span className={`text-xs font-semibold ${changeColor}`}>
+                      {change}
+                    </span>
+                  )}
+                  {changeLabel && (
+                    <span className="text-xs text-surface-400">{changeLabel}</span>
+                  )}
+                </div>
               )}
-              {changeLabel && (
-                <span className="text-xs text-surface-400">{changeLabel}</span>
-              )}
-              {description && !change && (
+              {description && (
                 <span className="text-xs text-surface-400">{description}</span>
               )}
             </div>

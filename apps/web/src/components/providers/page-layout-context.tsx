@@ -8,14 +8,15 @@
  * management independently.
  *
  * Manages per-page:
- * - savedLayout + onLayoutChange — widget positions/sizes
+ * - order + onReorder — widget order (screen-independent; no positions/sizes)
  * - closedWidgets + onCloseWidget/onOpenWidget — user-hidden widgets
  * - widgetReadiness + reportWidgetReady/reportWidgetNotReady — widget data state
- * - isEditMode + setIsEditMode — drag/resize mode toggle
+ * - isEditMode + setIsEditMode — reorder/hide mode toggle
  * - isLoading / isSaving — loading states
  *
  * Persistence format (merged into dashboard-preferences API):
- * { pageLayouts: { [pageId]: { layout: [...], closedWidgets: [...] } } }
+ * { pageLayouts: { [pageId]: { order: [...], closedWidgets: [...] } } }
+ * Legacy rows storing a coordinate `layout` are read via deriveWidgetOrder().
  */
 
 import {
@@ -29,14 +30,14 @@ import {
   type ReactNode,
 } from "react";
 import { apiFetch } from "@/lib/api-fetch";
-import type { PageWidgetLayout } from "@/components/ui/page-grid";
+import { deriveWidgetOrder } from "@/lib/widget-order";
 import { useInitialLayouts } from "./initial-layouts-context";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface PageLayoutState {
-  savedLayout: PageWidgetLayout[];
-  onLayoutChange: (layout: PageWidgetLayout[]) => void;
+  order: string[];
+  onReorder: (order: string[]) => void;
   closedWidgets: string[];
   onCloseWidget: (id: string) => void;
   onOpenWidget: (id: string) => void;
@@ -71,8 +72,8 @@ interface PageLayoutProviderProps {
   children: ReactNode;
   /** Unique page identifier (e.g. "expenses", "revenue", "runway") */
   pageId: string;
-  /** Server-side initial layout (avoids loading flash) */
-  initialLayout?: PageWidgetLayout[];
+  /** Server-side initial widget order (avoids loading flash) */
+  initialOrder?: string[];
   /** Server-side initial closed widgets (avoids loading flash) */
   initialClosedWidgets?: string[];
 }
@@ -80,7 +81,7 @@ interface PageLayoutProviderProps {
 export function PageLayoutProvider({
   children,
   pageId,
-  initialLayout,
+  initialOrder,
   initialClosedWidgets,
 }: PageLayoutProviderProps) {
   // Read server-fetched layouts from shared context (provided by DashboardShell).
@@ -88,15 +89,16 @@ export function PageLayoutProvider({
   const serverLayouts = useInitialLayouts();
   const serverPageData = serverLayouts[pageId];
 
-  const resolvedInitialLayout = initialLayout ?? serverPageData?.layout;
+  const resolvedInitialOrder =
+    initialOrder ?? (serverPageData ? deriveWidgetOrder(serverPageData) : undefined);
   const resolvedInitialClosed = initialClosedWidgets ?? serverPageData?.closedWidgets;
-  const hasInitialData = resolvedInitialLayout !== undefined;
+  const hasInitialData = resolvedInitialOrder !== undefined;
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
-  const [layout, setLayout] = useState<PageWidgetLayout[]>(resolvedInitialLayout ?? []);
+  const [order, setOrder] = useState<string[]>(resolvedInitialOrder ?? []);
   const [closedWidgets, setClosedWidgets] = useState<string[]>(resolvedInitialClosed ?? []);
 
   // Widget readiness — transient, widget self-reports
@@ -128,7 +130,7 @@ export function PageLayoutProvider({
         if (cancelled) return;
         const pageData = data.pageLayouts?.[pageId];
         if (pageData) {
-          setLayout(pageData.layout ?? []);
+          setOrder(deriveWidgetOrder(pageData));
           setClosedWidgets(pageData.closedWidgets ?? []);
         }
         setIsLoading(false);
@@ -154,12 +156,12 @@ export function PageLayoutProvider({
   }, []);
 
   const save = useCallback(
-    (nextLayout: PageWidgetLayout[], nextClosed: string[]): Promise<void> => {
+    (nextOrder: string[], nextClosed: string[]): Promise<void> => {
       setIsSaving(true);
       const body = JSON.stringify({
         pageLayouts: {
           [pageId]: {
-            layout: nextLayout,
+            order: nextOrder,
             closedWidgets: nextClosed,
           },
         },
@@ -207,10 +209,10 @@ export function PageLayoutProvider({
 
   // ── Callbacks ───────────────────────────────────────────────────────────────
 
-  const onLayoutChange = useCallback(
-    (nextLayout: PageWidgetLayout[]) => {
-      setLayout(nextLayout);
-      save(nextLayout, closedWidgets);
+  const onReorder = useCallback(
+    (nextOrder: string[]) => {
+      setOrder(nextOrder);
+      save(nextOrder, closedWidgets);
     },
     [save, closedWidgets]
   );
@@ -220,26 +222,26 @@ export function PageLayoutProvider({
       setClosedWidgets((prev) => {
         if (prev.includes(id)) return prev;
         const next = [...prev, id];
-        save(layout, next);
+        save(order, next);
         return next;
       });
     },
-    [save, layout]
+    [save, order]
   );
 
   const onOpenWidget = useCallback(
     (id: string) => {
       setClosedWidgets((prev) => {
         const next = prev.filter((w) => w !== id);
-        save(layout, next);
+        save(order, next);
         return next;
       });
     },
-    [save, layout]
+    [save, order]
   );
 
   const onReset = useCallback(() => {
-    setLayout([]);
+    setOrder([]);
     setClosedWidgets([]);
     save([], []);
   }, [save]);
@@ -248,8 +250,8 @@ export function PageLayoutProvider({
 
   const value = useMemo<PageLayoutState>(
     () => ({
-      savedLayout: layout,
-      onLayoutChange,
+      order,
+      onReorder,
       closedWidgets,
       onCloseWidget,
       onOpenWidget,
@@ -263,8 +265,8 @@ export function PageLayoutProvider({
       reportWidgetNotReady,
     }),
     [
-      layout,
-      onLayoutChange,
+      order,
+      onReorder,
       closedWidgets,
       onCloseWidget,
       onOpenWidget,

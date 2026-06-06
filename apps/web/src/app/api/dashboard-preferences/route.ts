@@ -114,6 +114,10 @@ const patchSchema = z.object({
     .record(
       z.string(),
       z.object({
+        // New, screen-independent model: ordered widget ids only.
+        order: z.array(z.string()).max(40).optional(),
+        // Legacy coordinate layout — still accepted for backward compatibility,
+        // no longer written by the client.
         layout: z
           .array(
             z.object({
@@ -125,7 +129,8 @@ const patchSchema = z.object({
               autoH: z.boolean().optional(),
             })
           )
-          .max(30),
+          .max(30)
+          .optional(),
         closedWidgets: z.array(z.string()).max(20).optional(),
       })
     )

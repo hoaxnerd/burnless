@@ -727,6 +727,20 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
     color: "blue",
     href: "/reports",
   },
+  {
+    slug: "ebitdaMargin",
+    name: "EBITDA Margin",
+    description: "EBITDA as a percentage of total revenue",
+    formula: "EBITDA / Total Revenue × 100",
+    dependsOn: ["ebitda", "totalRevenue"],
+    category: "profitability",
+    tier: "advanced",
+    format: "percent",
+    direction: "higher_better",
+    icon: "BarChart3",
+    color: "blue",
+    href: "/reports",
+  },
 
   // ── Cash Metrics ─────────────────────────────────────────────────────────
 
@@ -1607,6 +1621,7 @@ const DATA_REQUIREMENT_HINTS: Record<string, string> = {
   netIncome: "Add revenue & expenses to see net income",
   operatingIncome: "Add revenue & expenses to see operating income",
   ebitda: "Add revenue & expenses to see EBITDA",
+  ebitdaMargin: "Add revenue & expenses to see EBITDA margin",
   revenueGrowthRate: "Add revenue to track growth",
   revenuePerEmployee: "Add revenue & team members",
   burnMultiple: "Add revenue & expenses to calculate burn multiple",

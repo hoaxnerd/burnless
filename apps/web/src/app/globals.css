@@ -700,15 +700,66 @@ a,
     overflow: visible !important;
   }
 
-  /* Print: restore natural flow for react-grid-layout pages */
-  .react-grid-layout {
-    position: static !important;
-    height: auto !important;
+  /* Print: stack fluid-grid cards full width for clean pagination */
+  .page-fluid-grid {
+    display: block !important;
   }
-  .react-grid-item {
-    position: static !important;
-    transform: none !important;
+  .page-fluid-grid > * {
     width: 100% !important;
-    height: auto !important;
+    transform: none !important;
+    break-inside: avoid;
+  }
+}
+
+/* ── Fluid page grid ──────────────────────────────────────────────────────────
+ * Order-driven, screen-independent dashboard layout. Each card declares its own
+ * width via a .fluid-w-{n} span class (n = its preferred span out of 12) and its
+ * height flows with content. The grid reflows by CONTAINER width (container
+ * queries), not viewport, so the sidebar collapsing the content area is handled
+ * correctly. Only widget order + hidden state are persisted — never per-screen
+ * coordinates — so an arrangement made on any screen renders correctly on every
+ * screen. See lib/widget-order.ts.
+ */
+.page-fluid-container {
+  container-type: inline-size;
+}
+
+.page-fluid-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* Wide container (default): honor each card's declared span out of 12. */
+.fluid-w-3 { grid-column: span 3; }
+.fluid-w-4 { grid-column: span 4; }
+.fluid-w-6 { grid-column: span 6; }
+.fluid-w-8 { grid-column: span 8; }
+.fluid-w-12 { grid-column: span 12; }
+
+/* Medium container: collapse to a 6-column grid (≈ tablet / narrow laptop). */
+@container (max-width: 1024px) {
+  .page-fluid-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .fluid-w-3 { grid-column: span 3; }
+  .fluid-w-4 { grid-column: span 3; }
+  .fluid-w-6 { grid-column: span 6; }
+  .fluid-w-8 { grid-column: span 6; }
+  .fluid-w-12 { grid-column: span 6; }
+}
+
+/* Narrow container: single column, every card full width (≈ phone). */
+@container (max-width: 600px) {
+  .page-fluid-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  .fluid-w-3,
+  .fluid-w-4,
+  .fluid-w-6,
+  .fluid-w-8,
+  .fluid-w-12 {
+    grid-column: span 1;
   }
 }

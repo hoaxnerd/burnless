@@ -40,7 +40,7 @@ import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
 import { type CurrencyCode, isValidCurrency } from "@burnless/types";
-import type { PageWidgetLayout } from "@/components/ui/page-grid";
+import { deriveWidgetOrder, type LegacyWidgetLayout, type StoredPageLayout } from "@/lib/widget-order";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
@@ -134,13 +134,13 @@ export default async function DashboardPage() {
     headcountDelta: currentHeadcount - prevHeadcount,
   };
 
-  // Resolve initial layout for PageLayoutProvider — check pageLayouts.dashboard
-  // first, then fall back to legacy root-level layout for backward compat.
-  const pageLayoutData = (dashPrefs?.pageLayouts as Record<string, { layout?: unknown[]; closedWidgets?: string[] }> | undefined)?.dashboard;
-  const initialLayout: PageWidgetLayout[] | undefined = pageLayoutData?.layout
-    ? (pageLayoutData.layout as PageWidgetLayout[])
+  // Resolve initial widget order for PageLayoutProvider — check pageLayouts.dashboard
+  // first (new `order` or legacy `layout`), then fall back to legacy root-level layout.
+  const pageLayoutData = (dashPrefs?.pageLayouts as Record<string, StoredPageLayout> | undefined)?.dashboard;
+  const initialOrder: string[] | undefined = pageLayoutData
+    ? deriveWidgetOrder(pageLayoutData)
     : dashPrefs?.layout
-      ? (dashPrefs.layout as PageWidgetLayout[])
+      ? deriveWidgetOrder({ layout: dashPrefs.layout as LegacyWidgetLayout[] })
       : undefined;
   const initialClosedWidgets: string[] | undefined = pageLayoutData?.closedWidgets
     ? pageLayoutData.closedWidgets
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
   return (
     <PageLayoutProvider
       pageId="dashboard"
-      initialLayout={initialLayout}
+      initialOrder={initialOrder}
       initialClosedWidgets={initialClosedWidgets}
     >
       <DashboardLayoutProvider

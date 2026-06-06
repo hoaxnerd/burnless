@@ -13,8 +13,8 @@ export function ConnectedPageGrid(props: ConnectedProps) {
   return (
     <PageGrid
       {...props}
-      savedLayout={layout.savedLayout}
-      onLayoutChange={layout.onLayoutChange}
+      order={layout.order}
+      onReorder={layout.onReorder}
       closedWidgets={layout.closedWidgets}
       onCloseWidget={layout.onCloseWidget}
       onOpenWidget={layout.onOpenWidget}

@@ -7,7 +7,7 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { seriesToArray, METRIC_REGISTRY, annualize } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
-import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { buildSlotMetricCard, getMetricSubLabel } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { RevenueView } from "./revenue-view";
@@ -91,7 +91,9 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           label: "MRR",
           value: fc(g.currentMrr),
           change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
-          description: `ARR: ${fc(g.arr)}`,
+          changeLabel: g.mrrGrowthPercent !== 0 ? "MoM growth" : undefined,
+          // Metric-level sub-label (same source wherever MRR renders).
+          description: getMetricSubLabel("mrr", data.metrics, currentMonth, companyCurrency(company)),
           hasData: g.currentMrr > 0,
           sparkData: spark(mrrTimeline),
           metricStyle: { icon: "TrendingUp", color: "teal", href: "/revenue" },
