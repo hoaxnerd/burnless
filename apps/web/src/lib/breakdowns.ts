@@ -14,6 +14,7 @@ export interface ExpenseBreakdownRow {
   share: number; // 0-100
 }
 export interface RevenueBreakdownRow {
+  streamId: string; // the stream's id, or "imported" for the residual row
   name: string;
   type: string;
   amount: number;
@@ -107,7 +108,7 @@ export function buildRevenueBreakdown(
   const rows: RevenueBreakdownRow[] = lines
     .map((l) => {
       const amount = l.values.get(month) ?? 0;
-      return { name: l.name, type: l.type, amount, share: pctOfTotal(amount, total) };
+      return { streamId: l.streamId, name: l.name, type: l.type, amount, share: pctOfTotal(amount, total) };
     })
     // Skip only EXACT-zero lines. A negative residual / stream value is a real
     // component of the blended total and is kept on purpose so the breakdown
@@ -115,7 +116,7 @@ export function buildRevenueBreakdown(
     .filter((r) => r.amount !== 0);
   const res = residual.get(month) ?? 0;
   if (res !== 0) {
-    rows.push({ name: "Imported / Other revenue", type: "imported", amount: res, share: pctOfTotal(res, total) });
+    rows.push({ streamId: "imported", name: "Imported / Other revenue", type: "imported", amount: res, share: pctOfTotal(res, total) });
   }
   return rows.sort((a, b) => b.amount - a.amount);
 }

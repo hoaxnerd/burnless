@@ -4,16 +4,14 @@
  */
 import { cache } from "react";
 import {
-  computeRevenueStream,
   seriesToArray,
   pctChange,
   ratioChange,
-  pctOfTotal,
-  type RevenueStreamInput,
   type MetricValue,
 } from "@burnless/engine";
 import { getRevenueStreams } from "./data";
 import { computeDashboardData } from "./compute-dashboard";
+import { buildRevenueBreakdown } from "./breakdowns";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,55 +68,57 @@ export const computeRevenueDetails = cache(async function computeRevenueDetails(
   scenarioId: string,
   year?: number,
 ): Promise<RevenueDetails> {
-  const now = new Date();
-  const targetYear = year ?? now.getFullYear();
-  const periodStart = new Date(targetYear, 0, 1);
-  const periodEnd = new Date(targetYear, 11, 1);
-
   const [streams, dashData] = await Promise.all([
     getRevenueStreams(scenarioId),
     computeDashboardData(companyId, scenarioId, year),
   ]);
 
-  // Phase A: reuse the dashboard's snapped horizon so revenue growth/anomaly
-  // metrics read the same "as of" month as the headline KPIs.
-  const { metrics, totalRevenue, currentMonth, prevMonth } = dashData;
+  // Single-source: streamBreakdown reconciles to blended totalRevenue incl. an
+  // Imported/Other residual; waterfall/growthMetrics stay metric-derived.
+  const { metrics, totalRevenue, currentMonth, prevMonth, revenueLines, revenueResidual } = dashData;
   const hasSaaS = streams.some((s) => s.type === "subscription");
 
-  // Per-stream revenue computation
-  const streamBreakdowns: StreamBreakdown[] = [];
+  // Per-stream breakdown from the BLENDED source (streams + imported residual),
+  // so it reconciles to totalRevenue rather than diverging when actuals exist.
   const currentTotal = Number(totalRevenue.get(currentMonth) ?? 0);
+  const lineById = new Map(revenueLines.map((l) => [l.streamId, l]));
+  const streamById = new Map(streams.map((s) => [s.id, s]));
 
-  for (const stream of streams) {
-    const input: RevenueStreamInput = {
-      id: stream.id,
-      name: stream.name,
-      type: stream.type,
-      parameters: (stream.parameters ?? {}) as Record<string, unknown>,
-      startDate: stream.startDate,
-      endDate: stream.endDate,
-    };
-
-    const values = computeRevenueStream(input, periodStart, periodEnd);
-    const series = seriesToArray(values);
-    const current = Number(values.get(currentMonth) ?? 0);
-    const prev = Number(values.get(prevMonth) ?? 0);
-    const change = ratioChange(current, prev) ?? 0;
-
-    streamBreakdowns.push({
-      id: stream.id,
-      name: stream.name,
-      type: stream.type,
-      parameters: (stream.parameters ?? {}) as Record<string, unknown>,
-      currentRevenue: current,
+  const streamBreakdowns: StreamBreakdown[] = buildRevenueBreakdown(
+    revenueLines,
+    revenueResidual,
+    currentMonth,
+    currentTotal,
+  ).map((row): StreamBreakdown => {
+    if (row.streamId === "imported") {
+      const prev = Number(revenueResidual.get(prevMonth) ?? 0);
+      return {
+        id: "imported",
+        name: row.name,
+        type: "imported",
+        parameters: {},
+        currentRevenue: row.amount,
+        prevRevenue: prev,
+        changePercent: ratioChange(row.amount, prev) ?? 0,
+        percentage: row.share,
+        monthlySeries: seriesToArray(revenueResidual),
+      };
+    }
+    const line = lineById.get(row.streamId);
+    const stream = streamById.get(row.streamId);
+    const prev = Number(line?.values.get(prevMonth) ?? 0);
+    return {
+      id: row.streamId,
+      name: row.name,
+      type: row.type,
+      parameters: (stream?.parameters ?? {}) as Record<string, unknown>,
+      currentRevenue: row.amount,
       prevRevenue: prev,
-      changePercent: change,
-      percentage: pctOfTotal(current, currentTotal),
-      monthlySeries: series,
-    });
-  }
-
-  streamBreakdowns.sort((a, b) => b.currentRevenue - a.currentRevenue);
+      changePercent: ratioChange(row.amount, prev) ?? 0,
+      percentage: row.share,
+      monthlySeries: line ? seriesToArray(line.values) : [],
+    };
+  });
 
   // Build waterfall from metrics
   const waterfall: WaterfallPoint[] = [];

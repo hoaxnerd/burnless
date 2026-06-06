@@ -77,7 +77,9 @@ describe("buildRevenueBreakdown", () => {
     ];
     const rows = buildRevenueBreakdown(lines, m("2026-06", 700), "2026-06", 1700);
     expect(rows.find((r) => r.name === "Pro Plan")?.amount).toBe(1000);
+    expect(rows.find((r) => r.name === "Pro Plan")?.streamId).toBe("rs-sub");
     expect(rows.find((r) => r.name === "Imported / Other revenue")?.amount).toBe(700);
+    expect(rows.find((r) => r.name === "Imported / Other revenue")?.streamId).toBe("imported");
     expect(rows.reduce((s, r) => s + r.amount, 0)).toBeCloseTo(1700, 2);
   });
 

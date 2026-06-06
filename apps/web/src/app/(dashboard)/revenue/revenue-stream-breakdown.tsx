@@ -142,6 +142,9 @@ export function RevenueStreamBreakdown({
             const changeIcon = stream.changePercent > 0.01 ? "\u2191" : stream.changePercent < -0.01 ? "\u2193" : "\u2192";
             const changeColor = stream.changePercent > 0.01 ? "text-green-500" : stream.changePercent < -0.01 ? "text-red-500" : "text-surface-400";
             const isDeleting = deletingId === stream.id;
+            // The synthetic "Imported / Other revenue" residual row is not a DB
+            // entity — never wire Edit/Delete or scenario override mutations to it.
+            const isImported = stream.type === "imported";
             const override = isInScenarioMode ? overrideMap.get(stream.id) : undefined;
             const overrideTag = override?.action === "modify" ? "modified" as const : override?.action === "create" ? "created" as const : null;
 
@@ -150,8 +153,8 @@ export function RevenueStreamBreakdown({
                 key={stream.id}
                 override={overrideTag}
                 entityName={stream.name}
-                onRevert={() => handleRevert(stream.id)}
-                onRemove={() => handleRemove(stream.id)}
+                onRevert={isImported ? undefined : () => handleRevert(stream.id)}
+                onRemove={isImported ? undefined : () => handleRemove(stream.id)}
               >
                 <div className="group">
                   <div className="flex items-center justify-between mb-1">
@@ -167,33 +170,36 @@ export function RevenueStreamBreakdown({
                       <span className={`text-[10px] font-medium ${changeColor}`}>
                         {changeIcon}{Math.abs(ratioToPct(stream.changePercent)).toFixed(0)}%
                       </span>
-                      {/* Edit/delete actions — visible on hover */}
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() =>
-                            setEditingStream({
-                              id: stream.id,
-                              name: stream.name,
-                              type: stream.type,
-                              parameters: stream.parameters,
-                            })
-                          }
-                          className="rounded p-1 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                          aria-label={`Edit ${stream.name}`}
-                          title="Edit stream"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(stream.id)}
-                          disabled={isDeleting}
-                          className="rounded p-1 text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
-                          aria-label={`Delete ${stream.name}`}
-                          title="Delete stream"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+                      {/* Edit/delete actions — visible on hover. Hidden for the
+                          synthetic residual row (not a DB entity; would 404). */}
+                      {!isImported && (
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() =>
+                              setEditingStream({
+                                id: stream.id,
+                                name: stream.name,
+                                type: stream.type,
+                                parameters: stream.parameters,
+                              })
+                            }
+                            className="rounded p-1 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            aria-label={`Edit ${stream.name}`}
+                            title="Edit stream"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(stream.id)}
+                            disabled={isDeleting}
+                            className="rounded p-1 text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+                            aria-label={`Delete ${stream.name}`}
+                            title="Delete stream"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
