@@ -127,6 +127,19 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             });
             return pauseId;
           },
+          onPlanRequest: async (state) => {
+            const pauseId = crypto.randomUUID();
+            await createPendingAction({
+              conversationId: params.conversationId,
+              pauseId,
+              kind: "plan",
+              scenarioId: params.scenarioId,
+              assistantBlocks: state.assistantBlocks,
+              completedResults: state.completedResults,
+              pending: { planToolUseId: state.planToolUseId, spec: state.spec },
+            });
+            return pauseId;
+          },
         });
 
         for await (const chunk of chunks) {
@@ -176,6 +189,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 pauseId: chunk.pauseId,
                 conversationId: params.conversationId,
                 spec: chunk.spec,
+              });
+              break;
+            case "plan_request":
+              send(controller, {
+                type: "plan_request",
+                pauseId: chunk.pauseId,
+                conversationId: params.conversationId,
+                plan: chunk.plan,
               });
               break;
             case "paused":
