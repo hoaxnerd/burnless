@@ -162,9 +162,13 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   const subDetails = indexSubscriptionDetails(input.subscriptionDetails);
 
   // Revenue
+  // MRR = recurring (subscription) MRR only. When a month has no subscription
+  // detail it is 0 — NOT a fallback to total revenue, which would relabel
+  // non-recurring revenue (one-time / IAP / services / hardware) as recurring
+  // and fabricate MRR/ARR for businesses that have none (e.g. an IAP-only game).
   const mrr = months.map((m) => ({
     month: m,
-    value: subDetails.get(m)?.mrr ?? input.revenue.get(m) ?? 0,
+    value: subDetails.get(m)?.mrr ?? 0,
   }));
   const arr = mrr.map((v) => ({ month: v.month, value: dRound2(D(v.value).mul(12)) }));
   const totalRevenue = seriesToArray(input.revenue);

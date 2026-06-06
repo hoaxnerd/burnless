@@ -20,12 +20,30 @@ describe("metrics — edge cases", () => {
     const input = makeBasicInput();
     const metrics = computeAllMetrics(input);
 
-    // MRR falls back to revenue when no subscription details
-    expect(metrics.mrr[0]?.value).toBe(50000);
-    // ARR = MRR * 12
-    expect(metrics.arr[0]?.value).toBe(600000);
-    // Revenue run rate = monthly * 12
+    // MRR is 0 when there are no subscription (recurring) details — it must NOT
+    // fall back to total revenue, which would relabel non-recurring revenue
+    // (one-time / IAP / services / hardware) as recurring. See ARR below.
+    expect(metrics.mrr[0]?.value).toBe(0);
+    // ARR = MRR * 12 = 0
+    expect(metrics.arr[0]?.value).toBe(0);
+    // Revenue run rate is the total-revenue annualization and is unaffected
     expect(metrics.revenueRunRate[0]?.value).toBe(600000);
+  });
+
+  it("does not invent recurring revenue for a no-subscription business (IAP-only game)", () => {
+    // A game whose only revenue is one-time in-app purchases has NO recurring
+    // revenue, so MRR/ARR must be 0 — not its total transactional revenue.
+    const input = makeBasicInput({
+      revenue: new Map([["2026-01", 80000], ["2026-02", 120000]]),
+      subscriptionDetails: [],
+    });
+    const metrics = computeAllMetrics(input);
+
+    expect(metrics.mrr[0]?.value).toBe(0);
+    expect(metrics.mrr[1]?.value).toBe(0);
+    expect(metrics.arr[0]?.value).toBe(0);
+    // Total revenue / run rate still reflect the real (non-recurring) money.
+    expect(metrics.revenueRunRate[0]?.value).toBe(960000);
   });
 
   it("computes gross profit and margin", () => {
