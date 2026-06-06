@@ -58,7 +58,7 @@ export const GET = withErrorHandler(async (request: Request) => {
     // matching card.
     const pendingRow = await getActivePendingAction(conversationId);
     const pendingPermission =
-      pendingRow && pendingRow.kind !== "input"
+      pendingRow && pendingRow.kind === "permission"
         ? {
             pauseId: pendingRow.pauseId,
             conversationId,
@@ -85,8 +85,16 @@ export const GET = withErrorHandler(async (request: Request) => {
             spec: (pendingRow.pending as { spec: unknown }).spec,
           }
         : null;
+    const pendingPlan =
+      pendingRow && pendingRow.kind === "plan"
+        ? {
+            pauseId: pendingRow.pauseId,
+            conversationId,
+            spec: (pendingRow.pending as { spec: unknown }).spec,
+          }
+        : null;
 
-    return NextResponse.json({ conversationId, messages, pendingPermission, pendingInput });
+    return NextResponse.json({ conversationId, messages, pendingPermission, pendingInput, pendingPlan });
   }
 
   // List conversations with cursor-based pagination
