@@ -12,6 +12,35 @@ import { GENUI_DISPLAY_TOOLS, GENUI_INPUT_TOOLS } from "./tools-genui";
 /** Tool definitions for the AI assistant's function-calling capability. */
 const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
+    name: "propose_plan",
+    description:
+      "Before performing any data change (create/update/delete) or a multi-step task, call this to show the user an editable plan and PAUSE for approval. List the steps you intend to take in order — for steps that will call a tool, set kind:\"tool\" and name it; for explanatory steps set kind:\"note\". Add a short `rationale` and a `confidence` of \"high\" or \"low\" per step. The user reviews/edits the plan; on approval the plan comes back to you as a tool result and you then execute the steps (each data change still goes through its own confirmation). Do NOT call propose_plan for a simple read-only question — just answer it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the plan." },
+        description: { type: "string", description: "Optional one-line summary." },
+        steps: {
+          type: "array",
+          description: "Ordered steps you intend to take.",
+          items: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: ["tool", "note"], description: "\"tool\" if this step calls a tool, else \"note\"." },
+              title: { type: "string", description: "Human-readable step label." },
+              toolName: { type: "string", description: "For kind:tool — the tool you'll call." },
+              toolInput: { type: "object", description: "For kind:tool — the proposed arguments." },
+              rationale: { type: "string", description: "Why this step." },
+              confidence: { type: "string", enum: ["high", "low"], description: "Your confidence in this step." },
+            },
+            required: ["kind", "title"],
+          },
+        },
+      },
+      required: ["title", "steps"],
+    },
+  },
+  {
     name: "create_scenario",
     description:
       "Create a new financial scenario (e.g., best case, worst case, custom what-if). Returns the new scenario ID.",

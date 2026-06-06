@@ -71,3 +71,16 @@ describe("StreamChunk plan_request shape", () => {
     expect(chunk.plan?.title).toBe("T");
   });
 });
+
+import { getFinancialTools } from "../tools";
+
+describe("propose_plan tool definition", () => {
+  it("is advertised with an object schema", () => {
+    const defs = new Map(getFinancialTools().map((t) => [t.name, t]));
+    for (const name of PLAN_TOOL_NAMES) {
+      const def = defs.get(name);
+      expect(def, `missing plan tool def: ${name}`).toBeTruthy();
+      expect((def!.inputSchema as { type: string }).type).toBe("object");
+    }
+  });
+});
