@@ -79,6 +79,20 @@ export interface FinancialsInput {
   periodEnd: Date;
 }
 
+/** A blended per-line series for breakdown grouping (actuals + carry-forward + reconcile). */
+export interface BlendedExpenseLine {
+  accountId: string;
+  accountName: string;
+  category: "operating_expense" | "cogs" | "other_expense";
+  values: MonthlySeries;
+}
+export interface BlendedRevenueLine {
+  streamId: string;
+  name: string;
+  type: string;
+  values: MonthlySeries;
+}
+
 export interface FinancialsResult {
   metrics: ComputedMetrics;
   profitAndLoss: ProfitAndLoss;
@@ -99,6 +113,10 @@ export interface FinancialsResult {
   hasData: boolean;
   periodStart: Date;
   periodEnd: Date;
+  expenseLines: BlendedExpenseLine[];
+  revenueLines: BlendedRevenueLine[];
+  /** totalRevenue − Σ(revenueLines): revenue (transaction actuals or forecast-account lines) not attributable to a named stream. */
+  revenueResidual: MonthlySeries;
 }
 
 export function computeFinancials(input: FinancialsInput): FinancialsResult {
@@ -186,8 +204,10 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     ecommerce: new Map(),
     hardware: new Map(),
   };
+  const revStreamSeries = new Map<string, MonthlySeries>();
   for (const stream of revInputs) {
     const series = computeRevenueStream(stream, periodStart, periodEnd);
+    revStreamSeries.set(stream.id, series);
     const existing = revenueByTypeRaw[stream.type] ?? new Map<string, number>();
     revenueByTypeRaw[stream.type] = addSeries(existing, series);
   }
@@ -264,6 +284,9 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
   let totalOtherIncome: MonthlySeries = new Map();
   let totalOtherExpense: MonthlySeries = new Map();
 
+  const expenseLineMap = new Map<string, BlendedExpenseLine>();
+  const isExpenseCat = (c: string) => c === "cogs" || c === "operating_expense" || c === "other_expense";
+
   const seenAccountIds = new Set<string>();
   for (const [accountId, values] of accountForecasts) {
     const account = accountMap.get(accountId);
@@ -274,6 +297,12 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, values);
     else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, values);
     else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, values);
+    if (isExpenseCat(account.category)) {
+      expenseLineMap.set(accountId, {
+        accountId, accountName: account.name,
+        category: account.category as BlendedExpenseLine["category"], values,
+      });
+    }
   }
   // Include accounts that only have transaction data (no forecast lines).
   // Phase B: carry each such account's actuals forward across the horizon so the
@@ -293,8 +322,20 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     else if (account.category === "operating_expense") totalOpex = addSeries(totalOpex, series);
     else if (account.category === "other_income") totalOtherIncome = addSeries(totalOtherIncome, series);
     else if (account.category === "other_expense") totalOtherExpense = addSeries(totalOtherExpense, series);
+    if (isExpenseCat(account.category)) {
+      expenseLineMap.set(accountId, {
+        accountId, accountName: account.name,
+        category: account.category as BlendedExpenseLine["category"], values: series,
+      });
+    }
   }
   totalOpex = addSeries(totalOpex, reconciledHeadcountCost);
+  if (reconciledHeadcountCost.size > 0) {
+    expenseLineMap.set("headcount-cost", {
+      accountId: "headcount-cost", accountName: "Personnel Costs",
+      category: "operating_expense", values: reconciledHeadcountCost,
+    });
+  }
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
   const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
 
@@ -461,6 +502,27 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
 
   const hasData = fLines.length > 0 || revStreams.length > 0 || hcPlans.length > 0;
 
+  // Blended per-line series for breakdown grouping. expenseLines are built from
+  // the SAME carry-forward-applied series that feed totalExpenses (forecast /
+  // carried-forward actuals + reconciled headcount), so Σ(expenseLines) reconciles
+  // to totalExpenses in projection months. revenueLines are per-stream, with
+  // revenueResidual capturing imported revenue-account actuals not attributable
+  // to any stream.
+  const expenseLines: BlendedExpenseLine[] = Array.from(expenseLineMap.values());
+
+  const revenueLines: BlendedRevenueLine[] = revInputs.map((s) => ({
+    streamId: s.id,
+    name: s.name,
+    type: s.type,
+    values: revStreamSeries.get(s.id) ?? new Map(),
+  }));
+  const streamTotal = revenueLines.reduce<MonthlySeries>((acc, l) => addSeries(acc, l.values), new Map());
+  const revenueResidual: MonthlySeries = new Map();
+  for (const [month, total] of totalRevenue) {
+    const r = total - (streamTotal.get(month) ?? 0);
+    revenueResidual.set(month, Math.abs(r) < 0.005 ? 0 : dRound2(r));
+  }
+
   return {
     metrics,
     profitAndLoss,
@@ -481,5 +543,8 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     hasData,
     periodStart,
     periodEnd,
+    expenseLines,
+    revenueLines,
+    revenueResidual,
   };
 }
