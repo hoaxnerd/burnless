@@ -295,6 +295,9 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
             </div>
           </div>
         </div>
+        <p className="mt-2 text-xs text-surface-400">
+          Plan detail — your modelled forecast lines. Category totals above are actuals-blended and may differ.
+        </p>
       </div>
 
       {/* Bulk actions bar */}

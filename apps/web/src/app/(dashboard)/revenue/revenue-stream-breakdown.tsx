@@ -135,7 +135,10 @@ export function RevenueStreamBreakdown({
 
       {/* Stream proportions */}
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
-        <h3 className="text-sm font-semibold text-surface-900 mb-4">Revenue Mix</h3>
+        <h3 className="text-sm font-semibold text-surface-900 mb-1">Revenue Mix</h3>
+        <p className="mb-4 text-xs text-surface-400">
+          Streams are your modelled projections. &ldquo;Imported / Other revenue&rdquo; reconciles them to total booked revenue.
+        </p>
         <div className="space-y-3">
           {streams.map((stream, i) => {
             const color = typeColors[stream.type] ?? chartColors.palette[i % chartColors.palette.length] ?? "#94a3b8";
