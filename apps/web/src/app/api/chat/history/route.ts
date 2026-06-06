@@ -53,9 +53,9 @@ export const GET = withErrorHandler(async (request: Request) => {
 
     // Ownership was verified above; surface any persisted pending batch so the
     // client can re-show the right card after a reload. A turn pauses for one of
-    // two reasons (kind): "permission" (a write/tool approval) or "input" (a form
-    // the model asked the user to fill). Branch on kind so reload restores the
-    // matching card.
+    // three reasons (kind): "permission" (a write/tool approval), "input" (a form
+    // the model asked the user to fill), or "plan" (an editable plan awaiting
+    // approval). Branch on kind so reload restores the matching card.
     const pendingRow = await getActivePendingAction(conversationId);
     const pendingPermission =
       pendingRow && pendingRow.kind === "permission"
