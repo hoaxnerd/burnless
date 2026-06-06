@@ -27,6 +27,7 @@ import type {
   Conversation,
   PendingPermission,
   PendingInput,
+  PendingPlan,
   UiBlockClient,
 } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
@@ -258,6 +259,22 @@ export default function AiCompanionPage() {
             });
           }
           session.setMessages(id, msgs);
+        } else if (data.pendingPlan) {
+          // Re-show a pending plan card persisted server-side, mirroring the
+          // input restore: attach it to the last assistant message.
+          const msgs = [...restoredMessages];
+          const lastIdx = msgs.length - 1;
+          if (lastIdx >= 0 && msgs[lastIdx].role === "assistant") {
+            msgs[lastIdx] = { ...msgs[lastIdx], pendingPlan: data.pendingPlan as PendingPlan };
+          } else {
+            msgs.push({
+              role: "assistant",
+              content: "",
+              pendingPlan: data.pendingPlan as PendingPlan,
+              createdAt: Date.now(),
+            });
+          }
+          session.setMessages(id, msgs);
         } else {
           session.setMessages(id, restoredMessages);
         }
@@ -459,6 +476,7 @@ export default function AiCompanionPage() {
               onInputSubmit={(pending, data) =>
                 session.submitInput(pending.conversationId, pending, data)
               }
+              onPlanSubmit={(pending, plan) => session.submitPlan(pending.conversationId, pending, plan)}
               renderAfterMessage={(m) =>
                 m.pendingPermission ? (
                   <div className="mt-2">

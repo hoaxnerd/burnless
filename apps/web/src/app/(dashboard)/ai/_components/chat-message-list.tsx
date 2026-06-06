@@ -4,6 +4,7 @@ import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
 import { ToolResultDisplay } from "./tool-result-display";
 import { GenerativeBlocks } from "./generative/generative-block";
 import { InputFormCard } from "./generative/input-form-card";
+import { PlanPreviewCard } from "./generative/plan-preview-card";
 import type { Message, PendingInput } from "./types";
 
 /** Strip model thinking tags (e.g. <think>...</think>) from response text — fallback defense. */
@@ -65,6 +66,8 @@ interface ChatMessageListProps {
   onActionPrompt?: (prompt: string) => void;
   /** Triggered when the user submits a paused input form (genui). */
   onInputSubmit?: (pending: PendingInput, data: Record<string, unknown>) => void;
+  /** Triggered when the user approves (or edits then approves) a paused plan. */
+  onPlanSubmit?: (pending: NonNullable<Message["pendingPlan"]>, plan: NonNullable<Message["pendingPlan"]>["spec"]) => void;
 }
 
 export function ChatMessageList({
@@ -77,6 +80,7 @@ export function ChatMessageList({
   renderAfterMessage,
   onActionPrompt,
   onInputSubmit,
+  onPlanSubmit,
 }: ChatMessageListProps) {
   return (
     <div className="flex-1 overflow-auto space-y-5 mb-4 pr-2 scroll-smooth">
@@ -162,6 +166,15 @@ export function ChatMessageList({
                     pending={msg.pendingInput}
                     disabled={!!isLoading}
                     onSubmit={(data) => onInputSubmit?.(msg.pendingInput!, data)}
+                  />
+                )}
+
+                {/* Paused plan approval (assistant only) */}
+                {!isUser && msg.pendingPlan && (
+                  <PlanPreviewCard
+                    pending={msg.pendingPlan}
+                    disabled={!!isLoading}
+                    onSubmit={(plan) => onPlanSubmit?.(msg.pendingPlan!, plan)}
                   />
                 )}
 
