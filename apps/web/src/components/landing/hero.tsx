@@ -28,6 +28,7 @@ const recentThreshold = 4; // last 8 of 12 bars read brand-blue
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
+  { icon: Sparkles, label: "Companion", ai: true },
   { icon: TrendingUp, label: "Revenue" },
   { icon: Receipt, label: "Expenses" },
   { icon: Landmark, label: "Funding" },
@@ -75,22 +76,25 @@ function ProductPanel() {
               <span className="text-sm font-semibold tracking-tight text-surface-900">burnless</span>
             </div>
             <nav className="mt-3 space-y-0.5">
-              {sidebarNav.map((item) => (
-                <div
-                  key={item.label}
-                  className={`flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium ${
-                    item.active ? "bg-brand-50 text-brand-700 shadow-sm" : "text-surface-600"
-                  }`}
-                >
-                  <item.icon className={`h-3.5 w-3.5 ${item.active ? "text-brand-600" : "text-surface-400"}`} />
-                  {item.label}
-                </div>
-              ))}
-              {/* AI nav item — accent register, matching the real shell */}
-              <div className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-accent-500/[0.08] to-transparent px-2.5 py-1.5 text-xs font-medium text-accent-600">
-                <Sparkles className="h-3.5 w-3.5 text-accent-500" />
-                Companion
-              </div>
+              {sidebarNav.map((item) => {
+                // AI Companion sits directly under Dashboard, in the accent register.
+                const cls = item.ai
+                  ? "flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-accent-500/[0.08] to-transparent px-2.5 py-1.5 text-xs font-medium text-accent-600"
+                  : `flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs font-medium ${
+                      item.active ? "bg-brand-50 text-brand-700 shadow-sm" : "text-surface-600"
+                    }`;
+                const iconCls = item.ai
+                  ? "text-accent-500"
+                  : item.active
+                    ? "text-brand-600"
+                    : "text-surface-400";
+                return (
+                  <div key={item.label} className={cls}>
+                    <item.icon className={`h-3.5 w-3.5 ${iconCls}`} />
+                    {item.label}
+                  </div>
+                );
+              })}
             </nav>
           </div>
         </aside>
