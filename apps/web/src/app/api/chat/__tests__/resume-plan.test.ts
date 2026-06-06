@@ -125,5 +125,6 @@ describe("POST /api/chat/resume — plan approval (PGLite)", () => {
     const last = passed.messages.at(-1)!;
     const tr = (last.content as { toolUseId: string; content: string }[]).find((b) => b.toolUseId === "tu-p")!;
     expect(JSON.parse(tr.content).plan.steps).toHaveLength(1);
+    expect(JSON.parse(tr.content).plan.steps[0].title).toBe("Add hire"); // proves the STORED spec is used, not an edited one
   });
 });

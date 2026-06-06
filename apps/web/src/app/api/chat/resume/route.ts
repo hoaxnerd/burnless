@@ -46,9 +46,9 @@ const resumeSchema = z.object({
   /** The user-approved (possibly edited) plan, for a kind:"plan" pause. */
   plan: z
     .object({
-      title: z.string(),
-      description: z.string().optional(),
-      steps: z.array(z.record(z.string(), z.unknown())),
+      title: z.string().max(200),
+      description: z.string().max(500).optional(),
+      steps: z.array(z.record(z.string(), z.unknown())).max(50),
     })
     .optional(),
 });
