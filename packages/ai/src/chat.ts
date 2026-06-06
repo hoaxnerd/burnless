@@ -18,7 +18,7 @@ import {
 } from "./providers";
 import { getProviderForFeature } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
-import { isInputTool, buildInputFormSpec, type InputRequestState } from "./generative-ui";
+import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputRequestState, type PlanRequestState } from "./generative-ui";
 
 /** Resolve the provider: use explicit config override if present, else routing. */
 function resolveProvider(options: ChatOptions): LlmProvider | null {
@@ -43,6 +43,8 @@ interface ChatOptions {
   onPause?: (state: PauseState) => Promise<string>;
   /** Persist a turn paused to collect form input; returns a pauseId echoed in the input_request/paused chunks. */
   onInputRequest?: (state: InputRequestState) => Promise<string>;
+  /** Persist a turn paused to collect plan approval; returns a pauseId echoed in the plan_request/paused chunks. */
+  onPlanRequest?: (state: PlanRequestState) => Promise<string>;
   /** AI feature name for model routing. Defaults to "chat". */
   feature?: string;
   /** Configured companion name for the system prompt. */
@@ -200,8 +202,14 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       const completedResults: ContentBlock[] = [];
       const pending: PendingToolUse[] = [];
       const inputRequests: PendingToolUse[] = [];
+      const planRequests: PendingToolUse[] = [];
 
       for (const toolUse of toolUseBlocks) {
+        if (isPlanTool(toolUse.name)) {
+          planRequests.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
+          continue;
+        }
+
         if (isInputTool(toolUse.name)) {
           inputRequests.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
           continue;
@@ -237,6 +245,48 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       // The model still sees it on resume via the persisted assistantBlocks; do not
       // "fix" this into a duplicate-save.
       messages.push({ role: "assistant", content: lastResponse.content });
+
+      // Plan request takes precedence over input and permission (spec §4.1): a turn
+      // pauses for EITHER plan, input, OR permission. Same-turn write/input/extra-plan
+      // tools are deferred with a contract-safe tool_result so the provider's
+      // "every tool_use needs a tool_result" rule holds on resume.
+      if (planRequests.length > 0) {
+        for (const p of pending) {
+          completedResults.push({
+            type: "tool_result",
+            toolUseId: p.requestId,
+            content: JSON.stringify({ deferred: true, message: "Reviewing the plan first; I'll revisit this." }),
+          });
+        }
+        for (const i of inputRequests) {
+          completedResults.push({
+            type: "tool_result",
+            toolUseId: i.requestId,
+            content: JSON.stringify({ deferred: true, message: "Reviewing the plan first; I'll revisit this." }),
+          });
+        }
+        const first = planRequests[0]!;
+        for (const extra of planRequests.slice(1)) {
+          completedResults.push({
+            type: "tool_result",
+            toolUseId: extra.requestId,
+            content: JSON.stringify({ deferred: true, message: "One plan at a time." }),
+          });
+        }
+        const spec = buildPlanSpec(first.toolName, first.toolInput);
+        let pauseId: string | undefined;
+        if (options.onPlanRequest) {
+          pauseId = await options.onPlanRequest({
+            assistantBlocks: lastResponse.content,
+            completedResults,
+            planToolUseId: first.requestId,
+            spec,
+          });
+        }
+        yield { type: "plan_request", pauseId, plan: spec };
+        yield { type: "paused", pauseId };
+        return;
+      }
 
       // Input request takes precedence and is exclusive: a turn pauses for EITHER
       // input OR permission, never both (spec §7). Same-turn permission/extra-input
