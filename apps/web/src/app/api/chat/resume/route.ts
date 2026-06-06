@@ -22,7 +22,7 @@ import {
   type ChatMessage,
   type PermissionDefaults,
 } from "@burnless/ai";
-import type { ContentBlock, InputFormSpec, FormField } from "@burnless/ai"; // already exported from the package index
+import type { ContentBlock, InputFormSpec, FormField, PlanSpec } from "@burnless/ai"; // already exported from the package index
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
@@ -43,6 +43,14 @@ const resumeSchema = z.object({
     )
     .optional(),
   formData: z.record(z.string(), z.unknown()).optional(),
+  /** The user-approved (possibly edited) plan, for a kind:"plan" pause. */
+  plan: z
+    .object({
+      title: z.string(),
+      description: z.string().optional(),
+      steps: z.array(z.record(z.string(), z.unknown())),
+    })
+    .optional(),
 });
 
 interface PendingActionRecord {
@@ -167,6 +175,71 @@ export const POST = withErrorHandler(async (request: Request) => {
       providerConfig: inputProviderConfig,
       defaults: inputDefaults,
       sessionGrants: inputSessionGrants,
+    });
+  }
+
+  // PLAN pause (worklog plan 1): the user approved/edited the proposed plan.
+  // Synthesize a tool_result for the propose_plan tool_use id carrying the
+  // approved plan, then resume — the model proceeds to call the real tools
+  // (which themselves hit the permission/diff gate). Exclusive with input/permission.
+  if (pendingRow.kind === "plan") {
+    const planPending = pendingRow.pending as { planToolUseId: string; spec: PlanSpec };
+    const approvedPlan = (body.plan as PlanSpec | undefined) ?? planPending.spec;
+
+    const planResult: ContentBlock = {
+      type: "tool_result",
+      toolUseId: planPending.planToolUseId,
+      content: JSON.stringify({ approved: true, plan: approvedPlan }),
+    };
+    await resolvePendingAction(pendingRow.id);
+
+    const planHistory = await db
+      .select()
+      .from(aiMessages)
+      .where(eq(aiMessages.conversationId, body.conversationId))
+      .orderBy(asc(aiMessages.createdAt));
+    const planMessages: ChatMessage[] = planHistory
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    planMessages.push({ role: "assistant", content: assistantBlocks });
+    planMessages.push({ role: "user", content: [...completedResults, planResult] });
+
+    const { contextText: planBaseContext } = await buildAiContext(ctx.companyId, {
+      id: scenario.id,
+      name: scenario.name,
+      source: scenario.source ?? "blank",
+    });
+    const planOverrideCount = await getOverrideCount(scenario.id);
+    const planContextText =
+      (planOverrideCount > 0
+        ? `You are working inside scenario "${scenario.name}". ${planOverrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
+        : "") + planBaseContext;
+
+    const planProviderConfig = await getCompanyProviderConfig(ctx.companyId);
+    const planAiFlags = await getAiFlags(ctx.companyId);
+    const planSavedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
+    const planDefaults: PermissionDefaults = planSavedDefaults
+      ? {
+          read: planSavedDefaults.readMode,
+          write: planSavedDefaults.writeMode,
+          delete: planSavedDefaults.deleteMode,
+          web_search: planSavedDefaults.webSearchMode,
+          browser_use: planSavedDefaults.browserUseMode,
+        }
+      : BUILTIN_PERMISSION_DEFAULTS;
+    const planSessionGrants = await getSessionGrants(body.conversationId);
+
+    return buildChatSSEResponse({
+      companyId: ctx.companyId,
+      userId: ctx.userId,
+      scenarioId: scenario.id,
+      conversationId: body.conversationId,
+      messages: planMessages,
+      financialContext: planContextText,
+      companionName: planAiFlags.companionName,
+      providerConfig: planProviderConfig,
+      defaults: planDefaults,
+      sessionGrants: planSessionGrants,
     });
   }
 
