@@ -131,7 +131,7 @@ export function CookieConsentBanner() {
       aria-label="Cookie consent"
       className="fixed bottom-0 inset-x-0 z-50 p-4 sm:p-6"
     >
-      <div className="mx-auto max-w-2xl rounded-xl border border-surface-200/30 bg-surface-0/95 backdrop-blur-md shadow-lg dark:bg-surface-950/95 dark:border-surface-700/30">
+      <div className="mx-auto max-w-2xl rounded-xl border border-surface-200/60 bg-surface-0/95 backdrop-blur-md shadow-lg">
         <div className="p-5 sm:p-6">
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
@@ -155,7 +155,7 @@ export function CookieConsentBanner() {
 
           {/* Granular controls (expandable) */}
           {showDetails && (
-            <div className="mt-4 space-y-4 rounded-lg border border-surface-200/30 bg-surface-50/50 p-4 dark:bg-surface-900/50 dark:border-surface-700/20 max-h-[60vh] overflow-y-auto">
+            <div className="mt-4 space-y-4 rounded-lg border border-surface-200/60 bg-surface-50/50 p-4 max-h-[60vh] overflow-y-auto">
               {/* Essential */}
               <div>
                 <label className="flex items-center justify-between">
@@ -202,7 +202,7 @@ export function CookieConsentBanner() {
                     className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
                       preferences.analytics
                         ? "bg-brand-500"
-                        : "bg-surface-300 dark:bg-surface-600"
+                        : "bg-surface-300"
                     }`}
                   >
                     <span
@@ -238,7 +238,7 @@ export function CookieConsentBanner() {
                     className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
                       preferences.marketing
                         ? "bg-brand-500"
-                        : "bg-surface-300 dark:bg-surface-600"
+                        : "bg-surface-300"
                     }`}
                   >
                     <span
@@ -279,7 +279,7 @@ export function CookieConsentBanner() {
                   <button
                     type="button"
                     onClick={rejectNonEssential}
-                    className="px-4 py-2 text-sm font-medium rounded-lg border border-surface-200/50 text-surface-700 hover:bg-surface-100 transition-colors dark:border-surface-700/50 dark:text-surface-300 dark:hover:bg-surface-800"
+                    className="px-4 py-2 text-sm font-medium rounded-lg border border-surface-200 text-surface-700 hover:bg-surface-100 transition-colors"
                   >
                     Essential only
                   </button>
@@ -305,7 +305,7 @@ function CookieTable({ cookies }: { cookies: CookieInfo[] }) {
     <div className="mt-2 overflow-x-auto">
       <table className="w-full text-xs text-surface-500">
         <thead>
-          <tr className="border-b border-surface-200/20 dark:border-surface-700/20">
+          <tr className="border-b border-surface-200/40">
             <th className="text-left font-medium text-surface-600 pb-1.5 pr-3">Cookie</th>
             <th className="text-left font-medium text-surface-600 pb-1.5 pr-3">Purpose</th>
             <th className="text-left font-medium text-surface-600 pb-1.5">Duration</th>
@@ -313,7 +313,7 @@ function CookieTable({ cookies }: { cookies: CookieInfo[] }) {
         </thead>
         <tbody>
           {cookies.map((c) => (
-            <tr key={c.name} className="border-b border-surface-200/10 dark:border-surface-700/10 last:border-0">
+            <tr key={c.name} className="border-b border-surface-200/30 last:border-0">
               <td className="py-1.5 pr-3 font-mono text-surface-600 whitespace-nowrap">{c.name}</td>
               <td className="py-1.5 pr-3">{c.purpose}</td>
               <td className="py-1.5 whitespace-nowrap">{c.duration}</td>

@@ -1,262 +1,111 @@
 "use client";
 
 import {
-  Bot,
-  Gauge,
-  Sparkles,
-  Zap,
-  AlertTriangle,
   GitBranch,
+  BarChart3,
+  FileText,
+  Plug,
   TrendingUp,
+  AlertTriangle,
   Users,
-  ArrowRight,
 } from "lucide-react";
 import { useInView } from "./use-in-view";
-import { AIChatMockup, RunwayGauge } from "./feature-visuals";
-import { bottomFeatures, CardVisual } from "./feature-cards";
+import { RunwayGauge } from "./feature-visuals";
 
-/* ─────────────────────────────────────────────
-   Main Feature Section
-   ───────────────────────────────────────────── */
+/* Product tour (Workbench). The runway tracker is shown working; the supporting
+   capabilities sit beneath it as a flat feature list — icons inline with the
+   heading, hairline borders, no gradient-hover icon-tiles. */
+
+const runwayPoints = [
+  { icon: TrendingUp, text: "Live burn rate, recalculated as data lands" },
+  { icon: AlertTriangle, text: "Threshold alerts before you cross them" },
+  { icon: Users, text: "Benchmarks against companies at your stage" },
+];
+
+const capabilities = [
+  {
+    icon: GitBranch,
+    title: "Scenario planning",
+    description: "Ask “what if” in plain English — it builds the scenario.",
+  },
+  {
+    icon: BarChart3,
+    title: "Revenue intelligence",
+    description: "Revenue that explains its own movements.",
+  },
+  {
+    icon: FileText,
+    title: "Investor reports",
+    description: "A board update, drafted for you from live numbers.",
+  },
+  {
+    icon: Plug,
+    title: "Connected accounts",
+    description: "Link your accounts; the numbers keep themselves current.",
+  },
+];
 
 export function FeatureBento() {
-  const { ref: headerRef, inView: headerInView } = useInView(0.1);
-  const { ref: aiRef, inView: aiInView } = useInView(0.15);
-  const { ref: runwayRef, inView: runwayInView } = useInView(0.15);
-  const { ref: bottomRef, inView: bottomInView } = useInView(0.1);
+  const { ref: gaugeRef, inView: gaugeInView } = useInView(0.2);
 
   return (
-    <section id="features" className="py-24 sm:py-32 relative overflow-hidden">
-      {/* Subtle ambient gradient */}
-      <div
-        className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full opacity-[0.04] blur-[120px] pointer-events-none"
-        style={{
-          background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
-        }}
-      />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* ── Section Header ──────────────────────────── */}
-        <div
-          ref={headerRef}
-          className={`text-center mb-20 transition-all duration-700 ${
-            headerInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
-        >
-          <div
-            className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 border border-brand-500/20 px-4 py-1.5 text-sm font-medium text-brand-400 mb-6"
-            style={{ transitionDelay: headerInView ? "0.1s" : "0s" }}
-          >
-            <Sparkles className="w-4 h-4" />
-            Features
-          </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-surface-900 tracking-tight leading-tight">
-            Built for founders who need
-            <br className="hidden sm:block" />
-            <span className="bg-gradient-to-r from-brand-400 via-violet-400 to-brand-500 bg-clip-text text-transparent">
-              {" "}answers, not spreadsheets
-            </span>
+    <section id="product" className="pb-24 pt-6 sm:pb-32 sm:pt-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Section header — left aligned */}
+        <div className="max-w-2xl">
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-surface-900 sm:text-4xl">
+            Your numbers, thinking for themselves
           </h2>
-          <p className="mt-5 text-lg text-surface-500 max-w-2xl mx-auto leading-relaxed">
-            Every metric, insight, and projection your startup needs — powered by AI that understands your business.
+          <p className="mt-4 text-lg leading-relaxed text-surface-600">
+            burnless keeps every number current and reads the trend for you — so you
+            spend your time deciding, not reconciling.
           </p>
         </div>
 
-        {/* ── AI Feature Showcase ─────────────────────── */}
+        {/* Runway showcase */}
         <div
-          ref={aiRef}
-          className={`mb-6 transition-all duration-700 ${
-            aiInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-          }`}
+          ref={gaugeRef}
+          className="mt-16 grid grid-cols-1 items-center gap-10 rounded-2xl border border-surface-200 bg-surface-50/60 p-6 sm:p-10 lg:grid-cols-2"
         >
-          <div className="relative group rounded-2xl border border-surface-200/20 overflow-hidden">
-            {/* Background gradient */}
-            <div
-              className="absolute inset-0 opacity-60"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(124,58,237,0.06) 50%, rgba(59,130,246,0.03) 100%)",
-              }}
-            />
-            {/* Hover glow */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-              <div
-                className="absolute -inset-1 blur-3xl"
-                style={{
-                  background: "radial-gradient(600px circle at 50% 50%, rgba(59,130,246,0.06), transparent 70%)",
-                }}
-              />
-            </div>
-
-            <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-0">
-              {/* Left: Chat Mockup */}
-              <div className="p-6 sm:p-8 lg:p-10 lg:border-r border-surface-200/10">
-                <AIChatMockup visible={aiInView} />
-              </div>
-
-              {/* Right: Copy */}
-              <div className="p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-9 h-9 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-accent-400" />
-                  </div>
-                  <div className="h-px flex-1 bg-gradient-to-r from-accent-500/20 to-transparent" />
-                </div>
-
-                <h3 className="text-2xl sm:text-3xl font-bold text-surface-900 tracking-tight mb-3">
-                  Your AI CFO
-                </h3>
-                <p className="text-surface-500 leading-relaxed mb-6">
-                  Ask anything about your finances. Get instant answers, scenario modeling, and data narratives — no spreadsheet skills required.
-                </p>
-
-                <div className="space-y-3">
-                  {[
-                    { icon: Zap, text: "Natural language queries" },
-                    { icon: AlertTriangle, text: "Proactive alerts" },
-                    { icon: GitBranch, text: "One-click scenarios" },
-                  ].map((item) => (
-                    <div key={item.text} className="flex items-center gap-3 group/item">
-                      <div className="w-7 h-7 rounded-lg bg-accent-500/8 border border-accent-500/15 flex items-center justify-center transition-all duration-300 group-hover/item:bg-accent-500/15 group-hover/item:border-accent-500/25">
-                        <item.icon className="w-3.5 h-3.5 text-accent-400" />
-                      </div>
-                      <span className="text-sm font-medium text-surface-700 transition-colors duration-300 group-hover/item:text-surface-900">
-                        {item.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div>
+            <h3 className="text-2xl font-bold tracking-tight text-surface-900">
+              Never be surprised by zero
+            </h3>
+            <p className="mt-3 leading-relaxed text-surface-600">
+              Real-time runway tracking with intelligent alerts. Know exactly when to
+              fundraise, cut, or push on revenue — long before it&rsquo;s urgent.
+            </p>
+            <ul className="mt-6 space-y-3">
+              {runwayPoints.map((point) => (
+                <li key={point.text} className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50">
+                    <point.icon className="h-3.5 w-3.5 text-brand-600" />
+                  </span>
+                  <span className="text-sm font-medium text-surface-700">{point.text}</span>
+                </li>
+              ))}
+            </ul>
           </div>
+
+          <RunwayGauge visible={gaugeInView} />
         </div>
 
-        {/* ── Runway Feature Showcase ─────────────────── */}
-        <div
-          ref={runwayRef}
-          className={`mb-6 transition-all duration-700 ${
-            runwayInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-          }`}
-          style={{ transitionDelay: runwayInView ? "0.15s" : "0s" }}
-        >
-          <div className="relative group rounded-2xl border border-surface-200/20 overflow-hidden">
-            {/* Background gradient */}
+        {/* Capabilities — flat feature list, 2×2 */}
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {capabilities.map((cap) => (
             <div
-              className="absolute inset-0 opacity-60"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(245,158,11,0.04) 40%, rgba(16,185,129,0.05) 100%)",
-              }}
-            />
-            {/* Hover glow */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-              <div
-                className="absolute -inset-1 blur-3xl"
-                style={{
-                  background: "radial-gradient(600px circle at 50% 50%, rgba(16,185,129,0.06), transparent 70%)",
-                }}
-              />
+              key={cap.title}
+              className="group rounded-2xl border border-surface-200 bg-surface-0 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-surface-300 hover:shadow-lg"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 transition-transform duration-300 group-hover:scale-110">
+                  <cap.icon className="h-4 w-4 text-brand-600" />
+                </span>
+                <h3 className="text-base font-semibold text-surface-900">{cap.title}</h3>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-surface-600">{cap.description}</p>
             </div>
-
-            <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-0">
-              {/* Left: Copy */}
-              <div className="p-6 sm:p-8 lg:p-10 flex flex-col justify-center order-2 lg:order-1">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-9 h-9 rounded-xl bg-danger-500/10 border border-danger-500/20 flex items-center justify-center">
-                    <Gauge className="w-5 h-5 text-danger-400" />
-                  </div>
-                  <div className="h-px flex-1 bg-gradient-to-r from-danger-500/20 via-warning-500/15 to-transparent" />
-                </div>
-
-                <h3 className="text-2xl sm:text-3xl font-bold text-surface-900 tracking-tight mb-3">
-                  Never be surprised by zero
-                </h3>
-                <p className="text-surface-500 leading-relaxed mb-6">
-                  Real-time runway tracking with intelligent alerts. Know exactly when you need to fundraise, cut costs, or accelerate revenue.
-                </p>
-
-                <div className="space-y-3">
-                  {[
-                    { icon: TrendingUp, text: "Live burn rate tracking", color: "text-danger-400", bg: "bg-danger-500/8 border-danger-500/15" },
-                    { icon: AlertTriangle, text: "Smart threshold alerts", color: "text-warning-400", bg: "bg-warning-500/8 border-warning-500/15" },
-                    { icon: Users, text: "Peer benchmarking", color: "text-success-400", bg: "bg-success-500/8 border-success-500/15" },
-                  ].map((item) => (
-                    <div key={item.text} className="flex items-center gap-3 group/item">
-                      <div className={`w-7 h-7 rounded-lg ${item.bg} border flex items-center justify-center transition-all duration-300`}>
-                        <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
-                      </div>
-                      <span className="text-sm font-medium text-surface-700 transition-colors duration-300 group-hover/item:text-surface-900">
-                        {item.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right: Gauge visual */}
-              <div className="p-6 sm:p-8 lg:p-10 order-1 lg:order-2 lg:border-l border-surface-200/10">
-                <RunwayGauge visible={runwayInView} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Bottom Row — 4 Smaller Cards ────────────── */}
-        <div
-          ref={bottomRef}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-        >
-          {bottomFeatures.map((feature, i) => {
-            const Icon = feature.icon;
-            return (
-              <div
-                key={feature.title}
-                className={`group relative rounded-2xl border border-surface-200/20 overflow-hidden transition-all duration-500 hover:border-surface-200/40 hover:-translate-y-1 hover:shadow-xl ${
-                  bottomInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-                style={{
-                  transitionDelay: bottomInView ? `${i * 0.1 + 0.1}s` : "0s",
-                }}
-              >
-                {/* Gradient bg */}
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
-                />
-
-                <div className="relative">
-                  {/* Visual area */}
-                  <div className="h-28 border-b border-surface-200/10 bg-surface-200/[0.03] relative overflow-hidden">
-                    <CardVisual type={feature.visual} />
-                    {/* Fade overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-surface-0/80 to-transparent" />
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-5">
-                    <div className="flex items-center gap-2.5 mb-2.5">
-                      <div className={`w-8 h-8 rounded-lg ${feature.iconBg} border flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
-                        <Icon className={`w-4 h-4 ${feature.iconColor}`} />
-                      </div>
-                      <h3 className="text-sm font-semibold text-surface-900">
-                        {feature.title}
-                      </h3>
-                    </div>
-                    <p className="text-xs text-surface-500 leading-relaxed">
-                      {feature.description}
-                    </p>
-
-                    {/* Hover arrow */}
-                    <div className="mt-3 flex items-center gap-1 text-xs font-medium text-brand-400 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-0 group-hover:translate-x-1">
-                      Learn more <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom glow line */}
-                <div className="absolute bottom-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-brand-400/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              </div>
-            );
-          })}
+          ))}
         </div>
       </div>
     </section>

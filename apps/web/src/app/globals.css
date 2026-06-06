@@ -315,24 +315,26 @@ body {
 
 /* ── Landing Page ─────────────────────────────────────────────────────────── */
 
-@keyframes meshFloat {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(30px, -50px) scale(1.1); }
-  50% { transform: translate(-20px, 20px) scale(0.95); }
-  75% { transform: translate(50px, 30px) scale(1.05); }
+/* Focal brand glow — the single cognitively-capturing visual moment on the
+ * landing page: one controlled radial bloom behind the hero product panel.
+ * Token-driven (brand-500 via color-mix); the slow breath is frozen by the
+ * global prefers-reduced-motion reset above, leaving a static glow. This
+ * replaces the old multi-orb meshFloat backgrounds (one focal element, not many).
+ */
+@keyframes landingGlowBreath {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.04); }
 }
 
-@keyframes meshFloat2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(-40px, 30px) scale(1.08); }
-  50% { transform: translate(30px, -40px) scale(0.92); }
-  75% { transform: translate(-20px, -30px) scale(1.12); }
-}
-
-@keyframes meshFloat3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, 20px) scale(1.15); }
-  66% { transform: translate(-30px, -20px) scale(0.9); }
+.landing-glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--color-brand-500) 60%, transparent),
+    transparent 100%
+  );
+  filter: blur(72px);
+  animation: landingGlowBreath 9s var(--ease-smooth) infinite;
+  will-change: opacity, transform;
 }
 
 @keyframes heroTextReveal {
@@ -355,43 +357,15 @@ body {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes logoScroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
 @keyframes typingCursor {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
 
-@keyframes revealUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Gradient shimmer sweep across text — premium feel */
-@keyframes gradientShimmer {
-  0% { background-position: 200% center; }
-  100% { background-position: -200% center; }
-}
-
-/* Subtle pulsing glow for CTA buttons */
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px 0 rgba(37, 99, 235, 0.2); }
-  50% { box-shadow: 0 0 30px 4px rgba(37, 99, 235, 0.35); }
-}
-
-/* Ambient breathing for AI-related elements */
+/* Ambient breathing for AI-related elements (shared with dashboard) */
 @keyframes ambientBreath {
   0%, 100% { opacity: 0.3; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(1.02); }
-}
-
-/* Icon float on hover */
-@keyframes iconFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
 }
 
 .landing-reveal {
@@ -517,17 +491,6 @@ body {
 .hover-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px -5px rgb(0 0 0 / 0.08), 0 4px 10px -3px rgb(0 0 0 / 0.04);
-}
-
-/* Gradient shimmer text — sweeping highlight effect */
-.gradient-shimmer-text {
-  background-size: 200% auto;
-  animation: gradientShimmer 6s linear infinite;
-}
-
-/* CTA glow pulse */
-.cta-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
 }
 
 /* Stagger extensions */
