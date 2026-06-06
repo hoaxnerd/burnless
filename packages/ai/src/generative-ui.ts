@@ -211,3 +211,87 @@ export function buildInputFormSpec(
   }
   throw new Error(`unknown input tool: ${toolName}`);
 }
+
+// ── Plan pause (spec 2026-06-07 §4.1) ────────────────────────────────────────
+
+export type PlanStepKind = "tool" | "note";
+
+/**
+ * One proposed step. `tool` steps name the tool the model intends to call (the
+ * model still calls it itself after the plan is approved — the step is advisory
+ * intent, not an execution instruction). `note` steps are free-text.
+ * `confidence`/`rationale` are surfaced in the UI in later plans.
+ */
+export interface PlanStep {
+  id: string;
+  kind: PlanStepKind;
+  /** Human-readable label for the step. */
+  title: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  rationale?: string;
+  confidence?: "high" | "low";
+}
+
+export interface PlanSpec {
+  title: string;
+  description?: string;
+  steps: PlanStep[];
+}
+
+/** Persisted state for a turn paused awaiting plan approval (mirrors InputRequestState). */
+export interface PlanRequestState {
+  assistantBlocks: unknown[];
+  completedResults: unknown[];
+  /** The propose_plan tool_use id the approved plan answers on resume. */
+  planToolUseId: string;
+  spec: PlanSpec;
+}
+
+/** Plan/control tool names. The model calls these to PAUSE for plan approval. */
+export const PLAN_TOOL_NAMES: ReadonlySet<string> = new Set<string>(["propose_plan"]);
+
+export function isPlanTool(toolName: string): boolean {
+  return PLAN_TOOL_NAMES.has(toolName);
+}
+
+let planStepSeq = 0;
+function coercePlanStep(raw: unknown): PlanStep | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.title !== "string") return null;
+  const kind: PlanStepKind = r.kind === "tool" ? "tool" : "note";
+  const step: PlanStep = {
+    // Deterministic, collision-free id without Math.random/crypto (works in all runtimes).
+    id: typeof r.id === "string" && r.id ? r.id : `step-${++planStepSeq}`,
+    kind,
+    title: r.title,
+  };
+  if (typeof r.toolName === "string") step.toolName = r.toolName;
+  if (r.toolInput && typeof r.toolInput === "object") step.toolInput = r.toolInput as Record<string, unknown>;
+  if (typeof r.rationale === "string") step.rationale = r.rationale;
+  if (r.confidence === "high" || r.confidence === "low") step.confidence = r.confidence;
+  return step;
+}
+
+/**
+ * Build the plan spec from the model's `propose_plan` tool input. Tolerant:
+ * coerces/drops malformed steps and defaults the title (the model's structured
+ * output is not guaranteed well-formed).
+ */
+export function buildPlanSpec(
+  toolName: string,
+  input: Record<string, unknown>
+): PlanSpec {
+  if (toolName !== "propose_plan") {
+    throw new Error(`unknown plan tool: ${toolName}`);
+  }
+  const steps = Array.isArray(input.steps)
+    ? input.steps.map(coercePlanStep).filter((s): s is PlanStep => s !== null)
+    : [];
+  return {
+    title: typeof input.title === "string" ? input.title : "Plan",
+    description: typeof input.description === "string" ? input.description : undefined,
+    steps,
+  };
+}
