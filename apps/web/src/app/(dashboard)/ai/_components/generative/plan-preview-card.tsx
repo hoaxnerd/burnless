@@ -22,7 +22,7 @@ export function PlanPreviewCard({ pending, onSubmit, disabled }: PlanPreviewCard
   const remove = (id: string) => setSteps((s) => s.filter((step) => step.id !== id));
 
   return (
-    <div className="my-2 rounded-2xl border border-accent-100 bg-accent-50/40 p-4">
+    <div className="my-2 rounded-2xl border border-accent-200 bg-accent-50/40 p-4">
       <div className="mb-2 flex items-center gap-2">
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-accent-500/10">
           <ListChecks className="h-3.5 w-3.5 text-accent-600" />
