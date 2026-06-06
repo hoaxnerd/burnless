@@ -44,4 +44,17 @@ describe("plan tool set", () => {
   it("throws for an unknown plan tool name", () => {
     expect(() => buildPlanSpec("not_a_plan", {})).toThrow(/unknown plan tool/i);
   });
+
+  it("generates deterministic, contiguous ids per spec (no shared global state)", () => {
+    const input = { title: "P", steps: [{ kind: "tool", title: "A" }, { kind: "note", title: "B" }] };
+    const a = buildPlanSpec("propose_plan", input);
+    const b = buildPlanSpec("propose_plan", input);
+    expect(a.steps.map((s) => s.id)).toEqual(["step-1", "step-2"]);
+    expect(b.steps.map((s) => s.id)).toEqual(["step-1", "step-2"]); // same input → same ids every call
+  });
+
+  it("preserves a model-provided step id", () => {
+    const spec = buildPlanSpec("propose_plan", { title: "P", steps: [{ id: "custom-x", kind: "note", title: "A" }] });
+    expect(spec.steps[0]!.id).toBe("custom-x");
+  });
 });
