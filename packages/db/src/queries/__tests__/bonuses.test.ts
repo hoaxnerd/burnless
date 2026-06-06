@@ -97,6 +97,7 @@ describe("bonuses query module", () => {
         amount: "5000.00",
       },
       null,
+      ctx.company.id,
     );
     const rows = await listBonuses(ctx.company.id, hire.id);
     expect(rows).toHaveLength(1);
@@ -115,6 +116,7 @@ describe("bonuses query module", () => {
         type: "performance",
       },
       ctx.scenario.id,
+      ctx.company.id,
     );
     const baseRows = await listBonuses(ctx.company.id, hire.id);
     expect(baseRows).toHaveLength(0);
@@ -158,6 +160,7 @@ describe("bonuses query module", () => {
       base!.id,
       { amount: "8000.00" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     const [stillBase] = await db
@@ -189,7 +192,7 @@ describe("bonuses query module", () => {
       })
       .returning();
 
-    await removeBonus(base!.id, ctx.scenario.id);
+    await removeBonus(base!.id, ctx.scenario.id, ctx.company.id);
 
     const stillBase = await db
       .select()

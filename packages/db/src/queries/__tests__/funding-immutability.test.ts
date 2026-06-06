@@ -27,13 +27,14 @@ describe("scenarioUpdate funding-round roundType immutability", () => {
       amount: "1000000",
     });
 
-    // Positional signature: scenarioUpdate(entityType, table, entityId, changes, scenarioId)
+    // Positional signature: scenarioUpdate(entityType, table, entityId, changes, scenarioId, companyId)
     await scenarioUpdate(
       "funding_round",
       fundingRounds,
       round.id,
       { name: "Renamed", type: "series_a" as any, amount: "2000000" },
       null, // null scenarioId = base mutation
+      ctx.company.id,
     );
 
     const db = getTestDb();

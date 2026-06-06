@@ -34,7 +34,7 @@ describe("scenarioInsert", () => {
     const row = await scenarioInsert("revenue_stream", revenueStreams, {
       companyId: ctx.company.id,
       name: "Direct Insert Stream",
-    }, null);
+    }, null, ctx.company.id);
 
     expect(row).toBeDefined();
     expect(row.name).toBe("Direct Insert Stream");
@@ -51,7 +51,7 @@ describe("scenarioInsert", () => {
     const row = await scenarioInsert("revenue_stream", revenueStreams, {
       companyId: ctx.company.id,
       name: "Scenario Stream",
-    }, ctx.scenario.id);
+    }, ctx.scenario.id, ctx.company.id);
 
     expect(row).toBeDefined();
     expect(row.id).toBeDefined();
@@ -75,7 +75,7 @@ describe("scenarioInsert", () => {
       name: "Data Match Stream",
     };
 
-    const row = await scenarioInsert("revenue_stream", revenueStreams, inputData, ctx.scenario.id);
+    const row = await scenarioInsert("revenue_stream", revenueStreams, inputData, ctx.scenario.id, ctx.company.id);
 
     const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
     expect(overrides).toHaveLength(1);
@@ -102,6 +102,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { name: "Updated Name" },
       null,
+      ctx.company.id,
     );
 
     expect(updated).toBeDefined();
@@ -121,6 +122,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { name: "Modified Stream" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     expect(result!.name).toBe("Modified Stream");
@@ -149,6 +151,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { name: "First Edit" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     // Second update should upsert the same override
@@ -158,6 +161,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { name: "Second Edit" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     expect(result!.name).toBe("Second Edit");
@@ -192,6 +196,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { parameters: { expansionRate: 0.02 } },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     const resultParams = (result as { parameters: Record<string, number> }).parameters;
@@ -226,6 +231,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { parameters: { expansionRate: 0.02 } },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     // Second partial update: different field inside parameters
@@ -235,6 +241,7 @@ describe("scenarioUpdate", () => {
       stream.id,
       { parameters: { priceGrowthRate: 0.01 } },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     const resultParams = (result as { parameters: Record<string, number> }).parameters;
@@ -261,6 +268,7 @@ describe("scenarioUpdate", () => {
         sysAccount.id,
         { name: "Hacked" },
         ctx.scenario.id,
+        ctx.company.id,
       ),
     ).rejects.toThrow("System accounts cannot be modified in scenarios");
   });
@@ -276,7 +284,7 @@ describe("scenarioDelete", () => {
     });
     const stream = await createRevenueStream(ctx.company.id, { name: "Delete Me" });
 
-    await scenarioDelete("revenue_stream", revenueStreams, stream.id, null);
+    await scenarioDelete("revenue_stream", revenueStreams, stream.id, null, ctx.company.id);
 
     // Verify the row is gone from the base table
     const db = getTestDb();
@@ -292,7 +300,7 @@ describe("scenarioDelete", () => {
     });
     const stream = await createRevenueStream(ctx.company.id, { name: "Hide Me" });
 
-    await scenarioDelete("revenue_stream", revenueStreams, stream.id, ctx.scenario.id);
+    await scenarioDelete("revenue_stream", revenueStreams, stream.id, ctx.scenario.id, ctx.company.id);
 
     const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
     expect(overrides).toHaveLength(1);
@@ -315,7 +323,7 @@ describe("scenarioDelete", () => {
     const entityData = await scenarioInsert("revenue_stream", revenueStreams, {
       companyId: ctx.company.id,
       name: "Ephemeral Stream",
-    }, ctx.scenario.id);
+    }, ctx.scenario.id, ctx.company.id);
 
     // Verify override exists
     let overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
@@ -323,7 +331,7 @@ describe("scenarioDelete", () => {
     expect(overrides[0]!.action).toBe("create");
 
     // Delete the scenario-created entity
-    await scenarioDelete("revenue_stream", revenueStreams, entityData.id, ctx.scenario.id);
+    await scenarioDelete("revenue_stream", revenueStreams, entityData.id, ctx.scenario.id, ctx.company.id);
 
     // Override should be gone entirely (not converted to action=delete)
     overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
@@ -346,7 +354,7 @@ describe("scenarioDelete", () => {
       parentId: parent.id,
     });
 
-    await scenarioDelete("department", departments, parent.id, ctx.scenario.id);
+    await scenarioDelete("department", departments, parent.id, ctx.scenario.id, ctx.company.id);
 
     // Should have delete overrides for parent + both children
     const overrides = await getOverridesForScenario(ctx.scenario.id, "department");
@@ -358,5 +366,31 @@ describe("scenarioDelete", () => {
 
     // All should be action=delete
     expect(overrides.every((o) => o.action === "delete")).toBe(true);
+  });
+});
+
+// ── orphan override GC ────────────────────────────────────────────────────────
+
+describe("orphan override cleanup on base delete", () => {
+  it("hard-deleting a base entity removes its overrides across scenarios (no phantoms)", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "orphan-gc@test.burnless.app" },
+      company: { name: "Orphan GC Co" },
+    });
+    const stream = await createRevenueStream(ctx.company.id, { name: "Base Stream" });
+
+    // A modify override exists in a scenario for this base entity.
+    await createScenarioOverride(ctx.scenario.id, "revenue_stream", stream.id, "modify", {
+      ...stream,
+      name: "Renamed In Scenario",
+    });
+
+    // Hard-delete the base entity (base mode).
+    await scenarioDelete("revenue_stream", revenueStreams, stream.id, null, ctx.company.id);
+
+    // The dangling override must be GC'd — otherwise it resurfaces as a phantom
+    // "created" entity in the scenario view (resolveEntities dangling-modify path).
+    const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
+    expect(overrides).toHaveLength(0);
   });
 });

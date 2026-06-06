@@ -104,6 +104,7 @@ describe("salary-changes query module", () => {
         newSalary: "150000.00",
       },
       null,
+      ctx.company.id,
     );
     const rows = await listSalaryChanges(ctx.company.id, hire.id);
     expect(rows).toHaveLength(1);
@@ -121,6 +122,7 @@ describe("salary-changes query module", () => {
         newSalary: "150000.00",
       },
       ctx.scenario.id,
+      ctx.company.id,
     );
     // Base table empty
     const baseRows = await listSalaryChanges(ctx.company.id, hire.id);
@@ -168,6 +170,7 @@ describe("salary-changes query module", () => {
       base!.id,
       { newSalary: "200000.00" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     // Base unchanged
@@ -201,7 +204,7 @@ describe("salary-changes query module", () => {
       })
       .returning();
 
-    await removeSalaryChange(base!.id, ctx.scenario.id);
+    await removeSalaryChange(base!.id, ctx.scenario.id, ctx.company.id);
 
     // Base still there
     const stillBase = await db

@@ -47,8 +47,9 @@ export async function listResolvedEquityGrants(
 export async function createEquityGrant(
   data: NewEquityGrant,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioInsert("equity_grant", equityGrants, data, scenarioId);
+  return scenarioInsert("equity_grant", equityGrants, data, scenarioId, companyId);
 }
 
 /** Update an equity grant via the scenario layer. */
@@ -56,6 +57,7 @@ export async function updateEquityGrant(
   id: string,
   changes: Partial<NewEquityGrant>,
   scenarioId: string | null,
+  companyId: string,
 ) {
   return scenarioUpdate(
     "equity_grant",
@@ -63,6 +65,7 @@ export async function updateEquityGrant(
     id,
     changes,
     scenarioId,
+    companyId,
   );
 }
 
@@ -70,6 +73,7 @@ export async function updateEquityGrant(
 export async function removeEquityGrant(
   id: string,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioDelete("equity_grant", equityGrants, id, scenarioId);
+  return scenarioDelete("equity_grant", equityGrants, id, scenarioId, companyId);
 }

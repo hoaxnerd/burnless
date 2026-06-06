@@ -102,6 +102,7 @@ describe("equity-grants query module", () => {
         parameters: { vestingSchedule: [], cliffMonths: 12 },
       },
       null,
+      ctx.company.id,
     );
     const rows = await listEquityGrants(ctx.company.id, hire.id);
     expect(rows).toHaveLength(1);
@@ -129,6 +130,7 @@ describe("equity-grants query module", () => {
         },
       },
       ctx.scenario.id,
+      ctx.company.id,
     );
     const baseRows = await listEquityGrants(ctx.company.id, hire.id);
     expect(baseRows).toHaveLength(0);
@@ -173,6 +175,7 @@ describe("equity-grants query module", () => {
       base!.id,
       { shares: "20000.0000" },
       ctx.scenario.id,
+      ctx.company.id,
     );
 
     const [stillBase] = await db
@@ -204,7 +207,7 @@ describe("equity-grants query module", () => {
       })
       .returning();
 
-    await removeEquityGrant(base!.id, ctx.scenario.id);
+    await removeEquityGrant(base!.id, ctx.scenario.id, ctx.company.id);
 
     const stillBase = await db
       .select()
