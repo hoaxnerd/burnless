@@ -133,6 +133,7 @@ describe("POST /api/forecast-lines", () => {
       "forecast_line", expect.anything(),
       expect.objectContaining({ accountId: "a1", companyId: "c1" }),
       null,
+      "c1",
     );
   });
 
@@ -166,6 +167,7 @@ describe("POST /api/forecast-lines", () => {
         departmentId: "dept-1",
       }),
       null,
+      "c1",
     );
   });
 

@@ -43,8 +43,8 @@ interface PageInsight {
 interface AiPageInsightsProps {
   /** Which page these insights are for */
   page: "dashboard" | "expenses" | "revenue" | "scenarios" | "funding" | "team" | "reports";
-  /** Scenario ID for context (optional for non-scenario pages like funding, team, reports) */
-  scenarioId?: string;
+  /** Scenario ID for context. null/undefined ⇒ base (no active sandbox). */
+  scenarioId?: string | null;
   /** Additional page-specific data to send to the API */
   pageData?: Record<string, unknown>;
   /** Widget ID for grid readiness reporting (default: "ai-insights") */
@@ -116,7 +116,7 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
   const { enabled, loaded } = useAiFeature("insights");
   const { credits } = useAiFlags();
   const isBudgetExceeded = credits?.exceeded ?? false;
-  const cache = useInsightCache<PageInsight>({ page, scenarioId, pageData, aiEnabled: loaded && enabled, budgetExceeded: isBudgetExceeded });
+  const cache = useInsightCache<PageInsight>({ page, scenarioId: scenarioId ?? undefined, pageData, aiEnabled: loaded && enabled, budgetExceeded: isBudgetExceeded });
   const [expanded, setExpanded] = useState(true);
   const pageLayout = useOptionalPageLayout();
   const router = useRouter();

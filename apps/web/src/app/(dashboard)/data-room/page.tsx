@@ -4,14 +4,14 @@ export const revalidate = 0;
 import { Suspense } from "react";
 import Link from "next/link";
 import { Lock } from "lucide-react";
-import { getCompany, getDefaultScenario, getFundingRounds } from "@/lib/data";
+import { getCompany, getServerScenarioId, getFundingRounds } from "@/lib/data";
 import { getCompanyPlan } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { DataRoomView } from "./data-room-view";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 
 export default async function DataRoomPage() {
@@ -41,17 +41,18 @@ export default async function DataRoomPage() {
     );
   }
 
-  const scenario = await getDefaultScenario(company.id);
-  if (!scenario) return <ScenarioPrompt context="generate investor-ready reports" />;
+  const activeCookieId = await getServerScenarioId();
+  const scenarioId = activeCookieId ?? null;
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <DataRoomContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={companyCurrency(company)} />
+      <DataRoomContent companyId={company.id} scenarioId={scenarioId} companyName={company.name} currency={companyCurrency(company)} />
     </Suspense>
   );
 }
 
-async function DataRoomContent({ companyId, scenarioId, companyName, scenarioName, currency }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: CurrencyCode }) {
+async function DataRoomContent({ companyId, scenarioId, companyName, currency }: { companyId: string; scenarioId: string | null; companyName: string; currency: CurrencyCode }) {
+  const scenarioName = scenarioId ? "Active Scenario" : "Base";
   const [data, fundingRounds] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getFundingRounds(companyId, null), // Data room is base-only by design (artifact warehouse)

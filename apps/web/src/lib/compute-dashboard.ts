@@ -41,7 +41,7 @@ export interface DashboardData extends FinancialsResult {
 
 export const computeDashboardData = cache(async function computeDashboardData(
   companyId: string,
-  scenarioId: string,
+  scenarioId: string | null,
   year?: number
 ): Promise<DashboardData> {
   const now = new Date();
@@ -52,9 +52,9 @@ export const computeDashboardData = cache(async function computeDashboardData(
 
   const [accounts, fLines, revStreams, hcPlans, funding, txns] = await Promise.all([
     getAccounts(companyId),
-    getForecastLines(scenarioId),
-    getRevenueStreams(scenarioId),
-    getHeadcountPlans(scenarioId),
+    getForecastLines(companyId, scenarioId),
+    getRevenueStreams(companyId, scenarioId),
+    getHeadcountPlans(companyId, scenarioId),
     getFundingRounds(companyId, scenarioId),
     getTransactions(companyId),
   ]);

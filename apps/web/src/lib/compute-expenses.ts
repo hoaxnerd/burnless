@@ -134,7 +134,7 @@ const toIso = (d: Date | string | null | undefined): string | null =>
 // breakdown + currentMonth always come from computeDashboardData at today's month.
 export const computeExpenseDetails = cache(async function computeExpenseDetails(
   companyId: string,
-  scenarioId: string,
+  scenarioId: string | null,
   year?: number,
 ): Promise<ExpenseDetails> {
   const now = new Date();
@@ -144,8 +144,8 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
 
   const [accounts, fLines, hcPlans, dash] = await Promise.all([
     getAccounts(companyId),
-    getForecastLines(scenarioId),
-    getHeadcountPlans(scenarioId),
+    getForecastLines(companyId, scenarioId),
+    getHeadcountPlans(companyId, scenarioId),
     computeDashboardData(companyId, scenarioId),
   ]);
 

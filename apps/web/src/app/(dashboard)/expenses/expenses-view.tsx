@@ -54,7 +54,7 @@ interface ExpensesViewProps {
   opexTimeline: MetricPoint[];
   cogsTimeline: MetricPoint[];
   budgetTimeline: MetricPoint[] | null;
-  scenarioId: string;
+  scenarioId: string | null;
 }
 
 export function ExpensesView({

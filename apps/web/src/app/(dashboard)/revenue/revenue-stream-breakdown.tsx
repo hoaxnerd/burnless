@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 import { Pencil, Trash2 } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
@@ -27,7 +28,7 @@ interface RevenueStreamBreakdownProps {
   monthlyByStream: Record<string, unknown>[];
   streamNames: string[];
   totalRevenue: number;
-  scenarioId: string;
+  scenarioId: string | null;
 }
 
 const typeLabels: Record<string, string> = {
@@ -58,6 +59,7 @@ export function RevenueStreamBreakdown({
   scenarioId,
 }: RevenueStreamBreakdownProps) {
   const router = useRouter();
+  const { error: toastError } = useToast();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const {
@@ -117,8 +119,8 @@ export function RevenueStreamBreakdown({
         throw new Error(data.error ?? "Failed to delete");
       }
       router.refresh();
-    } catch {
-      // Error is handled silently; the stream remains if delete fails
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Failed to delete revenue stream");
     } finally {
       setDeletingId(null);
     }

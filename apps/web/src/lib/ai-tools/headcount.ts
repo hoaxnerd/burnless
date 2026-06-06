@@ -186,7 +186,8 @@ async function addHeadcount(
     "headcount_plan",
     headcountPlans,
     insertValues,
-    ctx.scenarioId ?? null
+    ctx.scenarioId ?? null,
+    ctx.companyId
   );
 
   const fteCount = data.count ?? 1;
@@ -209,7 +210,7 @@ async function createDepartment(
   const row = await scenarioInsert("department", departments, {
     companyId: ctx.companyId,
     name: data.name,
-  }, ctx.scenarioId ?? null);
+  }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -273,7 +274,7 @@ async function updateHeadcount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, ctx.scenarioId ?? null);
+  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -297,7 +298,7 @@ async function deleteHeadcount(
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
 
-  await scenarioDelete("headcount_plan", headcountPlans, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("headcount_plan", headcountPlans, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -324,7 +325,7 @@ async function updateDepartment(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("department", departments, data.id, { name: data.name }, ctx.scenarioId ?? null);
+  await scenarioUpdate("department", departments, data.id, { name: data.name }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -347,7 +348,7 @@ async function deleteDepartment(
     return JSON.stringify({ success: false, error: "Department not found or access denied" });
   }
 
-  await scenarioDelete("department", departments, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("department", departments, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -386,7 +387,8 @@ async function addSalaryChange(
       newSalary: num(data.newSalary)!,
       reason: data.reason ?? null,
     },
-    ctx.scenarioId ?? null
+    ctx.scenarioId ?? null,
+    ctx.companyId
   );
 
   return JSON.stringify({
@@ -420,7 +422,8 @@ async function addBonus(
       type: data.type,
       notes: data.notes ?? null,
     },
-    ctx.scenarioId ?? null
+    ctx.scenarioId ?? null,
+    ctx.companyId
   );
 
   return JSON.stringify({
@@ -455,7 +458,8 @@ async function addEquityGrant(
       grantType: data.grantType,
       parameters: { vestingSchedule: data.vestingSchedule },
     },
-    ctx.scenarioId ?? null
+    ctx.scenarioId ?? null,
+    ctx.companyId
   );
 
   return JSON.stringify({

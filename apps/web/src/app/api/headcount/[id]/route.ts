@@ -33,7 +33,7 @@ export const PATCH = withErrorHandler(async (
     changes.hoursPerWeek = parsed.data.hoursPerWeek === null ? null : String(parsed.data.hoursPerWeek);
   }
 
-  const row = await scenarioUpdate("headcount_plan", headcountPlans, id, changes, scenarioId);
+  const row = await scenarioUpdate("headcount_plan", headcountPlans, id, changes, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
@@ -54,7 +54,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("headcount_plan", headcountPlans, id, scenarioId);
+  const ok = await scenarioDelete("headcount_plan", headcountPlans, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");

@@ -22,16 +22,17 @@ export default async function BoardUpdatePage() {
   const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <ScenarioPrompt context="generate reports" />;
 
+  const activeScenarioId = scenarioId ?? null;
   const safeCurrency: CurrencyCode = isValidCurrency(company.currency) ? company.currency : "USD";
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <BoardUpdateContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={safeCurrency} locale={company.locale} />
+      <BoardUpdateContent companyId={company.id} scenarioId={activeScenarioId} companyName={company.name} scenarioName={scenario.name} currency={safeCurrency} locale={company.locale} />
     </Suspense>
   );
 }
 
-async function BoardUpdateContent({ companyId, scenarioId, companyName, scenarioName, currency, locale }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: CurrencyCode; locale?: string | null }) {
+async function BoardUpdateContent({ companyId, scenarioId, companyName, scenarioName, currency, locale }: { companyId: string; scenarioId: string | null; companyName: string; scenarioName: string; currency: CurrencyCode; locale?: string | null }) {
   const [data, revenueDetails, expenseDetails, funding] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),

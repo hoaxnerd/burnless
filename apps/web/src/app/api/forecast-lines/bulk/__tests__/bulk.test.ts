@@ -156,6 +156,7 @@ describe("POST /api/forecast-lines/bulk — delete (no scenario)", () => {
       expect.anything(),
       "fl-1",
       null,
+      "c1",
     );
     expect(mockScenarioDelete).toHaveBeenNthCalledWith(
       2,
@@ -163,6 +164,7 @@ describe("POST /api/forecast-lines/bulk — delete (no scenario)", () => {
       expect.anything(),
       "fl-2",
       null,
+      "c1",
     );
   });
 });
@@ -194,12 +196,14 @@ describe("POST /api/forecast-lines/bulk — delete (with active scenario)", () =
       expect.anything(),
       "fl-1",
       "scen-1",
+      "c1",
     );
     expect(mockScenarioDelete).toHaveBeenCalledWith(
       "forecast_line",
       expect.anything(),
       "fl-2",
       "scen-1",
+      "c1",
     );
   });
 });
@@ -243,6 +247,7 @@ describe("POST /api/forecast-lines/bulk — categorize", () => {
       "fl-1",
       { accountId: "acc-new" },
       null,
+      "c1",
     );
   });
 
@@ -280,6 +285,7 @@ describe("POST /api/forecast-lines/bulk — categorize", () => {
       "fl-1",
       { accountId: "acc-new" },
       "scen-1",
+      "c1",
     );
   });
 });

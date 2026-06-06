@@ -63,7 +63,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     startDate: new Date(parsed.data.startDate),
     endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
   };
-  const row = await scenarioInsert("revenue_stream", revenueStreams, data, scenarioId);
+  const row = await scenarioInsert("revenue_stream", revenueStreams, data, scenarioId, ctx.companyId);
 
   if (row) await logAudit(ctx, "revenue_stream", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");

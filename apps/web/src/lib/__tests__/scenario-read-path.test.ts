@@ -89,7 +89,7 @@ describe("Phase 4 A — scenario read-path regression", () => {
       name: "Scenario-Renamed Stream",
     });
 
-    const results = await getRevenueStreams(scenario.id);
+    const results = await getRevenueStreams(company.id, scenario.id);
     const names = results.map((r: { name: string }) => r.name);
     expect(names).toContain("Scenario-Renamed Stream");
     expect(names).not.toContain("Original Stream");
@@ -117,7 +117,7 @@ describe("Phase 4 A — scenario read-path regression", () => {
       startDate: new Date("2026-01-01").toISOString(),
     });
 
-    const results = await getForecastLines(scenario.id);
+    const results = await getForecastLines(company.id, scenario.id);
     const ids = results.map((r: { id: string }) => r.id);
     expect(ids).toContain(fakeLineId);
   });
@@ -138,7 +138,7 @@ describe("Phase 4 A — scenario read-path regression", () => {
     // Delete override: remove the hire inside the scenario
     await createScenarioOverride(scenario.id, "headcount_plan", hire.id, "delete");
 
-    const results = await getHeadcountPlans(scenario.id);
+    const results = await getHeadcountPlans(company.id, scenario.id);
     const ids = results.map((r: { id: string }) => r.id);
     expect(ids).not.toContain(hire.id);
   });

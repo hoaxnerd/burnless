@@ -3,7 +3,7 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { getCompany, getDefaultScenario, getBudgetScenario, getAccounts, getForecastLines, getTransactions } from "@/lib/data";
+import { getCompany, getServerScenarioId, getAccounts, getForecastLines, getTransactions } from "@/lib/data";
 import {
   computeAllForecastLines,
   aggregateByAccount,
@@ -18,7 +18,7 @@ import {
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { BudgetVsActualsView } from "./budget-vs-actuals-view";
 
@@ -26,13 +26,7 @@ export default async function BudgetVsActualsPage() {
   const company = await getCompany();
   if (!company) return <SetupPrompt context="viewing reports" />;
 
-  const budgetScenario = await getBudgetScenario(company.id);
-  const scenario = budgetScenario ?? (await getDefaultScenario(company.id));
-
-  if (!scenario) {
-    return <ScenarioPrompt context="compare budget vs actuals" />;
-  }
-
+  const scenarioId = (await getServerScenarioId()) ?? null;
   const safeCurrency: CurrencyCode = isValidCurrency(company.currency) ? company.currency : "USD";
 
   return (
@@ -43,25 +37,23 @@ export default async function BudgetVsActualsPage() {
       </div>
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Budget vs Actuals</h1>
-        <p className="mt-1 text-sm text-surface-500">
-          {company.name} &mdash; {scenario.name} {budgetScenario ? "(budget)" : "(default scenario)"}
-        </p>
+        <p className="mt-1 text-sm text-surface-500">{company.name}</p>
       </div>
       <Suspense fallback={<ReportContentSkeleton />}>
-        <BudgetVsActualsContent companyId={company.id} scenarioId={scenario.id} currency={safeCurrency} locale={company.locale} />
+        <BudgetVsActualsContent companyId={company.id} scenarioId={scenarioId} currency={safeCurrency} locale={company.locale} />
       </Suspense>
     </div>
   );
 }
 
-async function BudgetVsActualsContent({ companyId, scenarioId, currency, locale }: { companyId: string; scenarioId: string; currency: CurrencyCode; locale?: string | null }) {
+async function BudgetVsActualsContent({ companyId, scenarioId, currency, locale }: { companyId: string; scenarioId: string | null; currency: CurrencyCode; locale?: string | null }) {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), 0, 1);
   const periodEnd = new Date(now.getFullYear(), 11, 1);
 
   const [accounts, fLines, txns] = await Promise.all([
     getAccounts(companyId),
-    getForecastLines(scenarioId),
+    getForecastLines(companyId, scenarioId),
     getTransactions(companyId),
   ]);
 

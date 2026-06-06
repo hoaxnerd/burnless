@@ -35,7 +35,7 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateAccountSchema);
   if ("error" in parsed) return parsed.error;
 
-  const row = await scenarioUpdate("financial_account", financialAccounts, id, parsed.data, scenarioId);
+  const row = await scenarioUpdate("financial_account", financialAccounts, id, parsed.data, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "accounts");
@@ -55,7 +55,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("financial_account", financialAccounts, id, scenarioId);
+  const ok = await scenarioDelete("financial_account", financialAccounts, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "delete", {});
   await trackDataMutation(ctx.companyId, "accounts");
   revalidateTag("accounts");

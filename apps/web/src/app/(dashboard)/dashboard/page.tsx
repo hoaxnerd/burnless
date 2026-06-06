@@ -52,11 +52,13 @@ export default async function DashboardPage() {
   const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <NoScenarioPrompt />;
 
+  const activeScenarioId = scenarioId ?? null;
+
   const [data, revenueStreams, fundingRounds, dashPrefs] =
     await Promise.all([
-      computeDashboardData(company.id, scenario.id),
-      getRevenueStreams(scenario.id),
-      getFundingRounds(company.id, scenario.id),
+      computeDashboardData(company.id, activeScenarioId),
+      getRevenueStreams(company.id, activeScenarioId),
+      getFundingRounds(company.id, activeScenarioId),
       getDashboardPreferences().catch(() => null),
     ]);
 

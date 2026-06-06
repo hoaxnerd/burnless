@@ -55,7 +55,7 @@ export const createFundingRound: ToolHandler = async (input, context) => {
     notes: data.notes ?? null,
     parameters: (data.parameters as Record<string, unknown>) ?? {},
     isProjected: data.isProjected ?? false,
-  }, ctx.scenarioId ?? null);
+  }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -103,7 +103,7 @@ export const updateFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, ctx.scenarioId ?? null);
+  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -127,7 +127,7 @@ export const deleteFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
 
-  await scenarioDelete("funding_round", fundingRounds, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("funding_round", fundingRounds, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -200,7 +200,7 @@ export const markGrantMilestoneHit: ToolHandler = async (input, context) => {
   milestones[idx] = { ...milestones[idx], hitDate: data.hitDate };
   const updatedParams = { ...params, milestones };
 
-  await scenarioUpdate("funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams }, ctx.scenarioId ?? null);
+  await scenarioUpdate("funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,

@@ -44,7 +44,7 @@ export const PATCH = withErrorHandler(async (
     }
   }
 
-  const row = await scenarioUpdate("department", departments, id, parsed.data, scenarioId);
+  const row = await scenarioUpdate("department", departments, id, parsed.data, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "departments");
@@ -64,7 +64,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("department", departments, id, scenarioId);
+  const ok = await scenarioDelete("department", departments, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "delete", {});
   await trackDataMutation(ctx.companyId, "departments");
   revalidateTag("departments");

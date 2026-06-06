@@ -165,7 +165,7 @@ async function createAccount(
     type: data.type,
     category: data.category,
     coversHeadcount: data.coversHeadcount ?? false,
-  }, ctx.scenarioId ?? null);
+  }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -436,7 +436,7 @@ async function updateAccount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, ctx.scenarioId ?? null);
+  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -463,7 +463,7 @@ async function deleteAccount(
     return JSON.stringify({ success: false, error: "Cannot delete system accounts" });
   }
 
-  await scenarioDelete("financial_account", financialAccounts, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("financial_account", financialAccounts, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,

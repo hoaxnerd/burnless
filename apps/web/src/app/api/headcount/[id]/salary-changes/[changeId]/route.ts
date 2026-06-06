@@ -52,7 +52,7 @@ export const PATCH = withErrorHandler(async (
   const changes: Record<string, unknown> = { ...parsed.data };
   if (parsed.data.newSalary !== undefined) changes.newSalary = String(parsed.data.newSalary);
 
-  const row = await updateSalaryChange(changeId, changes, scenarioId);
+  const row = await updateSalaryChange(changeId, changes, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Salary change not found", 404);
   await logAudit(ctx, "salary_change", changeId, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
@@ -75,7 +75,8 @@ export const DELETE = withErrorHandler(async (
   if (!parent) return errorResponse("Headcount not found", 404);
 
   const scenarioId = getActiveScenario(request);
-  await removeSalaryChange(changeId, scenarioId);
+  const ok = await removeSalaryChange(changeId, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Salary change not found", 404);
   await logAudit(ctx, "salary_change", changeId, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");

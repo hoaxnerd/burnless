@@ -79,7 +79,8 @@ export const POST = withErrorHandler(async (
       grantType: parsed.data.grantType,
       parameters: parsed.data.parameters ?? {},
     },
-    scenarioId
+    scenarioId,
+    ctx.companyId
   );
 
   if (row) await logAudit(ctx, "equity_grant", row.id, "create", { after: row });

@@ -21,13 +21,14 @@ export default async function TeamPage() {
   const company = await getCompany();
   const scenario = company ? await getActiveScenario(company.id, scenarioId) : null;
 
+  const activeScenarioId = scenarioId ?? null;
   const companyBenefitsRates = (company?.benefitsRates as BenefitsBreakdown | null) ?? {};
 
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
       <TeamContent
         companyId={company?.id}
-        scenarioId={scenario?.id}
+        scenarioId={activeScenarioId}
         scenarioName={scenario?.name}
         companyBenefitsRates={companyBenefitsRates}
         currency={companyCurrency(company)}
@@ -36,8 +37,8 @@ export default async function TeamPage() {
   );
 }
 
-async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefitsRates, currency }: { companyId?: string; scenarioId?: string; scenarioName?: string; companyBenefitsRates: BenefitsBreakdown; currency: CurrencyCode }) {
-  if (!companyId || !scenarioId) {
+async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefitsRates, currency }: { companyId?: string; scenarioId: string | null; scenarioName?: string; companyBenefitsRates: BenefitsBreakdown; currency: CurrencyCode }) {
+  if (!companyId) {
     return (
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-12 text-center">
         <h3 className="text-lg font-semibold text-surface-900 mb-2">Set up your company first</h3>
@@ -47,7 +48,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
   }
 
   const [plans, departments, data] = await Promise.all([
-    getHeadcountPlans(scenarioId),
+    getHeadcountPlans(companyId, scenarioId),
     getDepartments(companyId),
     computeDashboardData(companyId, scenarioId),
   ]);

@@ -111,6 +111,7 @@ describe("POST /api/funding-rounds", () => {
       "funding_round", expect.anything(),
       expect.objectContaining({ name: "Seed Round", companyId: "comp-1" }),
       null,
+      "comp-1",
     );
   });
 

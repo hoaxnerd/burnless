@@ -76,7 +76,8 @@ export const POST = withErrorHandler(async (
       newSalary: parsed.data.newSalary.toFixed(2),
       reason: parsed.data.reason ?? null,
     },
-    scenarioId
+    scenarioId,
+    ctx.companyId
   );
 
   if (row) await logAudit(ctx, "salary_change", row.id, "create", { after: row });

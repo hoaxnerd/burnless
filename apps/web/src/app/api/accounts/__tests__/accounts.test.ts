@@ -107,6 +107,7 @@ describe("POST /api/accounts", () => {
       "financial_account", expect.anything(),
       expect.objectContaining({ name: "Marketing Expenses", companyId: "company-1" }),
       null,
+      "company-1",
     );
   });
 

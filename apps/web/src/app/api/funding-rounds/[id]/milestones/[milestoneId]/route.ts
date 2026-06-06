@@ -60,6 +60,7 @@ export const PATCH = withErrorHandler(async (
     id,
     { parameters: { ...params_, milestones: updated } },
     scenarioId,
+    ctx.companyId,
   );
   await logAudit(ctx, "funding_round", id, "update", { after: { milestoneId, hitDate: parsed.data.hitDate } });
   revalidateTag("funding-rounds");

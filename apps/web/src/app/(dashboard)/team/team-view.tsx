@@ -69,7 +69,7 @@ interface TeamViewProps {
     equityGrants: EquityGrant[];
   }>;
   resolvedSlotData: ResolvedSlotData[];
-  scenarioId: string;
+  scenarioId: string | null;
   departments: Array<{ id: string; name: string }>;
   companyBenefitsRates: BenefitsBreakdown;
   currency: CurrencyCode;

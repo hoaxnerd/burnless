@@ -23,14 +23,16 @@ export default async function RevenuePage() {
   const scenario = await getActiveScenario(company.id, scenarioId);
   if (!scenario) return <ScenarioPrompt context="model revenue" />;
 
+  const activeScenarioId = scenarioId ?? null;
+
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <RevenueContent companyId={company.id} scenarioId={scenario.id} company={company} />
+      <RevenueContent companyId={company.id} scenarioId={activeScenarioId} company={company} />
     </Suspense>
   );
 }
 
-async function RevenueContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string; company: { currency?: string | null } }) {
+async function RevenueContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string | null; company: { currency?: string | null } }) {
   const [data, revenueDetails] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     computeRevenueDetails(companyId, scenarioId),
