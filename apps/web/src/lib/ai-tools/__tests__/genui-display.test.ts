@@ -96,6 +96,7 @@ vi.mock("../../compute-dashboard", () => ({
         netMargin: [{ month: "2026-06", value: -164 }],
       },
       // Per-revenue-type breakdown (RevenueByType) — each value a MonthlySeries Map.
+      // revenueByType: no longer read by handlers (revenue_by_stream now uses revenueLines/revenueResidual); kept for shape fidelity.
       revenueByType: {
         subscriptionRevenue: new Map([
           ["2026-05", 40000],
@@ -108,6 +109,41 @@ vi.mock("../../compute-dashboard", () => ({
         ecommerceRevenue: new Map(),
         hardwareRevenue: new Map(),
       },
+      // Blended, reconciled per-stream revenue lines + the residual + current month.
+      // At currentMonth (2026-06): two subscription streams (30000 + 12000) + one
+      // services stream (3000) = 45000 of named-stream revenue; residual 5000 of
+      // imported revenue; Σ = 50000 = totalRevenue.get("2026-06"). Reconciles.
+      currentMonth: "2026-06",
+      revenueLines: [
+        {
+          streamId: "r1",
+          name: "Pro plan",
+          type: "subscription",
+          values: new Map([
+            ["2026-05", 28000],
+            ["2026-06", 30000],
+          ]),
+        },
+        {
+          streamId: "r2",
+          name: "Team plan",
+          type: "subscription",
+          values: new Map([
+            ["2026-05", 11000],
+            ["2026-06", 12000],
+          ]),
+        },
+        {
+          streamId: "r3",
+          name: "Consulting",
+          type: "services",
+          values: new Map([["2026-06", 3000]]),
+        },
+      ],
+      revenueResidual: new Map([
+        ["2026-05", 9000],
+        ["2026-06", 5000],
+      ]),
     };
   }),
 }));
@@ -180,6 +216,9 @@ vi.mock("../../compute-cap-table", () => ({
   })),
 }));
 
+import { computeDashboardData } from "../../compute-dashboard";
+import { computeCapTableInner } from "../../compute-cap-table";
+import { getFundingRounds } from "../../data";
 import { genuiDisplayHandlers } from "../genui-display";
 
 const ctx = { companyId: "c1", scenarioId: "s1", userId: "u1" };
@@ -264,7 +303,7 @@ describe("show_bar_chart", () => {
     expect(parsed.modelResult).toMatch(/bar_chart/);
   });
 
-  it("returns a bar_chart envelope of revenue grouped by stream type", async () => {
+  it("returns a bar_chart of blended revenue grouped by type at the current month, reconciling to totalRevenue (incl. residual)", async () => {
     const out = await genuiDisplayHandlers.show_bar_chart!(
       { dimension: "revenue_by_stream" },
       ctx
@@ -272,12 +311,26 @@ describe("show_bar_chart", () => {
     const parsed = JSON.parse(out);
     expect(parsed.render.component).toBe("bar_chart");
     expect(parsed.render.props.format).toBe("currency");
-    // Only non-zero revenue types appear; subscription sums 40000+42000=82000.
-    const sub = parsed.render.props.data.find(
-      (d: { label: string; value: number }) => d.label === "Subscription"
-    );
+
+    const data = parsed.render.props.data as Array<{ label: string; value: number }>;
+    // Current-month (2026-06) per-TYPE bars from the blended breakdown:
+    //   Subscription = 30000 + 12000 = 42000
+    //   Services     = 3000
+    //   Imported / Other (residual) = 5000
+    const sub = data.find((d) => d.label === "Subscription");
     expect(sub).toBeTruthy();
-    expect(sub.value).toBe(82000);
+    expect(sub!.value).toBe(42000); // current month only, NOT summed across months
+    const services = data.find((d) => d.label === "Services");
+    expect(services!.value).toBe(3000);
+    // Residual surfaces as its own bar.
+    const imported = data.find((d) => d.label === "Imported / Other");
+    expect(imported).toBeTruthy();
+    expect(imported!.value).toBe(5000);
+
+    // Reconciliation: Σ bars === totalRevenue at the current month (50000).
+    const total = data.reduce((s, d) => s + d.value, 0);
+    expect(total).toBe(50000);
+
     expect(parsed.render.props.bars[0].dataKey).toBe("value");
   });
 
@@ -286,6 +339,38 @@ describe("show_bar_chart", () => {
     const parsed = JSON.parse(out);
     expect(parsed.render.component).toBe("bar_chart");
     expect(parsed.render.props.data[0].label).toBe("Payroll");
+  });
+});
+
+describe("scenario-arg guard (resolveScenarioId)", () => {
+  it("pins data-bound display tools to the chat's active scenario, ignoring a model-supplied scenarioId", async () => {
+    const mock = vi.mocked(computeDashboardData);
+    mock.mockClear();
+    // ctx.scenarioId is "s1"; the model passes scenarioId "s2". The active
+    // scenario MUST win, or the rendered component diverges from the AI text.
+    await genuiDisplayHandlers.show_metric_card!({ metric: "mrr", scenarioId: "s2" }, ctx);
+    expect(mock).toHaveBeenCalledWith("c1", "s1");
+    expect(mock).not.toHaveBeenCalledWith("c1", "s2");
+  });
+
+  it("pins show_cap_table (computeCapTableInner path) to the active scenario", async () => {
+    const capMock = vi.mocked(computeCapTableInner);
+    capMock.mockClear();
+    // ctx.scenarioId is "s1"; the model passes "s2". The cap-table handler uses a
+    // different compute path (computeCapTableInner) but the SAME resolver guard.
+    await genuiDisplayHandlers.show_cap_table!({ scenarioId: "s2" }, ctx);
+    expect(capMock).toHaveBeenCalledWith("c1", "s1");
+    expect(capMock).not.toHaveBeenCalledWith("c1", "s2");
+  });
+
+  it("pins show_funding_summary (getFundingRounds path) to the active scenario", async () => {
+    const fundingMock = vi.mocked(getFundingRounds);
+    fundingMock.mockClear();
+    // ctx.scenarioId is "s1"; the model passes "s2". The funding handler resolves
+    // rounds via getFundingRounds(companyId, scenarioId) — the active scenario wins.
+    await genuiDisplayHandlers.show_funding_summary!({ scenarioId: "s2" }, ctx);
+    expect(fundingMock).toHaveBeenCalledWith("c1", "s1");
+    expect(fundingMock).not.toHaveBeenCalledWith("c1", "s2");
   });
 });
 

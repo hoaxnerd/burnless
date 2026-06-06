@@ -9,13 +9,13 @@ import {
   monthKey,
   parseMonthKey,
   seriesToArray,
-  sum,
   type ComparisonLine,
   type MonthlySeries,
   type ScenarioData,
 } from "@burnless/engine";
 import { getScenarioForCompany } from "@burnless/db";
 import { chartColors } from "@/components/charts/chart-theme";
+import { buildRevenueBreakdown } from "../breakdowns";
 import { computeDashboardData } from "../compute-dashboard";
 import { computeExpenseDetails } from "../compute-expenses";
 import { computeRevenueDetails } from "../compute-revenue";
@@ -28,13 +28,17 @@ import { latest, requireCompanyId, type ToolHandler } from "./types";
 export const genuiDisplaySchemas: Record<string, z.ZodType> = {};
 export const genuiDisplayHandlers: Record<string, ToolHandler> = {};
 
-/** Resolve the scenario id: explicit arg → context → company default. */
+/** Resolve the scenario id: active chat scenario → explicit arg → company default. */
 async function resolveScenarioId(
   ctx: { companyId: string; scenarioId?: string },
   given?: unknown
 ): Promise<string | null> {
-  const sid = (typeof given === "string" && given) || ctx.scenarioId;
-  if (sid) return sid;
+  // Single-source rule: data-bound display tools must render the chat's ACTIVE
+  // scenario, never a model-chosen one, or the component diverges from the AI text.
+  // (show_scenario_diff is the deliberate exception — it takes explicit
+  // scenarioA/scenarioB and does not use this resolver.)
+  if (ctx.scenarioId) return ctx.scenarioId;
+  if (typeof given === "string" && given) return given;
   const def = await getDefaultScenario(ctx.companyId);
   return def?.id ?? null;
 }
@@ -245,16 +249,22 @@ genuiDisplayHandlers.show_line_chart = async (input, context) => {
 
 type CategoryDatum = { label: string; value: number };
 
-/** RevenueByType field → human label, for the revenue_by_stream dimension. */
-const REVENUE_TYPE_LABELS: Array<{ key: string; label: string }> = [
-  { key: "subscriptionRevenue", label: "Subscription" },
-  { key: "oneTimeRevenue", label: "One-time" },
-  { key: "usageRevenue", label: "Usage" },
-  { key: "servicesRevenue", label: "Services" },
-  { key: "marketplaceRevenue", label: "Marketplace" },
-  { key: "ecommerceRevenue", label: "E-commerce" },
-  { key: "hardwareRevenue", label: "Hardware" },
-];
+/**
+ * Raw stream `type` (and the residual's "imported") → human label, for the
+ * revenue_by_stream dimension. Keyed by the `type` values carried on the blended
+ * `revenueLines` / the residual row (buildRevenueBreakdown), NOT by RevenueByType
+ * field names — so the per-type bars read the same reconciled source as the AI text.
+ */
+const REVENUE_TYPE_LABEL: Record<string, string> = {
+  subscription: "Subscription",
+  one_time: "One-time",
+  usage_based: "Usage",
+  services: "Services",
+  marketplace: "Marketplace",
+  ecommerce: "E-commerce",
+  hardware: "Hardware",
+  imported: "Imported / Other",
+};
 
 const BAR_DIMENSIONS = {
   expense_by_category: "Expenses by category",
@@ -298,14 +308,25 @@ genuiDisplayHandlers.show_bar_chart = async (input, context) => {
       .map((b) => ({ label: b.subcategory, value: b.amount }))
       .filter((d) => d.value > 0);
   } else {
+    // Blended, reconciled per-stream breakdown at the CURRENT month, grouped by
+    // revenue TYPE (keeping the per-type bar semantics) with the imported residual
+    // as its own bar. Σ bars === totalRevenue at the current month (reconciles).
     const dash = await computeDashboardData(ctx.companyId, scenarioId);
-    const byType = (dash as unknown as { revenueByType?: Record<string, MonthlySeries> })
-      .revenueByType;
-    data = REVENUE_TYPE_LABELS.map(({ key, label }) => {
-      const series = byType?.[key];
-      const total = series ? sum([...series.values()]) : 0;
-      return { label, value: total };
-    }).filter((d) => d.value > 0);
+    const total = dash.totalRevenue.get(dash.currentMonth) ?? 0;
+    const rows = buildRevenueBreakdown(
+      dash.revenueLines,
+      dash.revenueResidual,
+      dash.currentMonth,
+      total
+    );
+    const byType = new Map<string, number>();
+    for (const r of rows) byType.set(r.type, (byType.get(r.type) ?? 0) + r.amount);
+    data = Array.from(byType, ([type, value]) => ({
+      label: REVENUE_TYPE_LABEL[type] ?? type,
+      value,
+    }))
+      .filter((d) => d.value !== 0)
+      .sort((a, b) => b.value - a.value);
   }
 
   return envelope(data);
