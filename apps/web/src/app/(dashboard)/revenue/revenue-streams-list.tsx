@@ -24,7 +24,7 @@ interface RevenueStreamsListProps {
   revenueTimeline: MetricPoint[];
   mrrTimeline: MetricPoint[];
   hasSaaS: boolean;
-  scenarioId: string;
+  scenarioId: string | null;
 }
 
 const typeLabels: Record<string, string> = {

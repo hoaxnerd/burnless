@@ -39,7 +39,7 @@ export const PATCH = withErrorHandler(async (
     patch.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
   }
 
-  const row = await scenarioUpdate("revenue_stream", revenueStreams, id, patch, scenarioId);
+  const row = await scenarioUpdate("revenue_stream", revenueStreams, id, patch, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");
@@ -60,7 +60,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("revenue_stream", revenueStreams, id, scenarioId);
+  const ok = await scenarioDelete("revenue_stream", revenueStreams, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "delete", {});
   await trackDataMutation(ctx.companyId, "revenue");
   revalidateTag("revenue-streams");

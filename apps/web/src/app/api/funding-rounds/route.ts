@@ -53,7 +53,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     preMoneyValuation: parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null,
     dilutionPercent: parsed.data.dilutionPercent != null ? String(parsed.data.dilutionPercent) : null,
   };
-  const row = await scenarioInsert("funding_round", fundingRounds, data, scenarioId);
+  const row = await scenarioInsert("funding_round", fundingRounds, data, scenarioId, ctx.companyId);
 
   if (row) await logAudit(ctx, "funding_round", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "funding");

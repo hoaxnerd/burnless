@@ -51,8 +51,9 @@ export async function listResolvedSalaryChanges(
 export async function createSalaryChange(
   data: NewSalaryChange,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioInsert("salary_change", salaryChanges, data, scenarioId);
+  return scenarioInsert("salary_change", salaryChanges, data, scenarioId, companyId);
 }
 
 /** Update a salary change via the scenario layer. */
@@ -60,14 +61,16 @@ export async function updateSalaryChange(
   id: string,
   changes: Partial<NewSalaryChange>,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioUpdate("salary_change", salaryChanges, id, changes, scenarioId);
+  return scenarioUpdate("salary_change", salaryChanges, id, changes, scenarioId, companyId);
 }
 
 /** Delete a salary change via the scenario layer. */
 export async function removeSalaryChange(
   id: string,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioDelete("salary_change", salaryChanges, id, scenarioId);
+  return scenarioDelete("salary_change", salaryChanges, id, scenarioId, companyId);
 }

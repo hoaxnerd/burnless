@@ -65,11 +65,11 @@ export interface RevenueDetails {
 
 export const computeRevenueDetails = cache(async function computeRevenueDetails(
   companyId: string,
-  scenarioId: string,
+  scenarioId: string | null,
   year?: number,
 ): Promise<RevenueDetails> {
   const [streams, dashData] = await Promise.all([
-    getRevenueStreams(scenarioId),
+    getRevenueStreams(companyId, scenarioId),
     computeDashboardData(companyId, scenarioId, year),
   ]);
 

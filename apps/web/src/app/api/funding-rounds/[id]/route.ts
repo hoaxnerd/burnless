@@ -51,7 +51,7 @@ export const PATCH = withErrorHandler(async (
   if (parsed.data.notes !== undefined) changes.notes = parsed.data.notes;
   if (parsed.data.parameters !== undefined) changes.parameters = parsed.data.parameters;
 
-  const row = await scenarioUpdate("funding_round", fundingRounds, id, changes, scenarioId);
+  const row = await scenarioUpdate("funding_round", fundingRounds, id, changes, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
@@ -72,7 +72,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("funding_round", fundingRounds, id, scenarioId);
+  const ok = await scenarioDelete("funding_round", fundingRounds, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "delete", {});
   await trackDataMutation(ctx.companyId, "funding");
   revalidateTag("funding-rounds");

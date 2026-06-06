@@ -164,6 +164,7 @@ describe("POST /api/headcount/[id]/equity-grants", () => {
         grantType: "iso",
       }),
       null,
+      "comp-1",
     );
   });
 

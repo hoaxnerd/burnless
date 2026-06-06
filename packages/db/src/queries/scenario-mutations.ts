@@ -1,7 +1,26 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../index";
-import { scenarioOverrides, departments } from "../schema";
+import { scenarioOverrides, departments, scenarios } from "../schema";
 import { upsertOverride } from "./scenario-overrides";
+
+/**
+ * Security / multi-tenancy guard: every scenario mutation is scoped to a
+ * companyId. Base-table ops and base snapshots filter `WHERE id AND company_id`,
+ * and any scenario write first verifies the scenario belongs to the company.
+ * Without this a caller could read/update/delete another company's row (or
+ * write into another company's scenario) by passing a foreign id — see
+ * `__tests__/queries-scenario-security.test.ts`.
+ */
+async function assertScenarioOwned(scenarioId: string, companyId: string) {
+  const [owned] = await db
+    .select({ id: scenarios.id })
+    .from(scenarios)
+    .where(and(eq(scenarios.id, scenarioId), eq(scenarios.companyId, companyId)))
+    .limit(1);
+  if (!owned) {
+    throw new Error(`Scenario ${scenarioId} not found for company ${companyId}`);
+  }
+}
 
 /**
  * Keys whose values are plain JSONB objects that should merge (not replace)
@@ -55,12 +74,14 @@ export async function scenarioInsert(
   table: any,
   data: Record<string, any>,
   scenarioId: string | null,
+  companyId: string,
 ) {
   if (!scenarioId) {
     const [row] = await db.insert(table).values(data).returning();
     return row;
   }
 
+  await assertScenarioOwned(scenarioId, companyId);
   const id = data.id ?? crypto.randomUUID();
   const entityData = { ...data, id };
   await upsertOverride(scenarioId, entityType, id, "create", entityData, null);
@@ -81,6 +102,7 @@ export async function scenarioUpdate(
   entityId: string,
   changes: Record<string, any>,
   scenarioId: string | null,
+  companyId: string,
 ) {
   // Phase 2 D §1.2: roundType is immutable post-creation. The primary gate is the
   // update_funding_round Zod schema in packages/ai/src/schemas/funding.ts which omits
@@ -96,10 +118,12 @@ export async function scenarioUpdate(
     const [row] = await db
       .update(table)
       .set(changes)
-      .where(eq(table.id, entityId))
+      .where(and(eq(table.id, entityId), eq(table.companyId, companyId)))
       .returning();
     return row;
   }
+
+  await assertScenarioOwned(scenarioId, companyId);
 
   // Check for existing override
   const existing = await db
@@ -132,11 +156,12 @@ export async function scenarioUpdate(
     return updatedData;
   }
 
-  // First override -- snapshot base state
+  // First override -- snapshot base state (company-scoped: never snapshot
+  // another tenant's row)
   const [baseEntity] = await db
     .select()
     .from(table)
-    .where(eq(table.id, entityId));
+    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
   if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
   validateOverridable(entityType, baseEntity);
   const overrideData = mergeChanges(
@@ -168,11 +193,31 @@ export async function scenarioDelete(
   table: any,
   entityId: string,
   scenarioId: string | null,
-) {
+  companyId: string,
+): Promise<boolean> {
   if (!scenarioId) {
-    await db.delete(table).where(eq(table.id, entityId));
-    return;
+    const deleted = await db
+      .delete(table)
+      .where(and(eq(table.id, entityId), eq(table.companyId, companyId)))
+      .returning();
+    if (deleted.length > 0) {
+      // GC any scenario overrides that referenced this now-deleted base row.
+      // entityId is a globally-unique UUID, so a dangling modify/delete override
+      // for it would otherwise resurface as a phantom "created" entity in scenario
+      // views (resolveEntities dangling-modify path). Clean them up at the source.
+      await db
+        .delete(scenarioOverrides)
+        .where(
+          and(
+            eq(scenarioOverrides.entityType, entityType),
+            eq(scenarioOverrides.entityId, entityId),
+          ),
+        );
+    }
+    return deleted.length > 0;
   }
+
+  await assertScenarioOwned(scenarioId, companyId);
 
   // Check if this is a scenario-created entity
   const existing = await db
@@ -192,14 +237,14 @@ export async function scenarioDelete(
     await db
       .delete(scenarioOverrides)
       .where(eq(scenarioOverrides.id, existing.id));
-    return;
+    return true;
   }
 
-  // Hiding a base entity
+  // Hiding a base entity (company-scoped: never snapshot another tenant's row)
   const [baseEntity] = await db
     .select()
     .from(table)
-    .where(eq(table.id, entityId));
+    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
   if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
   validateOverridable(entityType, baseEntity);
   await upsertOverride(
@@ -218,7 +263,9 @@ export async function scenarioDelete(
       .from(departments)
       .where(eq(departments.parentId, entityId));
     for (const child of children) {
-      await scenarioDelete("department", departments, child.id, scenarioId);
+      await scenarioDelete("department", departments, child.id, scenarioId, companyId);
     }
   }
+
+  return true;
 }

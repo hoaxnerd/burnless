@@ -117,6 +117,7 @@ describe("PATCH /api/headcount/[id]/equity-grants/[grantId]", () => {
       "eg-1",
       expect.objectContaining({ shares: "12000.0000", strikePrice: "2.0000" }),
       null,
+      "comp-1",
     );
   });
 
@@ -133,6 +134,7 @@ describe("PATCH /api/headcount/[id]/equity-grants/[grantId]", () => {
       "eg-1",
       expect.objectContaining({ strikePrice: null }),
       null,
+      "comp-1",
     );
   });
 });
@@ -144,7 +146,7 @@ describe("DELETE /api/headcount/[id]/equity-grants/[grantId]", () => {
 
   it("deletes via removeEquityGrant", async () => {
     mockWhere.mockResolvedValue([{ id: "hc-1" }]);
-    mockRemoveEquityGrant.mockResolvedValue(undefined);
+    mockRemoveEquityGrant.mockResolvedValue(true);
     const res = await DELETE(
       jsonRequest("http://localhost/api/headcount/hc-1/equity-grants/eg-1", "DELETE"),
       makeParams("hc-1", "eg-1"),
@@ -152,7 +154,7 @@ describe("DELETE /api/headcount/[id]/equity-grants/[grantId]", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockRemoveEquityGrant).toHaveBeenCalledWith("eg-1", null);
+    expect(mockRemoveEquityGrant).toHaveBeenCalledWith("eg-1", null, "comp-1");
   });
 
   it("returns 403 for editor (requires admin)", async () => {

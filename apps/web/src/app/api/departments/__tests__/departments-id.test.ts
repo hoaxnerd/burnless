@@ -86,7 +86,7 @@ describe("PATCH /api/departments/[id]", () => {
     expect(body.name).toBe("Updated Engineering");
     expect(mockScenarioUpdate).toHaveBeenCalledWith(
       "department", expect.anything(), "dept-1",
-      { name: "Updated Engineering" }, null,
+      { name: "Updated Engineering" }, null, "comp-1",
     );
   });
 });
@@ -97,7 +97,7 @@ describe("DELETE /api/departments/[id]", () => {
   });
 
   it("deletes via scenarioDelete", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(jsonRequest("http://localhost/api/departments/dept-1", "DELETE"), makeParams("dept-1"));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -112,9 +112,8 @@ describe("DELETE /api/departments/[id]", () => {
   });
 
   it("returns 404 when not found", async () => {
-    // scenarioDelete doesn't return null, it just completes; but the route always returns { deleted: true }
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(false);
     const res = await DELETE(jsonRequest("http://localhost/api/departments/nonexistent", "DELETE"), makeParams("nonexistent"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 });

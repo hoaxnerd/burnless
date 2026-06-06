@@ -91,7 +91,7 @@ describe("PATCH /api/accounts/[id]", () => {
     const body = await res.json();
     expect(body.name).toBe("Updated Revenue");
     expect(mockScenarioUpdate).toHaveBeenCalledWith(
-      "financial_account", expect.anything(), "acc-1", { name: "Updated Revenue" }, null,
+      "financial_account", expect.anything(), "acc-1", { name: "Updated Revenue" }, null, "company-1",
     );
   });
 
@@ -129,7 +129,7 @@ describe("DELETE /api/accounts/[id]", () => {
   });
 
   it("deletes via scenarioDelete", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(
       makeRequest("http://localhost/api/accounts/acc-1", { method: "DELETE" }),
       makeParams("acc-1"),
@@ -137,7 +137,7 @@ describe("DELETE /api/accounts/[id]", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockScenarioDelete).toHaveBeenCalledWith("financial_account", expect.anything(), "acc-1", null);
+    expect(mockScenarioDelete).toHaveBeenCalledWith("financial_account", expect.anything(), "acc-1", null, "company-1");
   });
 
   it("returns 403 for editor role (requires admin)", async () => {

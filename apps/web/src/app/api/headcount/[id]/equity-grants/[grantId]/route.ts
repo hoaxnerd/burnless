@@ -56,7 +56,7 @@ export const PATCH = withErrorHandler(async (
       parsed.data.strikePrice === null ? null : parsed.data.strikePrice.toFixed(4);
   }
 
-  const row = await updateEquityGrant(grantId, changes, scenarioId);
+  const row = await updateEquityGrant(grantId, changes, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Equity grant not found", 404);
   await logAudit(ctx, "equity_grant", grantId, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
@@ -79,7 +79,8 @@ export const DELETE = withErrorHandler(async (
   if (!parent) return errorResponse("Headcount not found", 404);
 
   const scenarioId = getActiveScenario(request);
-  await removeEquityGrant(grantId, scenarioId);
+  const ok = await removeEquityGrant(grantId, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Equity grant not found", 404);
   await logAudit(ctx, "equity_grant", grantId, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
   revalidateTag("headcount-plans");

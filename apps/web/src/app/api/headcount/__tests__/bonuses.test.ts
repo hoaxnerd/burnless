@@ -153,6 +153,7 @@ describe("POST /api/headcount/[id]/bonuses", () => {
         notes: "Q4",
       }),
       null,
+      "comp-1",
     );
   });
 

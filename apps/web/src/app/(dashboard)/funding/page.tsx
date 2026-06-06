@@ -28,9 +28,10 @@ export default async function FundingPage() {
 
 async function FundingContent({ companyId, scenarioId: paramScenarioId, currency }: { companyId: string; scenarioId?: string; currency: ReturnType<typeof companyCurrency> }) {
   const scenario = await getActiveScenario(companyId, paramScenarioId);
+  const activeScenarioId = paramScenarioId ?? null;
   const [fundingRounds, data] = await Promise.all([
-    getFundingRounds(companyId, scenario?.id ?? null),
-    scenario ? computeDashboardData(companyId, scenario.id) : null,
+    getFundingRounds(companyId, activeScenarioId),
+    scenario ? computeDashboardData(companyId, activeScenarioId) : null,
   ]);
 
   const currentMonth = data?.currentMonth ?? monthKey(new Date());

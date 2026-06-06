@@ -74,7 +74,7 @@ async function createForecastLine(
     frequency: data.frequency,
     isOneTime: data.isOneTime,
     isRecurring: data.isRecurring ?? null,
-  }, ctx.scenarioId ?? null);
+  }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -287,7 +287,7 @@ async function updateForecastLine(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, ctx.scenarioId ?? null);
+  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -318,7 +318,7 @@ async function deleteForecastLine(
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
 
-  await scenarioDelete("forecast_line", forecastLines, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("forecast_line", forecastLines, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,

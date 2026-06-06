@@ -77,7 +77,8 @@ export const POST = withErrorHandler(async (
       type: parsed.data.type,
       notes: parsed.data.notes ?? null,
     },
-    scenarioId
+    scenarioId,
+    ctx.companyId
   );
 
   if (row) await logAudit(ctx, "bonus", row.id, "create", { after: row });

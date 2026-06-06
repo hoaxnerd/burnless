@@ -107,6 +107,7 @@ describe("forecast-lines/[id] PATCH", () => {
       "fl-1",
       expect.objectContaining({ frequency: "annual" }),
       null,
+      "c-1",
     );
   });
 
@@ -145,6 +146,7 @@ describe("forecast-lines/[id] PATCH", () => {
       "fl-1",
       expect.objectContaining({ vendor: "Stripe" }),
       "scen-1",
+      "c-1",
     );
   });
 });
@@ -155,7 +157,7 @@ describe("forecast-lines/[id] DELETE", () => {
   });
 
   it("deletes via scenarioDelete", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(
       makeRequest("http://localhost/api/forecast-lines/fl-1", { method: "DELETE" }),
       makeParams("fl-1"),

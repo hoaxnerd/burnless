@@ -56,7 +56,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   const data = { companyId: ctx.companyId, ...parsed.data };
-  const row = await scenarioInsert("department", departments, data, scenarioId);
+  const row = await scenarioInsert("department", departments, data, scenarioId, ctx.companyId);
 
   if (row) await logAudit(ctx, "department", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "departments");

@@ -24,7 +24,7 @@ interface RevenueViewProps {
   resolvedSlotData: ResolvedSlotData[];
   revenueTimeline: { month: string; value: number }[];
   mrrTimeline: MetricValue[];
-  scenarioId: string;
+  scenarioId: string | null;
 }
 
 export function RevenueView({

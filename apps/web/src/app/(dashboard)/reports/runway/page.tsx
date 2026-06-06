@@ -3,22 +3,21 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { getCompany, getDefaultScenario } from "@/lib/data";
+import { getCompany, getServerScenarioId } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, METRIC_REGISTRY } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { RunwayView } from "./runway-view";
 
 export default async function RunwayPage() {
   const company = await getCompany();
   if (!company) return <SetupPrompt context="viewing reports" />;
-  const scenario = await getDefaultScenario(company.id);
-  if (!scenario) return <ScenarioPrompt context="generate a Runway analysis" />;
+  const scenarioId = (await getServerScenarioId()) ?? null;
 
   return (
     <div>
@@ -28,18 +27,16 @@ export default async function RunwayPage() {
       </div>
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Runway Analysis</h1>
-        <p className="mt-1 text-sm text-surface-500">
-          {company.name} &mdash; {scenario.name} scenario
-        </p>
+        <p className="mt-1 text-sm text-surface-500">{company.name}</p>
       </div>
       <Suspense fallback={<ReportContentSkeleton />}>
-        <RunwayContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} currency={companyCurrency(company)} />
+        <RunwayContent companyId={company.id} scenarioId={scenarioId} companyName={company.name} currency={companyCurrency(company)} />
       </Suspense>
     </div>
   );
 }
 
-async function RunwayContent({ companyId, scenarioId, companyName, scenarioName, currency }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string; currency: ReturnType<typeof companyCurrency> }) {
+async function RunwayContent({ companyId, scenarioId, companyName, currency }: { companyId: string; scenarioId: string | null; companyName: string; currency: ReturnType<typeof companyCurrency> }) {
   const data = await computeDashboardData(companyId, scenarioId);
 
   const { currentMonth } = data;
@@ -113,7 +110,6 @@ async function RunwayContent({ companyId, scenarioId, companyName, scenarioName,
       grossBurnRate={data.metrics.burnRate}
       startingCash={data.startingCash}
       companyName={companyName}
-      scenarioName={scenarioName}
       resolvedSlotData={resolvedSlotData}
     />
   );

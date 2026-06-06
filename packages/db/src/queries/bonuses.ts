@@ -40,8 +40,12 @@ export async function listResolvedBonuses(
 }
 
 /** Create a bonus, routing through the scenario layer when active. */
-export async function createBonus(data: NewBonus, scenarioId: string | null) {
-  return scenarioInsert("bonus", bonuses, data, scenarioId);
+export async function createBonus(
+  data: NewBonus,
+  scenarioId: string | null,
+  companyId: string,
+) {
+  return scenarioInsert("bonus", bonuses, data, scenarioId, companyId);
 }
 
 /** Update a bonus via the scenario layer. */
@@ -49,11 +53,16 @@ export async function updateBonus(
   id: string,
   changes: Partial<NewBonus>,
   scenarioId: string | null,
+  companyId: string,
 ) {
-  return scenarioUpdate("bonus", bonuses, id, changes, scenarioId);
+  return scenarioUpdate("bonus", bonuses, id, changes, scenarioId, companyId);
 }
 
 /** Delete a bonus via the scenario layer. */
-export async function removeBonus(id: string, scenarioId: string | null) {
-  return scenarioDelete("bonus", bonuses, id, scenarioId);
+export async function removeBonus(
+  id: string,
+  scenarioId: string | null,
+  companyId: string,
+) {
+  return scenarioDelete("bonus", bonuses, id, scenarioId, companyId);
 }

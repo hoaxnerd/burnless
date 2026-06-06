@@ -3,17 +3,16 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { getCompany, getDefaultScenario } from "@/lib/data";
+import { getCompany, getServerScenarioId } from "@/lib/data";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
+import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { CashFlowView } from "./cash-flow-view";
 
 export default async function CashFlowPage() {
   const company = await getCompany();
   if (!company) return <SetupPrompt context="viewing reports" />;
-  const scenario = await getDefaultScenario(company.id);
-  if (!scenario) return <ScenarioPrompt context="generate a Cash Flow statement" />;
+  const scenarioId = (await getServerScenarioId()) ?? null;
 
   return (
     <div>
@@ -23,18 +22,16 @@ export default async function CashFlowPage() {
       </div>
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Cash Flow Statement</h1>
-        <p className="mt-1 text-sm text-surface-500">
-          {company.name} &mdash; {scenario.name} scenario
-        </p>
+        <p className="mt-1 text-sm text-surface-500">{company.name}</p>
       </div>
       <Suspense fallback={<ReportContentSkeleton />}>
-        <CashFlowContent companyId={company.id} scenarioId={scenario.id} companyName={company.name} scenarioName={scenario.name} />
+        <CashFlowContent companyId={company.id} scenarioId={scenarioId} companyName={company.name} />
       </Suspense>
     </div>
   );
 }
 
-async function CashFlowContent({ companyId, scenarioId, companyName, scenarioName }: { companyId: string; scenarioId: string; companyName: string; scenarioName: string }) {
+async function CashFlowContent({ companyId, scenarioId, companyName }: { companyId: string; scenarioId: string | null; companyName: string }) {
   const data = await computeDashboardData(companyId, scenarioId);
-  return <CashFlowView cashFlow={data.cashFlow} startingCash={data.startingCash} companyName={companyName} scenarioName={scenarioName} />;
+  return <CashFlowView cashFlow={data.cashFlow} startingCash={data.startingCash} companyName={companyName} />;
 }

@@ -110,7 +110,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (body.action === "delete") {
     for (const id of matchedIds) {
-      await scenarioDelete("forecast_line", forecastLines, id, scenarioId);
+      await scenarioDelete("forecast_line", forecastLines, id, scenarioId, ctx.companyId);
       await logAudit(ctx, "forecast_line", id, "delete", {});
     }
   } else {
@@ -122,6 +122,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         id,
         { accountId: body.accountId },
         scenarioId,
+        ctx.companyId,
       );
       await logAudit(ctx, "forecast_line", id, "update", { after: row });
     }

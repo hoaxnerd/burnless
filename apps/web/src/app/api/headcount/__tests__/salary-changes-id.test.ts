@@ -115,6 +115,7 @@ describe("PATCH /api/headcount/[id]/salary-changes/[changeId]", () => {
       "sc-1",
       expect.objectContaining({ newSalary: "130000" }),
       null,
+      "comp-1",
     );
   });
 });
@@ -126,7 +127,7 @@ describe("DELETE /api/headcount/[id]/salary-changes/[changeId]", () => {
 
   it("deletes via removeSalaryChange", async () => {
     mockWhere.mockResolvedValue([{ id: "hc-1" }]);
-    mockRemoveSalaryChange.mockResolvedValue(undefined);
+    mockRemoveSalaryChange.mockResolvedValue(true);
     const res = await DELETE(
       jsonRequest("http://localhost/api/headcount/hc-1/salary-changes/sc-1", "DELETE"),
       makeParams("hc-1", "sc-1"),
@@ -134,7 +135,7 @@ describe("DELETE /api/headcount/[id]/salary-changes/[changeId]", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockRemoveSalaryChange).toHaveBeenCalledWith("sc-1", null);
+    expect(mockRemoveSalaryChange).toHaveBeenCalledWith("sc-1", null, "comp-1");
   });
 
   it("returns 403 for editor (requires admin)", async () => {

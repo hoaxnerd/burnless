@@ -151,6 +151,7 @@ describe("POST /api/headcount/[id]/salary-changes", () => {
         reason: "promotion",
       }),
       null,
+      "comp-1",
     );
   });
 

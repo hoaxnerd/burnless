@@ -38,14 +38,16 @@ export default async function ExpensesPage() {
     );
   }
 
+  const activeScenarioId = scenarioId ?? null;
+
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <ExpensesContent companyId={company.id} scenarioId={scenario.id} company={company} />
+      <ExpensesContent companyId={company.id} scenarioId={activeScenarioId} company={company} />
     </Suspense>
   );
 }
 
-async function ExpensesContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string; company: { currency?: string | null } }) {
+async function ExpensesContent({ companyId, scenarioId, company }: { companyId: string; scenarioId: string | null; company: { currency?: string | null } }) {
   const [data, accounts, expenseDetails, departments] = await Promise.all([
     computeDashboardData(companyId, scenarioId),
     getAccounts(companyId),

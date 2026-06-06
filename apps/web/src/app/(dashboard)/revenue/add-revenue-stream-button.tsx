@@ -8,7 +8,7 @@ import { RevenueStreamForm, type RevenueStreamFormValues } from "./revenue-strea
 import { apiFetch } from "@/lib/api-fetch";
 
 interface AddRevenueStreamButtonProps {
-  scenarioId: string;
+  scenarioId: string | null;
 }
 
 export function AddRevenueStreamButton({ scenarioId }: AddRevenueStreamButtonProps) {

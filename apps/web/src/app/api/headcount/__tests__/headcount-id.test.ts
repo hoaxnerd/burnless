@@ -86,6 +86,7 @@ describe("PATCH /api/headcount/[id]", () => {
       "headcount_plan", expect.anything(), "hc-1",
       expect.objectContaining({ title: "Updated", salary: "150000", benefitsRate: "0.3" }),
       null,
+      "comp-1",
     );
   });
 });
@@ -96,12 +97,12 @@ describe("DELETE /api/headcount/[id]", () => {
   });
 
   it("deletes via scenarioDelete", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(jsonRequest("http://localhost/api/headcount/hc-1", "DELETE"), makeParams("hc-1"));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockScenarioDelete).toHaveBeenCalledWith("headcount_plan", expect.anything(), "hc-1", null);
+    expect(mockScenarioDelete).toHaveBeenCalledWith("headcount_plan", expect.anything(), "hc-1", null, "comp-1");
   });
 
   it("returns 403 for editor (requires admin)", async () => {

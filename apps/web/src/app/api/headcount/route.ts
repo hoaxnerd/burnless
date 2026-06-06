@@ -59,7 +59,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (parsed.data.hoursPerWeek !== undefined) {
     data.hoursPerWeek = parsed.data.hoursPerWeek === null ? null : String(parsed.data.hoursPerWeek);
   }
-  const row = await scenarioInsert("headcount_plan", headcountPlans, data, scenarioId);
+  const row = await scenarioInsert("headcount_plan", headcountPlans, data, scenarioId, ctx.companyId);
 
   if (row) await logAudit(ctx, "headcount_plan", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");

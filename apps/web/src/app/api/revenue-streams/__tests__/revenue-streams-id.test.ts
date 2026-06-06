@@ -98,7 +98,7 @@ describe("revenue-streams/[id] PATCH", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.name).toBe("Updated");
-    expect(mockScenarioUpdate).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", { name: "Updated" }, null);
+    expect(mockScenarioUpdate).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", { name: "Updated" }, null, "c-1");
   });
 
   it("passes scenarioId from header", async () => {
@@ -108,7 +108,7 @@ describe("revenue-streams/[id] PATCH", () => {
       makeRequest("http://localhost/api/revenue-streams/rs-1", { method: "PATCH", body: JSON.stringify({ name: "X" }) }),
       makeParams("rs-1"),
     );
-    expect(mockScenarioUpdate).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", expect.anything(), "scen-1");
+    expect(mockScenarioUpdate).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", expect.anything(), "scen-1", "c-1");
   });
 
   it("returns 400 for PATCH with invalid (overlapping) tiers", async () => {
@@ -150,7 +150,7 @@ describe("revenue-streams/[id] DELETE", () => {
   });
 
   it("deletes via scenarioDelete and returns success", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(
       makeRequest("http://localhost/api/revenue-streams/rs-1", { method: "DELETE" }),
       makeParams("rs-1"),
@@ -158,7 +158,7 @@ describe("revenue-streams/[id] DELETE", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockScenarioDelete).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", null);
+    expect(mockScenarioDelete).toHaveBeenCalledWith("revenue_stream", expect.anything(), "rs-1", null, "c-1");
   });
 
   it("returns 403 for editor role (requires admin)", async () => {

@@ -156,6 +156,7 @@ describe("POST /api/revenue-streams", () => {
       expect.anything(),
       expect.objectContaining({ name: "SaaS Subscriptions", companyId: "comp-1" }),
       null,
+      "comp-1",
     );
   });
 
@@ -175,6 +176,7 @@ describe("POST /api/revenue-streams", () => {
       expect.anything(),
       expect.anything(),
       "scen-1",
+      "comp-1",
     );
   });
 

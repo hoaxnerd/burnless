@@ -55,7 +55,22 @@ export const POST = withErrorHandler(async (request: Request) => {
     after: { action: "promote", backupId: result.backup.id },
   });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
+  // Promotion writes overrides into the base tables, so every scenario-aware
+  // entity cache must be invalidated — not just "scenarios". Otherwise the
+  // dashboard/reports serve pre-promotion data until the 30s TTL expires.
+  for (const tag of [
+    "scenarios",
+    "scenario-overrides",
+    "revenue-streams",
+    "forecast-lines",
+    "headcount-plans",
+    "funding-rounds",
+    "accounts",
+    "departments",
+    "cap-table",
+  ]) {
+    revalidateTag(tag);
+  }
 
   return NextResponse.json({
     backup: {

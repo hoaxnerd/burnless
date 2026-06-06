@@ -22,7 +22,7 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
-  const row = await scenarioUpdate("forecast_line", forecastLines, id, parsed.data, scenarioId);
+  const row = await scenarioUpdate("forecast_line", forecastLines, id, parsed.data, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");
@@ -43,7 +43,8 @@ export const DELETE = withErrorHandler(async (
 
   const scenarioId = getActiveScenario(request);
 
-  await scenarioDelete("forecast_line", forecastLines, id, scenarioId);
+  const ok = await scenarioDelete("forecast_line", forecastLines, id, scenarioId, ctx.companyId);
+  if (!ok) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "delete", {});
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");

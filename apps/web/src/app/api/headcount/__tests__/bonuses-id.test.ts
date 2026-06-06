@@ -115,6 +115,7 @@ describe("PATCH /api/headcount/[id]/bonuses/[bonusId]", () => {
       "b-1",
       expect.objectContaining({ amount: "6000" }),
       null,
+      "comp-1",
     );
   });
 });
@@ -126,7 +127,7 @@ describe("DELETE /api/headcount/[id]/bonuses/[bonusId]", () => {
 
   it("deletes via removeBonus", async () => {
     mockWhere.mockResolvedValue([{ id: "hc-1" }]);
-    mockRemoveBonus.mockResolvedValue(undefined);
+    mockRemoveBonus.mockResolvedValue(true);
     const res = await DELETE(
       jsonRequest("http://localhost/api/headcount/hc-1/bonuses/b-1", "DELETE"),
       makeParams("hc-1", "b-1"),
@@ -134,7 +135,7 @@ describe("DELETE /api/headcount/[id]/bonuses/[bonusId]", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.deleted).toBe(true);
-    expect(mockRemoveBonus).toHaveBeenCalledWith("b-1", null);
+    expect(mockRemoveBonus).toHaveBeenCalledWith("b-1", null, "comp-1");
   });
 
   it("returns 403 for editor (requires admin)", async () => {

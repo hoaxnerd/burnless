@@ -102,6 +102,7 @@ describe("POST /api/departments", () => {
       "department", expect.anything(),
       expect.objectContaining({ name: "Design", companyId: "comp-1" }),
       null,
+      "comp-1",
     );
   });
 

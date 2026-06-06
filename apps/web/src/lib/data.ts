@@ -132,6 +132,7 @@ export const getDefaultScenario = cachedQuery(
       .select()
       .from(scenarios)
       .where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt)))
+      .orderBy(scenarios.createdAt)
       .limit(1);
     return first ?? null;
   },
@@ -153,17 +154,12 @@ export const getAccounts = cachedQuery(
  * Phase 4 A §A1: closes the same overlay-bypass regression as getRevenueStreams.
  */
 export const getForecastLines = cachedQuery(
-  async (scenarioId: string) => {
-    const [scenario] = await db
-      .select({ companyId: scenarios.companyId })
-      .from(scenarios)
-      .where(eq(scenarios.id, scenarioId))
-      .limit(1);
-    if (!scenario) return [];
+  async (companyId: string, scenarioId: string | null) => {
     const base = await db
       .select()
       .from(forecastLines)
-      .where(eq(forecastLines.companyId, scenario.companyId));
+      .where(eq(forecastLines.companyId, companyId));
+    // scenarioId null ⇒ true base (no overrides); non-null ⇒ overlay merged.
     const resolved = await resolveEntities("forecast_line", base, scenarioId);
     return resolved.map(({ _override, ...entity }) => entity);
   },
@@ -189,17 +185,12 @@ export async function getForecastValues(lineIds: string[]) {
  * `revenueStreams.scenarioId` was dropped during the overlay refactor.
  */
 export const getRevenueStreams = cachedQuery(
-  async (scenarioId: string) => {
-    const [scenario] = await db
-      .select({ companyId: scenarios.companyId })
-      .from(scenarios)
-      .where(eq(scenarios.id, scenarioId))
-      .limit(1);
-    if (!scenario) return [];
+  async (companyId: string, scenarioId: string | null) => {
     const base = await db
       .select()
       .from(revenueStreams)
-      .where(eq(revenueStreams.companyId, scenario.companyId));
+      .where(eq(revenueStreams.companyId, companyId));
+    // scenarioId null ⇒ true base (no overrides); non-null ⇒ overlay merged.
     const resolved = await resolveEntities("revenue_stream", base, scenarioId);
     return resolved.map(({ _override, ...entity }) => entity);
   },
@@ -212,17 +203,12 @@ export const getRevenueStreams = cachedQuery(
  * Phase 4 A §A1.
  */
 export const getHeadcountPlans = cachedQuery(
-  async (scenarioId: string) => {
-    const [scenario] = await db
-      .select({ companyId: scenarios.companyId })
-      .from(scenarios)
-      .where(eq(scenarios.id, scenarioId))
-      .limit(1);
-    if (!scenario) return [];
+  async (companyId: string, scenarioId: string | null) => {
     const base = await db
       .select()
       .from(headcountPlans)
-      .where(eq(headcountPlans.companyId, scenario.companyId));
+      .where(eq(headcountPlans.companyId, companyId));
+    // scenarioId null ⇒ true base (no overrides); non-null ⇒ overlay merged.
     const resolved = await resolveEntities("headcount_plan", base, scenarioId);
     return resolved.map(({ _override, ...entity }) => entity);
   },

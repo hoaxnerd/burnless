@@ -39,6 +39,7 @@ export async function getDefaultScenario(companyId: string) {
     .select()
     .from(scenarios)
     .where(and(eq(scenarios.companyId, companyId), notDeleted))
+    .orderBy(scenarios.createdAt)
     .limit(1);
   return row ?? null;
 }

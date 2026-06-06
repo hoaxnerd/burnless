@@ -119,7 +119,7 @@ describe("funding-rounds/[id] DELETE", () => {
   });
 
   it("deletes via scenarioDelete", async () => {
-    mockScenarioDelete.mockResolvedValue(undefined);
+    mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(
       makeRequest("http://localhost/api/funding-rounds/fr-1", { method: "DELETE" }),
       makeParams("fr-1"),

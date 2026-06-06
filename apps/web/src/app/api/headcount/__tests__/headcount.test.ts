@@ -111,6 +111,7 @@ describe("POST /api/headcount", () => {
       "headcount_plan", expect.anything(),
       expect.objectContaining({ departmentId: "dept-1", companyId: "comp-1" }),
       null,
+      "comp-1",
     );
   });
 

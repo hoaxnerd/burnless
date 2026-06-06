@@ -48,7 +48,7 @@ async function addRevenueStream(
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
     parameters: data.parameters,
-  }, ctx.scenarioId ?? null);
+  }, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -92,7 +92,7 @@ async function updateRevenueStream(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, ctx.scenarioId ?? null);
+  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
@@ -117,7 +117,7 @@ async function deleteRevenueStream(
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
 
-  await scenarioDelete("revenue_stream", revenueStreams, data.id, ctx.scenarioId ?? null);
+  await scenarioDelete("revenue_stream", revenueStreams, data.id, ctx.scenarioId ?? null, ctx.companyId);
 
   return JSON.stringify({
     success: true,
