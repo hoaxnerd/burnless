@@ -5,6 +5,7 @@ import {
   PLAN_TOOL_NAMES,
 } from "../generative-ui";
 import { categorizeToolName } from "../permissions";
+import type { StreamChunk } from "../types";
 
 describe("plan tool set", () => {
   it("recognizes propose_plan", () => {
@@ -56,5 +57,17 @@ describe("plan tool set", () => {
   it("preserves a model-provided step id", () => {
     const spec = buildPlanSpec("propose_plan", { title: "P", steps: [{ id: "custom-x", kind: "note", title: "A" }] });
     expect(spec.steps[0]!.id).toBe("custom-x");
+  });
+});
+
+describe("StreamChunk plan_request shape", () => {
+  it("accepts a plan_request chunk with a plan", () => {
+    const chunk: StreamChunk = {
+      type: "plan_request",
+      pauseId: "p1",
+      plan: { title: "T", steps: [] },
+    };
+    expect(chunk.type).toBe("plan_request");
+    expect(chunk.plan?.title).toBe("T");
   });
 });
