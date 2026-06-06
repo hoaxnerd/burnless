@@ -2,7 +2,7 @@
 import { createContext, useContext, useRef, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { readSseStream } from "@/app/(dashboard)/ai/_components/sse";
-import type { Message, PendingPermission, PendingInput } from "@/app/(dashboard)/ai/_components/types";
+import type { Message, PendingPermission, PendingInput, PendingPlan } from "@/app/(dashboard)/ai/_components/types";
 
 // A draft/new chat (no id yet) uses this key until the server returns a real id.
 const NEW = "__new__";
@@ -23,6 +23,7 @@ interface ChatSessionValue {
   ) => Promise<void>;
   decide: (conversationId: string, pending: PendingPermission, decisions: { requestId: string; decision: "once" | "session" | "deny" }[]) => Promise<void>;
   submitInput: (conversationId: string, pending: PendingInput, formData: Record<string, unknown>) => Promise<void>;
+  submitPlan: (conversationId: string, pending: PendingPlan, plan: PendingPlan["spec"]) => Promise<void>;
   setMessages: (conversationId: string | null, msgs: Message[]) => void;
   /** Reassign the draft session to a real id once the server creates it. */
   rekey: (fromConversationId: string) => void;
@@ -79,6 +80,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     else if (t === "permission_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPermission: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, actions: (ev.actions as PendingPermission["actions"]) ?? [] } }));
     else if (t === "ui_component") patchLast(key, (m) => ({ ...m, uiBlocks: [...(m.uiBlocks ?? []), { id: ev.id as string, component: ev.component as string, props: (ev.props as Record<string, unknown>) ?? {} }] }));
     else if (t === "input_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingInput: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } }));
+    else if (t === "plan_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPlan: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.plan as PendingPlan["spec"] } }));
     else if (t === "paused") write(key, (s) => ({ ...s, isLoading: false }));
     else if (t === "done") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null }));
     else if (t === "error") patchLast(key, (m) => ({ ...m, content: m.content + `\n\n*Error: ${ev.content}*`, isStreaming: false }));
@@ -135,7 +137,22 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     }
   }, [write, patchLast, applyEvent]);
 
-  return <Ctx.Provider value={{ get, send, decide, submitInput, setMessages, rekey }}>{children}</Ctx.Provider>;
+  const submitPlan = useCallback(async (id: string, pending: PendingPlan, plan: PendingPlan["spec"]) => {
+    const key = keyOf(id);
+    patchLast(key, (m) => ({ ...m, pendingPlan: m.pendingPlan ? { ...m.pendingPlan, resolved: true } : null, isStreaming: true }));
+    write(key, (s) => ({ ...s, isLoading: true }));
+    try {
+      const res = await apiFetch("/api/chat/resume", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: pending.conversationId, pauseId: pending.pauseId, plan }) });
+      if (!res.ok) throw new Error("plan submit failed");
+      await readSseStream(res, (ev) => applyEvent(key, ev));
+    } catch {
+      patchLast(key, (m) => ({ ...m, content: m.content + "\n\n*Couldn't start the plan. Please try again.*", isStreaming: false }));
+    } finally {
+      write(key, (s) => ({ ...s, isLoading: false }));
+    }
+  }, [write, patchLast, applyEvent]);
+
+  return <Ctx.Provider value={{ get, send, decide, submitInput, submitPlan, setMessages, rekey }}>{children}</Ctx.Provider>;
 }
 
 export function useChatSession() {
