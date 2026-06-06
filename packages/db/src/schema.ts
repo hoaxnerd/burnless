@@ -1093,6 +1093,7 @@ export const aiMessages = pgTable(
 export const aiPendingActionKindEnum = pgEnum("ai_pending_action_kind", [
   "permission",
   "input",
+  "plan",
 ]);
 
 export const aiPendingActions = pgTable(

@@ -89,7 +89,7 @@ export interface NewPendingAction {
   conversationId: string;
   pauseId: string;
   /** Why the turn paused. Defaults to "permission". */
-  kind?: "permission" | "input";
+  kind?: "permission" | "input" | "plan";
   /** Active scenario the paused turn operates in (resume executes against this). */
   scenarioId: string;
   assistantBlocks: unknown;
