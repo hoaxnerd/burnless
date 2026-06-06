@@ -13,6 +13,8 @@ export interface Message {
   uiBlocks?: UiBlockClient[];
   /** A form-input request paused on this message (genui). */
   pendingInput?: PendingInput | null;
+  /** A plan-approval request paused on this message (worklog). */
+  pendingPlan?: PendingPlan | null;
 }
 
 export interface Insight {
@@ -80,5 +82,30 @@ export interface PendingInput {
   pauseId: string;
   conversationId: string;
   spec: { title: string; description?: string; submitLabel?: string; fields: PendingInputField[] };
+  resolved?: boolean;
+}
+
+/** A plan step as seen by the client (mirrors @burnless/ai PlanStep). */
+export interface PlanStepClient {
+  id: string;
+  kind: "tool" | "note";
+  title: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  rationale?: string;
+  confidence?: "high" | "low";
+}
+
+export interface PlanSpecClient {
+  title: string;
+  description?: string;
+  steps: PlanStepClient[];
+}
+
+/** A turn paused awaiting plan approval. */
+export interface PendingPlan {
+  pauseId: string;
+  conversationId: string;
+  spec: PlanSpecClient;
   resolved?: boolean;
 }
