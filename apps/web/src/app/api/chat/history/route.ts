@@ -47,8 +47,11 @@ export const GET = withErrorHandler(async (request: Request) => {
     // Rehydrate genui display blocks persisted on `metadata.uiBlocks` so reload
     // re-renders the inline components (spec §6/§8).
     const messages = rows.map((row) => {
-      const uiBlocks = (row.metadata as { uiBlocks?: unknown[] } | null)?.uiBlocks;
-      return uiBlocks ? { ...row, uiBlocks } : row;
+      const meta = row.metadata as { uiBlocks?: unknown[]; timeline?: unknown[] } | null;
+      const lifted: Record<string, unknown> = { ...row };
+      if (meta?.uiBlocks) lifted.uiBlocks = meta.uiBlocks;
+      if (meta?.timeline) lifted.timeline = meta.timeline;
+      return lifted;
     });
 
     // Ownership was verified above; surface any persisted pending batch so the

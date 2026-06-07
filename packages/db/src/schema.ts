@@ -1077,7 +1077,7 @@ export const aiMessages = pgTable(
       .references(() => aiConversations.id, { onDelete: "cascade" }),
     role: aiMessageRoleEnum("role").notNull(),
     content: text("content").notNull(),
-    metadata: jsonb("metadata"),
+    metadata: jsonb("metadata").$type<{ uiBlocks?: unknown[]; timeline?: unknown[] }>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
