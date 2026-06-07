@@ -64,6 +64,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // aiMessages.metadata.uiBlocks on `done` so reload can re-render (spec §6/§8).
       const uiBlocks: UiBlock[] = [];
 
+      // Diff-gate (spec §4.2): override deltas computed at pause-time, keyed by the
+      // tool_use requestId, so the permission_request SSE case can attach them.
+      const pendingOverrides = new Map<string, unknown[]>();
+
       try {
         const chunks = chatStream({
           messages: params.messages,
@@ -112,13 +116,43 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           },
           onPause: async (state) => {
             const pauseId = crypto.randomUUID();
+            // Diff-gate enrichment (spec §4.2): for each write/delete awaiting
+            // approval, compute its scenario-override delta WITHOUT writing
+            // (executeToolCall mode:"plan") and attach it so the client renders the
+            // before/after diff. Non-facade mutations (scenario CRUD, investor)
+            // return empty overrides from plan mode → no diff → plain card. A failed
+            // delta computation pauses without a diff (still safe).
+            const enrichedPending = await Promise.all(
+              state.pending.map(async (action) => {
+                const category = categorizeToolName(action.toolName);
+                if (category !== "write" && category !== "delete") return action;
+                try {
+                  const raw = await executeToolCall(action.toolName, action.toolInput, {
+                    companyId: params.companyId,
+                    scenarioId: params.scenarioId,
+                    userId: params.userId,
+                    conversationId: params.conversationId,
+                    mode: "plan",
+                    permissionDecision: "auto",
+                  });
+                  const parsed = JSON.parse(raw) as { planned?: boolean; overrides?: unknown[] };
+                  if (parsed?.planned && Array.isArray(parsed.overrides) && parsed.overrides.length > 0) {
+                    pendingOverrides.set(action.requestId, parsed.overrides);
+                    return { ...action, override: parsed.overrides };
+                  }
+                } catch {
+                  /* delta computation failed — pause without a diff */
+                }
+                return action;
+              }),
+            );
             await createPendingAction({
               conversationId: params.conversationId,
               pauseId,
               scenarioId: params.scenarioId, // persist active scenario for correct resume targeting
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
-              pending: state.pending,
+              pending: enrichedPending,
             });
             return pauseId;
           },
@@ -188,6 +222,8 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                   category: categorizeToolName(a.toolName),
                   description: describeToolAction(a.toolName, a.toolInput),
                   input: a.toolInput,
+                  // Diff-gate delta (spec §4.2); null for non-facade mutations.
+                  override: pendingOverrides.get(a.requestId) ?? null,
                 })),
               });
               break;
