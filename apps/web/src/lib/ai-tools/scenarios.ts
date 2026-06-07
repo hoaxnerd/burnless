@@ -32,6 +32,10 @@ export const compareScenarioSchema = z.object({
   compareScenarioId: idString,
 });
 
+export const activateScenarioSchema = z.object({
+  scenarioId: idString,
+});
+
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
 async function createScenario(
@@ -54,6 +58,7 @@ async function createScenario(
   return JSON.stringify({
     success: true,
     scenarioId: row!.id,
+    name: row!.name,
     message: `Created scenario "${row!.name}". ID: ${row!.id}`,
   });
 }
@@ -151,6 +156,31 @@ async function deleteScenario(
   });
 }
 
+async function activateScenario(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof activateScenarioSchema>;
+  const ctx = requireCompanyId(context);
+  // View-only control: verify the scenario is owned + not deleted, then hand the
+  // id+name back. chat-stream emits `scenario_activated` from this result so the
+  // client runs the real enterScenario (top bar) — no data is written here.
+  const [row] = await db
+    .select({ id: scenarios.id, name: scenarios.name })
+    .from(scenarios)
+    .where(and(eq(scenarios.id, data.scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
+  if (!row) {
+    return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
+  }
+  return JSON.stringify({
+    success: true,
+    scenarioId: row.id,
+    name: row.name,
+    activated: true,
+    message: `Activated scenario "${row.name}".`,
+  });
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const scenarioSchemas: Record<string, z.ZodType> = {
@@ -158,6 +188,7 @@ export const scenarioSchemas: Record<string, z.ZodType> = {
   update_scenario: updateScenarioSchema,
   delete_scenario: deleteScenarioSchema,
   get_scenario_comparison: compareScenarioSchema,
+  activate_scenario: activateScenarioSchema,
 };
 
 export const scenarioHandlers: Record<string, ToolHandler> = {
@@ -165,4 +196,5 @@ export const scenarioHandlers: Record<string, ToolHandler> = {
   update_scenario: updateScenario,
   delete_scenario: deleteScenario,
   get_scenario_comparison: compareScenariosTool,
+  activate_scenario: activateScenario,
 };
