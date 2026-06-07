@@ -2,7 +2,7 @@
 import type { ToolDefinition } from "./providers";
 
 /** Data-bound + presentational display tools. Populated by Plans 2–3. */
-export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
+const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
   {
     name: "show_metric_card",
     description:
@@ -487,3 +487,37 @@ GENUI_INPUT_TOOLS.push(
     },
   },
 );
+
+/** Optional binary-confidence inputs the model may set on any display tool (spec
+ *  §4.3). The handler ignores them; chat-stream merges them onto the result block
+ *  so the ConfidenceChip lights up (Plan 5). Added centrally to every show_* tool
+ *  so the 16 schemas stay DRY. */
+const CONFIDENCE_INPUT_PROPS = {
+  confidence: {
+    type: "string",
+    enum: ["high", "low"],
+    description: "Optional: your binary confidence in this result (\"high\" or \"low\").",
+  },
+  rationale: {
+    type: "string",
+    description: "Optional: one short line, e.g. \"because you said 50% growth\".",
+  },
+} as const;
+
+function withConfidenceInputs(tool: ToolDefinition): ToolDefinition {
+  // Do NOT cast inputSchema to a widened shape — `ToolDefinition.inputSchema.type`
+  // is the literal "object" and `properties` is required (providers/types.ts), so a
+  // `{ type?: string }` cast would widen `type` to `string` and break the
+  // `: ToolDefinition` return (tsc-only error, masked from vitest). Spread the real
+  // typed schema directly.
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...tool.inputSchema.properties, ...CONFIDENCE_INPUT_PROPS },
+    },
+  };
+}
+
+/** Display tools with the confidence/rationale inputs grafted on (Plan 5). */
+export const GENUI_DISPLAY_TOOLS: ToolDefinition[] = BASE_GENUI_DISPLAY_TOOLS.map(withConfidenceInputs);
