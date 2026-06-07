@@ -1,7 +1,7 @@
 // apps/web/src/app/(dashboard)/ai/_components/timeline/nodes/plan-node.tsx
 "use client";
 import { useState } from "react";
-import { ListChecks, X, ArrowDown, ArrowUp, Wrench } from "lucide-react";
+import { ListChecks, X, ArrowDown, ArrowUp, Wrench, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PendingPlan, PlanStepClient } from "../../types";
 
@@ -31,6 +31,17 @@ export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
       return copy;
     });
 
+  const ConfChip = ({ c }: { c: "high" | "low" }) => (
+    <span
+      className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium ${
+        c === "high" ? "bg-success-50 text-success-600" : "bg-warning-50 text-warning-600"
+      }`}
+    >
+      {c === "high" ? <ShieldCheck className="h-2.5 w-2.5" /> : <ShieldAlert className="h-2.5 w-2.5" />}
+      {c === "high" ? "High" : "Low"}
+    </span>
+  );
+
   return (
     <div className="rounded-xl border border-accent-200 bg-accent-50/40 p-3">
       <div className="mb-2 flex items-center gap-2">
@@ -46,12 +57,15 @@ export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
             <div className="min-w-0 flex-1">
               {editable ? (
                 <>
-                  <input
-                    aria-label={`Step title: ${step.title}`}
-                    value={step.title}
-                    onChange={(e) => patch(step.id, "title", e.target.value)}
-                    className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm text-surface-800 hover:border-surface-200 focus:border-accent-300 focus:outline-none"
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      aria-label={`Step title: ${step.title}`}
+                      value={step.title}
+                      onChange={(e) => patch(step.id, "title", e.target.value)}
+                      className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm text-surface-800 hover:border-surface-200 focus:border-accent-300 focus:outline-none"
+                    />
+                    {step.confidence ? <ConfChip c={step.confidence} /> : null}
+                  </div>
                   {step.rationale !== undefined ? (
                     <input
                       aria-label={`Step rationale: ${step.title}`}
@@ -64,7 +78,10 @@ export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
                 </>
               ) : (
                 <>
-                  <span className="block text-sm text-surface-700">{step.title}</span>
+                  <span className="flex items-center gap-1.5 text-sm text-surface-700">
+                    {step.title}
+                    {step.confidence ? <ConfChip c={step.confidence} /> : null}
+                  </span>
                   {step.rationale ? <span className="block text-xs text-surface-400">{step.rationale}</span> : null}
                 </>
               )}
