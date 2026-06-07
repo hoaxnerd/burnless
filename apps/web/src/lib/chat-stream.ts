@@ -100,12 +100,25 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 const parsed = JSON.parse(raw) as {
                   render?: { component: string; props: Record<string, unknown> };
                   modelResult?: string;
+                  confidence?: "high" | "low";
+                  rationale?: string;
                 };
                 if (parsed.render?.component) {
                   const id = crypto.randomUUID();
                   const block: UiBlock = { id, component: parsed.render.component, props: parsed.render.props ?? {} };
+                  // Binary confidence + rationale (spec §4.3); absent until Plan 5's prompt.
+                  if (parsed.confidence === "high" || parsed.confidence === "low") block.confidence = parsed.confidence;
+                  if (typeof parsed.rationale === "string") block.rationale = parsed.rationale;
                   uiBlocks.push(block);
-                  send(controller, { type: "ui_component", id, component: block.component, props: block.props, tool: toolName });
+                  send(controller, {
+                    type: "ui_component",
+                    id,
+                    component: block.component,
+                    props: block.props,
+                    tool: toolName,
+                    confidence: block.confidence,
+                    rationale: block.rationale,
+                  });
                   return typeof parsed.modelResult === "string" ? parsed.modelResult : `[${parsed.render.component} shown]`;
                 }
               } catch {
