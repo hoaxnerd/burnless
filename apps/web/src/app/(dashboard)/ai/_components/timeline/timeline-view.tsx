@@ -1,11 +1,12 @@
 // apps/web/src/app/(dashboard)/ai/_components/timeline/timeline-view.tsx
 "use client";
-import { ListChecks, Wrench, GitCompareArrows, MessageSquareText, FormInput } from "lucide-react";
+import { ListChecks, Wrench, GitCompareArrows, MessageSquareText, FormInput, GitBranch } from "lucide-react";
 import { PlanNode } from "./nodes/plan-node";
 import { ToolNode } from "./nodes/tool-node";
 import { DiffGateNode } from "./nodes/diff-gate-node";
 import { InputNode } from "./nodes/input-node";
 import { ResultNode } from "./nodes/result-node";
+import { ScenarioNode } from "./nodes/scenario-node";
 import type { TimelineNodeClient, PendingPermission, PendingPlan, PendingInput } from "../types";
 
 const RAIL_ICON: Record<TimelineNodeClient["kind"], React.ReactNode> = {
@@ -14,6 +15,7 @@ const RAIL_ICON: Record<TimelineNodeClient["kind"], React.ReactNode> = {
   diff_gate: <GitCompareArrows className="h-3 w-3" />,
   result: <MessageSquareText className="h-3 w-3" />,
   input: <FormInput className="h-3 w-3" />,
+  scenario: <GitBranch className="h-3 w-3" />,
 };
 
 export interface TimelineViewProps {
@@ -46,6 +48,8 @@ export function TimelineView({ nodes, disabled, onPlanSubmit, onDecide, onInputS
             <InputNode pending={node.input} disabled={disabled} onSubmit={onInputSubmit} />
           ) : node.kind === "result" ? (
             <ResultNode node={node} onAction={onAction} />
+          ) : node.kind === "scenario" ? (
+            <ScenarioNode node={node} />
           ) : null}
         </li>
       ))}
