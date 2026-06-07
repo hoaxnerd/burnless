@@ -91,6 +91,23 @@ function isMutationTool(toolName: string): boolean {
   return MUTATION_TOOLS.has(toolName);
 }
 
+/** Mutation tools that DON'T route through the scenario-mutate facade — they
+ *  write non-overridable tables directly (scenario CRUD writes `scenarios`;
+ *  investor writes `fundingRoundInvestors`) and ignore ctx.mode. They cannot be
+ *  previewed as a scenario-override diff, so plan mode must not run them (it would
+ *  write while auditing pending_apply). See worklog Plan 3 / carry-over follow-up a. */
+const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
+  "create_scenario",
+  "update_scenario",
+  "delete_scenario",
+  "create_funding_round_investor",
+]);
+
+/** A mutation whose plan mode yields a real scenario-override delta (diff-gate). */
+function isDiffableMutationTool(toolName: string): boolean {
+  return isMutationTool(toolName) && !NON_FACADE_MUTATION_TOOLS.has(toolName);
+}
+
 /** Maps mutation tool names to the cache tags they should invalidate.
  *  Scenario-override changes also invalidate "scenario-overrides" so the
  *  banner / diff views refresh. */
@@ -218,6 +235,16 @@ export async function executeToolCall(
     return JSON.stringify(errorResult);
   }
 
+  // Plan-mode safety (worklog Plan 3): a non-facade mutation cannot be previewed
+  // as a scenario-override delta and would WRITE if its handler ran. In plan mode,
+  // skip execution entirely and return an empty plan envelope so the diff-gate
+  // shows no diff (plain permission card); the real write happens on Apply (commit).
+  if (context.mode === "plan" && isMutationTool(toolName) && !isDiffableMutationTool(toolName)) {
+    const planned = JSON.stringify({ planned: true, overrides: [] });
+    logToolAudit(context, toolName, input, "pending_apply", { planned: true, overrides: [] }, Math.round(performance.now() - startTime));
+    return planned;
+  }
+
   let result: string;
   try {
     result = await handler(data, context);
@@ -278,4 +305,6 @@ export type { ToolContext } from "./types";
 export const __testables = {
   MUTATION_TOOLS,
   MUTATION_CACHE_TAGS: MUTATION_CACHE_TAGS as Readonly<Record<string, string[]>>,
+  NON_FACADE_MUTATION_TOOLS,
+  isDiffableMutationTool,
 };
