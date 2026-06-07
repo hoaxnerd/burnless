@@ -139,7 +139,7 @@ genuiDisplayHandlers.show_kpi_grid = async (input, context) => {
     JSON.stringify({
       render: { component: "kpi_grid", props: { items } },
       modelResult: items.length
-        ? `[kpi_grid shown: ${items.map((i) => i.label).join(", ")}]`
+        ? `[kpi_grid shown] ${items.map((i) => `${i.label}=${i.value ?? "n/a"}`).join(", ")}`
         : `[kpi_grid: no data]`,
     });
 
@@ -241,7 +241,9 @@ genuiDisplayHandlers.show_line_chart = async (input, context) => {
         lines: [{ dataKey: "value", label: spec.label }],
       },
     },
-    modelResult: `[line_chart shown: ${spec.label}, ${data.length} months]`,
+    modelResult: data.length
+      ? `[line_chart shown] ${spec.label}: ${data.length} months, latest ${data[data.length - 1]!.value}, range ${Math.min(...data.map((d) => d.value))}–${Math.max(...data.map((d) => d.value))}`
+      : `[line_chart shown: ${spec.label}, 0 months]`,
   });
 };
 
@@ -295,7 +297,10 @@ genuiDisplayHandlers.show_bar_chart = async (input, context) => {
         },
       },
       modelResult: data.length
-        ? `[bar_chart shown: ${title}, ${data.length} categories]`
+        ? `[bar_chart shown] ${title}, ${data.length} categories: ${data
+            .slice(0, 5)
+            .map((d) => `${d.label}=${d.value}`)
+            .join(", ")}`
         : `[bar_chart: no data for ${dimension}]`,
     });
 
@@ -362,7 +367,13 @@ genuiDisplayHandlers.show_burn_breakdown = async (input, context) => {
         },
       },
       modelResult: data.length
-        ? `[burn_breakdown shown: ${title}, ${data.length} categories]`
+        ? `[burn_breakdown shown] ${title}, total ${data.reduce(
+            (s, d) => s + d.value,
+            0
+          )}/mo across ${data.length} categories: ${data
+            .slice(0, 5)
+            .map((d) => `${d.label}=${d.value}`)
+            .join(", ")}`
         : `[burn_breakdown: no expense data]`,
     });
 
@@ -414,7 +425,9 @@ genuiDisplayHandlers.show_area_chart = async (input, context) => {
         props: { title: spec.label, format: "currency", data, color: chartColors.brand },
       },
       modelResult: data.length
-        ? `[area_chart shown: ${spec.label}, ${data.length} months]`
+        ? `[area_chart shown] ${spec.label}: ${data.length} months, latest ${data[data.length - 1]!.value}, range ${Math.min(
+            ...data.map((d) => d.value)
+          )}–${Math.max(...data.map((d) => d.value))}`
         : `[area_chart: no data for ${series}]`,
     });
 
@@ -475,7 +488,7 @@ genuiDisplayHandlers.show_runway = async (input, context) => {
       modelResult:
         props.runwayMonths === null
           ? `[runway: no data]`
-          : `[runway shown: ${props.runwayMonths} months, cash-out ${props.zeroCashMonth ?? "n/a"}]`,
+          : `[runway shown] runway ${props.runwayMonths} months · cash ${props.cash ?? "n/a"} · net burn ${props.netBurn ?? "n/a"}/mo · cash-out ${props.zeroCashMonth ?? "n/a"}`,
     });
 
   if (!scenarioId) {
@@ -517,7 +530,10 @@ genuiDisplayHandlers.show_cap_table = async (input, context) => {
     JSON.stringify({
       render: { component: "cap_table", props: { rows, totalShares } },
       modelResult: rows.length
-        ? `[cap_table shown: ${rows.length} holders, ${totalShares} fully-diluted shares]`
+        ? `[cap_table shown] ${rows.length} holders, ${totalShares} fully-diluted shares; ${rows
+            .slice(0, 5)
+            .map((r) => `${r.holder}=${Math.round(r.pctOwnership * 10) / 10}%`)
+            .join(", ")}`
         : `[cap_table: no data]`,
     });
 
@@ -613,7 +629,9 @@ genuiDisplayHandlers.show_scenario_diff = async (input, context) => {
     JSON.stringify({
       render: { component: "scenario_diff", props: { aName, bName, rows } },
       modelResult: rows.length
-        ? `[scenario_diff shown: ${aName} vs ${bName}, ${rows.length} metrics]`
+        ? `[scenario_diff shown] ${aName} vs ${bName}: ${rows
+            .map((r) => `${r.label} ${r.a ?? "n/a"}→${r.b ?? "n/a"} (Δ${r.delta ?? "n/a"})`)
+            .join(", ")}`
         : `[scenario_diff: no data]`,
     });
 
@@ -689,7 +707,9 @@ genuiDisplayHandlers.show_funding_summary = async (input, context) => {
         props: { rounds, totalRaised, format: "currency" as FormatHint },
       },
       modelResult: rounds.length
-        ? `[funding_summary shown: ${rounds.length} rounds, ${totalRaised} total raised]`
+        ? `[funding_summary shown] ${rounds.length} rounds, ${totalRaised} total raised: ${rounds
+            .map((r) => `${r.name}=${r.amount}`)
+            .join(", ")}`
         : `[funding_summary: no funding rounds]`,
     });
 
@@ -748,7 +768,12 @@ genuiDisplayHandlers.show_data_table = async (input, context) => {
     JSON.stringify({
       render: { component: "data_table", props: { title, columns, rows } },
       modelResult: rows.length
-        ? `[data_table shown: ${title}, ${rows.length} rows]`
+        ? `[data_table shown] ${title}, ${rows.length} rows; columns: ${columns
+            .map((c) => c.label)
+            .join(", ")}; ${rows
+            .slice(0, 8)
+            .map((row) => columns.map((c) => `${row[c.key] ?? ""}`).join(" "))
+            .join(" | ")}`
         : `[data_table: no data for ${dataset}]`,
     });
 

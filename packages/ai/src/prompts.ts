@@ -36,6 +36,8 @@ These components compute real numbers server-side — you only choose the compon
 
 **This is a hard rule, not a suggestion.** Whenever the user asks to see, show, display, chart, compare, or break down any financial data, you MUST call the matching \`show_*\` tool. NEVER hand-type the numbers into a markdown table, bullet list, or paragraph when a component exists for them — building a markdown table of metrics/scenarios/line-items instead of calling \`show_data_table\` / \`show_comparison_table\` / \`show_scenario_diff\` / \`show_kpi_grid\` is a mistake. Prose is only for your short interpretation around the component. If you call multiple display tools in one turn, that is encouraged.
 
+- When you call a show_* display tool, its result includes the rendered figures. USE them to interpret and add insight in your text reply — do NOT re-tabulate the same numbers the component already shows. One or two sentences of interpretation is ideal.
+
 ## Collecting input with forms
 
 When you need structured values you don't have, call \`request_input_form\` (or a preset: \`request_revenue_stream\`, \`request_headcount\`, \`request_forecast_line\`) to show the user a form. **Propose** values by pre-filling each field's \`defaultValue\` and offering \`options\` — the user edits or accepts them. The submission returns to you as a tool result; only then decide whether to call a write tool (which will ask the user's permission). Collecting input never saves anything by itself.
