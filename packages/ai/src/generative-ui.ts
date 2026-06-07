@@ -320,7 +320,15 @@ export function buildPlanSpec(
 
 // ── Typed-node timeline (spec 2026-06-07 §4.5) ───────────────────────────────
 
-export type TimelineNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input";
+export type TimelineNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input" | "scenario";
+
+/** Rich gate payloads persisted inline on a TimelineNode (Plan 5) so a reloaded
+ *  run reconstructs the plan/diff/input gate WITHOUT the live pending row. Shapes
+ *  mirror the client PendingPlan/PendingPermission/PendingInput so persisted JSON
+ *  renders directly. */
+export interface TimelineGatePlan { pauseId: string; conversationId: string; spec: PlanSpec; resolved?: boolean; }
+export interface TimelineGateInput { pauseId: string; conversationId: string; spec: InputFormSpec; resolved?: boolean; }
+export interface TimelineGatePermission { pauseId: string; conversationId: string; actions: unknown[]; resolved?: boolean; }
 
 /**
  * One node in an assistant turn's worklog. The ordered `TimelineNode[]` is the
@@ -347,4 +355,13 @@ export interface TimelineNode {
   // ── plan / diff_gate / input nodes ── (payload lives on the pending row;
   //    the client hydrates these from the SSE pause events by pauseId)
   pauseId?: string;
+  // ── gate nodes (Plan 5: rich payload persisted for reload) ──
+  plan?: TimelineGatePlan;
+  pending?: TimelineGatePermission;
+  input?: TimelineGateInput;
+  /** Set once a gate has been decided (historical render). */
+  resolved?: boolean;
+  // ── scenario marker node (Plan 5) ──
+  scenarioId?: string;
+  scenarioName?: string;
 }
