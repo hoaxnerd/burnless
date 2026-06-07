@@ -98,6 +98,10 @@ vi.mock("@burnless/db", () => ({
   getOverrideCount: mockGetOverrideCount,
   getPermissionDefaults: vi.fn().mockResolvedValue(null),
   getSessionGrants: vi.fn().mockResolvedValue({}),
+  // Plan 5: stale-pause auto-resolve guard runs on every turn — default to no
+  // active pending action so the existing scenarios stay unaffected.
+  getActivePendingAction: vi.fn().mockResolvedValue(undefined),
+  resolvePendingAction: vi.fn().mockResolvedValue(undefined),
   aiConversations: {
     id: "id",
     companyId: "companyId",
