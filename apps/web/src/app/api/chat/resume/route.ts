@@ -21,6 +21,7 @@ import {
   BUILTIN_PERMISSION_DEFAULTS,
   type ChatMessage,
   type PermissionDefaults,
+  type AiWriteMode,
 } from "@burnless/ai";
 import type { ContentBlock, InputFormSpec, FormField, PlanSpec } from "@burnless/ai"; // already exported from the package index
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -74,8 +75,9 @@ async function resumeStream(args: {
   assistantBlocks: ContentBlock[];
   completedResults: ContentBlock[];
   resumeResults: ContentBlock[];
+  writeMode?: AiWriteMode;
 }): Promise<Response> {
-  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults } = args;
+  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults, writeMode } = args;
 
   const history = await db
     .select()
@@ -124,6 +126,7 @@ async function resumeStream(args: {
     providerConfig,
     defaults,
     sessionGrants,
+    writeMode: writeMode ?? "confirm",
   });
 }
 
@@ -203,6 +206,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       assistantBlocks,
       completedResults,
       resumeResults: [inputResult],
+      writeMode: aiCheck.writeMode ?? "confirm",
     });
   }
 
@@ -228,6 +232,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       assistantBlocks,
       completedResults,
       resumeResults: [planResult],
+      writeMode: aiCheck.writeMode ?? "confirm",
     });
   }
 
@@ -281,5 +286,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     assistantBlocks,
     completedResults,
     resumeResults: pendingResults,
+    writeMode: aiCheck.writeMode ?? "confirm",
   });
 });

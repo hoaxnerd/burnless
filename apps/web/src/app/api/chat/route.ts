@@ -157,6 +157,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     providerConfig,
     defaults,
     sessionGrants,
+    writeMode: aiCheck.writeMode ?? "confirm",
     creditWarning,
   });
 });

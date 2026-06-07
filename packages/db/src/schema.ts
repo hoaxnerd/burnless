@@ -942,7 +942,7 @@ export const aiFeatureFlags = pgTable(
         weeklyDigest: true,
       }),
     // AI write mode — guardrail for AI mutations (full = execute, confirm = ask first, read_only = block)
-    writeMode: aiWriteModeEnum("write_mode").notNull().default("full"),
+    writeMode: aiWriteModeEnum("write_mode").notNull().default("confirm"),
     // Configurable companion name (default: "Companion")
     companionName: text("companion_name").notNull().default("Companion"),
     // BYOK (Bring Your Own Key) — when false, platform LLM is used; when true, company's own provider config is used

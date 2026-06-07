@@ -60,7 +60,7 @@ export async function getAiFlags(
   return {
     masterEnabled: row.masterEnabled,
     dataMode: row.dataMode as AiFeatureFlagsState["dataMode"],
-    writeMode: (row.writeMode ?? "full") as AiWriteMode,
+    writeMode: (row.writeMode ?? "confirm") as AiWriteMode,
     features: row.features as AiFeatureConfig,
     companionName: row.companionName ?? DEFAULT_AI_FLAGS.companionName,
     byokEnabled: row.byokEnabled,

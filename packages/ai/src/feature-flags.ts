@@ -51,7 +51,7 @@ export const DEFAULT_COMPANION_NAME = "Companion";
 export const DEFAULT_AI_FLAGS: AiFeatureFlagsState = {
   masterEnabled: true,
   dataMode: "full",
-  writeMode: "full",
+  writeMode: "confirm",
   companionName: DEFAULT_COMPANION_NAME,
   features: {
     onboarding: true,

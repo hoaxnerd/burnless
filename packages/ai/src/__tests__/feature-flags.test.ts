@@ -13,7 +13,7 @@ describe("resolveFeatureStatus", () => {
   const allOn: AiFeatureFlagsState = {
     masterEnabled: true,
     dataMode: "full",
-    writeMode: "full",
+    writeMode: "confirm",
     companionName: "Assistant",
     features: {
       onboarding: true,
@@ -61,7 +61,7 @@ describe("resolveFeatureStatus", () => {
     const flags: AiFeatureFlagsState = {
       masterEnabled: false,
       dataMode: "full",
-      writeMode: "full",
+      writeMode: "confirm",
       companionName: "Assistant",
       features: { ...allOn.features, chat: true },
     };

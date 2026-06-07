@@ -15,6 +15,7 @@ import {
   type ChatMessage,
   type PermissionDefaults,
   type UiBlock,
+  type AiWriteMode,
 } from "@burnless/ai";
 import { executeToolCall, describeToolAction } from "@/lib/ai-tools";
 
@@ -29,6 +30,9 @@ export interface ChatStreamParams {
   providerConfig: Parameters<typeof chatStream>[0]["providerConfig"];
   defaults: PermissionDefaults;
   sessionGrants: Record<string, boolean>;
+  /** Company AI write mode (spec §4.4). Drives the resolvePermission clamp.
+   *  Optional for back-compat; the agentic surface treats absent as "confirm". */
+  writeMode?: AiWriteMode;
   creditWarning?: string;
 }
 
@@ -67,7 +71,11 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           companionName: params.companionName,
           providerConfig: params.providerConfig,
           resolvePermission: (toolName) =>
-            resolvePermission(toolName, { defaults: params.defaults, sessionGrants: params.sessionGrants }),
+            resolvePermission(toolName, {
+              defaults: params.defaults,
+              sessionGrants: params.sessionGrants,
+              writeMode: params.writeMode ?? "confirm",
+            }),
           onToolCall: async (toolName, input) => {
             const raw = await executeToolCall(toolName, input, {
               companyId: params.companyId,
