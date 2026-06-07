@@ -163,7 +163,7 @@ describe("planScenarioUpdate", () => {
       id,
       "create",
       { id, name: "Created In Scenario", companyId: ctx.company.id },
-      null,
+      undefined,
     );
 
     const plan = await planScenarioUpdate(
@@ -217,7 +217,7 @@ describe("planScenarioDelete", () => {
       id,
       "create",
       { id, name: "Scenario Only", companyId: ctx.company.id },
-      null,
+      undefined,
     );
 
     const plans = await planScenarioDelete(
@@ -251,5 +251,15 @@ describe("planScenarioDelete", () => {
     expect(ids).toEqual([parent.id, child.id].sort());
     expect(plans.every((p) => p.action === "delete")).toBe(true);
     expect(plans[0]!.entityId).toBe(parent.id); // parent precedes children (commit + diff-display order)
+  });
+});
+
+describe("@burnless/db package surface", () => {
+  it("re-exports the plan/commit helpers + ScenarioPlan type", async () => {
+    const mod = await import("../queries");
+    expect(typeof mod.planScenarioInsert).toBe("function");
+    expect(typeof mod.planScenarioUpdate).toBe("function");
+    expect(typeof mod.planScenarioDelete).toBe("function");
+    expect(typeof mod.commitScenarioPlan).toBe("function");
   });
 });

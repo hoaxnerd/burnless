@@ -37,7 +37,12 @@ export {
   scenarioInsert,
   scenarioUpdate,
   scenarioDelete,
+  planScenarioInsert,
+  planScenarioUpdate,
+  planScenarioDelete,
+  commitScenarioPlan,
 } from "./scenario-mutations";
+export type { ScenarioPlan } from "./scenario-mutations";
 
 export { promoteScenario } from "./scenario-promotion";
 
