@@ -100,7 +100,16 @@ export const GET = withErrorHandler(async (request: Request) => {
           }
         : null;
 
-    return NextResponse.json({ conversationId, messages, pendingPermission, pendingInput, pendingPlan });
+    return NextResponse.json({
+      conversationId,
+      messages,
+      pendingPermission,
+      pendingInput,
+      pendingPlan,
+      // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
+      // pause-time; the client prefers this over the per-kind pending fields.
+      pendingTimeline: (pendingRow?.timeline as unknown[] | null) ?? null,
+    });
   }
 
   // List conversations with cursor-based pagination
