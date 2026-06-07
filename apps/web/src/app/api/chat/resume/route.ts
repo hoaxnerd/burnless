@@ -59,6 +59,74 @@ interface PendingActionRecord {
   toolInput: Record<string, unknown>;
 }
 
+/**
+ * Rebuild the resume stream: load full conversation history, append the paused
+ * assistant turn + a single user turn carrying ALL tool_result blocks
+ * (completedResults + this resume's synthesized results), rebuild the scenario
+ * financial context, re-resolve permission defaults / session grants / writeMode,
+ * and hand off to the shared SSE responder. Shared by the input, plan, and
+ * permission resume branches (spec §4.0 — resume is a fresh chatStream).
+ */
+async function resumeStream(args: {
+  ctx: { companyId: string; userId: string };
+  scenario: { id: string; name: string; source: string | null };
+  conversationId: string;
+  assistantBlocks: ContentBlock[];
+  completedResults: ContentBlock[];
+  resumeResults: ContentBlock[];
+}): Promise<Response> {
+  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults } = args;
+
+  const history = await db
+    .select()
+    .from(aiMessages)
+    .where(eq(aiMessages.conversationId, conversationId))
+    .orderBy(asc(aiMessages.createdAt));
+  const messages: ChatMessage[] = history
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  messages.push({ role: "assistant", content: assistantBlocks });
+  messages.push({ role: "user", content: [...completedResults, ...resumeResults] });
+
+  const { contextText: baseContext } = await buildAiContext(ctx.companyId, {
+    id: scenario.id,
+    name: scenario.name,
+    source: scenario.source ?? "blank",
+  });
+  const overrideCount = await getOverrideCount(scenario.id);
+  const financialContext =
+    (overrideCount > 0
+      ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
+      : "") + baseContext;
+
+  const providerConfig = await getCompanyProviderConfig(ctx.companyId);
+  const aiFlags = await getAiFlags(ctx.companyId);
+  const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
+  const defaults: PermissionDefaults = savedDefaults
+    ? {
+        read: savedDefaults.readMode,
+        write: savedDefaults.writeMode,
+        delete: savedDefaults.deleteMode,
+        web_search: savedDefaults.webSearchMode,
+        browser_use: savedDefaults.browserUseMode,
+      }
+    : BUILTIN_PERMISSION_DEFAULTS;
+  const sessionGrants = await getSessionGrants(conversationId);
+
+  return buildChatSSEResponse({
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    scenarioId: scenario.id,
+    conversationId,
+    messages,
+    financialContext,
+    companionName: aiFlags.companionName,
+    providerConfig,
+    defaults,
+    sessionGrants,
+  });
+}
+
 export const POST = withErrorHandler(async (request: Request) => {
   const blocked = await applyRateLimit(request, "chat");
   if (blocked) return blocked;
@@ -128,53 +196,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     };
     await resolvePendingAction(pendingRow.id);
 
-    const inputHistory = await db
-      .select()
-      .from(aiMessages)
-      .where(eq(aiMessages.conversationId, body.conversationId))
-      .orderBy(asc(aiMessages.createdAt));
-    const inputMessages: ChatMessage[] = inputHistory
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-    inputMessages.push({ role: "assistant", content: assistantBlocks });
-    inputMessages.push({ role: "user", content: [...completedResults, inputResult] });
-
-    const { contextText: inputBaseContext } = await buildAiContext(ctx.companyId, {
-      id: scenario.id,
-      name: scenario.name,
-      source: scenario.source ?? "blank",
-    });
-    const inputOverrideCount = await getOverrideCount(scenario.id);
-    const inputContextText =
-      (inputOverrideCount > 0
-        ? `You are working inside scenario "${scenario.name}". ${inputOverrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
-        : "") + inputBaseContext;
-
-    const inputProviderConfig = await getCompanyProviderConfig(ctx.companyId);
-    const inputAiFlags = await getAiFlags(ctx.companyId);
-    const inputSavedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
-    const inputDefaults: PermissionDefaults = inputSavedDefaults
-      ? {
-          read: inputSavedDefaults.readMode,
-          write: inputSavedDefaults.writeMode,
-          delete: inputSavedDefaults.deleteMode,
-          web_search: inputSavedDefaults.webSearchMode,
-          browser_use: inputSavedDefaults.browserUseMode,
-        }
-      : BUILTIN_PERMISSION_DEFAULTS;
-    const inputSessionGrants = await getSessionGrants(body.conversationId);
-
-    return buildChatSSEResponse({
-      companyId: ctx.companyId,
-      userId: ctx.userId,
-      scenarioId: scenario.id,
+    return resumeStream({
+      ctx: { companyId: ctx.companyId, userId: ctx.userId },
+      scenario,
       conversationId: body.conversationId,
-      messages: inputMessages,
-      financialContext: inputContextText,
-      companionName: inputAiFlags.companionName,
-      providerConfig: inputProviderConfig,
-      defaults: inputDefaults,
-      sessionGrants: inputSessionGrants,
+      assistantBlocks,
+      completedResults,
+      resumeResults: [inputResult],
     });
   }
 
@@ -193,53 +221,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     };
     await resolvePendingAction(pendingRow.id);
 
-    const planHistory = await db
-      .select()
-      .from(aiMessages)
-      .where(eq(aiMessages.conversationId, body.conversationId))
-      .orderBy(asc(aiMessages.createdAt));
-    const planMessages: ChatMessage[] = planHistory
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-    planMessages.push({ role: "assistant", content: assistantBlocks });
-    planMessages.push({ role: "user", content: [...completedResults, planResult] });
-
-    const { contextText: planBaseContext } = await buildAiContext(ctx.companyId, {
-      id: scenario.id,
-      name: scenario.name,
-      source: scenario.source ?? "blank",
-    });
-    const planOverrideCount = await getOverrideCount(scenario.id);
-    const planContextText =
-      (planOverrideCount > 0
-        ? `You are working inside scenario "${scenario.name}". ${planOverrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
-        : "") + planBaseContext;
-
-    const planProviderConfig = await getCompanyProviderConfig(ctx.companyId);
-    const planAiFlags = await getAiFlags(ctx.companyId);
-    const planSavedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
-    const planDefaults: PermissionDefaults = planSavedDefaults
-      ? {
-          read: planSavedDefaults.readMode,
-          write: planSavedDefaults.writeMode,
-          delete: planSavedDefaults.deleteMode,
-          web_search: planSavedDefaults.webSearchMode,
-          browser_use: planSavedDefaults.browserUseMode,
-        }
-      : BUILTIN_PERMISSION_DEFAULTS;
-    const planSessionGrants = await getSessionGrants(body.conversationId);
-
-    return buildChatSSEResponse({
-      companyId: ctx.companyId,
-      userId: ctx.userId,
-      scenarioId: scenario.id,
+    return resumeStream({
+      ctx: { companyId: ctx.companyId, userId: ctx.userId },
+      scenario,
       conversationId: body.conversationId,
-      messages: planMessages,
-      financialContext: planContextText,
-      companionName: planAiFlags.companionName,
-      providerConfig: planProviderConfig,
-      defaults: planDefaults,
-      sessionGrants: planSessionGrants,
+      assistantBlocks,
+      completedResults,
+      resumeResults: [planResult],
     });
   }
 
@@ -286,58 +274,12 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   await resolvePendingAction(pendingRow.id);
 
-  // Reconstruct message history: prior text turns + the paused assistant turn +
-  // a single user message carrying ALL tool_result blocks.
-  const history = await db
-    .select()
-    .from(aiMessages)
-    .where(eq(aiMessages.conversationId, body.conversationId))
-    .orderBy(asc(aiMessages.createdAt));
-
-  const messages: ChatMessage[] = history
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-  messages.push({ role: "assistant", content: assistantBlocks });
-  messages.push({ role: "user", content: [...completedResults, ...pendingResults] });
-
-  // Rebuild financial context.
-  const { contextText: baseContextText } = await buildAiContext(ctx.companyId, {
-    id: scenario.id,
-    name: scenario.name,
-    source: scenario.source ?? "blank",
-  });
-  const overrideCount = await getOverrideCount(scenario.id);
-  const contextText =
-    (overrideCount > 0
-      ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
-      : "") + baseContextText;
-
-  const providerConfig = await getCompanyProviderConfig(ctx.companyId);
-  const aiFlags = await getAiFlags(ctx.companyId);
-
-  // Re-resolve defaults + (now possibly updated) grants for any further tool calls.
-  const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
-  const defaults: PermissionDefaults = savedDefaults
-    ? {
-        read: savedDefaults.readMode,
-        write: savedDefaults.writeMode,
-        delete: savedDefaults.deleteMode,
-        web_search: savedDefaults.webSearchMode,
-        browser_use: savedDefaults.browserUseMode,
-      }
-    : BUILTIN_PERMISSION_DEFAULTS;
-  const sessionGrants = await getSessionGrants(body.conversationId);
-
-  return buildChatSSEResponse({
-    companyId: ctx.companyId,
-    userId: ctx.userId,
-    scenarioId: scenario.id,
+  return resumeStream({
+    ctx: { companyId: ctx.companyId, userId: ctx.userId },
+    scenario,
     conversationId: body.conversationId,
-    messages,
-    financialContext: contextText,
-    companionName: aiFlags.companionName,
-    providerConfig,
-    defaults,
-    sessionGrants,
+    assistantBlocks,
+    completedResults,
+    resumeResults: pendingResults,
   });
 });
