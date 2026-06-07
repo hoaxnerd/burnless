@@ -78,7 +78,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     else if (t === "tool_use") patchLast(key, (m) => ({ ...m, toolCalls: [...(m.toolCalls ?? []), ev.tool as string] }));
     else if (t === "tool_status") patchLast(key, (m) => ({ ...m, toolStatus: { tool: ev.tool as string, phase: ev.phase as "running" | "done" | "error" } }));
     else if (t === "permission_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPermission: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, actions: (ev.actions as PendingPermission["actions"]) ?? [] } }));
-    else if (t === "ui_component") patchLast(key, (m) => ({ ...m, uiBlocks: [...(m.uiBlocks ?? []), { id: ev.id as string, component: ev.component as string, props: (ev.props as Record<string, unknown>) ?? {} }] }));
+    else if (t === "ui_component") patchLast(key, (m) => ({ ...m, uiBlocks: [...(m.uiBlocks ?? []), { id: ev.id as string, component: ev.component as string, props: (ev.props as Record<string, unknown>) ?? {}, confidence: ev.confidence as "high" | "low" | undefined, rationale: ev.rationale as string | undefined }] }));
     else if (t === "input_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingInput: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } }));
     else if (t === "plan_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPlan: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.plan as PendingPlan["spec"] } }));
     else if (t === "paused") write(key, (s) => ({ ...s, isLoading: false }));
