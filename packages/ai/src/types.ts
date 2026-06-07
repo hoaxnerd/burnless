@@ -220,6 +220,11 @@ export interface StreamChunk {
   spec?: InputFormSpec;
   /** For plan_request: the proposed plan to review. */
   plan?: PlanSpec;
+  /** Binary model confidence on a result node (spec §4.3); P4 timeline result nodes
+   *  consume this. Optional plumbing — populated by the Plan 5 prompt convention. */
+  confidence?: "high" | "low";
+  /** One-line "because you said X" rationale on a result node (spec §4.3). */
+  rationale?: string;
 }
 
 // ── Tool definitions ────────────────────────────────────────────────────────

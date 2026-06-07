@@ -45,6 +45,23 @@ export interface UiBlock {
   id: string;
   component: string;
   props: Record<string, unknown>;
+  /** Binary model confidence in this result (spec §4.3); populated in Plan 5. */
+  confidence?: "high" | "low";
+  /** One-line "because you said X" rationale (spec §4.3); populated in Plan 5. */
+  rationale?: string;
+}
+
+/**
+ * The envelope a display tool's handler returns (spec §4.3). `render` carries the
+ * component + props to display; `modelResult` is the terse string handed back to
+ * the model. `confidence`/`rationale` are optional binary-confidence plumbing
+ * (the model populates them via the Plan 5 prompt convention).
+ */
+export interface GenuiResultEnvelope {
+  render?: { component: string; props: Record<string, unknown> };
+  modelResult?: string;
+  confidence?: "high" | "low";
+  rationale?: string;
 }
 
 /** Persisted state for a turn paused awaiting form input (mirrors PauseState). */
