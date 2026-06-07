@@ -93,6 +93,7 @@ export {
   createPendingAction,
   getActivePendingAction,
   resolvePendingAction,
+  updatePendingActionTimeline,
 } from "./ai-permissions";
 export type {
   PermissionModeValue,
