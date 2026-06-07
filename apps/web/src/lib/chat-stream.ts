@@ -15,6 +15,7 @@ import {
   type ChatMessage,
   type PermissionDefaults,
   type UiBlock,
+  type TimelineNode,
   type AiWriteMode,
 } from "@burnless/ai";
 import { executeToolCall, describeToolAction } from "@/lib/ai-tools";
@@ -68,6 +69,19 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // tool_use requestId, so the permission_request SSE case can attach them.
       const pendingOverrides = new Map<string, unknown[]>();
 
+      // Ordered worklog nodes (spec §4.5), persisted to metadata.timeline on done.
+      const timeline: TimelineNode[] = [];
+      const findNode = (id: string) => timeline.find((n) => n.id === id);
+      // Append/extend the trailing text-result node for streamed prose.
+      const appendText = (content: string) => {
+        const last = timeline[timeline.length - 1];
+        if (last && last.kind === "result" && last.block === undefined) {
+          last.text = (last.text ?? "") + content;
+        } else {
+          timeline.push({ id: `text-${timeline.length}`, kind: "result", text: content });
+        }
+      };
+
       try {
         const chunks = chatStream({
           messages: params.messages,
@@ -114,6 +128,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                   if (parsed.confidence === "high" || parsed.confidence === "low") block.confidence = parsed.confidence;
                   if (typeof parsed.rationale === "string") block.rationale = parsed.rationale;
                   uiBlocks.push(block);
+                  timeline.push({ id, kind: "result", block, confidence: block.confidence, rationale: block.rationale });
                   send(controller, {
                     type: "ui_component",
                     id,
@@ -206,6 +221,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             case "text":
               if (chunk.content) {
                 fullResponse += chunk.content;
+                appendText(chunk.content);
                 send(controller, { type: "text", content: chunk.content });
               }
               break;
@@ -213,11 +229,15 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               if (chunk.content) send(controller, { type: "thinking", content: chunk.content });
               break;
             case "tool_use":
-              send(controller, { type: "tool_use", tool: chunk.toolName });
+              if (chunk.nodeId) timeline.push({ id: chunk.nodeId, kind: "tool", toolName: chunk.toolName, phase: "pending" });
+              send(controller, { type: "tool_use", tool: chunk.toolName, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
               break;
-            case "tool_status":
-              send(controller, { type: "tool_status", tool: chunk.toolName, phase: chunk.phase });
+            case "tool_status": {
+              const n = chunk.nodeId ? findNode(chunk.nodeId) : undefined;
+              if (n) n.phase = chunk.phase;
+              send(controller, { type: "tool_status", tool: chunk.toolName, phase: chunk.phase, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
               break;
+            }
             case "tool_result": {
               let parsed: unknown = null;
               try {
@@ -225,10 +245,11 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               } catch {
                 /* non-JSON, skip */
               }
-              send(controller, { type: "tool_result", tool: chunk.toolName, data: parsed });
+              send(controller, { type: "tool_result", tool: chunk.toolName, data: parsed, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
               break;
             }
             case "permission_request":
+              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "diff_gate", pauseId: chunk.pauseId });
               send(controller, {
                 type: "permission_request",
                 pauseId: chunk.pauseId,
@@ -245,6 +266,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               });
               break;
             case "input_request":
+              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "input", pauseId: chunk.pauseId });
               send(controller, {
                 type: "input_request",
                 pauseId: chunk.pauseId,
@@ -253,6 +275,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               });
               break;
             case "plan_request":
+              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "plan", pauseId: chunk.pauseId });
               send(controller, {
                 type: "plan_request",
                 pauseId: chunk.pauseId,
@@ -265,14 +288,15 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               break;
             case "done": {
               const clean = fullResponse.replace(THINK_TAG, "").trim();
-              // Persist when there is text OR rendered display blocks; a
-              // display-only turn carries the uiBlocks so reload re-renders (spec §6/§8).
-              if (clean || uiBlocks.length > 0) {
+              // Persist when there is text OR rendered display blocks OR worklog nodes;
+              // a display-only or worklog turn carries metadata so reload re-renders
+              // (spec §6/§8 uiBlocks + §4.5 timeline).
+              if (clean || uiBlocks.length > 0 || timeline.length > 0) {
                 await db.insert(aiMessages).values({
                   conversationId: params.conversationId,
                   role: "assistant",
                   content: clean,
-                  metadata: uiBlocks.length > 0 ? { uiBlocks } : null,
+                  metadata: (uiBlocks.length > 0 || timeline.length > 0) ? { uiBlocks, timeline } : null,
                 });
                 await db
                   .update(aiConversations)
