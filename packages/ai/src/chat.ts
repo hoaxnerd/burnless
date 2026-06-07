@@ -38,7 +38,7 @@ interface ChatOptions {
   financialContext: string;
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** Decide whether a tool may run without prompting. Default: everything "allow". */
-  resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask";
+  resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask" | "deny";
   /** Persist a paused turn; returns a pauseId echoed in the permission_request/paused chunks. */
   onPause?: (state: PauseState) => Promise<string>;
   /** Persist a turn paused to collect form input; returns a pauseId echoed in the input_request/paused chunks. */
@@ -218,6 +218,17 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
         const decision = options.resolvePermission
           ? options.resolvePermission(toolUse.name, toolUse.input)
           : "allow";
+
+        if (decision === "deny") {
+          // read_only write-mode clamp: refuse without executing (spec §4.4).
+          const declined = JSON.stringify({
+            declined: true,
+            message: "This action is blocked: the AI is in read-only mode. Change the write mode in AI settings to allow data changes.",
+          });
+          yield { type: "tool_result", toolName: toolUse.name, toolResult: declined };
+          completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: declined });
+          continue;
+        }
 
         if (decision === "ask") {
           pending.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
