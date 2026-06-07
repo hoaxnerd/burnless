@@ -179,15 +179,19 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         const err = await res.json().catch(() => ({}));
         if (err?.code === "SCENARIO_CHANGED") {
           // Roll back the optimistic "resolved" so the gate stays actionable, and
-          // tell the user the active scenario drifted (decision 4).
+          // surface the drift as a VISIBLE worklog node (the timeline is the render
+          // source — appending to `content` alone would be invisible). (decision 4)
+          const note = `The active scenario changed${err.details?.activeScenarioName ? ` (now "${err.details.activeScenarioName}")` : ""}. Switch back to the scenario this action was proposed in to apply it, or cancel it.`;
           patchLast(key, (m) => ({
             ...m,
             isStreaming: false,
             pendingPermission: m.pendingPermission ? { ...m.pendingPermission, resolved: false } : null,
-            timeline: (m.timeline ?? []).map((n) =>
-              n.id === pending.pauseId && n.pending ? { ...n, pending: { ...n.pending, resolved: false } } : n,
-            ),
-            content: m.content + `\n\n*The active scenario changed${err.details?.activeScenarioName ? ` (now "${err.details.activeScenarioName}")` : ""}. Switch back to the scenario this action was proposed in to apply it, or cancel.*`,
+            timeline: [
+              ...(m.timeline ?? []).map((n) =>
+                n.id === pending.pauseId && n.pending ? { ...n, pending: { ...n.pending, resolved: false } } : n,
+              ),
+              { id: `scenario-changed-${pending.pauseId}`, kind: "result" as const, text: `⚠️ ${note}` },
+            ],
           }));
           return;
         }

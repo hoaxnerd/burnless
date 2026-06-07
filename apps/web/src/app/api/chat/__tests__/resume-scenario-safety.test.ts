@@ -84,7 +84,9 @@ function reqWith(headers: Record<string, string>, body: Record<string, unknown>)
 async function seedPermissionPause(opts: {
   activeName: string;
   activeAiConversationId?: string | null;
+  toolName?: string;
 }) {
+  const toolName = opts.toolName ?? "create_revenue_stream";
   const user = await createUser();
   const company = await createCompany(user.id);
   hoisted.userId = user.id;
@@ -119,10 +121,10 @@ async function seedPermissionPause(opts: {
     pauseId,
     scenarioId: baseScenario.id,
     assistantBlocks: [
-      { type: "tool_use", id: requestId, name: "create_revenue_stream", input: {} },
+      { type: "tool_use", id: requestId, name: toolName, input: {} },
     ],
     completedResults: [],
-    pending: [{ requestId, toolName: "create_revenue_stream", toolInput: {} }],
+    pending: [{ requestId, toolName, toolInput: {} }],
   });
 
   return { conversationId, pauseId, requestId, baseScenario, activeScenario };
@@ -168,6 +170,52 @@ describe("resume scenario safety (Plan 5)", () => {
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.code).toBe("SCENARIO_CHANGED");
+  });
+
+  it("does NOT 409 when the changed-scenario turn only commits a NON-overlay write (create_scenario)", async () => {
+    // create_scenario writes a company-scoped row, not the active overlay, so a
+    // mid-turn scenario switch doesn't endanger it — decision-4 must not fire.
+    const seeded = await seedPermissionPause({
+      activeName: "Other",
+      activeAiConversationId: null,
+      toolName: "create_scenario",
+    });
+    const { POST } = await import("../resume/route");
+    const res = await POST(
+      reqWith(
+        {
+          "X-Scenario-Id": seeded.activeScenario.id,
+          Cookie: `active-scenario-id=${seeded.activeScenario.id}`,
+        },
+        {
+          conversationId: seeded.conversationId,
+          pauseId: seeded.pauseId,
+          decisions: [{ requestId: seeded.requestId, decision: "once" }],
+        }
+      )
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("does NOT 409 when the only decision on the changed-scenario turn is Deny", async () => {
+    // A declined action never commits, so Deny/Cancel must always pass through even
+    // if the active scenario drifted.
+    const seeded = await seedPermissionPause({ activeName: "Other", activeAiConversationId: null });
+    const { POST } = await import("../resume/route");
+    const res = await POST(
+      reqWith(
+        {
+          "X-Scenario-Id": seeded.activeScenario.id,
+          Cookie: `active-scenario-id=${seeded.activeScenario.id}`,
+        },
+        {
+          conversationId: seeded.conversationId,
+          pauseId: seeded.pauseId,
+          decisions: [{ requestId: seeded.requestId, decision: "deny" }],
+        }
+      )
+    );
+    expect(res.status).toBe(200);
   });
 
   it("tolerates a mismatch when the active scenario was created by this conversation", async () => {

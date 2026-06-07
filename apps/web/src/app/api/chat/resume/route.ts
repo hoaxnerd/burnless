@@ -277,34 +277,44 @@ export const POST = withErrorHandler(async (request: Request) => {
   const decisionMap = new Map(body.decisions.map((d) => [d.requestId, d.decision]));
 
   // Decision 4 (spec §6): re-confirm the user is still in the scenario this turn
-  // paused in before committing. effectiveActive = the header value, or the default
-  // scenario when in base view. Tolerate a mismatch only when the active scenario
-  // was created by THIS conversation (the AI activated its own new scenario — not a
-  // user switch). Otherwise surface a "scenario changed" prompt instead of silently
-  // committing to the old overlay.
-  // Only run decision-4 when the client asserts an ACTIVE scenario via the header.
-  // With no header the client is in true base view (no scenario channel) and is not
-  // signalling a switch — the resume still targets the persisted overlay (§5), so
-  // there is nothing to re-confirm. (Resolving the default and comparing here would
-  // false-positive a base-view resume of a turn paused inside a non-default scenario.)
-  if (headerScenarioId) {
-    const effectiveActiveId = headerScenarioId;
-    if (effectiveActiveId !== pendingRow.scenarioId) {
-      const [activeScn] = await db
-        .select({ aiConversationId: scenariosTable.aiConversationId, name: scenariosTable.name })
-        .from(scenariosTable)
-        .where(and(eq(scenariosTable.id, effectiveActiveId), eq(scenariosTable.companyId, ctx.companyId)));
-      const tolerated = activeScn?.aiConversationId === body.conversationId;
-      if (!tolerated) {
-        return NextResponse.json(
-          {
-            error: "The active scenario changed since this action was proposed.",
-            code: "SCENARIO_CHANGED",
-            details: { pendingScenarioId: pendingRow.scenarioId, activeScenarioId: effectiveActiveId, activeScenarioName: activeScn?.name ?? null },
-          },
-          { status: 409 },
-        );
-      }
+  // paused in before committing an OVERLAY write. Tolerate a mismatch only when the
+  // active scenario was created by THIS conversation (the AI activated its own new
+  // scenario — not a user switch). Otherwise surface a "scenario changed" prompt
+  // instead of silently committing to the old overlay.
+  //
+  // Gate ONLY when the user asserts an active scenario via the header AND at least one
+  // APPROVED action actually writes that scenario's overlay. Rationale:
+  //   - No header → true base view (no scenario channel) → not signalling a switch;
+  //     the resume still targets the persisted overlay (§5), nothing to re-confirm.
+  //   - Non-overlay mutations (create/update/delete_scenario, funding-investor) write
+  //     company-scoped tables, NOT the overlay, so a mid-turn scenario switch doesn't
+  //     endanger them — gating them false-positives (e.g. the AI activates an existing
+  //     scenario then creates a NEW one in the same turn).
+  //   - A declined action never commits, so Deny/Cancel must always pass through.
+  const NON_OVERLAY_MUTATIONS = new Set<string>([
+    "create_scenario", "update_scenario", "delete_scenario", "create_funding_round_investor",
+  ]);
+  const hasApprovedOverlayWrite = pending.some((a) => {
+    const d = decisionMap.get(a.requestId) ?? "deny";
+    if (d === "deny") return false;
+    const cat = categorizeToolName(a.toolName);
+    return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
+  });
+  if (headerScenarioId && hasApprovedOverlayWrite && headerScenarioId !== pendingRow.scenarioId) {
+    const [activeScn] = await db
+      .select({ aiConversationId: scenariosTable.aiConversationId, name: scenariosTable.name })
+      .from(scenariosTable)
+      .where(and(eq(scenariosTable.id, headerScenarioId), eq(scenariosTable.companyId, ctx.companyId)));
+    const tolerated = activeScn?.aiConversationId === body.conversationId;
+    if (!tolerated) {
+      return NextResponse.json(
+        {
+          error: "The active scenario changed since this action was proposed.",
+          code: "SCENARIO_CHANGED",
+          details: { pendingScenarioId: pendingRow.scenarioId, activeScenarioId: headerScenarioId, activeScenarioName: activeScn?.name ?? null },
+        },
+        { status: 409 },
+      );
     }
   }
 
