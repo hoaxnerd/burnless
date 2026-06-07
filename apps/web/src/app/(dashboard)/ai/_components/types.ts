@@ -82,7 +82,7 @@ export interface UiBlockClient {
   rationale?: string;
 }
 
-export type TimelineNodeKindClient = "plan" | "tool" | "diff_gate" | "result" | "input";
+export type TimelineNodeKindClient = "plan" | "tool" | "diff_gate" | "result" | "input" | "scenario";
 
 /** One worklog node on the client (mirrors @burnless/ai TimelineNode). The pause
  *  nodes (plan/diff_gate/input) hold their full payload inline once the SSE pause
@@ -104,6 +104,9 @@ export interface TimelineNodeClient {
   input?: PendingInput;         // input
   /** Set once a pause node's gate has been decided. */
   resolved?: boolean;
+  // scenario marker (Plan 5)
+  scenarioId?: string;
+  scenarioName?: string;
 }
 
 export interface PendingInputField {
