@@ -185,6 +185,81 @@ export async function planScenarioUpdate(
 }
 
 /**
+ * Pure planning counterpart of scenarioDelete: compute the delete delta(s)
+ * WITHOUT writing. A scenario-created entity yields one `remove_override` plan;
+ * a base entity yields one `delete` plan. Department deletes cascade to child
+ * departments (one delete plan each), mirroring scenarioDelete's cascade.
+ */
+export async function planScenarioDelete(
+  entityType: string,
+  table: any,
+  entityId: string,
+  scenarioId: string,
+  companyId: string,
+): Promise<ScenarioPlan[]> {
+  if (!scenarioId) throw new Error("planScenarioDelete requires an active scenario");
+  await assertScenarioOwned(scenarioId, companyId);
+
+  const existing = await db
+    .select()
+    .from(scenarioOverrides)
+    .where(
+      and(
+        eq(scenarioOverrides.scenarioId, scenarioId),
+        eq(scenarioOverrides.entityType, entityType),
+        eq(scenarioOverrides.entityId, entityId),
+      ),
+    )
+    .then((r) => r[0]);
+
+  // Deleting a scenario-created entity → drop the override row (no base to hide).
+  // Mirrors scenarioDelete: this case does NOT cascade.
+  if (existing?.action === "create") {
+    return [
+      {
+        action: "remove_override",
+        entityType,
+        entityId,
+        before: (existing.data as Record<string, unknown> | null) ?? null,
+        after: null,
+      },
+    ];
+  }
+
+  const [baseEntity] = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
+  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
+  validateOverridable(entityType, baseEntity);
+
+  const plans: ScenarioPlan[] = [
+    {
+      action: "delete",
+      entityType,
+      entityId,
+      before: baseEntity as Record<string, unknown>,
+      after: null,
+    },
+  ];
+
+  // Cascade: deleting a department hides its child departments too.
+  if (entityType === "department") {
+    const children = await db
+      .select()
+      .from(departments)
+      .where(eq(departments.parentId, entityId));
+    for (const child of children) {
+      plans.push(
+        ...(await planScenarioDelete("department", departments, child.id, scenarioId, companyId)),
+      );
+    }
+  }
+
+  return plans;
+}
+
+/**
  * Insert a new entity, routing to scenario overrides when a scenario is active.
  *
  * - No scenario (null): inserts directly into the base table.
@@ -278,55 +353,9 @@ export async function scenarioDelete(
     return deleted.length > 0;
   }
 
-  await assertScenarioOwned(scenarioId, companyId);
-
-  // Check if this is a scenario-created entity
-  const existing = await db
-    .select()
-    .from(scenarioOverrides)
-    .where(
-      and(
-        eq(scenarioOverrides.scenarioId, scenarioId),
-        eq(scenarioOverrides.entityType, entityType),
-        eq(scenarioOverrides.entityId, entityId),
-      ),
-    )
-    .then((r) => r[0]);
-
-  if (existing?.action === "create") {
-    // Deleting a scenario-created entity -- just remove the override
-    await db
-      .delete(scenarioOverrides)
-      .where(eq(scenarioOverrides.id, existing.id));
-    return true;
+  const plans = await planScenarioDelete(entityType, table, entityId, scenarioId, companyId);
+  for (const plan of plans) {
+    await commitScenarioPlan(scenarioId, plan);
   }
-
-  // Hiding a base entity (company-scoped: never snapshot another tenant's row)
-  const [baseEntity] = await db
-    .select()
-    .from(table)
-    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
-  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
-  validateOverridable(entityType, baseEntity);
-  await upsertOverride(
-    scenarioId,
-    entityType,
-    entityId,
-    "delete",
-    null,
-    baseEntity as Record<string, unknown>,
-  );
-
-  // Cascade: if deleting a department, create delete overrides for children
-  if (entityType === "department") {
-    const children = await db
-      .select()
-      .from(departments)
-      .where(eq(departments.parentId, entityId));
-    for (const child of children) {
-      await scenarioDelete("department", departments, child.id, scenarioId, companyId);
-    }
-  }
-
   return true;
 }

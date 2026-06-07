@@ -10,12 +10,13 @@ vi.mock("../index", () => ({
 import {
   planScenarioInsert,
   planScenarioUpdate,
+  planScenarioDelete,
   commitScenarioPlan,
   type ScenarioPlan,
 } from "../queries/scenario-mutations";
 import { getOverridesForScenario } from "../queries/scenario-overrides";
-import { createCompanyContext, createRevenueStream, createScenarioOverride, createFundingRound } from "./factories";
-import { revenueStreams } from "../schema";
+import { createCompanyContext, createRevenueStream, createScenarioOverride, createFundingRound, createDepartment } from "./factories";
+import { revenueStreams, departments } from "../schema";
 
 describe("planScenarioInsert", () => {
   it("returns a create delta WITHOUT writing an override", async () => {
@@ -177,5 +178,78 @@ describe("planScenarioUpdate", () => {
     expect(plan.action).toBe("create"); // preserved, not downgraded to "modify"
     expect(plan.before).toBeNull();      // create override has null originalData
     expect((plan.after as { name: string }).name).toBe("Edited Again");
+  });
+});
+
+describe("planScenarioDelete", () => {
+  it("base entity → single delete delta (before=base, after=null), no write", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "plan-delete@test.burnless.app" },
+      company: { name: "Plan Delete Co" },
+    });
+    const base = await createRevenueStream(ctx.company.id, { name: "Doomed" });
+
+    const plans = await planScenarioDelete(
+      "revenue_stream",
+      revenueStreams,
+      base.id,
+      ctx.scenario.id,
+      ctx.company.id,
+    );
+
+    expect(plans).toHaveLength(1);
+    expect(plans[0]!.action).toBe("delete");
+    expect(plans[0]!.after).toBeNull();
+    expect((plans[0]!.before as { name: string }).name).toBe("Doomed");
+    const overrides = await getOverridesForScenario(ctx.scenario.id, "revenue_stream");
+    expect(overrides).toHaveLength(0);
+  });
+
+  it("scenario-created entity → remove_override delta", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "plan-delete-created@test.burnless.app" },
+      company: { name: "Plan Delete Created Co" },
+    });
+    const id = crypto.randomUUID();
+    await createScenarioOverride(
+      ctx.scenario.id,
+      "revenue_stream",
+      id,
+      "create",
+      { id, name: "Scenario Only", companyId: ctx.company.id },
+      null,
+    );
+
+    const plans = await planScenarioDelete(
+      "revenue_stream",
+      revenueStreams,
+      id,
+      ctx.scenario.id,
+      ctx.company.id,
+    );
+    expect(plans).toHaveLength(1);
+    expect(plans[0]!.action).toBe("remove_override");
+    expect(plans[0]!.entityId).toBe(id);
+  });
+
+  it("department cascade → parent + child delete deltas", async () => {
+    const ctx = await createCompanyContext({
+      user: { email: "plan-delete-dept@test.burnless.app" },
+      company: { name: "Plan Delete Dept Co" },
+    });
+    const parent = await createDepartment(ctx.company.id, { name: "Parent" });
+    const child = await createDepartment(ctx.company.id, { name: "Child", parentId: parent.id });
+
+    const plans = await planScenarioDelete(
+      "department",
+      departments,
+      parent.id,
+      ctx.scenario.id,
+      ctx.company.id,
+    );
+    const ids = plans.map((p) => p.entityId).sort();
+    expect(ids).toEqual([parent.id, child.id].sort());
+    expect(plans.every((p) => p.action === "delete")).toBe(true);
+    expect(plans[0]!.entityId).toBe(parent.id); // parent precedes children (commit + diff-display order)
   });
 });
