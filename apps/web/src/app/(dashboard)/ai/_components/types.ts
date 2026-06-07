@@ -15,6 +15,9 @@ export interface Message {
   pendingInput?: PendingInput | null;
   /** A plan-approval request paused on this message (worklog). */
   pendingPlan?: PendingPlan | null;
+  /** Ordered worklog nodes for an assistant turn (worklog Plan 4). When present,
+   *  the timeline is the render source; the legacy bubble fields are a fallback. */
+  timeline?: TimelineNodeClient[];
 }
 
 export interface Insight {
@@ -77,6 +80,30 @@ export interface UiBlockClient {
   /** Binary confidence + rationale (spec §4.3); absent until Plan 5's prompt. */
   confidence?: "high" | "low";
   rationale?: string;
+}
+
+export type TimelineNodeKindClient = "plan" | "tool" | "diff_gate" | "result" | "input";
+
+/** One worklog node on the client (mirrors @burnless/ai TimelineNode). The pause
+ *  nodes (plan/diff_gate/input) hold their full payload inline once the SSE pause
+ *  event hydrates them — they are not just markers on the client. */
+export interface TimelineNodeClient {
+  id: string;
+  kind: TimelineNodeKindClient;
+  // tool
+  toolName?: string;
+  phase?: "pending" | "running" | "done" | "error";
+  // result
+  text?: string;
+  block?: UiBlockClient;
+  confidence?: "high" | "low";
+  rationale?: string;
+  // pause payloads (hydrated from the SSE pause event)
+  pending?: PendingPermission;  // diff_gate
+  plan?: PendingPlan;           // plan
+  input?: PendingInput;         // input
+  /** Set once a pause node's gate has been decided. */
+  resolved?: boolean;
 }
 
 export interface PendingInputField {
