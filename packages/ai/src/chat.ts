@@ -187,7 +187,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       } else if (event.type === "thinking_delta") {
         yield { type: "thinking", content: event.text };
       } else if (event.type === "tool_use") {
-        yield { type: "tool_use", toolName: event.name, toolInput: event.input };
+        yield { type: "tool_use", toolName: event.name, toolInput: event.input, nodeId: event.id, nodeKind: "tool" };
       } else if (event.type === "done") {
         lastResponse = event.response;
       }
@@ -225,7 +225,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
             declined: true,
             message: "This action is blocked: the AI is in read-only mode. Change the write mode in AI settings to allow data changes.",
           });
-          yield { type: "tool_result", toolName: toolUse.name, toolResult: declined };
+          yield { type: "tool_result", toolName: toolUse.name, toolResult: declined, nodeId: toolUse.id, nodeKind: "tool" };
           completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: declined });
           continue;
         }
@@ -237,16 +237,16 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
 
         // Auto-allowed → execute now, with live status.
         ranTool = true;
-        yield { type: "tool_status", toolName: toolUse.name, phase: "running" };
+        yield { type: "tool_status", toolName: toolUse.name, phase: "running", nodeId: toolUse.id, nodeKind: "tool" };
         let result: string;
         try {
           result = await options.onToolCall(toolUse.name, toolUse.input);
-          yield { type: "tool_status", toolName: toolUse.name, phase: "done" };
+          yield { type: "tool_status", toolName: toolUse.name, phase: "done", nodeId: toolUse.id, nodeKind: "tool" };
         } catch (err) {
           result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
-          yield { type: "tool_status", toolName: toolUse.name, phase: "error" };
+          yield { type: "tool_status", toolName: toolUse.name, phase: "error", nodeId: toolUse.id, nodeKind: "tool" };
         }
-        yield { type: "tool_result", toolName: toolUse.name, toolResult: result };
+        yield { type: "tool_result", toolName: toolUse.name, toolResult: result, nodeId: toolUse.id, nodeKind: "tool" };
         completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: result });
       }
 
