@@ -278,7 +278,10 @@ export async function scenarioInsert(
   }
   const plan = await planScenarioInsert(entityType, table, data, scenarioId, companyId);
   await commitScenarioPlan(scenarioId, plan);
-  return plan.after;
+  // plan.after is always the inserted entity (never null for create); narrow away
+  // the null that ScenarioPlan.after carries for delete plans, preserving the
+  // pre-refactor non-null return contract.
+  return plan.after as Record<string, unknown>;
 }
 
 /**
@@ -312,7 +315,9 @@ export async function scenarioUpdate(
   }
   const plan = await planScenarioUpdate(entityType, table, entityId, changes, scenarioId, companyId);
   await commitScenarioPlan(scenarioId, plan);
-  return plan.after;
+  // plan.after is always the merged entity (never null for create/modify);
+  // narrow away the null ScenarioPlan.after carries for delete plans.
+  return plan.after as Record<string, unknown>;
 }
 
 /**
