@@ -8,7 +8,7 @@ const WEB_TOOLS = new Set(["search_web", "read_webpage", "read_webpage_rendered"
 // View-control tools (read-only, not gated) are an intentional family — they
 // change the user's UI view (e.g. active scenario) without mutating data, so
 // they do not fit the CRUD verb prefixes. Allowlisted like WEB_TOOLS.
-const CONTROL_TOOLS = new Set(["activate_scenario"]);
+const CONTROL_TOOLS = new Set(["activate_scenario", "list_scenarios"]);
 
 describe("tool naming convention", () => {
   const tools = getFinancialTools();

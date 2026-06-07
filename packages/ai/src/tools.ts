@@ -75,6 +75,12 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "list_scenarios",
+    description:
+      "List the company's existing scenarios, each with a short diff headline (how many overrides it has, by entity type + action) so you can SEE what what-ifs already exist and what each one changes. ALWAYS call this before create_scenario to avoid creating a duplicate of a scenario that already exists — if a matching one exists, activate_scenario it instead. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "create_forecast_line",
     description:
       "Create a forecast line — a monthly projection rule for ANY account (revenue, COGS, operating expense, other income/expense). NOT an actual transaction; it defines how the account's amount evolves over time. For subscription/usage/services revenue prefer create_revenue_stream instead. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
