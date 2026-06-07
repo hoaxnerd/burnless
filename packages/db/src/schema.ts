@@ -1122,6 +1122,12 @@ export const aiPendingActions = pgTable(
     completedResults: jsonb("completed_results").notNull().default([]),
     /** Actions awaiting a user decision: [{ requestId, tool, category, ... }]. */
     pending: jsonb("pending").notNull(),
+    /**
+     * Worklog timeline accumulated before this pause (Plan 5 full-run persistence).
+     * Mirrors @burnless/ai's TimelineNode shape; typed `unknown[]` to avoid a
+     * cross-package schema import.
+     */
+    timeline: jsonb("timeline").$type<unknown[]>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at", { mode: "date" }),
   },
