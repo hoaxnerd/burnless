@@ -6,7 +6,7 @@
 import type { MonthlySeries, ComputedMetrics, ProfitAndLoss, CashFlowStatement } from "@burnless/engine";
 import type { Company, Scenario, Account, FundingRound } from "@burnless/types";
 import type { ContentBlock } from "./providers/types";
-import type { InputFormSpec, PlanSpec } from "./generative-ui";
+import type { InputFormSpec, PlanSpec, TimelineNodeKind } from "./generative-ui";
 
 // ── Financial context passed to the AI ──────────────────────────────────────
 
@@ -225,6 +225,10 @@ export interface StreamChunk {
   confidence?: "high" | "low";
   /** One-line "because you said X" rationale on a result node (spec §4.3). */
   rationale?: string;
+  /** Stable node id correlating tool_status/tool_result→the tool node (spec §4.5). */
+  nodeId?: string;
+  /** Which timeline node kind this chunk maps to (spec §4.5). */
+  nodeKind?: TimelineNodeKind;
 }
 
 // ── Tool definitions ────────────────────────────────────────────────────────

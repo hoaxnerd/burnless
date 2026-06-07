@@ -317,3 +317,34 @@ export function buildPlanSpec(
     steps,
   };
 }
+
+// ── Typed-node timeline (spec 2026-06-07 §4.5) ───────────────────────────────
+
+export type TimelineNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input";
+
+/**
+ * One node in an assistant turn's worklog. The ordered `TimelineNode[]` is the
+ * presentation model for the agentic timeline — accumulated from StreamChunks on
+ * the client and persisted to aiMessages.metadata.timeline so reload reconstructs
+ * the full run. `plan`/`diff_gate`/`input` carry their pause payload by reference
+ * (pauseId) so the existing pause/resume machinery is unchanged; `tool` tracks a
+ * live tool invocation; `result` is a rendered output (text and/or a UiBlock).
+ */
+export interface TimelineNode {
+  /** Stable id correlating status→result. tool nodes use the tool_use id. */
+  id: string;
+  kind: TimelineNodeKind;
+  // ── tool node ──
+  toolName?: string;
+  phase?: "pending" | "running" | "done" | "error";
+  // ── result node ──
+  /** Streamed assistant prose for a text result node. */
+  text?: string;
+  /** A rendered genui block for a component result node. */
+  block?: UiBlock;
+  confidence?: "high" | "low";
+  rationale?: string;
+  // ── plan / diff_gate / input nodes ── (payload lives on the pending row;
+  //    the client hydrates these from the SSE pause events by pauseId)
+  pauseId?: string;
+}
