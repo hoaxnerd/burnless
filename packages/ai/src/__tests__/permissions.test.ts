@@ -4,6 +4,7 @@ import {
   categorizeToolName,
   BUILTIN_PERMISSION_DEFAULTS,
   type PermissionDefaults,
+  type ResolvePermissionContext,
 } from "../permissions";
 
 const def = (over: Partial<PermissionDefaults> = {}): PermissionDefaults => ({
@@ -65,5 +66,41 @@ describe("resolvePermission", () => {
     expect(
       resolvePermission("delete_scenario", { defaults: def(), sessionGrants: { delete: true } })
     ).toBe("allow");
+  });
+});
+
+const writeModeBase: ResolvePermissionContext = {
+  defaults: { read: "always", write: "always", delete: "ask", web_search: "always", browser_use: "ask" },
+  sessionGrants: { write: true, delete: true },
+};
+
+describe("writeMode clamp (spec §4.4)", () => {
+  it("confirm forces a write to ask, overriding an 'always' default AND a session grant", () => {
+    expect(resolvePermission("create_revenue_stream", { ...writeModeBase, writeMode: "confirm" })).toBe("ask");
+  });
+
+  it("confirm forces a delete to ask, overriding the session grant", () => {
+    expect(resolvePermission("delete_revenue_stream", { ...writeModeBase, writeMode: "confirm" })).toBe("ask");
+  });
+
+  it("read_only denies writes and deletes (never executes)", () => {
+    expect(resolvePermission("create_revenue_stream", { ...writeModeBase, writeMode: "read_only" })).toBe("deny");
+    expect(resolvePermission("delete_revenue_stream", { ...writeModeBase, writeMode: "read_only" })).toBe("deny");
+  });
+
+  it("read_only still allows reads", () => {
+    expect(resolvePermission("get_metrics", { ...writeModeBase, writeMode: "read_only" })).toBe("allow");
+  });
+
+  it("full preserves today's per-category resolution (grant → allow)", () => {
+    expect(resolvePermission("create_revenue_stream", { ...writeModeBase, writeMode: "full" })).toBe("allow");
+  });
+
+  it("absent writeMode defaults to full (back-compat: existing callers unchanged)", () => {
+    expect(resolvePermission("create_revenue_stream", writeModeBase)).toBe("allow");
+  });
+
+  it("read_only does not clamp web_search / browser_use (only write + delete)", () => {
+    expect(resolvePermission("search_web", { ...writeModeBase, writeMode: "read_only" })).toBe("allow");
   });
 });
