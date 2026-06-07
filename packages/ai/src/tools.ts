@@ -60,6 +60,21 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "activate_scenario",
+    description:
+      "Switch the user's ACTIVE scenario view to an existing scenario by id, so it appears in the UI (the scenario bar at the top) and their pages reflect it. Use when the user asks to open / switch to / work in a specific existing scenario. This is a read-only VIEW change — it does not modify any data and is not gated. For a NEW scenario use create_scenario (which activates it automatically). Reading from a scenario for comparison does NOT need this — get_scenario_comparison reads any scenario by id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "The id of the existing scenario to activate (from context).",
+        },
+      },
+      required: ["scenarioId"],
+    },
+  },
+  {
     name: "create_forecast_line",
     description:
       "Create a forecast line — a monthly projection rule for ANY account (revenue, COGS, operating expense, other income/expense). NOT an actual transaction; it defines how the account's amount evolves over time. For subscription/usage/services revenue prefer create_revenue_stream instead. Method-specific parameters: 'fixed' { amount }; 'growth_rate' { baseAmount, monthlyGrowthRate }; 'per_unit' { units, pricePerUnit, unitGrowthRate?, priceGrowthRate? }; 'percentage_of' { sourceLineId, percentage }; 'custom_formula' { expression, variables? }.",
