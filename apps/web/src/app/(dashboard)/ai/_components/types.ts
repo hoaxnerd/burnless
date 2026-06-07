@@ -38,12 +38,25 @@ export type PermissionCategoryId =
   | "web_search"
   | "browser_use";
 
+/** One per-entity scenario-override delta — the diff-gate before/after payload
+ *  (mirrors @burnless/db ScenarioPlan; spec §4.2). */
+export interface ScenarioOverrideDelta {
+  action: "create" | "modify" | "delete" | "remove_override";
+  entityType: string;
+  entityId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}
+
 export interface PermissionAction {
   requestId: string;
   tool: string;
   category: PermissionCategoryId;
   description: string;
   input: Record<string, unknown>;
+  /** Diff-gate delta computed at pause-time (worklog Plan 3); absent for
+   *  non-facade mutations and full-mode writes with no diff. */
+  override?: ScenarioOverrideDelta[] | null;
 }
 
 export interface PendingPermission {
@@ -61,6 +74,9 @@ export interface UiBlockClient {
   id: string;
   component: string;
   props: Record<string, unknown>;
+  /** Binary confidence + rationale (spec §4.3); absent until Plan 5's prompt. */
+  confidence?: "high" | "low";
+  rationale?: string;
 }
 
 export interface PendingInputField {
