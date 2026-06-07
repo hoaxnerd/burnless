@@ -60,19 +60,6 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("Your burn rate is $50k/mo")).toBeInTheDocument();
   });
 
-  it("shows Financial Companion badge on first assistant message", () => {
-    render(
-      <ChatMessageList
-        {...defaultProps}
-        messages={[
-          makeMessage("user", "Hello"),
-          makeMessage("assistant", "Hi!"),
-        ]}
-      />
-    );
-    expect(screen.getByText("Financial Companion")).toBeInTheDocument();
-  });
-
   it("shows typing indicator when streaming with empty content", () => {
     render(
       <ChatMessageList
@@ -82,7 +69,7 @@ describe("ChatMessageList", () => {
         ]}
       />
     );
-    expect(screen.getByText("Thinking...")).toBeInTheDocument();
+    expect(screen.getByText("Thinking…")).toBeInTheDocument();
   });
 
   it("shows copy button for assistant messages", () => {
@@ -139,17 +126,18 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("Copied")).toBeInTheDocument();
   });
 
-  it("renders tool calls when present", () => {
+  it("renders tool nodes from the timeline", () => {
     render(
       <ChatMessageList
         {...defaultProps}
         messages={[
-          makeMessage("assistant", "Here are results", { toolCalls: ["suggest_cost_cuts"] }),
+          makeMessage("assistant", "Here are results", {
+            timeline: [{ id: "t1", kind: "tool", toolName: "suggest_cost_cuts", phase: "done" }],
+          }),
         ]}
       />
     );
-    expect(screen.getByTestId("tool-display")).toBeInTheDocument();
-    expect(screen.getByText("suggest_cost_cuts")).toBeInTheDocument();
+    expect(screen.getByText(/suggest cost cuts/i)).toBeInTheDocument();
   });
 
   it("shows thinking indicator when isLoading and last message is not streaming", () => {
@@ -160,7 +148,7 @@ describe("ChatMessageList", () => {
         messages={[makeMessage("user", "Query")]}
       />
     );
-    expect(screen.getByText("Thinking...")).toBeInTheDocument();
+    expect(screen.getByText("Working…")).toBeInTheDocument();
   });
 
   it("renders multiple messages in order", () => {
