@@ -2,6 +2,7 @@
 import { createContext, useContext, useRef, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { readSseStream } from "@/app/(dashboard)/ai/_components/sse";
+import { useScenario } from "@/components/scenarios/scenario-context";
 import type { Message, PendingPermission, PendingInput, PendingPlan, TimelineNodeClient } from "@/app/(dashboard)/ai/_components/types";
 
 // A draft/new chat (no id yet) uses this key until the server returns a real id.
@@ -69,6 +70,8 @@ export function reduceTimeline(
     next.push({ id: ev.pauseId as string, kind: "plan", plan: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.plan as PendingPlan["spec"] } });
   } else if (t === "input_request") {
     next.push({ id: ev.pauseId as string, kind: "input", input: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } });
+  } else if (t === "scenario_activated") {
+    next.push({ id: `scenario-${ev.scenarioId as string}-${next.length}`, kind: "scenario", scenarioId: ev.scenarioId as string, scenarioName: ev.name as string });
   }
   return next;
 }
@@ -79,6 +82,11 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const store = useRef<Map<string, SessionState>>(new Map());
   const [, force] = useState(0);
   const rerender = useCallback(() => force((n) => n + 1), []);
+
+  // ChatSessionProvider is mounted inside ScenarioProvider (dashboard shell), so
+  // enterScenario is available here — the AI's scenario_activated event runs the
+  // SAME activation the manual UI uses (cookie + sessionStorage + top bar). (Plan 5)
+  const { enterScenario } = useScenario();
 
   const keyOf = (id: string | null) => id ?? NEW;
   const get = useCallback((id: string | null) => store.current.get(keyOf(id)) ?? EMPTY, []);
@@ -115,7 +123,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     const t = ev.type as string;
     // Worklog accumulation (spec §4.5): every streaming/pause event folds into the
     // ordered timeline; the legacy flat-field patches below remain during transition.
-    if (["text", "tool_use", "tool_status", "ui_component", "permission_request", "plan_request", "input_request"].includes(t)) {
+    if (["text", "tool_use", "tool_status", "ui_component", "permission_request", "plan_request", "input_request", "scenario_activated"].includes(t)) {
       patchLast(key, (m) => ({ ...m, timeline: reduceTimeline(m.timeline ?? [], ev) }));
     }
     if (t === "conversation_id" && ev.conversationId) onConversationId?.(ev.conversationId as string);
@@ -127,10 +135,11 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     else if (t === "ui_component") patchLast(key, (m) => ({ ...m, uiBlocks: [...(m.uiBlocks ?? []), { id: ev.id as string, component: ev.component as string, props: (ev.props as Record<string, unknown>) ?? {}, confidence: ev.confidence as "high" | "low" | undefined, rationale: ev.rationale as string | undefined }] }));
     else if (t === "input_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingInput: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } }));
     else if (t === "plan_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPlan: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.plan as PendingPlan["spec"] } }));
+    else if (t === "scenario_activated") enterScenario(ev.scenarioId as string, ev.name as string);
     else if (t === "paused") write(key, (s) => ({ ...s, isLoading: false }));
     else if (t === "done") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null }));
     else if (t === "error") patchLast(key, (m) => ({ ...m, content: m.content + `\n\n*Error: ${ev.content}*`, isStreaming: false }));
-  }, [patchLast, write]);
+  }, [patchLast, write, enterScenario]);
 
   const send = useCallback(async (id: string | null, text: string, scenarioId: string | null, onConversationId?: (id: string) => void) => {
     let key = keyOf(id);
@@ -166,6 +175,24 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     write(key, (s) => ({ ...s, isLoading: true }));
     try {
       const res = await apiFetch("/api/chat/resume", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: pending.conversationId, pauseId: pending.pauseId, decisions }) });
+      if (res.status === 409) {
+        const err = await res.json().catch(() => ({}));
+        if (err?.code === "SCENARIO_CHANGED") {
+          // Roll back the optimistic "resolved" so the gate stays actionable, and
+          // tell the user the active scenario drifted (decision 4).
+          patchLast(key, (m) => ({
+            ...m,
+            isStreaming: false,
+            pendingPermission: m.pendingPermission ? { ...m.pendingPermission, resolved: false } : null,
+            timeline: (m.timeline ?? []).map((n) =>
+              n.id === pending.pauseId && n.pending ? { ...n, pending: { ...n.pending, resolved: false } } : n,
+            ),
+            content: m.content + `\n\n*The active scenario changed${err.details?.activeScenarioName ? ` (now "${err.details.activeScenarioName}")` : ""}. Switch back to the scenario this action was proposed in to apply it, or cancel.*`,
+          }));
+          return;
+        }
+        throw new Error("resume failed");
+      }
       if (!res.ok) throw new Error("resume failed");
       await readSseStream(res, (ev) => applyEvent(key, ev));
     } catch {
