@@ -20,8 +20,8 @@ describe("PlanNode editing", () => {
     fireEvent.change(titleInput, { target: { value: "Add senior hire" } });
     fireEvent.click(screen.getByRole("button", { name: /proceed/i }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    const submitted = onSubmit.mock.calls[0][0] as { steps: { title: string }[] };
-    expect(submitted.steps[0].title).toBe("Add senior hire");
+    const submitted = onSubmit.mock.calls[0]![0] as { steps: { title: string }[] };
+    expect(submitted.steps[0]!.title).toBe("Add senior hire");
   });
 
   it("removes a step", () => {
@@ -29,7 +29,7 @@ describe("PlanNode editing", () => {
     render(<PlanNode pending={pending} disabled={false} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByLabelText("Remove step: Recompute runway"));
     fireEvent.click(screen.getByRole("button", { name: /proceed/i }));
-    const submitted = onSubmit.mock.calls[0][0] as { steps: { id: string }[] };
+    const submitted = onSubmit.mock.calls[0]![0] as { steps: { id: string }[] };
     expect(submitted.steps.map((s) => s.id)).toEqual(["s1"]);
   });
 
@@ -38,7 +38,7 @@ describe("PlanNode editing", () => {
     render(<PlanNode pending={pending} disabled={false} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByLabelText("Move step down: Add hire"));
     fireEvent.click(screen.getByRole("button", { name: /proceed/i }));
-    const submitted = onSubmit.mock.calls[0][0] as { steps: { id: string }[] };
+    const submitted = onSubmit.mock.calls[0]![0] as { steps: { id: string }[] };
     expect(submitted.steps.map((s) => s.id)).toEqual(["s2", "s1"]);
   });
 
