@@ -4,7 +4,7 @@
  * resolver, persists paused turns, serializes stream chunks, and saves the
  * final assistant message. Used by POST /api/chat and POST /api/chat/resume.
  */
-import { db, createPendingAction } from "@burnless/db";
+import { db, createPendingAction, updatePendingActionTimeline } from "@burnless/db";
 import { aiConversations, aiMessages } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import {
@@ -35,6 +35,12 @@ export interface ChatStreamParams {
    *  Optional for back-compat; the agentic surface treats absent as "confirm". */
   writeMode?: AiWriteMode;
   creditWarning?: string;
+  /** Worklog timeline accumulated before a pause, seeded so the resumed turn's
+   *  `done` persists the FULL run (Plan 5 full-run persistence). */
+  seedTimeline?: TimelineNode[];
+  /** Scenarios the AI created/activated during the resumed Apply — emitted at
+   *  stream start so the client enters them (Plan 5 scenario activation). */
+  activatedScenarios?: { scenarioId: string; name: string }[];
 }
 
 const THINK_TAG = /<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi;
@@ -48,6 +54,24 @@ function looksLikeRenderEnvelope(raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** If a tool result represents a scenario the AI created or activated, return its
+ *  id+name so the stream can emit `scenario_activated` (Plan 5). Else null. */
+export function scenarioActivationFrom(
+  toolName: string,
+  raw: string
+): { scenarioId: string; name: string } | null {
+  if (toolName !== "create_scenario" && toolName !== "activate_scenario") return null;
+  try {
+    const p = JSON.parse(raw) as { success?: boolean; scenarioId?: string; name?: string };
+    if (p?.success && typeof p.scenarioId === "string") {
+      return { scenarioId: p.scenarioId, name: typeof p.name === "string" ? p.name : "Scenario" };
+    }
+  } catch {
+    /* non-JSON */
+  }
+  return null;
 }
 
 export function buildChatSSEResponse(params: ChatStreamParams): Response {
@@ -70,7 +94,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       const pendingOverrides = new Map<string, unknown[]>();
 
       // Ordered worklog nodes (spec §4.5), persisted to metadata.timeline on done.
-      const timeline: TimelineNode[] = [];
+      const timeline: TimelineNode[] = params.seedTimeline ? [...params.seedTimeline] : [];
       const findNode = (id: string) => timeline.find((n) => n.id === id);
       // Append/extend the trailing text-result node for streamed prose.
       const appendText = (content: string) => {
@@ -81,6 +105,20 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           timeline.push({ id: `text-${timeline.length}`, kind: "result", text: content });
         }
       };
+
+      // Emit a scenario activation to the client AND record a persisted marker node
+      // (Plan 5). The client runs enterScenario on the event; the node persists so
+      // reload shows "Activated scenario X" with an Enter affordance.
+      const emitScenarioActivated = (
+        controller: ReadableStreamDefaultController,
+        a: { scenarioId: string; name: string }
+      ) => {
+        send(controller, { type: "scenario_activated", scenarioId: a.scenarioId, name: a.name });
+        timeline.push({ id: `scenario-${a.scenarioId}-${timeline.length}`, kind: "scenario", scenarioId: a.scenarioId, scenarioName: a.name });
+      };
+
+      // Re-enter scenarios created/activated during a resumed Apply (Plan 5).
+      for (const a of params.activatedScenarios ?? []) emitScenarioActivated(controller, a);
 
       try {
         const chunks = chatStream({
@@ -106,6 +144,8 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               conversationId: params.conversationId,
               permissionDecision: "auto",
             });
+            const activation = scenarioActivationFrom(toolName, raw);
+            if (activation) emitScenarioActivated(controller, activation);
             // Display tool: emit the render payload to the client, return the terse
             // modelResult to the model. A display tool is recognized either by the
             // DISPLAY_TOOL_NAMES membership (the spec's registry, populated in Plan 2)
@@ -255,25 +295,39 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               send(controller, { type: "tool_result", tool: chunk.toolName, data: parsed, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
               break;
             }
-            case "permission_request":
-              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "diff_gate", pauseId: chunk.pauseId });
+            case "permission_request": {
+              const actions = (chunk.actions ?? []).map((a) => ({
+                requestId: a.requestId,
+                tool: a.toolName,
+                category: categorizeToolName(a.toolName),
+                description: describeToolAction(a.toolName, a.toolInput),
+                input: a.toolInput,
+                // Diff-gate delta (spec §4.2); null for non-facade mutations.
+                override: pendingOverrides.get(a.requestId) ?? null,
+              }));
+              if (chunk.pauseId) {
+                // Rich gate node (Plan 5): carries the full payload so a reloaded /
+                // resumed run reconstructs the diff-gate without the live pending row.
+                timeline.push({
+                  id: chunk.pauseId, kind: "diff_gate",
+                  pending: { pauseId: chunk.pauseId, conversationId: params.conversationId, actions },
+                });
+              }
               send(controller, {
                 type: "permission_request",
                 pauseId: chunk.pauseId,
                 conversationId: params.conversationId,
-                actions: (chunk.actions ?? []).map((a) => ({
-                  requestId: a.requestId,
-                  tool: a.toolName,
-                  category: categorizeToolName(a.toolName),
-                  description: describeToolAction(a.toolName, a.toolInput),
-                  input: a.toolInput,
-                  // Diff-gate delta (spec §4.2); null for non-facade mutations.
-                  override: pendingOverrides.get(a.requestId) ?? null,
-                })),
+                actions,
               });
               break;
+            }
             case "input_request":
-              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "input", pauseId: chunk.pauseId });
+              if (chunk.pauseId) {
+                timeline.push({
+                  id: chunk.pauseId, kind: "input",
+                  input: { pauseId: chunk.pauseId, conversationId: params.conversationId, spec: chunk.spec! },
+                });
+              }
               send(controller, {
                 type: "input_request",
                 pauseId: chunk.pauseId,
@@ -282,7 +336,12 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               });
               break;
             case "plan_request":
-              if (chunk.pauseId) timeline.push({ id: chunk.pauseId, kind: "plan", pauseId: chunk.pauseId });
+              if (chunk.pauseId) {
+                timeline.push({
+                  id: chunk.pauseId, kind: "plan",
+                  plan: { pauseId: chunk.pauseId, conversationId: params.conversationId, spec: chunk.plan! },
+                });
+              }
               send(controller, {
                 type: "plan_request",
                 pauseId: chunk.pauseId,
@@ -291,6 +350,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               });
               break;
             case "paused":
+              // Full-run persistence (Plan 5): the lead-up nodes + the rich gate node
+              // are now in `timeline`; stash them on the pending row so reload shows
+              // the lead-up and the resumed turn can seed them into its final `done`.
+              if (chunk.pauseId) await updatePendingActionTimeline(chunk.pauseId, timeline);
               send(controller, { type: "paused", pauseId: chunk.pauseId, conversationId: params.conversationId });
               break;
             case "done": {
