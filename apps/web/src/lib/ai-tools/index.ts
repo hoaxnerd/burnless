@@ -270,4 +270,7 @@ export function logDeniedToolCall(
 export type { ToolContext } from "./types";
 
 /** Internal handles exposed for regression guards only — not a public API. */
-export const __testables = { MUTATION_TOOLS, MUTATION_CACHE_TAGS };
+export const __testables = {
+  MUTATION_TOOLS,
+  MUTATION_CACHE_TAGS: MUTATION_CACHE_TAGS as Readonly<Record<string, string[]>>,
+};

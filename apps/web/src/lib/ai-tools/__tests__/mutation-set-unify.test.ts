@@ -48,7 +48,8 @@ describe("mutation-set unification", () => {
 
   it("every mutation tool has a cache-tag mapping (no silent no-op invalidation)", () => {
     for (const name of MUTATION_TOOL_NAMES) {
-      expect(__testables.MUTATION_CACHE_TAGS[name], `missing cache tags for ${name}`).toBeTruthy();
+      const tags = __testables.MUTATION_CACHE_TAGS[name];
+      expect(Array.isArray(tags) && tags.length > 0, `missing/empty cache tags for ${name}`).toBe(true);
     }
   });
 });
