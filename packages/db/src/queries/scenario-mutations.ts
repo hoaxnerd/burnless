@@ -115,6 +115,76 @@ export async function commitScenarioPlan(
 }
 
 /**
+ * Pure planning counterpart of scenarioUpdate: compute the modify delta WITHOUT
+ * writing. Preserves an existing override's action + originalData; snapshots the
+ * base row on first override; strips immutable funding_round roundType.
+ *
+ * Unlike planScenarioInsert, `table` IS used here — to snapshot the base row on first override.
+ */
+export async function planScenarioUpdate(
+  entityType: string,
+  table: any,
+  entityId: string,
+  changes: Record<string, any>,
+  scenarioId: string,
+  companyId: string,
+): Promise<ScenarioPlan> {
+  if (!scenarioId) throw new Error("planScenarioUpdate requires an active scenario");
+
+  // Phase 2 D §1.2: roundType is immutable post-creation (defense-in-depth strip).
+  if (entityType === "funding_round" && changes && "type" in changes) {
+    const { type: _stripped, ...rest } = changes as Record<string, unknown>;
+    changes = rest as typeof changes;
+  }
+
+  await assertScenarioOwned(scenarioId, companyId);
+
+  const existing = await db
+    .select()
+    .from(scenarioOverrides)
+    .where(
+      and(
+        eq(scenarioOverrides.scenarioId, scenarioId),
+        eq(scenarioOverrides.entityType, entityType),
+        eq(scenarioOverrides.entityId, entityId),
+      ),
+    )
+    .then((r) => r[0]);
+
+  if (existing) {
+    const after = mergeChanges(
+      existing.data as Record<string, unknown>,
+      changes as Record<string, unknown>,
+    );
+    return {
+      action: existing.action as "create" | "modify" | "delete",
+      entityType,
+      entityId,
+      before: (existing.originalData as Record<string, unknown> | null) ?? null,
+      after,
+    };
+  }
+
+  const [baseEntity] = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
+  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
+  validateOverridable(entityType, baseEntity);
+  const after = mergeChanges(
+    baseEntity as Record<string, unknown>,
+    changes as Record<string, unknown>,
+  );
+  return {
+    action: "modify",
+    entityType,
+    entityId,
+    before: baseEntity as Record<string, unknown>,
+    after,
+  };
+}
+
+/**
  * Insert a new entity, routing to scenario overrides when a scenario is active.
  *
  * - No scenario (null): inserts directly into the base table.
@@ -152,17 +222,12 @@ export async function scenarioUpdate(
   scenarioId: string | null,
   companyId: string,
 ) {
-  // Phase 2 D §1.2: roundType is immutable post-creation. The primary gate is the
-  // update_funding_round Zod schema in packages/ai/src/schemas/funding.ts which omits
-  // the field entirely. This strip is defense-in-depth for any direct caller that
-  // bypasses the schema (e.g. raw DB scripts, future internal tools). Mutates the
-  // local `changes` reference by reassignment — function param is not reused after.
-  if (entityType === "funding_round" && changes && "type" in changes) {
-    const { type: _stripped, ...rest } = changes as Record<string, unknown>;
-    changes = rest as typeof changes;
-  }
-
   if (!scenarioId) {
+    // Phase 2 D §1.2: strip immutable roundType on the base-table path too.
+    if (entityType === "funding_round" && changes && "type" in changes) {
+      const { type: _stripped, ...rest } = changes as Record<string, unknown>;
+      changes = rest as typeof changes;
+    }
     const [row] = await db
       .update(table)
       .set(changes)
@@ -170,61 +235,9 @@ export async function scenarioUpdate(
       .returning();
     return row;
   }
-
-  await assertScenarioOwned(scenarioId, companyId);
-
-  // Check for existing override
-  const existing = await db
-    .select()
-    .from(scenarioOverrides)
-    .where(
-      and(
-        eq(scenarioOverrides.scenarioId, scenarioId),
-        eq(scenarioOverrides.entityType, entityType),
-        eq(scenarioOverrides.entityId, entityId),
-      ),
-    )
-    .then((r) => r[0]);
-
-  if (existing) {
-    // Update existing override's data — merge nested JSONB (parameters)
-    // so partial updates don't clobber untouched keys.
-    const updatedData = mergeChanges(
-      existing.data as Record<string, unknown>,
-      changes as Record<string, unknown>,
-    );
-    await upsertOverride(
-      scenarioId,
-      entityType,
-      entityId,
-      existing.action as "create" | "modify" | "delete",
-      updatedData,
-      existing.originalData as Record<string, unknown> | null,
-    );
-    return updatedData;
-  }
-
-  // First override -- snapshot base state (company-scoped: never snapshot
-  // another tenant's row)
-  const [baseEntity] = await db
-    .select()
-    .from(table)
-    .where(and(eq(table.id, entityId), eq(table.companyId, companyId)));
-  if (!baseEntity) throw new Error(`Entity ${entityType}/${entityId} not found`);
-  validateOverridable(entityType, baseEntity);
-  const overrideData = mergeChanges(
-    baseEntity as Record<string, unknown>,
-    changes as Record<string, unknown>,
-  );
-  await upsertOverride(
-    scenarioId,
-    entityType,
-    entityId,
-    "modify",
-    overrideData,
-    baseEntity as Record<string, unknown>,
-  );
-  return overrideData;
+  const plan = await planScenarioUpdate(entityType, table, entityId, changes, scenarioId, companyId);
+  await commitScenarioPlan(scenarioId, plan);
+  return plan.after;
 }
 
 /**
