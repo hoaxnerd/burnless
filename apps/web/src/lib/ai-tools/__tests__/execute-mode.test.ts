@@ -44,13 +44,12 @@ vi.mock("@burnless/ai", async (importOriginal) => {
 });
 
 // Stub the revenue handler so we assert executeToolCall's mode plumbing in isolation.
-vi.mock("../revenue", () => {
-  const { z } = require("zod");
-  return {
-    revenueSchemas: { create_revenue_stream: z.object({ name: z.string() }) },
-    revenueHandlers: { create_revenue_stream: vi.fn(async () => JSON.stringify({ planned: true, overrides: [{ action: "create" }] })) },
-  };
-});
+vi.mock("../revenue", () => ({
+  revenueSchemas: {
+    create_revenue_stream: { safeParse: (input: unknown) => ({ success: true, data: input }) },
+  },
+  revenueHandlers: { create_revenue_stream: vi.fn(async () => JSON.stringify({ planned: true, overrides: [{ action: "create" }] })) },
+}));
 
 import { executeToolCall } from "../index";
 
