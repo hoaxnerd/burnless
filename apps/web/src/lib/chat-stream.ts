@@ -74,6 +74,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           financialContext: params.financialContext,
           companionName: params.companionName,
           providerConfig: params.providerConfig,
+          // NOTE: two unrelated "writeMode"s converge here. `defaults.write` is the
+          // per-USER permission-category default (PermissionMode ask/session/always).
+          // `params.writeMode` is the per-COMPANY AiWriteMode clamp (full/confirm/
+          // read_only). They are distinct types with distinct sources — do not merge.
           resolvePermission: (toolName) =>
             resolvePermission(toolName, {
               defaults: params.defaults,
