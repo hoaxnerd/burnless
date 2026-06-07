@@ -67,6 +67,7 @@ export const GET = withErrorHandler(async (request: Request) => {
                 requestId: string;
                 toolName: string;
                 toolInput: Record<string, unknown>;
+                override?: unknown[];
               }[]
             ).map((a) => ({
               requestId: a.requestId,
@@ -74,6 +75,8 @@ export const GET = withErrorHandler(async (request: Request) => {
               category: categorizeToolName(a.toolName),
               description: describeToolAction(a.toolName, a.toolInput),
               input: a.toolInput,
+              // Diff-gate delta persisted at pause-time (worklog Plan 3); null if none.
+              override: a.override ?? null,
             })),
           }
         : null;
