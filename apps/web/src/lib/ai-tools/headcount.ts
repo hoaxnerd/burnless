@@ -2,16 +2,9 @@
  * Headcount planning and department tools — CRUD operations.
  */
 
-import {
-  db,
-  scenarioInsert,
-  scenarioUpdate,
-  scenarioDelete,
-  createSalaryChange,
-  createBonus,
-  createEquityGrant,
-} from "@burnless/db";
-import { headcountPlans, departments, companies } from "@burnless/db";
+import { db } from "@burnless/db";
+import { headcountPlans, departments, companies, salaryChanges, bonuses, equityGrants, scenarioOverrides } from "@burnless/db";
+import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { formatCurrency, isValidCurrency } from "@burnless/types";
@@ -182,13 +175,9 @@ async function addHeadcount(
   if (data.hoursPerWeek !== undefined) insertValues.hoursPerWeek = num(data.hoursPerWeek);
   if (data.parameters !== undefined) insertValues.parameters = data.parameters;
 
-  const row = await scenarioInsert(
-    "headcount_plan",
-    headcountPlans,
-    insertValues,
-    ctx.scenarioId ?? null,
-    ctx.companyId
-  );
+  const res = await mutateInsert(ctx, "headcount_plan", headcountPlans, insertValues);
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   const fteCount = data.count ?? 1;
   const totalCost = fteCount * data.salary * (1 + data.benefitsRate);
@@ -207,10 +196,12 @@ async function createDepartment(
   const data = input as z.infer<typeof createDepartmentSchema>;
   const ctx = requireCompanyId(context);
 
-  const row = await scenarioInsert("department", departments, {
+  const res = await mutateInsert(ctx, "department", departments, {
     companyId: ctx.companyId,
     name: data.name,
-  }, ctx.scenarioId ?? null, ctx.companyId);
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -274,7 +265,8 @@ async function updateHeadcount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("headcount_plan", headcountPlans, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "headcount_plan", headcountPlans, data.id, updates);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -298,7 +290,8 @@ async function deleteHeadcount(
     return JSON.stringify({ success: false, error: "Headcount plan not found or access denied" });
   }
 
-  await scenarioDelete("headcount_plan", headcountPlans, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "headcount_plan", headcountPlans, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -325,7 +318,8 @@ async function updateDepartment(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("department", departments, data.id, { name: data.name }, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "department", departments, data.id, { name: data.name });
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -348,7 +342,8 @@ async function deleteDepartment(
     return JSON.stringify({ success: false, error: "Department not found or access denied" });
   }
 
-  await scenarioDelete("department", departments, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "department", departments, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -358,13 +353,54 @@ async function deleteDepartment(
 
 async function verifyHeadcountOwnership(
   headcountId: string,
-  companyId: string
+  companyId: string,
+  scenarioId?: string | null,
 ): Promise<{ id: string } | null> {
   const [parent] = await db
     .select({ id: headcountPlans.id })
     .from(headcountPlans)
     .where(and(eq(headcountPlans.id, headcountId), eq(headcountPlans.companyId, companyId)));
-  return parent ?? null;
+
+  if (parent) {
+    // Base-table headcount found; but if a scenario is active, verify it hasn't
+    // been soft-deleted by a "delete" override in this scenario. A delete override
+    // means the headcount is hidden in this scenario and must NOT be ownable.
+    if (scenarioId) {
+      const [deleteOverride] = await db
+        .select({ id: scenarioOverrides.entityId })
+        .from(scenarioOverrides)
+        .where(
+          and(
+            eq(scenarioOverrides.scenarioId, scenarioId),
+            eq(scenarioOverrides.entityType, "headcount_plan"),
+            eq(scenarioOverrides.entityId, headcountId),
+            eq(scenarioOverrides.action, "delete"),
+          ),
+        );
+      if (deleteOverride) return null; // scenario-deleted: treat as not found
+    }
+    return parent;
+  }
+
+  // Also check scenario-created headcounts (overrides with action=create).
+  // Must filter to action="create" only: a "modify" override means the headcount
+  // also exists in the base table (already checked above), and a "delete" override
+  // means it is hidden in this scenario and must NOT be ownable.
+  if (scenarioId) {
+    const [override] = await db
+      .select({ id: scenarioOverrides.entityId })
+      .from(scenarioOverrides)
+      .where(
+        and(
+          eq(scenarioOverrides.scenarioId, scenarioId),
+          eq(scenarioOverrides.entityType, "headcount_plan"),
+          eq(scenarioOverrides.entityId, headcountId),
+          eq(scenarioOverrides.action, "create"),
+        ),
+      );
+    if (override) return { id: override.id };
+  }
+  return null;
 }
 
 async function addSalaryChange(
@@ -374,22 +410,20 @@ async function addSalaryChange(
   const data = input as z.infer<typeof addSalaryChangeSchema>;
   const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId, ctx.scenarioId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
 
-  const row = await createSalaryChange(
-    {
-      companyId: ctx.companyId,
-      headcountId: data.headcountId,
-      effectiveDate: new Date(data.effectiveDate),
-      newSalary: num(data.newSalary)!,
-      reason: data.reason ?? null,
-    },
-    ctx.scenarioId ?? null,
-    ctx.companyId
-  );
+  const res = await mutateInsert(ctx, "salary_change", salaryChanges, {
+    companyId: ctx.companyId,
+    headcountId: data.headcountId,
+    effectiveDate: new Date(data.effectiveDate),
+    newSalary: num(data.newSalary)!,
+    reason: data.reason ?? null,
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -405,7 +439,7 @@ async function addBonus(
   const data = input as z.infer<typeof addBonusSchema>;
   const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId, ctx.scenarioId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
@@ -413,18 +447,16 @@ async function addBonus(
   // Normalize YYYY-MM to a Date at the first of the month.
   const monthStr = data.payoutMonth.length === 7 ? `${data.payoutMonth}-01` : data.payoutMonth;
 
-  const row = await createBonus(
-    {
-      companyId: ctx.companyId,
-      headcountId: data.headcountId,
-      payoutMonth: new Date(monthStr),
-      amount: num(data.amount)!,
-      type: data.type,
-      notes: data.notes ?? null,
-    },
-    ctx.scenarioId ?? null,
-    ctx.companyId
-  );
+  const res = await mutateInsert(ctx, "bonus", bonuses, {
+    companyId: ctx.companyId,
+    headcountId: data.headcountId,
+    payoutMonth: new Date(monthStr),
+    amount: num(data.amount)!,
+    type: data.type,
+    notes: data.notes ?? null,
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -440,27 +472,25 @@ async function addEquityGrant(
   const data = input as z.infer<typeof addEquityGrantSchema>;
   const ctx = requireCompanyId(context);
 
-  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId);
+  const parent = await verifyHeadcountOwnership(data.headcountId, ctx.companyId, ctx.scenarioId);
   if (!parent) {
     return JSON.stringify({ success: false, error: "Headcount not found or access denied" });
   }
 
-  const row = await createEquityGrant(
-    {
-      companyId: ctx.companyId,
-      headcountId: data.headcountId,
-      grantDate: new Date(data.grantDate),
-      shares: data.shares.toFixed(4),
-      strikePrice:
-        data.strikePrice === undefined || data.strikePrice === null
-          ? null
-          : data.strikePrice.toFixed(4),
-      grantType: data.grantType,
-      parameters: { vestingSchedule: data.vestingSchedule },
-    },
-    ctx.scenarioId ?? null,
-    ctx.companyId
-  );
+  const res = await mutateInsert(ctx, "equity_grant", equityGrants, {
+    companyId: ctx.companyId,
+    headcountId: data.headcountId,
+    grantDate: new Date(data.grantDate),
+    shares: data.shares.toFixed(4),
+    strikePrice:
+      data.strikePrice === undefined || data.strikePrice === null
+        ? null
+        : data.strikePrice.toFixed(4),
+    grantType: data.grantType,
+    parameters: { vestingSchedule: data.vestingSchedule },
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,

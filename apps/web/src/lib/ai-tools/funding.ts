@@ -3,8 +3,9 @@
  * Phase 2 D §1.5 canonical schemas from @burnless/ai (roundType immutability enforced).
  */
 
-import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { db } from "@burnless/db";
 import { fundingRounds, fundingRoundInvestors, companies } from "@burnless/db";
+import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
 import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
 import {
@@ -43,7 +44,7 @@ export const createFundingRound: ToolHandler = async (input, context) => {
   const ctx = requireCompanyId(context);
   const { currency, locale } = await getCompanyCurrency(ctx.companyId);
 
-  const row = await scenarioInsert("funding_round", fundingRounds, {
+  const res = await mutateInsert(ctx, "funding_round", fundingRounds, {
     companyId: ctx.companyId,
     name: data.name,
     type: data.roundType,
@@ -55,7 +56,9 @@ export const createFundingRound: ToolHandler = async (input, context) => {
     notes: data.notes ?? null,
     parameters: (data.parameters as Record<string, unknown>) ?? {},
     isProjected: data.isProjected ?? false,
-  }, ctx.scenarioId ?? null, ctx.companyId);
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -103,7 +106,8 @@ export const updateFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("funding_round", fundingRounds, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "funding_round", fundingRounds, data.id, updates);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -127,7 +131,8 @@ export const deleteFundingRound: ToolHandler = async (input, context) => {
     return JSON.stringify({ success: false, error: "Funding round not found or access denied" });
   }
 
-  await scenarioDelete("funding_round", fundingRounds, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "funding_round", fundingRounds, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -200,7 +205,8 @@ export const markGrantMilestoneHit: ToolHandler = async (input, context) => {
   milestones[idx] = { ...milestones[idx], hitDate: data.hitDate };
   const updatedParams = { ...params, milestones };
 
-  await scenarioUpdate("funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams }, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "funding_round", fundingRounds, data.fundingRoundId, { parameters: updatedParams });
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
