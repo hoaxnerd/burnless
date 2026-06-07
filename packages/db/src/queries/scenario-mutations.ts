@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../index";
 import { scenarioOverrides, departments, scenarios } from "../schema";
-import { upsertOverride } from "./scenario-overrides";
+import { upsertOverride, deleteOverrideByEntity } from "./scenario-overrides";
 
 /**
  * Security / multi-tenancy guard: every scenario mutation is scoped to a
@@ -64,6 +64,57 @@ function validateOverridable(entityType: string, baseEntity: any) {
 }
 
 /**
+ * A computed scenario-override delta — the diff-before-apply payload (spec §4.2).
+ * `remove_override` means "delete a scenario-CREATED entity by dropping its
+ * override row" (no base row to hide); the other actions map to upsertOverride.
+ */
+export interface ScenarioPlan {
+  action: "create" | "modify" | "delete" | "remove_override";
+  entityType: string;
+  entityId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}
+
+/**
+ * Pure planning counterpart of scenarioInsert: compute the create delta WITHOUT
+ * writing. Plan mode only makes sense inside a scenario (the gate previews an
+ * override), so scenarioId is required.
+ *
+ * `table` is accepted for API symmetry with scenarioInsert but unused: for
+ * inserts the plan is synthetic (provided data + generated id); no base read needed.
+ */
+export async function planScenarioInsert(
+  entityType: string,
+  table: any,
+  data: Record<string, any>,
+  scenarioId: string,
+  companyId: string,
+): Promise<ScenarioPlan> {
+  if (!scenarioId) throw new Error("planScenarioInsert requires an active scenario");
+  await assertScenarioOwned(scenarioId, companyId);
+  const id = data.id ?? crypto.randomUUID();
+  const entityData = { ...data, id };
+  return { action: "create", entityType, entityId: id, before: null, after: entityData };
+}
+
+/**
+ * Apply a previously-computed ScenarioPlan to the override table. The single
+ * write path the diff-gate Apply uses (spec §2 non-goal: Apply does not bypass
+ * the normal write path).
+ */
+export async function commitScenarioPlan(
+  scenarioId: string,
+  plan: ScenarioPlan,
+): Promise<void> {
+  if (plan.action === "remove_override") {
+    await deleteOverrideByEntity(scenarioId, plan.entityType, plan.entityId);
+    return;
+  }
+  await upsertOverride(scenarioId, plan.entityType, plan.entityId, plan.action, plan.after, plan.before);
+}
+
+/**
  * Insert a new entity, routing to scenario overrides when a scenario is active.
  *
  * - No scenario (null): inserts directly into the base table.
@@ -80,12 +131,9 @@ export async function scenarioInsert(
     const [row] = await db.insert(table).values(data).returning();
     return row;
   }
-
-  await assertScenarioOwned(scenarioId, companyId);
-  const id = data.id ?? crypto.randomUUID();
-  const entityData = { ...data, id };
-  await upsertOverride(scenarioId, entityType, id, "create", entityData, null);
-  return entityData;
+  const plan = await planScenarioInsert(entityType, table, data, scenarioId, companyId);
+  await commitScenarioPlan(scenarioId, plan);
+  return plan.after;
 }
 
 /**
