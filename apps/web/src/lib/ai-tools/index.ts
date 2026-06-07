@@ -27,6 +27,7 @@ import {
   AddFundingRoundInvestorSchema,
   MarkGrantMilestoneHitSchema,
   ModelDilutionSchema,
+  MUTATION_TOOL_NAMES,
 } from "@burnless/ai";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
@@ -80,20 +81,11 @@ const toolHandlers: Record<string, ToolHandler> = {
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
 
-/** Tools that create, update, or delete data. Read-only tools are excluded. */
-const MUTATION_TOOLS = new Set([
-  // Create
-  "create_scenario", "create_headcount", "create_department", "create_revenue_stream",
-  "create_funding_round", "create_funding_round_investor", "update_grant_milestone",
-  "create_forecast_line", "create_account",
-  "create_salary_change", "create_bonus", "create_equity_grant",
-  // Update
-  "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
-  "update_funding_round", "update_forecast_line", "update_account",
-  // Delete
-  "delete_scenario", "delete_headcount", "delete_department", "delete_revenue_stream",
-  "delete_funding_round", "delete_forecast_line", "delete_account",
-]);
+/** Tools that create, update, or delete data. Single source of truth: the
+ *  permission layer's MUTATION_TOOL_NAMES (WRITE_TOOLS ∪ DELETE_TOOLS). Deriving
+ *  it here keeps the diff-gate, cache invalidation, and permission resolver from
+ *  drifting (spec §4.4 "unify the two mutation sets"). */
+const MUTATION_TOOLS: ReadonlySet<string> = MUTATION_TOOL_NAMES;
 
 function isMutationTool(toolName: string): boolean {
   return MUTATION_TOOLS.has(toolName);
@@ -276,3 +268,6 @@ export function logDeniedToolCall(
 
 // Re-export types for consumers
 export type { ToolContext } from "./types";
+
+/** Internal handles exposed for regression guards only — not a public API. */
+export const __testables = { MUTATION_TOOLS, MUTATION_CACHE_TAGS };
