@@ -19,7 +19,6 @@ import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
 import { InsightCard } from "./_components/insights-panel";
-import { PermissionCard } from "./_components/permission-card";
 import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
 import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
 import type {
@@ -131,7 +130,15 @@ export default function AiCompanionPage() {
   const { messages, isLoading } = session.get(conversationId);
   const isEmptyState = messages.length === 0;
   const awaitingDecision = messages.some(
-    (m) => m.pendingPermission && !m.pendingPermission.resolved
+    (m) =>
+      (m.pendingPermission && !m.pendingPermission.resolved) ||
+      (m.timeline?.some(
+        (n) =>
+          (n.kind === "diff_gate" && n.pending && !n.pending.resolved) ||
+          (n.kind === "plan" && n.plan && !n.plan.resolved) ||
+          (n.kind === "input" && n.input && !n.input.resolved)
+      ) ??
+        false)
   );
 
   // ?prompt= pre-fills input without sending; ?send= pre-fills and auto-submits
@@ -219,6 +226,7 @@ export default function AiCompanionPage() {
               content: string;
               createdAt?: string;
               uiBlocks?: UiBlockClient[];
+              timeline?: unknown[];
             }) => ({
               role: m.role as "user" | "assistant",
               content: m.content,
@@ -227,54 +235,37 @@ export default function AiCompanionPage() {
                 : Date.now(),
               // Re-render persisted genui display blocks after reload (spec §6/§8).
               ...(m.uiBlocks ? { uiBlocks: m.uiBlocks } : {}),
+              ...(m.timeline ? { timeline: m.timeline } : {}),
             })
           );
-        // #3: re-show a pending permission card persisted server-side.
+        // #3: re-show a pending gate persisted server-side, attached in-stream to
+        // the last assistant message's timeline (so it renders as a gate node).
+        const attachGate = (node: {
+          id: string;
+          kind: "diff_gate" | "input" | "plan";
+          pending?: PendingPermission;
+          input?: PendingInput;
+          plan?: PendingPlan;
+        }) => {
+          const msgs = [...restoredMessages];
+          let lastIdx = msgs.length - 1;
+          if (lastIdx < 0 || msgs[lastIdx].role !== "assistant") {
+            msgs.push({ role: "assistant", content: "", createdAt: Date.now(), timeline: [] });
+            lastIdx = msgs.length - 1;
+          }
+          const tl = [...(msgs[lastIdx].timeline ?? []), node];
+          msgs[lastIdx] = { ...msgs[lastIdx], timeline: tl };
+          session.setMessages(id, msgs);
+        };
         if (data.pendingPermission) {
-          session.setMessages(id, [
-            ...restoredMessages,
-            {
-              role: "assistant",
-              content: "",
-              pendingPermission: data.pendingPermission as PendingPermission,
-              createdAt: Date.now(),
-            },
-          ]);
+          const p = data.pendingPermission as PendingPermission;
+          attachGate({ id: p.pauseId, kind: "diff_gate", pending: p });
         } else if (data.pendingInput) {
-          // Re-show a pending input form persisted server-side, mirroring the
-          // permission restore: attach it to the last assistant message.
-          const msgs = [...restoredMessages];
-          const lastIdx = msgs.length - 1;
-          if (lastIdx >= 0 && msgs[lastIdx].role === "assistant") {
-            msgs[lastIdx] = {
-              ...msgs[lastIdx],
-              pendingInput: data.pendingInput as PendingInput,
-            };
-          } else {
-            msgs.push({
-              role: "assistant",
-              content: "",
-              pendingInput: data.pendingInput as PendingInput,
-              createdAt: Date.now(),
-            });
-          }
-          session.setMessages(id, msgs);
+          const p = data.pendingInput as PendingInput;
+          attachGate({ id: p.pauseId, kind: "input", input: p });
         } else if (data.pendingPlan) {
-          // Re-show a pending plan card persisted server-side, mirroring the
-          // input restore: attach it to the last assistant message.
-          const msgs = [...restoredMessages];
-          const lastIdx = msgs.length - 1;
-          if (lastIdx >= 0 && msgs[lastIdx].role === "assistant") {
-            msgs[lastIdx] = { ...msgs[lastIdx], pendingPlan: data.pendingPlan as PendingPlan };
-          } else {
-            msgs.push({
-              role: "assistant",
-              content: "",
-              pendingPlan: data.pendingPlan as PendingPlan,
-              createdAt: Date.now(),
-            });
-          }
-          session.setMessages(id, msgs);
+          const p = data.pendingPlan as PendingPlan;
+          attachGate({ id: p.pauseId, kind: "plan", plan: p });
         } else {
           session.setMessages(id, restoredMessages);
         }
@@ -477,16 +468,7 @@ export default function AiCompanionPage() {
                 session.submitInput(pending.conversationId, pending, data)
               }
               onPlanSubmit={(pending, plan) => session.submitPlan(pending.conversationId, pending, plan)}
-              renderAfterMessage={(m) =>
-                m.pendingPermission ? (
-                  <div className="mt-2">
-                    <PermissionCard
-                      pending={m.pendingPermission}
-                      onDecide={(decisions) => handlePermissionDecision(m.pendingPermission!, decisions)}
-                    />
-                  </div>
-                ) : null
-              }
+              onDecide={(pending, decisions) => handlePermissionDecision(pending, decisions)}
             />
             {planLimit && (
               <div className="mx-4 mb-3">
