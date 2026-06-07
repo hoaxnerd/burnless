@@ -8,12 +8,6 @@ vi.mock("@/components/ai/markdown-renderer", () => ({
   MarkdownRenderer: ({ content }: { content: string }) => <span>{content}</span>,
 }));
 
-vi.mock("../tool-result-display", () => ({
-  ToolResultDisplay: ({ toolCalls }: { toolCalls: string[] }) => (
-    <div data-testid="tool-display">{toolCalls.join(", ")}</div>
-  ),
-}));
-
 const makeMessage = (
   role: "user" | "assistant",
   content: string,
