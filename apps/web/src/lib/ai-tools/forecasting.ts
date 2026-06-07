@@ -2,8 +2,9 @@
  * Forecast line creation, revenue forecasting, and financial statement generation.
  */
 
-import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { db } from "@burnless/db";
 import { forecastLines } from "@burnless/db";
+import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { CreateExpenseSchema, UpdateExpenseSchema } from "@burnless/ai";
@@ -61,7 +62,7 @@ async function createForecastLine(
   const data = parsed.data;
   const ctx = requireCompanyId(context);
 
-  const row = await scenarioInsert("forecast_line", forecastLines, {
+  const res = await mutateInsert(ctx, "forecast_line", forecastLines, {
     companyId: ctx.companyId,
     accountId: data.accountId,
     method: data.method,
@@ -74,7 +75,9 @@ async function createForecastLine(
     frequency: data.frequency,
     isOneTime: data.isOneTime,
     isRecurring: data.isRecurring ?? null,
-  }, ctx.scenarioId ?? null, ctx.companyId);
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -287,7 +290,8 @@ async function updateForecastLine(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("forecast_line", forecastLines, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "forecast_line", forecastLines, data.id, updates);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -318,7 +322,8 @@ async function deleteForecastLine(
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
 
-  await scenarioDelete("forecast_line", forecastLines, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "forecast_line", forecastLines, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,

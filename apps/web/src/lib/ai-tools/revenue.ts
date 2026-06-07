@@ -3,8 +3,9 @@
  * Funding round tools have been moved to ./funding.ts
  */
 
-import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { db } from "@burnless/db";
 import { revenueStreams } from "@burnless/db";
+import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -41,14 +42,16 @@ async function addRevenueStream(
 
   const ctx = requireCompanyId(context);
 
-  const row = await scenarioInsert("revenue_stream", revenueStreams, {
+  const res = await mutateInsert(ctx, "revenue_stream", revenueStreams, {
     companyId: ctx.companyId,
     name: data.name,
     type: data.type,
     startDate: new Date(data.startDate),
     endDate: data.endDate ? new Date(data.endDate) : null,
     parameters: data.parameters,
-  }, ctx.scenarioId ?? null, ctx.companyId);
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -92,7 +95,8 @@ async function updateRevenueStream(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("revenue_stream", revenueStreams, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "revenue_stream", revenueStreams, data.id, updates);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -117,7 +121,8 @@ async function deleteRevenueStream(
     return JSON.stringify({ success: false, error: "Revenue stream not found or access denied" });
   }
 
-  await scenarioDelete("revenue_stream", revenueStreams, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "revenue_stream", revenueStreams, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
