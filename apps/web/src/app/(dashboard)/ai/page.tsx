@@ -257,7 +257,19 @@ export default function AiCompanionPage() {
           msgs[lastIdx] = { ...msgs[lastIdx], timeline: tl };
           session.setMessages(id, msgs);
         };
-        if (data.pendingPermission) {
+        if (data.pendingTimeline && Array.isArray(data.pendingTimeline) && data.pendingTimeline.length) {
+          // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
+          // pause-time. The gate node carries its own (unresolved) payload, so it
+          // renders live + actionable; this also restores the pre-pause worklog.
+          const msgs = [...restoredMessages];
+          let lastIdx = msgs.length - 1;
+          if (lastIdx < 0 || msgs[lastIdx].role !== "assistant") {
+            msgs.push({ role: "assistant", content: "", createdAt: Date.now(), timeline: [] });
+            lastIdx = msgs.length - 1;
+          }
+          msgs[lastIdx] = { ...msgs[lastIdx], timeline: data.pendingTimeline };
+          session.setMessages(id, msgs);
+        } else if (data.pendingPermission) {
           const p = data.pendingPermission as PendingPermission;
           attachGate({ id: p.pauseId, kind: "diff_gate", pending: p });
         } else if (data.pendingInput) {
