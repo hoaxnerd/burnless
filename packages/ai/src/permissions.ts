@@ -2,16 +2,19 @@
  * AI tool permission model (spec §3).
  *
  * Five categories; each tool maps to exactly one. The resolver is pure: it
- * returns "allow" or "ask". An explicit "deny" is a runtime user action taken
- * at the permission card (Plan 3), never produced here.
+ * returns "allow", "ask", or "deny". An explicit "deny" is produced by the
+ * read_only write-mode clamp (spec §4.4); it is also a runtime user action
+ * taken at the permission card (Plan 3).
  */
+
+import type { AiWriteMode } from "./feature-flags";
 
 export type PermissionCategory = "read" | "write" | "delete" | "web_search" | "browser_use";
 
 /** How a category behaves by default. `delete` never uses "always". */
 export type PermissionMode = "ask" | "session" | "always";
 
-export type PermissionDecision = "allow" | "ask";
+export type PermissionDecision = "allow" | "ask" | "deny";
 
 export interface PermissionDefaults {
   read: PermissionMode;
@@ -89,17 +92,30 @@ export interface ResolvePermissionContext {
   defaults: PermissionDefaults;
   /** Categories granted "for session" in the current conversation. */
   sessionGrants: Partial<Record<PermissionCategory, boolean>>;
+  /** Company AI write mode (spec §4.4). Absent → "full" (no clamp; back-compat). */
+  writeMode?: AiWriteMode;
 }
 
 /**
  * Resolve whether a tool call may proceed without prompting.
- * Returns "allow" (run it) or "ask" (pause for a permission card).
+ * Returns "allow" (run it), "ask" (pause for a card), or "deny" (refuse — never
+ * execute; used by the read_only write-mode clamp).
  */
 export function resolvePermission(
   toolName: string,
   ctx: ResolvePermissionContext
 ): PermissionDecision {
   const category = categorizeToolName(toolName);
+
+  // Write-mode clamp (spec §4.4): layered BEFORE the session-grant short-circuit
+  // so neither a grant nor an "always" default can bypass it. Mirrors the delete
+  // clamp. Reads pass through untouched.
+  const writeMode = ctx.writeMode ?? "full";
+  if (category === "write" || category === "delete") {
+    if (writeMode === "read_only") return "deny"; // refuse; chatStream synthesizes a declined result
+    if (writeMode === "confirm") return "ask";    // force the diff-gate
+    // "full" falls through to today's per-category resolution.
+  }
 
   // 1. A session grant on this category short-circuits to allow.
   if (ctx.sessionGrants[category]) return "allow";

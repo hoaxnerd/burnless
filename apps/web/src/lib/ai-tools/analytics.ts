@@ -3,8 +3,9 @@
  * report narratives, cost analysis, and account management tools.
  */
 
-import { db, scenarioInsert, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { db } from "@burnless/db";
 import { financialAccounts } from "@burnless/db";
+import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { computeDashboardData } from "../compute-dashboard";
@@ -159,13 +160,15 @@ async function createAccount(
 
   const ctx = requireCompanyId(context);
 
-  const row = await scenarioInsert("financial_account", financialAccounts, {
+  const res = await mutateInsert(ctx, "financial_account", financialAccounts, {
     companyId: ctx.companyId,
     name: data.name,
     type: data.type,
     category: data.category,
     coversHeadcount: data.coversHeadcount ?? false,
-  }, ctx.scenarioId ?? null, ctx.companyId);
+  });
+  if ("planned" in res) return planResultJson(res.planned);
+  const row = res.row;
 
   return JSON.stringify({
     success: true,
@@ -436,7 +439,8 @@ async function updateAccount(
     return JSON.stringify({ success: false, error: "No fields to update" });
   }
 
-  await scenarioUpdate("financial_account", financialAccounts, data.id, updates, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateUpdate(ctx, "financial_account", financialAccounts, data.id, updates);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,
@@ -463,7 +467,8 @@ async function deleteAccount(
     return JSON.stringify({ success: false, error: "Cannot delete system accounts" });
   }
 
-  await scenarioDelete("financial_account", financialAccounts, data.id, ctx.scenarioId ?? null, ctx.companyId);
+  const res = await mutateDelete(ctx, "financial_account", financialAccounts, data.id);
+  if ("planned" in res) return planResultJson(res.planned);
 
   return JSON.stringify({
     success: true,

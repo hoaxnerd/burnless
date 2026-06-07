@@ -39,3 +39,45 @@ describe("PermissionCard", () => {
     expect(screen.queryByRole("button", { name: /allow once/i })).toBeNull();
   });
 });
+
+import type { ScenarioOverrideDelta } from "./types";
+
+const overrideDelta: ScenarioOverrideDelta[] = [
+  { action: "create", entityType: "revenue_stream", entityId: "id1", before: null, after: { id: "id1", name: "Pro Plan", type: "subscription" } },
+];
+const pendingWithDiff: PendingPermission = {
+  pauseId: "p2",
+  conversationId: "c1",
+  actions: [
+    { requestId: "t1", tool: "create_revenue_stream", category: "write", description: 'create revenue stream "Pro Plan"', input: { name: "Pro Plan" }, override: overrideDelta },
+  ],
+};
+
+describe("PermissionCard diff-gate", () => {
+  it("renders the before/after diff and Apply/Cancel labels when an override is present", () => {
+    render(<PermissionCard pending={pendingWithDiff} onDecide={() => {}} />);
+    expect(screen.getByText("Pro Plan")).toBeTruthy();          // the diff
+    expect(screen.getByRole("button", { name: /apply/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy();
+  });
+
+  it("Apply emits an 'once' decision (same approve path)", () => {
+    const onDecide = vi.fn();
+    render(<PermissionCard pending={pendingWithDiff} onDecide={onDecide} />);
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+    expect(onDecide).toHaveBeenCalledWith([{ requestId: "t1", decision: "once" }]);
+  });
+
+  it("Cancel emits a 'deny' decision", () => {
+    const onDecide = vi.fn();
+    render(<PermissionCard pending={pendingWithDiff} onDecide={onDecide} />);
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(onDecide).toHaveBeenCalledWith([{ requestId: "t1", decision: "deny" }]);
+  });
+
+  it("without an override, keeps the existing Allow once / Deny labels", () => {
+    render(<PermissionCard pending={pending} onDecide={() => {}} />);
+    expect(screen.getByRole("button", { name: /allow once/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^deny$/i })).toBeTruthy();
+  });
+});

@@ -116,7 +116,7 @@ async function getOrCreateFlags(companyId: string) {
     return {
       masterEnabled: existing.masterEnabled,
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
-      writeMode: (existing.writeMode ?? "full") as "full" | "confirm" | "read_only",
+      writeMode: (existing.writeMode ?? "confirm") as "full" | "confirm" | "read_only",
       features: existing.features as AiFeatureConfig,
       companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
       byokEnabled: existing.byokEnabled,
@@ -134,6 +134,7 @@ async function getOrCreateFlags(companyId: string) {
       companyId,
       masterEnabled: DEFAULT_AI_FLAGS.masterEnabled,
       dataMode: DEFAULT_AI_FLAGS.dataMode,
+      writeMode: DEFAULT_AI_FLAGS.writeMode,
       features: DEFAULT_AI_FLAGS.features,
     })
     .returning();

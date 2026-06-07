@@ -102,14 +102,18 @@ vi.mock("@/lib/ai-tools", () => ({
 // Mock the shared SSE responder: capture the reconstructed messages + scenarioId
 // (proves one-tool_result-per-tool_use-id), and return a dummy stream so the
 // continuation does NOT call a real provider.
-vi.mock("@/lib/chat-stream", () => ({
-  buildChatSSEResponse: vi.fn((params: { scenarioId: string; messages: unknown[] }) => {
-    hoisted.capturedSSEParams = { scenarioId: params.scenarioId, messages: params.messages };
-    return new Response("data: {}\n\n", {
-      headers: { "Content-Type": "text/event-stream" },
-    });
-  }),
-}));
+vi.mock("@/lib/chat-stream", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/chat-stream")>();
+  return {
+    ...actual,
+    buildChatSSEResponse: vi.fn((params: { scenarioId: string; messages: unknown[] }) => {
+      hoisted.capturedSSEParams = { scenarioId: params.scenarioId, messages: params.messages };
+      return new Response("data: {}\n\n", {
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }),
+  };
+});
 
 import {
   createUser,

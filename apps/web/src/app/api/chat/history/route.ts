@@ -47,18 +47,21 @@ export const GET = withErrorHandler(async (request: Request) => {
     // Rehydrate genui display blocks persisted on `metadata.uiBlocks` so reload
     // re-renders the inline components (spec §6/§8).
     const messages = rows.map((row) => {
-      const uiBlocks = (row.metadata as { uiBlocks?: unknown[] } | null)?.uiBlocks;
-      return uiBlocks ? { ...row, uiBlocks } : row;
+      const meta = row.metadata as { uiBlocks?: unknown[]; timeline?: unknown[] } | null;
+      const lifted: Record<string, unknown> = { ...row };
+      if (meta?.uiBlocks) lifted.uiBlocks = meta.uiBlocks;
+      if (meta?.timeline) lifted.timeline = meta.timeline;
+      return lifted;
     });
 
     // Ownership was verified above; surface any persisted pending batch so the
     // client can re-show the right card after a reload. A turn pauses for one of
-    // two reasons (kind): "permission" (a write/tool approval) or "input" (a form
-    // the model asked the user to fill). Branch on kind so reload restores the
-    // matching card.
+    // three reasons (kind): "permission" (a write/tool approval), "input" (a form
+    // the model asked the user to fill), or "plan" (an editable plan awaiting
+    // approval). Branch on kind so reload restores the matching card.
     const pendingRow = await getActivePendingAction(conversationId);
     const pendingPermission =
-      pendingRow && pendingRow.kind !== "input"
+      pendingRow && pendingRow.kind === "permission"
         ? {
             pauseId: pendingRow.pauseId,
             conversationId,
@@ -67,6 +70,7 @@ export const GET = withErrorHandler(async (request: Request) => {
                 requestId: string;
                 toolName: string;
                 toolInput: Record<string, unknown>;
+                override?: unknown[];
               }[]
             ).map((a) => ({
               requestId: a.requestId,
@@ -74,6 +78,8 @@ export const GET = withErrorHandler(async (request: Request) => {
               category: categorizeToolName(a.toolName),
               description: describeToolAction(a.toolName, a.toolInput),
               input: a.toolInput,
+              // Diff-gate delta persisted at pause-time (worklog Plan 3); null if none.
+              override: a.override ?? null,
             })),
           }
         : null;
@@ -85,8 +91,25 @@ export const GET = withErrorHandler(async (request: Request) => {
             spec: (pendingRow.pending as { spec: unknown }).spec,
           }
         : null;
+    const pendingPlan =
+      pendingRow && pendingRow.kind === "plan"
+        ? {
+            pauseId: pendingRow.pauseId,
+            conversationId,
+            spec: (pendingRow.pending as { spec: unknown }).spec,
+          }
+        : null;
 
-    return NextResponse.json({ conversationId, messages, pendingPermission, pendingInput });
+    return NextResponse.json({
+      conversationId,
+      messages,
+      pendingPermission,
+      pendingInput,
+      pendingPlan,
+      // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
+      // pause-time; the client prefers this over the per-kind pending fields.
+      pendingTimeline: (pendingRow?.timeline as unknown[] | null) ?? null,
+    });
   }
 
   // List conversations with cursor-based pagination

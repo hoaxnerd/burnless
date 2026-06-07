@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
@@ -17,6 +17,7 @@ import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse } from "@/lib/chat-stream";
+import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
 
 const chatSchema = z.object({
   message: z.string().min(1),
@@ -33,6 +34,14 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Set company context for usage tracking
   setTrackingCompanyId(ctx.companyId);
+
+  // Dual-channel scenario safety (spec §6 decision 4): cookie + X-Scenario-Id must
+  // agree. apiFetch keeps them in lockstep, so this only fires on a genuine drift.
+  try {
+    getActiveScenario(request);
+  } catch (e) {
+    return errorResponse(e instanceof ScenarioSafetyError ? e.message : "Scenario channel mismatch", 409);
+  }
 
   let body: z.infer<typeof chatSchema>;
   try {
@@ -74,6 +83,13 @@ export const POST = withErrorHandler(async (request: Request) => {
       .returning();
     conversationId = conv!.id;
   }
+
+  // Stale-pause guard (Plan 5): if the user left a plan/diff card unresolved and
+  // sends a new message, free the single-active slot first so the new turn's pause
+  // doesn't trip the ai_pending_actions_active_idx unique index (duplicate-key).
+  // The orphaned card goes inert (its resume 409s — already handled).
+  const stalePending = await getActivePendingAction(conversationId);
+  if (stalePending) await resolvePendingAction(stalePending.id);
 
   // Per-user permission defaults (fall back to builtin) + this conversation's grants.
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
@@ -157,6 +173,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     providerConfig,
     defaults,
     sessionGrants,
+    writeMode: aiCheck.writeMode ?? "confirm",
     creditWarning,
   });
 });

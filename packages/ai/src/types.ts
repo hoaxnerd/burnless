@@ -6,7 +6,7 @@
 import type { MonthlySeries, ComputedMetrics, ProfitAndLoss, CashFlowStatement } from "@burnless/engine";
 import type { Company, Scenario, Account, FundingRound } from "@burnless/types";
 import type { ContentBlock } from "./providers/types";
-import type { InputFormSpec } from "./generative-ui";
+import type { InputFormSpec, PlanSpec, TimelineNodeKind } from "./generative-ui";
 
 // ── Financial context passed to the AI ──────────────────────────────────────
 
@@ -202,6 +202,7 @@ export interface StreamChunk {
     | "tool_result"
     | "permission_request"
     | "input_request"
+    | "plan_request"
     | "paused"
     | "done"
     | "error";
@@ -217,6 +218,17 @@ export interface StreamChunk {
   pauseId?: string;
   /** For input_request: the form to render. */
   spec?: InputFormSpec;
+  /** For plan_request: the proposed plan to review. */
+  plan?: PlanSpec;
+  /** Binary model confidence on a result node (spec §4.3); P4 timeline result nodes
+   *  consume this. Optional plumbing — populated by the Plan 5 prompt convention. */
+  confidence?: "high" | "low";
+  /** One-line "because you said X" rationale on a result node (spec §4.3). */
+  rationale?: string;
+  /** Stable node id correlating tool_status/tool_result→the tool node (spec §4.5). */
+  nodeId?: string;
+  /** Which timeline node kind this chunk maps to (spec §4.5). */
+  nodeKind?: TimelineNodeKind;
 }
 
 // ── Tool definitions ────────────────────────────────────────────────────────

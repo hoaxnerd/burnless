@@ -45,6 +45,23 @@ export interface UiBlock {
   id: string;
   component: string;
   props: Record<string, unknown>;
+  /** Binary model confidence in this result (spec §4.3); populated in Plan 5. */
+  confidence?: "high" | "low";
+  /** One-line "because you said X" rationale (spec §4.3); populated in Plan 5. */
+  rationale?: string;
+}
+
+/**
+ * The envelope a display tool's handler returns (spec §4.3). `render` carries the
+ * component + props to display; `modelResult` is the terse string handed back to
+ * the model. `confidence`/`rationale` are optional binary-confidence plumbing
+ * (the model populates them via the Plan 5 prompt convention).
+ */
+export interface GenuiResultEnvelope {
+  render?: { component: string; props: Record<string, unknown> };
+  modelResult?: string;
+  confidence?: "high" | "low";
+  rationale?: string;
 }
 
 /** Persisted state for a turn paused awaiting form input (mirrors PauseState). */
@@ -210,4 +227,141 @@ export function buildInputFormSpec(
     };
   }
   throw new Error(`unknown input tool: ${toolName}`);
+}
+
+// ── Plan pause (spec 2026-06-07 §4.1) ────────────────────────────────────────
+
+export type PlanStepKind = "tool" | "note";
+
+/**
+ * One proposed step. `tool` steps name the tool the model intends to call (the
+ * model still calls it itself after the plan is approved — the step is advisory
+ * intent, not an execution instruction). `note` steps are free-text.
+ * `confidence`/`rationale` are surfaced in the UI in later plans.
+ */
+export interface PlanStep {
+  id: string;
+  kind: PlanStepKind;
+  /** Human-readable label for the step. */
+  title: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  rationale?: string;
+  confidence?: "high" | "low";
+}
+
+export interface PlanSpec {
+  title: string;
+  description?: string;
+  steps: PlanStep[];
+}
+
+/** Persisted state for a turn paused awaiting plan approval (mirrors InputRequestState). */
+export interface PlanRequestState {
+  assistantBlocks: unknown[];
+  completedResults: unknown[];
+  /** The propose_plan tool_use id the approved plan answers on resume. */
+  planToolUseId: string;
+  spec: PlanSpec;
+}
+
+/** Plan/control tool names. The model calls these to PAUSE for plan approval. */
+export const PLAN_TOOL_NAMES: ReadonlySet<string> = new Set<string>(["propose_plan"]);
+
+export function isPlanTool(toolName: string): boolean {
+  return PLAN_TOOL_NAMES.has(toolName);
+}
+
+function coercePlanStep(raw: unknown): PlanStep | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.title !== "string") return null;
+  const kind: PlanStepKind = r.kind === "tool" ? "tool" : "note";
+  // id is carried through if the model supplied a non-empty string; otherwise
+  // left as an empty placeholder so buildPlanSpec can assign a positional id.
+  const step: PlanStep = {
+    id: typeof r.id === "string" ? r.id : "",
+    kind,
+    title: r.title,
+  };
+  if (typeof r.toolName === "string") step.toolName = r.toolName;
+  if (r.toolInput && typeof r.toolInput === "object") step.toolInput = r.toolInput as Record<string, unknown>;
+  if (typeof r.rationale === "string") step.rationale = r.rationale;
+  if (r.confidence === "high" || r.confidence === "low") step.confidence = r.confidence;
+  return step;
+}
+
+/**
+ * Build the plan spec from the model's `propose_plan` tool input. Tolerant:
+ * coerces/drops malformed steps and defaults the title (the model's structured
+ * output is not guaranteed well-formed).
+ *
+ * Step ids are positional and deterministic per spec: same input always
+ * produces the same ids (step-1, step-2, …), regardless of call order or
+ * process lifetime. A model-provided non-empty string id is preserved as-is.
+ */
+export function buildPlanSpec(
+  toolName: string,
+  input: Record<string, unknown>
+): PlanSpec {
+  if (toolName !== "propose_plan") {
+    throw new Error(`unknown plan tool: ${toolName}`);
+  }
+  const steps = (Array.isArray(input.steps) ? input.steps : [])
+    .map(coercePlanStep)
+    .filter((s): s is PlanStep => s !== null)
+    .map((s, i) => ({ ...s, id: s.id && s.id.length > 0 ? s.id : `step-${i + 1}` }));
+  return {
+    title: typeof input.title === "string" ? input.title : "Plan",
+    description: typeof input.description === "string" ? input.description : undefined,
+    steps,
+  };
+}
+
+// ── Typed-node timeline (spec 2026-06-07 §4.5) ───────────────────────────────
+
+export type TimelineNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input" | "scenario";
+
+/** Rich gate payloads persisted inline on a TimelineNode (Plan 5) so a reloaded
+ *  run reconstructs the plan/diff/input gate WITHOUT the live pending row. Shapes
+ *  mirror the client PendingPlan/PendingPermission/PendingInput so persisted JSON
+ *  renders directly. */
+export interface TimelineGatePlan { pauseId: string; conversationId: string; spec: PlanSpec; resolved?: boolean; }
+export interface TimelineGateInput { pauseId: string; conversationId: string; spec: InputFormSpec; resolved?: boolean; }
+export interface TimelineGatePermission { pauseId: string; conversationId: string; actions: unknown[]; resolved?: boolean; }
+
+/**
+ * One node in an assistant turn's worklog. The ordered `TimelineNode[]` is the
+ * presentation model for the agentic timeline — accumulated from StreamChunks on
+ * the client and persisted to aiMessages.metadata.timeline so reload reconstructs
+ * the full run. `plan`/`diff_gate`/`input` carry their pause payload by reference
+ * (pauseId) so the existing pause/resume machinery is unchanged; `tool` tracks a
+ * live tool invocation; `result` is a rendered output (text and/or a UiBlock).
+ */
+export interface TimelineNode {
+  /** Stable id correlating status→result. tool nodes use the tool_use id. */
+  id: string;
+  kind: TimelineNodeKind;
+  // ── tool node ──
+  toolName?: string;
+  phase?: "pending" | "running" | "done" | "error";
+  // ── result node ──
+  /** Streamed assistant prose for a text result node. */
+  text?: string;
+  /** A rendered genui block for a component result node. */
+  block?: UiBlock;
+  confidence?: "high" | "low";
+  rationale?: string;
+  // ── plan / diff_gate / input nodes ── (payload lives on the pending row;
+  //    the client hydrates these from the SSE pause events by pauseId)
+  pauseId?: string;
+  // ── gate nodes (Plan 5: rich payload persisted for reload) ──
+  plan?: TimelineGatePlan;
+  pending?: TimelineGatePermission;
+  input?: TimelineGateInput;
+  /** Set once a gate has been decided (historical render). */
+  resolved?: boolean;
+  // ── scenario marker node (Plan 5) ──
+  scenarioId?: string;
+  scenarioName?: string;
 }

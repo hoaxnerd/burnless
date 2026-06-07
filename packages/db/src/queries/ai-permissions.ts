@@ -89,7 +89,7 @@ export interface NewPendingAction {
   conversationId: string;
   pauseId: string;
   /** Why the turn paused. Defaults to "permission". */
-  kind?: "permission" | "input";
+  kind?: "permission" | "input" | "plan";
   /** Active scenario the paused turn operates in (resume executes against this). */
   scenarioId: string;
   assistantBlocks: unknown;
@@ -138,4 +138,17 @@ export async function resolvePendingAction(id: string): Promise<void> {
     .update(aiPendingActions)
     .set({ resolvedAt: new Date() })
     .where(eq(aiPendingActions.id, id));
+}
+
+/** Persist the accumulated worklog timeline onto a still-active pending row, keyed
+ *  by pauseId (Plan 5). Called at pause-time so reload + the post-resume `done`
+ *  can reconstruct the full run. No-op if the pauseId is unknown/already resolved. */
+export async function updatePendingActionTimeline(
+  pauseId: string,
+  timeline: unknown[]
+): Promise<void> {
+  await db
+    .update(aiPendingActions)
+    .set({ timeline })
+    .where(and(eq(aiPendingActions.pauseId, pauseId), isNull(aiPendingActions.resolvedAt)));
 }

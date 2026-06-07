@@ -12,6 +12,35 @@ import { GENUI_DISPLAY_TOOLS, GENUI_INPUT_TOOLS } from "./tools-genui";
 /** Tool definitions for the AI assistant's function-calling capability. */
 const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
+    name: "propose_plan",
+    description:
+      "Before performing any data change (create/update/delete) or a multi-step task, call this to show the user an editable plan and PAUSE for approval. List the steps you intend to take in order — for steps that will call a tool, set kind:\"tool\" and name it; for explanatory steps set kind:\"note\". Add a short `rationale` and a `confidence` of \"high\" or \"low\" per step. The user reviews/edits the plan; on approval the plan comes back to you as a tool result and you then execute the steps (each data change still goes through its own confirmation). Do NOT call propose_plan for a simple read-only question — just answer it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the plan." },
+        description: { type: "string", description: "Optional one-line summary." },
+        steps: {
+          type: "array",
+          description: "Ordered steps you intend to take.",
+          items: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: ["tool", "note"], description: "\"tool\" if this step calls a tool, else \"note\"." },
+              title: { type: "string", description: "Human-readable step label." },
+              toolName: { type: "string", description: "For kind:tool — the tool you'll call." },
+              toolInput: { type: "object", description: "For kind:tool — the proposed arguments." },
+              rationale: { type: "string", description: "Why this step." },
+              confidence: { type: "string", enum: ["high", "low"], description: "Your confidence in this step." },
+            },
+            required: ["kind", "title"],
+          },
+        },
+      },
+      required: ["title", "steps"],
+    },
+  },
+  {
     name: "create_scenario",
     description:
       "Create a new financial scenario (e.g., best case, worst case, custom what-if). Returns the new scenario ID.",
@@ -29,6 +58,27 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name"],
     },
+  },
+  {
+    name: "activate_scenario",
+    description:
+      "Switch the user's ACTIVE scenario view to an existing scenario by id, so it appears in the UI (the scenario bar at the top) and their pages reflect it. Use when the user asks to open / switch to / work in a specific existing scenario. This is a read-only VIEW change — it does not modify any data and is not gated. For a NEW scenario use create_scenario (which activates it automatically). Reading from a scenario for comparison does NOT need this — get_scenario_comparison reads any scenario by id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scenarioId: {
+          type: "string",
+          description: "The id of the existing scenario to activate (from context).",
+        },
+      },
+      required: ["scenarioId"],
+    },
+  },
+  {
+    name: "list_scenarios",
+    description:
+      "List the company's existing scenarios, each with a short diff headline (how many overrides it has, by entity type + action) so you can SEE what what-ifs already exist and what each one changes. ALWAYS call this before create_scenario to avoid creating a duplicate of a scenario that already exists — if a matching one exists, activate_scenario it instead. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "create_forecast_line",

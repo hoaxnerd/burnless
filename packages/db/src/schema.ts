@@ -942,7 +942,7 @@ export const aiFeatureFlags = pgTable(
         weeklyDigest: true,
       }),
     // AI write mode — guardrail for AI mutations (full = execute, confirm = ask first, read_only = block)
-    writeMode: aiWriteModeEnum("write_mode").notNull().default("full"),
+    writeMode: aiWriteModeEnum("write_mode").notNull().default("confirm"),
     // Configurable companion name (default: "Companion")
     companionName: text("companion_name").notNull().default("Companion"),
     // BYOK (Bring Your Own Key) — when false, platform LLM is used; when true, company's own provider config is used
@@ -1077,7 +1077,7 @@ export const aiMessages = pgTable(
       .references(() => aiConversations.id, { onDelete: "cascade" }),
     role: aiMessageRoleEnum("role").notNull(),
     content: text("content").notNull(),
-    metadata: jsonb("metadata"),
+    metadata: jsonb("metadata").$type<{ uiBlocks?: unknown[]; timeline?: unknown[] }>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
@@ -1093,6 +1093,7 @@ export const aiMessages = pgTable(
 export const aiPendingActionKindEnum = pgEnum("ai_pending_action_kind", [
   "permission",
   "input",
+  "plan",
 ]);
 
 export const aiPendingActions = pgTable(
@@ -1121,6 +1122,12 @@ export const aiPendingActions = pgTable(
     completedResults: jsonb("completed_results").notNull().default([]),
     /** Actions awaiting a user decision: [{ requestId, tool, category, ... }]. */
     pending: jsonb("pending").notNull(),
+    /**
+     * Worklog timeline accumulated before this pause (Plan 5 full-run persistence).
+     * Mirrors @burnless/ai's TimelineNode shape; typed `unknown[]` to avoid a
+     * cross-package schema import.
+     */
+    timeline: jsonb("timeline").$type<unknown[]>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at", { mode: "date" }),
   },
@@ -1715,6 +1722,7 @@ export const aiToolAuditLogStatusEnum = pgEnum("ai_tool_audit_log_status", [
   "success",
   "error",
   "validation_error",
+  "pending_apply",
 ]);
 
 export const aiToolAuditLogs = pgTable(

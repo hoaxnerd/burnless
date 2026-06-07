@@ -24,6 +24,7 @@ export {
   deleteOverride,
   deleteOverrideByEntity,
   getOverrideCount,
+  getOverrideBreakdown,
 } from "./scenario-overrides";
 
 export {
@@ -37,7 +38,12 @@ export {
   scenarioInsert,
   scenarioUpdate,
   scenarioDelete,
+  planScenarioInsert,
+  planScenarioUpdate,
+  planScenarioDelete,
+  commitScenarioPlan,
 } from "./scenario-mutations";
+export type { ScenarioPlan } from "./scenario-mutations";
 
 export { promoteScenario } from "./scenario-promotion";
 
@@ -88,6 +94,7 @@ export {
   createPendingAction,
   getActivePendingAction,
   resolvePendingAction,
+  updatePendingActionTimeline,
 } from "./ai-permissions";
 export type {
   PermissionModeValue,

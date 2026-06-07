@@ -27,6 +27,7 @@ import {
   AddFundingRoundInvestorSchema,
   MarkGrantMilestoneHitSchema,
   ModelDilutionSchema,
+  MUTATION_TOOL_NAMES,
 } from "@burnless/ai";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
@@ -80,23 +81,31 @@ const toolHandlers: Record<string, ToolHandler> = {
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
 
-/** Tools that create, update, or delete data. Read-only tools are excluded. */
-const MUTATION_TOOLS = new Set([
-  // Create
-  "create_scenario", "create_headcount", "create_department", "create_revenue_stream",
-  "create_funding_round", "create_funding_round_investor", "update_grant_milestone",
-  "create_forecast_line", "create_account",
-  "create_salary_change", "create_bonus", "create_equity_grant",
-  // Update
-  "update_scenario", "update_headcount", "update_department", "update_revenue_stream",
-  "update_funding_round", "update_forecast_line", "update_account",
-  // Delete
-  "delete_scenario", "delete_headcount", "delete_department", "delete_revenue_stream",
-  "delete_funding_round", "delete_forecast_line", "delete_account",
-]);
+/** Tools that create, update, or delete data. Single source of truth: the
+ *  permission layer's MUTATION_TOOL_NAMES (WRITE_TOOLS ∪ DELETE_TOOLS). Deriving
+ *  it here keeps the diff-gate, cache invalidation, and permission resolver from
+ *  drifting (spec §4.4 "unify the two mutation sets"). */
+const MUTATION_TOOLS: ReadonlySet<string> = MUTATION_TOOL_NAMES;
 
 function isMutationTool(toolName: string): boolean {
   return MUTATION_TOOLS.has(toolName);
+}
+
+/** Mutation tools that DON'T route through the scenario-mutate facade — they
+ *  write non-overridable tables directly (scenario CRUD writes `scenarios`;
+ *  investor writes `fundingRoundInvestors`) and ignore ctx.mode. They cannot be
+ *  previewed as a scenario-override diff, so plan mode must not run them (it would
+ *  write while auditing pending_apply). See worklog Plan 3 / carry-over follow-up a. */
+const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
+  "create_scenario",
+  "update_scenario",
+  "delete_scenario",
+  "create_funding_round_investor",
+]);
+
+/** A mutation whose plan mode yields a real scenario-override delta (diff-gate). */
+function isDiffableMutationTool(toolName: string): boolean {
+  return isMutationTool(toolName) && !NON_FACADE_MUTATION_TOOLS.has(toolName);
 }
 
 /** Maps mutation tool names to the cache tags they should invalidate.
@@ -176,7 +185,7 @@ function logToolAudit(
   context: ToolContext,
   toolName: string,
   input: Record<string, unknown>,
-  status: "success" | "error" | "validation_error",
+  status: "success" | "error" | "validation_error" | "pending_apply",
   result: unknown,
   durationMs: number
 ) {
@@ -226,6 +235,16 @@ export async function executeToolCall(
     return JSON.stringify(errorResult);
   }
 
+  // Plan-mode safety (worklog Plan 3): a non-facade mutation cannot be previewed
+  // as a scenario-override delta and would WRITE if its handler ran. In plan mode,
+  // skip execution entirely and return an empty plan envelope so the diff-gate
+  // shows no diff (plain permission card); the real write happens on Apply (commit).
+  if (context.mode === "plan" && isMutationTool(toolName) && !isDiffableMutationTool(toolName)) {
+    const planned = JSON.stringify({ planned: true, overrides: [] });
+    logToolAudit(context, toolName, input, "pending_apply", { planned: true, overrides: [] }, Math.round(performance.now() - startTime));
+    return planned;
+  }
+
   let result: string;
   try {
     result = await handler(data, context);
@@ -236,8 +255,10 @@ export async function executeToolCall(
     return JSON.stringify({ error: `Tool execution failed: ${errorMsg}` });
   }
 
-  // Invalidate relevant caches after successful mutations so pages show fresh data
-  if (isMutationTool(toolName)) {
+  const isPlan = context.mode === "plan";
+
+  // Plan mode previews the write — never invalidate caches (nothing was committed).
+  if (!isPlan && isMutationTool(toolName)) {
     invalidateCacheForTool(toolName);
   }
 
@@ -248,7 +269,7 @@ export async function executeToolCall(
   } catch {
     parsedResult = { raw: result };
   }
-  logToolAudit(context, toolName, input, "success", parsedResult, durationMs);
+  logToolAudit(context, toolName, input, isPlan ? "pending_apply" : "success", parsedResult, durationMs);
 
   return result;
 }
@@ -264,6 +285,9 @@ export function logDeniedToolCall(
   toolName: string,
   input: Record<string, unknown>
 ): void {
+  // NOTE: a declined tool has no dedicated audit status; "success" here means
+  // "the decline was recorded without error". Disambiguate via permissionDecision:
+  // "denied" in queries — do NOT treat status="success" alone as "tool ran".
   logToolAudit(
     { ...context, permissionDecision: "denied" },
     toolName,
@@ -276,3 +300,11 @@ export function logDeniedToolCall(
 
 // Re-export types for consumers
 export type { ToolContext } from "./types";
+
+/** Internal handles exposed for regression guards only — not a public API. */
+export const __testables = {
+  MUTATION_TOOLS,
+  MUTATION_CACHE_TAGS: MUTATION_CACHE_TAGS as Readonly<Record<string, string[]>>,
+  NON_FACADE_MUTATION_TOOLS,
+  isDiffableMutationTool,
+};

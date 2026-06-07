@@ -220,6 +220,7 @@ describe("GET /api/chat/history", () => {
     // an unresolved paused turn exists
     mockGetActivePendingAction.mockResolvedValueOnce({
       pauseId: "pause-1",
+      kind: "permission",
       pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
     });
 

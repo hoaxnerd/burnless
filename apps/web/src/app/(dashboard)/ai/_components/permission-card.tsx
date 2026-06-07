@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, MonitorPlay, ChevronDown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DiffGate } from "./generative/diff-gate";
 import type { PendingPermission, PermissionCategoryId, PermissionDecisionKind } from "./types";
 
 const CATEGORY_ICON: Record<PermissionCategoryId, React.ReactNode> = {
@@ -41,6 +42,8 @@ export function PermissionCard({
     onDecide(pending.actions.map((a) => ({ requestId: a.requestId, decision })));
 
   const hasDelete = pending.actions.some((a) => a.category === "delete");
+  const diffActions = pending.actions.filter((a) => a.override && a.override.length > 0);
+  const hasDiff = diffActions.length > 0;
 
   return (
     <div className="rounded-2xl border border-accent-200 bg-accent-50/40 p-4 animate-slide-up">
@@ -48,6 +51,10 @@ export function PermissionCard({
         <span className="text-accent-600">{CATEGORY_ICON[pending.actions[0]!.category]}</span>
         {multi ? `${pending.actions.length} actions need your approval` : "Approve this action?"}
       </div>
+
+      {hasDiff
+        ? diffActions.map((a) => <DiffGate key={a.requestId} override={a.override!} />)
+        : null}
 
       <ul className="space-y-1.5 mb-3">
         {pending.actions.map((a) => (
@@ -76,13 +83,13 @@ export function PermissionCard({
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="primary" onClick={() => decideAll("once")}>
-          {multi ? "Allow all once" : "Allow once"}
+          {hasDiff ? (multi ? "Apply all" : "Apply") : multi ? "Allow all once" : "Allow once"}
         </Button>
         <Button size="sm" variant="secondary" onClick={() => decideAll("session")}>
           Allow for session
         </Button>
         <Button size="sm" variant="ghost" onClick={() => decideAll("deny")}>
-          Deny
+          {hasDiff ? "Cancel" : "Deny"}
         </Button>
       </div>
 

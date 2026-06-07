@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { getFinancialTools } from "../tools";
 import { TOOL_NAME_ALIASES } from "../tool-aliases";
-import { DISPLAY_TOOL_NAMES, INPUT_TOOL_NAMES } from "../generative-ui";
+import { DISPLAY_TOOL_NAMES, INPUT_TOOL_NAMES, PLAN_TOOL_NAMES } from "../generative-ui";
 
 const ALLOWED_PREFIXES = ["create_", "get_", "update_", "delete_"];
 const WEB_TOOLS = new Set(["search_web", "read_webpage", "read_webpage_rendered"]);
+// View-control tools (read-only, not gated) are an intentional family — they
+// change the user's UI view (e.g. active scenario) without mutating data, so
+// they do not fit the CRUD verb prefixes. Allowlisted like WEB_TOOLS.
+const CONTROL_TOOLS = new Set(["activate_scenario", "list_scenarios"]);
 
 describe("tool naming convention", () => {
   const tools = getFinancialTools();
@@ -14,8 +18,15 @@ describe("tool naming convention", () => {
       // Generative-UI display (show_*) and input (request_*) tools are a distinct,
       // intentional family — they are allowed only if registered in their set, so a
       // stray show_*/request_* name still fails (guards correct registration).
+      // Plan tools (propose_plan) are a separate family registered in PLAN_TOOL_NAMES.
       const isGenui = DISPLAY_TOOL_NAMES.has(t.name) || INPUT_TOOL_NAMES.has(t.name);
-      const ok = isGenui || WEB_TOOLS.has(t.name) || ALLOWED_PREFIXES.some((p) => t.name.startsWith(p));
+      const isPlan = PLAN_TOOL_NAMES.has(t.name);
+      const ok =
+        isGenui ||
+        isPlan ||
+        WEB_TOOLS.has(t.name) ||
+        CONTROL_TOOLS.has(t.name) ||
+        ALLOWED_PREFIXES.some((p) => t.name.startsWith(p));
       expect(ok, `tool "${t.name}" violates the naming convention`).toBe(true);
     }
   });

@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { scenarioOverrides } from "../schema";
 
@@ -84,4 +84,23 @@ export async function getOverrideCount(scenarioId: string) {
     .from(scenarioOverrides)
     .where(eq(scenarioOverrides.scenarioId, scenarioId));
   return result?.count ?? 0;
+}
+
+/**
+ * Grouped override breakdown for a set of scenarios — one row per
+ * (scenarioId, entityType, action) with a count. Powers the list_scenarios diff
+ * headline (Plan 5) without computing full dashboards.
+ */
+export async function getOverrideBreakdown(scenarioIds: string[]) {
+  if (scenarioIds.length === 0) return [] as { scenarioId: string; entityType: string; action: string; count: number }[];
+  return db
+    .select({
+      scenarioId: scenarioOverrides.scenarioId,
+      entityType: scenarioOverrides.entityType,
+      action: scenarioOverrides.action,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(scenarioOverrides)
+    .where(inArray(scenarioOverrides.scenarioId, scenarioIds))
+    .groupBy(scenarioOverrides.scenarioId, scenarioOverrides.entityType, scenarioOverrides.action);
 }

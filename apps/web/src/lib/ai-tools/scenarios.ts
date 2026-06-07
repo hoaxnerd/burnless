@@ -2,7 +2,7 @@
  * Scenario creation, update, deletion, and comparison tools.
  */
 
-import { db } from "@burnless/db";
+import { db, getOverrideBreakdown } from "@burnless/db";
 import { scenarios } from "@burnless/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -32,6 +32,12 @@ export const compareScenarioSchema = z.object({
   compareScenarioId: idString,
 });
 
+export const activateScenarioSchema = z.object({
+  scenarioId: idString,
+});
+
+export const listScenariosSchema = z.object({});
+
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
 async function createScenario(
@@ -54,6 +60,7 @@ async function createScenario(
   return JSON.stringify({
     success: true,
     scenarioId: row!.id,
+    name: row!.name,
     message: `Created scenario "${row!.name}". ID: ${row!.id}`,
   });
 }
@@ -151,6 +158,63 @@ async function deleteScenario(
   });
 }
 
+async function activateScenario(
+  input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const data = input as z.infer<typeof activateScenarioSchema>;
+  const ctx = requireCompanyId(context);
+  // View-only control: verify the scenario is owned + not deleted, then hand the
+  // id+name back. chat-stream emits `scenario_activated` from this result so the
+  // client runs the real enterScenario (top bar) — no data is written here.
+  const [row] = await db
+    .select({ id: scenarios.id, name: scenarios.name })
+    .from(scenarios)
+    .where(and(eq(scenarios.id, data.scenarioId), eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)));
+  if (!row) {
+    return JSON.stringify({ success: false, error: "Scenario not found or access denied" });
+  }
+  return JSON.stringify({
+    success: true,
+    scenarioId: row.id,
+    name: row.name,
+    activated: true,
+    message: `Activated scenario "${row.name}".`,
+  });
+}
+
+async function listScenarios(
+  _input: Record<string, unknown>,
+  context: ToolContext
+): Promise<string> {
+  const ctx = requireCompanyId(context);
+  const rows = await db
+    .select({ id: scenarios.id, name: scenarios.name, source: scenarios.source, status: scenarios.status })
+    .from(scenarios)
+    .where(and(eq(scenarios.companyId, ctx.companyId), isNull(scenarios.deletedAt)))
+    .orderBy(scenarios.createdAt);
+
+  const breakdown = await getOverrideBreakdown(rows.map((r) => r.id));
+  const byScenario = new Map<string, { entityType: string; action: string; count: number }[]>();
+  for (const b of breakdown) {
+    const list = byScenario.get(b.scenarioId) ?? [];
+    list.push({ entityType: b.entityType, action: b.action, count: b.count });
+    byScenario.set(b.scenarioId, list);
+  }
+
+  const out = rows.map((r) => {
+    const changes = byScenario.get(r.id) ?? [];
+    const overrideCount = changes.reduce((s, c) => s + c.count, 0);
+    const headline =
+      changes.length === 0
+        ? "no changes from base"
+        : changes.map((c) => `${c.count} ${c.entityType} ${c.action}`).join(", ");
+    return { id: r.id, name: r.name, source: r.source, status: r.status, overrideCount, changes, headline };
+  });
+
+  return JSON.stringify({ success: true, scenarios: out });
+}
+
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const scenarioSchemas: Record<string, z.ZodType> = {
@@ -158,6 +222,8 @@ export const scenarioSchemas: Record<string, z.ZodType> = {
   update_scenario: updateScenarioSchema,
   delete_scenario: deleteScenarioSchema,
   get_scenario_comparison: compareScenarioSchema,
+  activate_scenario: activateScenarioSchema,
+  list_scenarios: listScenariosSchema,
 };
 
 export const scenarioHandlers: Record<string, ToolHandler> = {
@@ -165,4 +231,6 @@ export const scenarioHandlers: Record<string, ToolHandler> = {
   update_scenario: updateScenario,
   delete_scenario: deleteScenario,
   get_scenario_comparison: compareScenariosTool,
+  activate_scenario: activateScenario,
+  list_scenarios: listScenarios,
 };

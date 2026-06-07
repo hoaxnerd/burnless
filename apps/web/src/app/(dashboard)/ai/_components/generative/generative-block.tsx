@@ -15,6 +15,7 @@ import { GenComparisonTable, type GenComparisonTableProps } from "./comparison-t
 import { GenChecklist, type GenChecklistProps } from "./checklist";
 import { GenSuggestedActions, type GenSuggestedActionsProps } from "./suggested-actions";
 import { GenProgressSteps, type GenProgressStepsProps } from "./progress-steps";
+import { ConfidenceChip } from "./confidence-chip";
 
 export interface GenerativeBlockProps {
   component: string;
@@ -86,12 +87,10 @@ export function GenerativeBlocks({
   return (
     <>
       {blocks.map((b) => (
-        <GenerativeBlock
-          key={b.id}
-          component={b.component}
-          props={b.props}
-          onAction={onAction}
-        />
+        <div key={b.id}>
+          <GenerativeBlock component={b.component} props={b.props} onAction={onAction} />
+          <ConfidenceChip confidence={b.confidence} rationale={b.rationale} />
+        </div>
       ))}
     </>
   );

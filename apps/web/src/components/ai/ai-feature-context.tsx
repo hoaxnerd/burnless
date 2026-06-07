@@ -82,7 +82,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           setFlags({
             masterEnabled: data.masterEnabled,
             dataMode: data.dataMode,
-            writeMode: data.writeMode ?? "full",
+            writeMode: data.writeMode ?? "confirm",
             companionName: data.companionName ?? DEFAULT_COMPANION_NAME,
             features: data.features,
           });
@@ -137,7 +137,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           setFlags({
             masterEnabled: updated.masterEnabled,
             dataMode: updated.dataMode,
-            writeMode: updated.writeMode ?? "full",
+            writeMode: updated.writeMode ?? "confirm",
             companionName: updated.companionName ?? DEFAULT_COMPANION_NAME,
             features: updated.features,
           });
