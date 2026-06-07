@@ -30,7 +30,10 @@ import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/l
 import { executeToolCall, logDeniedToolCall } from "@/lib/ai-tools";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
-import { buildChatSSEResponse } from "@/lib/chat-stream";
+import { buildChatSSEResponse, scenarioActivationFrom } from "@/lib/chat-stream";
+import { NextResponse } from "next/server";
+import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
+import type { TimelineNode } from "@burnless/ai";
 
 const resumeSchema = z.object({
   conversationId: z.string().min(1),
@@ -60,6 +63,20 @@ interface PendingActionRecord {
   toolInput: Record<string, unknown>;
 }
 
+/** Build the seed timeline for a resumed turn: the lead-up + gate nodes persisted
+ *  at pause-time, with THIS pause's gate marked resolved so it renders historical
+ *  once `done` persists the full run (Plan 5). */
+function buildSeedTimeline(timeline: unknown, pauseId: string): TimelineNode[] {
+  const nodes = (Array.isArray(timeline) ? timeline : []) as TimelineNode[];
+  return nodes.map((n) => {
+    if (n.id !== pauseId) return n;
+    if (n.plan) return { ...n, plan: { ...n.plan, resolved: true }, resolved: true };
+    if (n.pending) return { ...n, pending: { ...n.pending, resolved: true }, resolved: true };
+    if (n.input) return { ...n, input: { ...n.input, resolved: true }, resolved: true };
+    return { ...n, resolved: true };
+  });
+}
+
 /**
  * Rebuild the resume stream: load full conversation history, append the paused
  * assistant turn + a single user turn carrying ALL tool_result blocks
@@ -76,8 +93,10 @@ async function resumeStream(args: {
   completedResults: ContentBlock[];
   resumeResults: ContentBlock[];
   writeMode?: AiWriteMode;
+  seedTimeline?: TimelineNode[];
+  activatedScenarios?: { scenarioId: string; name: string }[];
 }): Promise<Response> {
-  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults, writeMode } = args;
+  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, seedTimeline, activatedScenarios } = args;
 
   const history = await db
     .select()
@@ -127,6 +146,8 @@ async function resumeStream(args: {
     defaults,
     sessionGrants,
     writeMode: writeMode ?? "confirm",
+    seedTimeline,
+    activatedScenarios,
   });
 }
 
@@ -137,6 +158,16 @@ export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   setTrackingCompanyId(ctx.companyId);
+
+  // Dual-channel scenario safety (spec §6 decision 4): the cookie + X-Scenario-Id
+  // header must agree. apiFetch keeps them in lockstep, so this only fires on a
+  // genuine drift. Returns the active scenario id (null in base view).
+  let headerScenarioId: string | null;
+  try {
+    headerScenarioId = getActiveScenario(request);
+  } catch (e) {
+    return errorResponse(e instanceof ScenarioSafetyError ? e.message : "Scenario channel mismatch", 409);
+  }
 
   let body: z.infer<typeof resumeSchema>;
   try {
@@ -207,6 +238,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       completedResults,
       resumeResults: [inputResult],
       writeMode: aiCheck.writeMode ?? "confirm",
+      seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
 
@@ -233,6 +265,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       completedResults,
       resumeResults: [planResult],
       writeMode: aiCheck.writeMode ?? "confirm",
+      seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
 
@@ -243,7 +276,40 @@ export const POST = withErrorHandler(async (request: Request) => {
   const pending = pendingRow.pending as PendingActionRecord[];
   const decisionMap = new Map(body.decisions.map((d) => [d.requestId, d.decision]));
 
+  // Decision 4 (spec §6): re-confirm the user is still in the scenario this turn
+  // paused in before committing. effectiveActive = the header value, or the default
+  // scenario when in base view. Tolerate a mismatch only when the active scenario
+  // was created by THIS conversation (the AI activated its own new scenario — not a
+  // user switch). Otherwise surface a "scenario changed" prompt instead of silently
+  // committing to the old overlay.
+  // Only run decision-4 when the client asserts an ACTIVE scenario via the header.
+  // With no header the client is in true base view (no scenario channel) and is not
+  // signalling a switch — the resume still targets the persisted overlay (§5), so
+  // there is nothing to re-confirm. (Resolving the default and comparing here would
+  // false-positive a base-view resume of a turn paused inside a non-default scenario.)
+  if (headerScenarioId) {
+    const effectiveActiveId = headerScenarioId;
+    if (effectiveActiveId !== pendingRow.scenarioId) {
+      const [activeScn] = await db
+        .select({ aiConversationId: scenariosTable.aiConversationId, name: scenariosTable.name })
+        .from(scenariosTable)
+        .where(and(eq(scenariosTable.id, effectiveActiveId), eq(scenariosTable.companyId, ctx.companyId)));
+      const tolerated = activeScn?.aiConversationId === body.conversationId;
+      if (!tolerated) {
+        return NextResponse.json(
+          {
+            error: "The active scenario changed since this action was proposed.",
+            code: "SCENARIO_CHANGED",
+            details: { pendingScenarioId: pendingRow.scenarioId, activeScenarioId: effectiveActiveId, activeScenarioName: activeScn?.name ?? null },
+          },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
   // Execute / synthesize results for each pending action.
+  const activatedScenarios: { scenarioId: string; name: string }[] = [];
   const pendingResults: ContentBlock[] = [];
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
@@ -275,6 +341,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       permissionDecision: decision === "session" ? "granted_session" : "granted_once",
     });
     pendingResults.push({ type: "tool_result", toolUseId: action.requestId, content: result });
+    const activation = scenarioActivationFrom(action.toolName, result);
+    if (activation) activatedScenarios.push(activation);
   }
 
   await resolvePendingAction(pendingRow.id);
@@ -287,5 +355,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     completedResults,
     resumeResults: pendingResults,
     writeMode: aiCheck.writeMode ?? "confirm",
+    seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
+    activatedScenarios,
   });
 });
