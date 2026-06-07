@@ -1716,6 +1716,7 @@ export const aiToolAuditLogStatusEnum = pgEnum("ai_tool_audit_log_status", [
   "success",
   "error",
   "validation_error",
+  "pending_apply",
 ]);
 
 export const aiToolAuditLogs = pgTable(

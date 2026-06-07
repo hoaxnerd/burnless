@@ -168,7 +168,7 @@ function logToolAudit(
   context: ToolContext,
   toolName: string,
   input: Record<string, unknown>,
-  status: "success" | "error" | "validation_error",
+  status: "success" | "error" | "validation_error" | "pending_apply",
   result: unknown,
   durationMs: number
 ) {
@@ -228,8 +228,10 @@ export async function executeToolCall(
     return JSON.stringify({ error: `Tool execution failed: ${errorMsg}` });
   }
 
-  // Invalidate relevant caches after successful mutations so pages show fresh data
-  if (isMutationTool(toolName)) {
+  const isPlan = context.mode === "plan";
+
+  // Plan mode previews the write — never invalidate caches (nothing was committed).
+  if (!isPlan && isMutationTool(toolName)) {
     invalidateCacheForTool(toolName);
   }
 
@@ -240,7 +242,7 @@ export async function executeToolCall(
   } catch {
     parsedResult = { raw: result };
   }
-  logToolAudit(context, toolName, input, "success", parsedResult, durationMs);
+  logToolAudit(context, toolName, input, isPlan ? "pending_apply" : "success", parsedResult, durationMs);
 
   return result;
 }
@@ -256,6 +258,9 @@ export function logDeniedToolCall(
   toolName: string,
   input: Record<string, unknown>
 ): void {
+  // NOTE: a declined tool has no dedicated audit status; "success" here means
+  // "the decline was recorded without error". Disambiguate via permissionDecision:
+  // "denied" in queries — do NOT treat status="success" alone as "tool ran".
   logToolAudit(
     { ...context, permissionDecision: "denied" },
     toolName,

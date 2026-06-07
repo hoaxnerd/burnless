@@ -13,6 +13,10 @@ export interface ToolContext {
   conversationId?: string;
   /** How this call was authorized — recorded in the audit log. */
   permissionDecision?: "auto" | "granted_once" | "granted_session" | "denied";
+  /** Execution mode (spec §4.2). "plan" computes the override delta WITHOUT
+   *  writing, skips cache invalidation, and audits pending_apply. "commit"
+   *  (default) is today's behavior: write + invalidate + audit success. */
+  mode?: "plan" | "commit";
 }
 
 // ── Validation primitives ────────────────────────────────────────────────────
