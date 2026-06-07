@@ -124,9 +124,16 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 if (parsed.render?.component) {
                   const id = crypto.randomUUID();
                   const block: UiBlock = { id, component: parsed.render.component, props: parsed.render.props ?? {} };
-                  // Binary confidence + rationale (spec §4.3); absent until Plan 5's prompt.
-                  if (parsed.confidence === "high" || parsed.confidence === "low") block.confidence = parsed.confidence;
-                  if (typeof parsed.rationale === "string") block.rationale = parsed.rationale;
+                  // Binary confidence + rationale (spec §4.3). The envelope is built
+                  // server-side and rarely carries them, so fall back to the model's
+                  // tool INPUT (Plan 5 prompt convention) — this lights the chip.
+                  const inp = input as Record<string, unknown>;
+                  const inConf = inp.confidence === "high" || inp.confidence === "low" ? inp.confidence : undefined;
+                  const inRat = typeof inp.rationale === "string" ? inp.rationale : undefined;
+                  const confidence = parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : inConf;
+                  const rationale = typeof parsed.rationale === "string" ? parsed.rationale : inRat;
+                  if (confidence === "high" || confidence === "low") block.confidence = confidence;
+                  if (typeof rationale === "string") block.rationale = rationale;
                   uiBlocks.push(block);
                   timeline.push({ id, kind: "result", block, confidence: block.confidence, rationale: block.rationale });
                   send(controller, {
