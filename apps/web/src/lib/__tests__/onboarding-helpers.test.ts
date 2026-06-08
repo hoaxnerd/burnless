@@ -5,6 +5,9 @@ import {
   parseBusinessModel,
   parseMoneyAmount,
   parseTeamSize,
+  SANE_MAX_AMOUNT,
+  SANE_MAX_COUNT,
+  SANE_MAX_SALARY,
 } from "../onboarding-helpers";
 
 // ── parseStage ────────────────────────────────────────────────────────────────
@@ -398,6 +401,185 @@ describe("onboardingSchema", () => {
         ],
       };
       expect(() => onboardingSchema.parse(input)).toThrow();
+    });
+  });
+
+  // ── ONB-02: sane upper bounds on financial values ─────────────────────────
+  describe("ONB-02 financial value bounds", () => {
+    const base = { company_name: "Acme Corp" };
+
+    it("rejects a revenue_streams amount above the hard max", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          revenue_streams: [
+            {
+              name: "Huge",
+              type: "subscription",
+              amount: SANE_MAX_AMOUNT + 1,
+              quantity: 10,
+              startDate: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a negative revenue_streams amount", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          revenue_streams: [
+            {
+              name: "Neg",
+              type: "subscription",
+              amount: -5,
+              quantity: 10,
+              startDate: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a quantity above the count max", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          revenue_streams: [
+            {
+              name: "Q",
+              type: "usage_based",
+              amount: 1,
+              quantity: SANE_MAX_COUNT + 1,
+              startDate: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a headcount salary above the salary max", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          headcount: [
+            {
+              title: "CEO",
+              department: "Engineering",
+              employeeType: "full_time",
+              salary: SANE_MAX_SALARY + 1,
+              startDate: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a negative headcount salary", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          headcount: [
+            {
+              title: "CEO",
+              department: "Engineering",
+              employeeType: "full_time",
+              salary: -1,
+              startDate: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a funding_rounds amount above the hard max", () => {
+      expect(() =>
+        onboardingSchema.parse({
+          ...base,
+          funding_rounds: [
+            {
+              name: "Mega",
+              type: "seed",
+              amount: SANE_MAX_AMOUNT + 1,
+              date: "2026-06-01",
+            },
+          ],
+        }),
+      ).toThrow();
+    });
+
+    it("rejects a monthly_revenue string whose parsed value exceeds the hard max", () => {
+      // 2 trillion > SANE_MAX_AMOUNT (1e12)
+      expect(() =>
+        onboardingSchema.parse({ ...base, monthly_revenue: "2000000000000" }),
+      ).toThrow();
+    });
+
+    it("rejects a funding string whose parsed value exceeds the hard max", () => {
+      expect(() =>
+        onboardingSchema.parse({ ...base, funding: "5000000000000" }),
+      ).toThrow();
+    });
+
+    it("rejects a team_size string whose parsed value exceeds the count max", () => {
+      expect(() =>
+        onboardingSchema.parse({ ...base, team_size: "200000" }),
+      ).toThrow();
+    });
+
+    it("accepts reasonable financial values", () => {
+      const result = onboardingSchema.parse({
+        ...base,
+        monthly_revenue: "$50k",
+        funding: "$2m",
+        team_size: "12",
+        revenue_streams: [
+          {
+            name: "Pro",
+            type: "subscription",
+            amount: 99,
+            quantity: 500,
+            startDate: "2026-06-01",
+          },
+        ],
+        headcount: [
+          {
+            title: "Engineer",
+            department: "Engineering",
+            employeeType: "full_time",
+            salary: 180000,
+            startDate: "2026-06-01",
+          },
+        ],
+        funding_rounds: [
+          {
+            name: "Seed",
+            type: "seed",
+            amount: 2_000_000,
+            date: "2026-06-01",
+          },
+        ],
+      });
+      expect(result.revenue_streams[0]?.amount).toBe(99);
+      expect(result.headcount[0]?.salary).toBe(180000);
+      expect(result.funding_rounds[0]?.amount).toBe(2_000_000);
+    });
+
+    it("accepts amount/salary exactly at the max", () => {
+      const result = onboardingSchema.parse({
+        ...base,
+        headcount: [
+          {
+            title: "Founder",
+            department: "Engineering",
+            employeeType: "full_time",
+            salary: SANE_MAX_SALARY,
+            startDate: "2026-06-01",
+          },
+        ],
+      });
+      expect(result.headcount[0]?.salary).toBe(SANE_MAX_SALARY);
     });
   });
 });

@@ -221,6 +221,7 @@ export {
   categorizeWithMemory,
   categorizeTransactionsWithMemory,
   extractMerchantKey,
+  getCategorySubcategories,
   DEFAULT_CATEGORIZATION_RULES,
   type CategorizationRule,
   type CategorizationResult,

@@ -40,6 +40,7 @@ const ALLOWED_EXACT: { match: string; why: string }[] = [
   { match: "dashboard-preferences/route.ts", why: "Writes per-user dashboard layout prefs." },
   { match: "user-preferences/route.ts", why: "Writes per-user preferences." },
   { match: "users/me/route.ts", why: "Self profile mutation (the caller's own user row)." },
+  { match: "auth/change-password/route.ts", why: "Self-scoped per-user password change — gates on session (getAuthUser), not company role. Also covered by the auth/ prefix." },
   { match: "users/me/consent/route.ts", why: "Self privacy-consent mutation." },
   { match: "ai/permissions/route.ts", why: "Per-company AI permission grants (AI-config, not financial data)." },
   { match: "insights/route.ts", why: "AI insight cache (regenerate/cache write), not business data." },

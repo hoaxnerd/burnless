@@ -12,6 +12,7 @@ import { parseMoneyAmount, parseTeamSize } from "@/lib/onboarding-helpers";
 import { WebsiteStep } from "./_components/website-step";
 import { EnrichingStep } from "./_components/enriching-step";
 import { ReviewStep } from "./_components/review-step";
+import { NameFallbackStep } from "./_components/name-fallback-step";
 import { CreatingStep } from "./_components/creating-step";
 import { DoneStep } from "./_components/done-step";
 
@@ -31,9 +32,16 @@ export default function OnboardingPage() {
   const [enrichedCount, setEnrichedCount] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
+  // Lifted so the name-fallback prompt (skip path) and the review step share a
+  // single source of the user's name. Primarily filled by the AI agent
+  // (suggested founders); the fallback prompt covers skip/AI-failure.
+  const [userName, setUserName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
   const movedToReviewRef = useRef(false);
+  // Once the name-fallback prompt has been shown (and dismissed/answered) we
+  // don't loop back into it on the next skip.
+  const namePromptShownRef = useRef(false);
 
   useEffect(() => {
     if (step === "website") {
@@ -162,6 +170,15 @@ export default function OnboardingPage() {
   };
 
   const skipOnboarding = async () => {
+    // Name-prompt fallback (founder decision #3): skipping the AI flow means we
+    // never collected a name. Give the user one explicit chance to provide one
+    // before creating the company. namePromptShownRef ensures we ask at most
+    // once — "Continue without a name" sets it and re-enters here.
+    if (!userName.trim() && !namePromptShownRef.current) {
+      setStep("name-fallback");
+      return;
+    }
+
     if (submittingRef.current) return;
     submittingRef.current = true;
 
@@ -176,6 +193,7 @@ export default function OnboardingPage() {
           company_name: fields.company_name.value.trim() || "My Company",
           stage: fields.stage.value || "Pre-seed",
           business_model: fields.business_model.value || "SaaS",
+          user_name: userName.trim() || "",
         }),
       });
 
@@ -215,7 +233,6 @@ export default function OnboardingPage() {
   // ── Create company ──────────────────────────────────────────────────────
 
   const handleCreate = async (extraData?: {
-    userName?: string;
     founders: string[];
     fundingRounds: FundingRound[];
     headcount: HeadcountRole[];
@@ -247,7 +264,7 @@ export default function OnboardingPage() {
           team_size: fields.team_size.value,
           funding: fields.funding.value,
           main_expenses: fields.main_expenses.value,
-          user_name: extraData?.userName ?? "",
+          user_name: userName.trim() || "",
           founders: extraData?.founders ?? [],
           funding_rounds: extraData?.fundingRounds ?? [],
           headcount: extraData?.headcount ?? [],
@@ -316,11 +333,29 @@ export default function OnboardingPage() {
           onUpdateField={updateField}
           onCreate={handleCreate}
           onSkipOnboarding={skipOnboarding}
+          userName={userName}
+          onUserNameChange={setUserName}
           initialFounders={founders}
           initialFundingRounds={fundingRounds}
           initialHeadcount={headcount}
           initialExpenses={expenses}
           initialRevenueStreams={revenueStreams}
+        />
+      );
+
+    case "name-fallback":
+      return (
+        <NameFallbackStep
+          name={userName}
+          onNameChange={setUserName}
+          onContinue={() => {
+            namePromptShownRef.current = true;
+            void skipOnboarding();
+          }}
+          onSkip={() => {
+            namePromptShownRef.current = true;
+            void skipOnboarding();
+          }}
         />
       );
 

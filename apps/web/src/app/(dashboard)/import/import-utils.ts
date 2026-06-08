@@ -78,6 +78,12 @@ export interface PreviewTransaction {
   suggestedCategory?: string;
   categoryConfidence?: number;
   metadata?: Record<string, unknown>;
+  /**
+   * User-supplied category override (DATA-08). When set, it replaces the
+   * AI-suggested category and is threaded through executeImport's payload so
+   * the server persists it instead of re-categorizing. Undefined = no override.
+   */
+  categoryOverride?: string;
   _edited?: boolean;
   _excluded?: boolean;
 }
@@ -432,6 +438,47 @@ export function autoMapColumns(
   }
 
   return { mapping, confidence };
+}
+
+/**
+ * Pluralize a noun against a count (DATA-06). Returns just the noun form
+ * (caller renders the count) so it composes with `{n} {pluralize(n, "row")}`.
+ * Default plural is `noun + "s"`; pass `plural` for irregulars.
+ */
+export function pluralize(count: number, noun: string, plural?: string): string {
+  return count === 1 ? noun : (plural ?? `${noun}s`);
+}
+
+/**
+ * Pure per-row transform for the preview inline editor (DATA-03 + DATA-08).
+ * Returns the SAME row reference when the edit is a no-op so React bails out of
+ * the re-render AND the "Edited" flag is never spuriously set — opening the
+ * editor and blurring with no change must not mark the row edited.
+ *
+ *  - `amount`   → parse to number; ignore NaN; no-op if equal to current amount.
+ *  - `category` → DATA-08 override; no-op if equal to the effective category
+ *                 (override if set, else the AI suggestion); empty string clears.
+ *  - text       → normalize null/undefined vs "" before comparing.
+ */
+export function applyPreviewRowEdit(
+  row: PreviewTransaction,
+  field: string,
+  value: string,
+): PreviewTransaction {
+  if (field === "amount") {
+    const num = parseFloat(value);
+    if (isNaN(num)) return row;
+    if (num === row.amount) return row;
+    return { ...row, amount: num, _edited: true };
+  }
+  if (field === "category") {
+    const current = row.categoryOverride ?? row.suggestedCategory ?? "";
+    if (value === current) return row;
+    return { ...row, categoryOverride: value || undefined, _edited: true };
+  }
+  const existing = (row[field as keyof PreviewTransaction] as string | null | undefined) ?? "";
+  if (value === existing) return row;
+  return { ...row, [field]: value, _edited: true };
 }
 
 export function confidenceColor(c: number): string {

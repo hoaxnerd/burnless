@@ -9,6 +9,8 @@ import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { formatCurrency, formatPercent } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
+import Link from "next/link";
+import { PieChart } from "lucide-react";
 import { FundingView } from "./funding-view";
 import { AddFundingButton } from "./add-funding-button";
 import { SetupPrompt } from "@/components/ui/empty-state";
@@ -55,6 +57,16 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
     preMoneyValuation: r.preMoneyValuation ? Number(r.preMoneyValuation) : null,
     dilutionPercent: r.dilutionPercent ? Number(r.dilutionPercent) : null,
     isProjected: r.isProjected,
+    // FUND-07: grant milestones drive the MilestoneTracker in the round-detail
+    // panel. Non-grant rounds have none.
+    milestones: ((r.parameters as { milestones?: unknown } | null)?.milestones ?? []) as Array<{
+      id: string;
+      label: string;
+      amount: number;
+      dueDate: string;
+      hitDate?: string;
+      matchWarning?: { requiredAmount: number; actualAmount: number; asOf: string };
+    }>,
   }));
 
   const prevMonth = data?.prevMonth ?? previousMonthKey(currentMonth);
@@ -128,7 +140,18 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
             Capital sources, fundraising history, and cap table
           </p>
         </div>
-        <AddFundingButton />
+        <div className="flex items-center gap-3">
+          {/* FUND-08: cap-table is always reachable from /funding (even when empty,
+              where it lands on the FUND-05 empty-state). */}
+          <Link
+            href="/funding/cap-table"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-surface-600 hover:text-surface-900"
+          >
+            <PieChart className="h-4 w-4" />
+            View cap table
+          </Link>
+          <AddFundingButton />
+        </div>
       </div>
 
       <FundingView

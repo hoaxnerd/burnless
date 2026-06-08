@@ -179,12 +179,16 @@ export default function SettingsPage() {
       {/* Security Tab */}
       {activeTab === "security" && <SecurityTab />}
 
-      {/* TODO: Re-enable AI Features and AI Dashboard tabs in a later release */}
-      {/* {activeTab === "ai" && aiLoaded && (
+      {/* AI Features Tab (SET-07 Path B — shipped). Gated on aiLoaded so the
+          tab renders against fully-resolved flags from the live useAiFlags
+          context. writeMode is not surfaced here — per-user AI tool permissions
+          govern (two-gates); company default stays `confirm`. */}
+      {activeTab === "ai" && aiLoaded && (
         <AiFeaturesTab flags={flags} updateFlags={updateFlags} credits={credits} providerConfig={providerConfig} />
-      )} */}
+      )}
 
-      {/* {activeTab === "ai-dashboard" && <AiDashboardTab />} */}
+      {/* AI Dashboard Tab (SET-07 Path B — shipped) */}
+      {activeTab === "ai-dashboard" && <AiDashboardTab />}
 
       {/* Integrations Tab */}
       {activeTab === "integrations" && (

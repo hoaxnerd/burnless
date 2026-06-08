@@ -1,9 +1,14 @@
 "use client";
 
 import { Check, Sparkles, Pencil, ArrowLeft } from "lucide-react";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Select } from "@/components/ui";
+import { getCategorySubcategories } from "@burnless/engine";
 import type { Step, PreviewTransaction } from "./import-utils";
 import { useLocale } from "@/components/locale/locale-context";
+
+// DATA-08: override choices sourced from engine categorization so the manual
+// list stays in lockstep with what the auto-categorizer can emit.
+const CATEGORY_OPTIONS = getCategorySubcategories();
 
 interface PreviewStepProps {
   preview: PreviewTransaction[];
@@ -176,21 +181,36 @@ export function PreviewStep({
                       )}
                     </td>
                     <td className="py-2 px-3">
-                      {t.suggestedCategory ? (
+                      {isEditing ? (
+                        // DATA-08: inline category override select.
+                        <Select
+                          aria-label="Category"
+                          value={t.categoryOverride ?? t.suggestedCategory ?? ""}
+                          onChange={(e) => updatePreviewRow(i, "category", e.target.value)}
+                          className="text-xs py-0.5"
+                        >
+                          <option value="">{"\u2014"}</option>
+                          {CATEGORY_OPTIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </Select>
+                      ) : (t.categoryOverride ?? t.suggestedCategory) ? (
                         <div className="flex items-center gap-1.5">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              (t.categoryConfidence ?? 0) >= 0.8
-                                ? "bg-success-50 text-success-700 dark:bg-success-950 dark:text-success-300"
-                                : (t.categoryConfidence ?? 0) >= 0.6
-                                  ? "bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-300"
-                                  : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400"
+                              t.categoryOverride
+                                ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                                : (t.categoryConfidence ?? 0) >= 0.8
+                                  ? "bg-success-50 text-success-700 dark:bg-success-950 dark:text-success-300"
+                                  : (t.categoryConfidence ?? 0) >= 0.6
+                                    ? "bg-warning-50 text-warning-700 dark:bg-warning-950 dark:text-warning-300"
+                                    : "bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400"
                             }`}
                           >
-                            {t.suggestedCategory}
+                            {t.categoryOverride ?? t.suggestedCategory}
                           </span>
                           <span className="text-[10px] text-surface-400">
-                            {Math.round((t.categoryConfidence ?? 0) * 100)}%
+                            {t.categoryOverride ? "manual" : `${Math.round((t.categoryConfidence ?? 0) * 100)}%`}
                           </span>
                         </div>
                       ) : (

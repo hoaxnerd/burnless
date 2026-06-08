@@ -10,14 +10,14 @@ import { useToast } from "@/components/ui/toast";
 import { extractApiError, toUserMessage } from "@/lib/api-error";
 import { useImports, useAccounts, revalidate, KEYS } from "@/lib/swr";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
-import { autoMapColumns, resolveAmount } from "./import-utils";
+import { autoMapColumns, resolveAmount, applyPreviewRowEdit } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, AnyColumnMapping, MappingConfidence,
   AccountOption, PreviewTransaction, ImportResult, ImportBatch,
   FundingRoundColumnMapping, ImportTarget,
 } from "./import-utils";
 import { UploadStep } from "./upload-step";
-import { MapStep } from "./map-step";
+import { MapStep, FundingMapStep } from "./map-step";
 import { PreviewStep } from "./preview-step";
 import { ResultStep } from "./result-step";
 import { ImportHistoryPanel } from "./import-history-panel";
@@ -276,6 +276,9 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         vendor: t.vendor ?? null,
         notes: t.notes ?? null,
         externalId: t.externalId || undefined,
+        // DATA-08: resolved category — manual override wins, else the AI
+        // suggestion. Threaded to the server so the override actually persists.
+        category: t.categoryOverride ?? t.suggestedCategory ?? undefined,
       }));
       const res = await apiFetch("/api/import", {
         method: "POST",
@@ -313,16 +316,10 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   };
 
   const updatePreviewRow = (index: number, field: string, value: string) => {
+    // DATA-03 + DATA-08: per-row transform is a pure, tested helper that only
+    // sets _edited on a real change and carries category overrides.
     setPreview((prev) =>
-      prev.map((t, i) => {
-        if (i !== index) return t;
-        if (field === "amount") {
-          const num = parseFloat(value);
-          if (!isNaN(num)) return { ...t, amount: num, _edited: true };
-          return t;
-        }
-        return { ...t, [field]: value, _edited: true };
-      })
+      prev.map((t, i) => (i === index ? applyPreviewRowEdit(t, field, value) : t)),
     );
   };
 
@@ -403,9 +400,17 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
             id="import-target"
             value={target}
             onChange={(e) => {
-              setTarget(e.target.value as ImportTarget);
-              // Reset mapping so it re-auto-maps on next file pick
-              setMapping({ date: "", amount: "", description: "", category: "" });
+              const next = e.target.value as ImportTarget;
+              setTarget(next);
+              // Reset mapping so it re-auto-maps on next file pick. Seed the
+              // shape that matches the new target (DATA-01) — a transaction-shaped
+              // seed for funding would leave name/roundType undefined and the
+              // funding preview validation would always fail.
+              setMapping(
+                next === "funding-rounds"
+                  ? ({ target: "funding-rounds", name: "", roundType: "", amount: "", date: "" } as unknown as ColumnMapping)
+                  : { date: "", amount: "", description: "", category: "" },
+              );
               setFundingPreview([]);
             }}
           >
@@ -457,7 +462,13 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         <UploadStep dragActive={dragActive} handleDrop={handleDrop} handleDragOver={handleDragOver}
           handleDragLeave={handleDragLeave} fileInputRef={fileInputRef} handleFile={handleFile} />
       )}
-      {step === "map" && (
+      {step === "map" && target === "funding-rounds" && (
+        <FundingMapStep fileName={fileName} rows={rows} headers={headers}
+          mapping={mapping as unknown as FundingRoundColumnMapping}
+          setMapping={setMapping} mappingConfidence={mappingConfidence}
+          loading={loading} reset={reset} generatePreview={generatePreview} />
+      )}
+      {step === "map" && target === "transactions" && (
         <MapStep fileName={fileName} rows={rows} headers={headers} mapping={mapping}
           setMapping={setMapping} mappingConfidence={mappingConfidence}
           setMappingConfidence={setMappingConfidence} targetAccountId={targetAccountId}

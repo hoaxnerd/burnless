@@ -13,6 +13,20 @@ import { computeCapTable, type CapTable } from "@burnless/engine";
 import { getCompany } from "./data";
 
 /**
+ * Cap-table with an explicit emptiness signal [ESL-1 / FUND-05].
+ *
+ * `isEmpty` is true only when the cap-table is ALL-derived-zero — no holder rows
+ * AND zero fully-diluted shares. Views branch on this to render a `DataEmptyState`
+ * instead of an all-zero value grid. Additive: existing consumers ignore it.
+ */
+export type CapTableWithEmpty = CapTable & { isEmpty: boolean };
+
+/** Strict all-derived-zero predicate: no rows AND nothing fully diluted. */
+function capTableIsEmpty(t: CapTable): boolean {
+  return t.rows.length === 0 && t.totalFullyDiluted === 0;
+}
+
+/**
  * Build the option-pool projection consumed by the engine's computeCapTable.
  * Exported for testability — extracted from computeCapTableInner so the
  * single-pool guard (Phase 3 F §F5) can be exercised without mocking DB calls.
@@ -61,7 +75,7 @@ export function buildOptionPoolsWithGranted(
 export async function computeCapTableInner(
   companyId: string,
   scenarioId: string | null,
-): Promise<CapTable> {
+): Promise<CapTableWithEmpty> {
   const company = await getCompany();
   if (!company) {
     return {
@@ -73,6 +87,7 @@ export async function computeCapTableInner(
         safeOverhang: 0,
         optionPoolOverhang: 0,
       },
+      isEmpty: true,
     };
   }
 
@@ -114,7 +129,7 @@ export async function computeCapTableInner(
 
   const commonClass = classes.find((s) => /common/i.test(s.name));
 
-  return computeCapTable({
+  const capTable = computeCapTable({
     foundersOwnershipPercent:
       company.foundersOwnershipPercent != null
         ? Number(company.foundersOwnershipPercent) / 100
@@ -131,10 +146,12 @@ export async function computeCapTableInner(
     pendingSafes,
     pendingConvertibles,
   });
+
+  return { ...capTable, isEmpty: capTableIsEmpty(capTable) };
 }
 
 export const computeCapTableForCompany = cache(
-  async (companyId: string, scenarioId: string | null): Promise<CapTable> => {
+  async (companyId: string, scenarioId: string | null): Promise<CapTableWithEmpty> => {
     const cached = unstable_cache(
       async () => computeCapTableInner(companyId, scenarioId),
       ["cap-table", companyId, scenarioId ?? "base"],

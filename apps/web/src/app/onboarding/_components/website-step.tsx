@@ -3,6 +3,19 @@ import { Globe, Sparkles, SkipForward } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Input } from "@/components/ui";
 
+/**
+ * ONB-03 — lightweight client-side domain/URL check. Requires a dot and a
+ * TLD-like trailing segment so garbage ('asdf') keeps submit disabled and
+ * never reaches the paid AI enrich endpoint. A bare domain ('stripe.com')
+ * passes — the enrich route prepends https:// after its own validation.
+ */
+const DOMAIN_LIKE_RE =
+  /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i;
+
+export function isLikelyWebsite(value: string): boolean {
+  return DOMAIN_LIKE_RE.test(value.trim());
+}
+
 interface WebsiteStepProps {
   websiteUrl: string;
   onWebsiteUrlChange: (url: string) => void;
@@ -20,6 +33,7 @@ export function WebsiteStep({
   onSkipOnboarding,
   inputRef,
 }: WebsiteStepProps) {
+  const valid = isLikelyWebsite(websiteUrl);
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md text-center animate-slide-up">
@@ -52,22 +66,35 @@ export function WebsiteStep({
           Enter your company website and we&apos;ll set everything up for you.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-8">
+        <form onSubmit={onSubmit} className="mt-8 text-left">
+          <label
+            htmlFor="onboarding-website-url"
+            className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5"
+          >
+            Company website URL
+          </label>
           <div className="relative">
             <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400 z-10" />
             <Input
               ref={inputRef}
-              aria-label="Company website"
-              type="text"
+              id="onboarding-website-url"
+              aria-describedby="onboarding-website-hint"
+              type="url"
               value={websiteUrl}
               onChange={(e) => onWebsiteUrlChange(e.target.value)}
               placeholder="yourcompany.com"
               className="rounded-2xl pl-12 pr-4 py-4 text-base"
             />
           </div>
+          <p
+            id="onboarding-website-hint"
+            className="mt-1.5 text-xs text-surface-400"
+          >
+            Enter a domain like stripe.com — we&apos;ll analyze it to set up your company.
+          </p>
           <button
             type="submit"
-            disabled={!websiteUrl.trim()}
+            disabled={!valid}
             className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-600 px-6 py-4 text-base font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Sparkles className="w-5 h-5" />

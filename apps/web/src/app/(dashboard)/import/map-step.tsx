@@ -3,8 +3,11 @@
 import { Sparkles, Check, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button, Select } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
-import { confidenceColor, confidenceLabel, getAmountColumn } from "./import-utils";
-import type { ParsedRow, ColumnMapping, MappingConfidence, AccountOption } from "./import-utils";
+import { confidenceColor, confidenceLabel, getAmountColumn, pluralize } from "./import-utils";
+import type {
+  ParsedRow, ColumnMapping, MappingConfidence, AccountOption,
+  FundingRoundColumnMapping,
+} from "./import-utils";
 
 interface MapStepProps {
   fileName: string;
@@ -51,7 +54,8 @@ export function MapStep({
           <div>
             <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-50">{fileName}</h3>
             <p className="text-xs text-surface-500 mt-0.5">
-              {rows.length} rows &middot; {headers.length} columns detected
+              {rows.length} {pluralize(rows.length, "row")} &middot;{" "}
+              {headers.length} {pluralize(headers.length, "column")} detected
             </p>
           </div>
           {(mappingConfidence.date > 0 || mappingConfidence.amount > 0) && (
@@ -314,6 +318,161 @@ export function MapStep({
           iconPosition="right"
           state={loading ? "loading" : "idle"}
           disabled={!mapping.date || !amountReady || !targetAccountId}
+          onClick={generatePreview}
+        >
+          Preview Import
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Funding Rounds Map step (DATA-01) ────────────────────────────────────────
+
+interface FundingMapStepProps {
+  fileName: string;
+  rows: ParsedRow[];
+  headers: string[];
+  mapping: FundingRoundColumnMapping;
+  setMapping: React.Dispatch<React.SetStateAction<ColumnMapping>>;
+  mappingConfidence: MappingConfidence;
+  loading: boolean;
+  reset: () => void;
+  generatePreview: () => void;
+}
+
+/**
+ * Map step for funding-round imports. Renders selects for the
+ * {@link FundingRoundColumnMapping} slots (no 'Import into account' picker —
+ * funding rounds are company-scoped, not posted to an account). name/roundType/
+ * amount/date are required; the rest optional. `setMapping` is typed against the
+ * polymorphic `ColumnMapping` to share import-flow's single mapping state — we
+ * spread funding-shaped fields through it and narrow on read via `mapping`.
+ */
+export function FundingMapStep({
+  fileName,
+  rows,
+  headers,
+  mapping,
+  setMapping,
+  mappingConfidence,
+  loading,
+  reset,
+  generatePreview,
+}: FundingMapStepProps) {
+  const ready = !!mapping.name && !!mapping.roundType && !!mapping.amount && !!mapping.date;
+  // setMapping is ColumnMapping-typed (shared state); patch funding fields through it.
+  const patch = (field: keyof FundingRoundColumnMapping, v: string) =>
+    setMapping((m) => ({ ...m, [field]: v || undefined, target: "funding-rounds" } as unknown as ColumnMapping));
+
+  return (
+    <div className="max-w-3xl space-y-6 animate-slide-up">
+      <div className="rounded-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-50">{fileName}</h3>
+            <p className="text-xs text-surface-500 mt-0.5">
+              {rows.length} {pluralize(rows.length, "row")} &middot;{" "}
+              {headers.length} {pluralize(headers.length, "column")} detected
+            </p>
+          </div>
+          {(mappingConfidence.date > 0 || mappingConfidence.amount > 0) && (
+            <div className="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI auto-mapped columns
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <SimpleSelectRow
+            label="Round name column"
+            required
+            value={mapping.name}
+            confidence={mapping.name ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("name", v)}
+          />
+          <SimpleSelectRow
+            label="Round type column"
+            required
+            value={mapping.roundType}
+            confidence={mapping.roundType ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("roundType", v)}
+          />
+          <SimpleSelectRow
+            label="Amount column"
+            required
+            value={mapping.amount}
+            confidence={mappingConfidence.amount}
+            headers={headers}
+            onChange={(v) => patch("amount", v)}
+          />
+          <SimpleSelectRow
+            label="Date column"
+            required
+            value={mapping.date}
+            confidence={mappingConfidence.date}
+            headers={headers}
+            onChange={(v) => patch("date", v)}
+          />
+          <SimpleSelectRow
+            label="Close date column"
+            value={mapping.closeDate ?? ""}
+            confidence={mapping.closeDate ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("closeDate", v)}
+          />
+          <SimpleSelectRow
+            label="Valuation cap column"
+            value={mapping.valuationCap ?? ""}
+            confidence={mapping.valuationCap ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("valuationCap", v)}
+          />
+          <SimpleSelectRow
+            label="Discount rate column"
+            value={mapping.discountRate ?? ""}
+            confidence={mapping.discountRate ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("discountRate", v)}
+          />
+          <SimpleSelectRow
+            label="Interest rate column"
+            value={mapping.interestRate ?? ""}
+            confidence={mapping.interestRate ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("interestRate", v)}
+          />
+          <SimpleSelectRow
+            label="Term (months) column"
+            value={mapping.termMonths ?? ""}
+            confidence={mapping.termMonths ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("termMonths", v)}
+          />
+          <SimpleSelectRow
+            label="Notes column"
+            value={mapping.notes ?? ""}
+            confidence={mapping.notes ? 1 : 0}
+            headers={headers}
+            onChange={(v) => patch("notes", v)}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Button variant="secondary" size="md" icon={<ArrowLeft className="h-4 w-4" />} onClick={reset}>
+          Back
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          icon={<ArrowRight className="h-4 w-4" />}
+          iconPosition="right"
+          state={loading ? "loading" : "idle"}
+          disabled={!ready}
           onClick={generatePreview}
         >
           Preview Import

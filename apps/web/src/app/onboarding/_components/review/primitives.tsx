@@ -89,6 +89,7 @@ export function InlineField({
   badge,
   type = "text",
   min,
+  max,
   step,
   prefix,
   error,
@@ -103,6 +104,7 @@ export function InlineField({
   badge?: ReactNode;
   type?: "text" | "number";
   min?: string;
+  max?: string;
   step?: string;
   prefix?: string;
   error?: string;
@@ -133,6 +135,7 @@ export function InlineField({
           onBlur={onBlur}
           placeholder={placeholder}
           min={min}
+          max={max}
           step={step}
           invalid={!!error}
           aria-invalid={error ? true : undefined}

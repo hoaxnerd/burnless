@@ -17,7 +17,6 @@ import { HeadcountSection } from "./review/headcount-section";
 import { ExpensesSection } from "./review/expenses-section";
 
 export interface CreatePayload {
-  userName?: string;
   founders: string[];
   fundingRounds: FundingRound[];
   headcount: HeadcountRole[];
@@ -31,6 +30,9 @@ interface ReviewStepProps {
   onUpdateField: (name: keyof CompanyFields, value: string) => void;
   onCreate: (extraData?: CreatePayload) => void;
   onSkipOnboarding: () => void;
+  /** Lifted to the page so the skip-path name-fallback shares the same value. */
+  userName: string;
+  onUserNameChange: (next: string) => void;
   initialFounders?: string[];
   initialFundingRounds?: FundingRound[];
   initialHeadcount?: HeadcountRole[];
@@ -44,6 +46,8 @@ export function ReviewStep({
   onUpdateField,
   onCreate,
   onSkipOnboarding,
+  userName,
+  onUserNameChange,
   initialFounders = [],
   initialFundingRounds = [],
   initialHeadcount = [],
@@ -52,7 +56,6 @@ export function ReviewStep({
 }: ReviewStepProps) {
   const { currencySymbol, fmtCurrency } = useLocale();
 
-  const [userName, setUserName] = useState("");
   const [nameBlurred, setNameBlurred] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const nameError = nameBlurred && !fields.company_name.value.trim()
@@ -75,7 +78,6 @@ export function ReviewStep({
       return;
     }
     onCreate({
-      userName,
       founders: initialFounders,
       fundingRounds: fundingApi.selectedPayload() as FundingRound[],
       headcount: headcountApi.selectedPayload() as HeadcountRole[],
@@ -100,7 +102,7 @@ export function ReviewStep({
             onNameBlur={() => setNameBlurred(true)}
             nameInputRef={nameInputRef}
             userName={userName}
-            onUserNameChange={setUserName}
+            onUserNameChange={onUserNameChange}
             suggestedFounders={initialFounders}
           />
           <FinancialsSummarySection

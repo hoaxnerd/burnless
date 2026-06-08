@@ -14,6 +14,7 @@ import {
   Copy,
   ShieldCheck,
   ShieldOff,
+  KeyRound,
 } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { toUserMessage } from "@/lib/api-error";
@@ -120,6 +121,49 @@ export function SecurityTab() {
     navigator.clipboard.writeText(backupCodes.join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ── Change password (SET-08) ───────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  const changePassword = async () => {
+    setPwError(null);
+    setPwSuccess(false);
+    if (!currentPassword || !newPassword) {
+      setPwError("Enter your current and new password");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords don't match");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPwError(toUserMessage(data) || "Failed to change password");
+        return;
+      }
+      setPwSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch {
+      setPwError("Failed to change password");
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   return (
@@ -403,6 +447,74 @@ export function SecurityTab() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Change Password (SET-08) */}
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-9 w-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <KeyRound className="h-[18px] w-[18px] text-brand-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-surface-900">
+              Change Password
+            </h2>
+            <p className="text-xs text-surface-500 mt-0.5">
+              Update the password you use to sign in
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4 max-w-sm">
+          <Input
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Input
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            hint="At least 8 characters with upper, lower, and a number."
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <Input
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") changePassword();
+            }}
+          />
+
+          {pwError && (
+            <div className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-700">
+              <Check className="h-3.5 w-3.5 shrink-0" />
+              Password changed successfully.
+            </div>
+          )}
+
+          <Button
+            variant="primary"
+            size="sm"
+            state={pwSaving ? "loading" : "idle"}
+            disabled={pwSaving}
+            onClick={changePassword}
+          >
+            Change password
+          </Button>
+        </div>
       </div>
 
       {/* Security & Privacy Trust Signals */}

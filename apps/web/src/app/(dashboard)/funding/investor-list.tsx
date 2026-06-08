@@ -15,7 +15,7 @@ interface Investor {
 }
 
 export function InvestorList({ roundId }: { roundId: string }) {
-  const { data, mutate } = useSWR<{ investors: Investor[] }>(
+  const { data, mutate, error, isLoading } = useSWR<{ investors: Investor[] }>(
     `/api/funding-rounds/${roundId}/investors`,
     (url: string) => apiFetch(url).then((r) => r.json()),
   );
@@ -47,6 +47,16 @@ export function InvestorList({ roundId }: { roundId: string }) {
   return (
     <div className="space-y-2">
       <div className="text-sm font-medium">Investors</div>
+      {/* ESL-3: surface load + error states instead of silently rendering an
+          empty list when the fetch is pending or failed. */}
+      {isLoading && (
+        <div className="text-xs text-muted">Loading investors…</div>
+      )}
+      {error && (
+        <div className="text-xs text-danger">
+          Couldn&apos;t load investors. Please try again.
+        </div>
+      )}
       <ul className="space-y-1">
         {(data?.investors ?? []).map((inv) => (
           <li key={inv.id} className="flex items-center justify-between p-2 border rounded">

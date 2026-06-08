@@ -71,21 +71,37 @@ const METHODS: Array<{ value: ForecastMethod; label: string }> = [
   { value: "custom_formula", label: "Custom Formula" },
 ];
 
-// ── isRecurring tri-state ────────────────────────────────────────────────────
-// null → "Auto-detect", true → "Yes, recurring", false → "No, one-off"
+// ── Single recurring choice ──────────────────────────────────────────────────
+// Replaces the old "isRecurring tri-state radio + standalone isOneTime checkbox"
+// pair that could be set contradictorily (EXP-04).
+//
+// Mapping to DB columns:
+//   'auto'      → isRecurring=null,  isOneTime=false  (auto-detect from variance)
+//   'recurring' → isRecurring=true,  isOneTime=false  (user-confirmed recurring)
+//   'one-time'  → isRecurring=false, isOneTime=true   (user-confirmed one-off)
+//
+// Engine independence: isOneTime buckets expenses into oneTimeExpensesSeries;
+// isRecurring drives the UI recurring filter. Both columns stay in the schema —
+// the single choice derives both from one control.
 
-type RecurringChoice = "auto" | "yes" | "no";
+type RecurringChoice = "auto" | "recurring" | "one-time";
 
-function recurringFromTri(v: boolean | null | undefined): RecurringChoice {
-  if (v === true) return "yes";
-  if (v === false) return "no";
+function recurringChoiceFromRow(
+  isRecurring: boolean | null | undefined,
+  isOneTime: boolean | null | undefined,
+): RecurringChoice {
+  if (isOneTime) return "one-time";
+  if (isRecurring === true) return "recurring";
   return "auto";
 }
 
-function recurringToTri(c: RecurringChoice): boolean | null {
-  if (c === "yes") return true;
-  if (c === "no") return false;
-  return null;
+function recurringChoiceToColumns(c: RecurringChoice): {
+  isRecurring: boolean | null;
+  isOneTime: boolean;
+} {
+  if (c === "one-time") return { isRecurring: false, isOneTime: true };
+  if (c === "recurring") return { isRecurring: true, isOneTime: false };
+  return { isRecurring: null, isOneTime: false };
 }
 
 // ── Date coercion helpers ────────────────────────────────────────────────────
@@ -141,9 +157,8 @@ export function ExpenseForm({
   const [frequency, setFrequency] = useState<Frequency>(
     (initialValue?.frequency as Frequency | undefined) ?? "monthly",
   );
-  const [isOneTime, setIsOneTime] = useState<boolean>(initialValue?.isOneTime ?? false);
-  const [recurring, setRecurring] = useState<RecurringChoice>(
-    recurringFromTri(initialValue?.isRecurring ?? null),
+  const [recurringChoice, setRecurringChoice] = useState<RecurringChoice>(
+    recurringChoiceFromRow(initialValue?.isRecurring, initialValue?.isOneTime),
   );
   const [departmentId, setDepartmentId] = useState<string>(initialValue?.departmentId ?? "");
   const [vendor, setVendor] = useState<string>(initialValue?.vendor ?? "");
@@ -201,6 +216,7 @@ export function ExpenseForm({
       return;
     }
 
+    const { isRecurring, isOneTime } = recurringChoiceToColumns(recurringChoice);
     const payload = normalizeExpensePayload({
       method,
       parameters,
@@ -208,7 +224,7 @@ export function ExpenseForm({
       endDate,
       frequency,
       isOneTime,
-      isRecurring: recurringToTri(recurring),
+      isRecurring,
       vendor: vendor.trim() === "" ? null : vendor.trim(),
       notes: notes.trim() === "" ? null : notes.trim(),
       departmentId: departmentId === "" ? null : departmentId,
@@ -348,13 +364,13 @@ export function ExpenseForm({
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="block text-sm font-medium text-surface-700">Recurring</legend>
+        <legend className="block text-sm font-medium text-surface-700">Recurrence</legend>
         <div className="space-y-1.5">
           {(
             [
               { value: "auto", label: "Auto-detect (suggested)" },
-              { value: "yes", label: "Yes, recurring" },
-              { value: "no", label: "No, one-off charge" },
+              { value: "recurring", label: "Yes, recurring" },
+              { value: "one-time", label: "One-time expense (does not recur)" },
             ] as Array<{ value: RecurringChoice; label: string }>
           ).map((opt) => (
             <label key={opt.value} className="flex items-center gap-2 text-sm text-surface-700">
@@ -362,23 +378,14 @@ export function ExpenseForm({
                 type="radio"
                 name="ef-recurring"
                 value={opt.value}
-                checked={recurring === opt.value}
-                onChange={() => setRecurring(opt.value)}
+                checked={recurringChoice === opt.value}
+                onChange={() => setRecurringChoice(opt.value)}
               />
               {opt.label}
             </label>
           ))}
         </div>
       </fieldset>
-
-      <label className="flex items-center gap-2 text-sm text-surface-700">
-        <input
-          type="checkbox"
-          checked={isOneTime}
-          onChange={(e) => setIsOneTime(e.target.checked)}
-        />
-        One-time expense (does not recur)
-      </label>
 
       <div className="flex justify-end gap-3 pt-2">
         <button

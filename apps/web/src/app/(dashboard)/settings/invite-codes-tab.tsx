@@ -13,6 +13,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Pencil,
+  Trash2,
   Users,
   Calendar,
   Gift,
@@ -138,6 +139,22 @@ export function InviteCodesTab() {
       body: JSON.stringify({ isActive: !code.isActive }),
     });
     reloadCodes();
+  };
+
+  // SET-09 — hard-delete a never-redeemed code. Redeemed codes have no delete
+  // affordance (server returns 409); deactivate via the toggle instead.
+  const deleteCode = async (code: InviteCode) => {
+    if (code.currentRedemptions > 0) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Permanently delete invite code ${code.code}? This can't be undone.`)
+    ) {
+      return;
+    }
+    const res = await apiFetch(`/api/admin/invite-codes/${code.id}`, {
+      method: "DELETE",
+    });
+    if (res.ok) reloadCodes();
   };
 
   const copyLink = (code: InviteCode) => {
@@ -298,6 +315,18 @@ export function InviteCodesTab() {
               <ToggleLeft className="h-4 w-4 text-surface-400" />
             )}
           </button>
+          {row.currentRedemptions === 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteCode(row);
+              }}
+              className="p-1.5 rounded-lg hover:bg-danger-50 text-surface-400 hover:text-danger-600 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ),
     },

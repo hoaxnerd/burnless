@@ -7,6 +7,8 @@ import { CurrencyInput } from "@/components/forms/primitives";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { FundingRoundForm } from "./funding-round-form";
+import { InvestorList } from "./investor-list";
+import { MilestoneTracker } from "./milestone-tracker";
 import { Modal } from "@/components/ui";
 import { dSum } from "@burnless/engine";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
@@ -18,6 +20,15 @@ import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError, toUserMessage } from "@/lib/api-error";
 import { useToast } from "@/components/ui/toast";
 
+interface GrantMilestone {
+  id: string;
+  label: string;
+  amount: number;
+  dueDate: string;
+  hitDate?: string;
+  matchWarning?: { requiredAmount: number; actualAmount: number; asOf: string };
+}
+
 interface FundingRound {
   id: string;
   name: string;
@@ -27,6 +38,7 @@ interface FundingRound {
   preMoneyValuation: number | null;
   dilutionPercent: number | null;
   isProjected: boolean;
+  milestones?: GrantMilestone[];
 }
 
 const roundTypeLabels: Record<string, string> = {
@@ -200,6 +212,9 @@ export function FundingRoundsList({
   const router = useRouter();
   // Edit modal state
   const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
+  // FUND-07: round-detail panel — mounts InvestorList (+ MilestoneTracker for
+  // grant rounds). Opened by clicking a round row.
+  const [detailRound, setDetailRound] = useState<FundingRound | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const {
@@ -274,7 +289,19 @@ export function FundingRoundsList({
                   onRevert={() => handleRevert(round.id)}
                   onRemove={() => handleRemove(round.id)}
                 >
-                  <div className="group px-6 py-4 hover:bg-surface-50/50 transition-colors">
+                  <div
+                    className="group px-6 py-4 hover:bg-surface-50/50 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View details for ${round.name}`}
+                    onClick={() => setDetailRound(round)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailRound(round);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -290,7 +317,7 @@ export function FundingRoundsList({
                       <div className="flex items-start gap-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                           <button
-                            onClick={() => setEditingRound(round)}
+                            onClick={(e) => { e.stopPropagation(); setEditingRound(round); }}
                             className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
                             aria-label={`Edit ${round.name}`}
                           >
@@ -352,7 +379,19 @@ export function FundingRoundsList({
                   onRevert={() => handleRevert(round.id)}
                   onRemove={() => handleRemove(round.id)}
                 >
-                  <div className="group px-6 py-4 bg-surface-50/30">
+                  <div
+                    className="group px-6 py-4 bg-surface-50/30 hover:bg-surface-50/60 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View details for ${round.name}`}
+                    onClick={() => setDetailRound(round)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailRound(round);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -372,7 +411,7 @@ export function FundingRoundsList({
                       <div className="flex items-start gap-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                           <button
-                            onClick={() => setEditingRound(round)}
+                            onClick={(e) => { e.stopPropagation(); setEditingRound(round); }}
                             className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
                             aria-label={`Edit ${round.name}`}
                           >
@@ -424,6 +463,43 @@ export function FundingRoundsList({
           entityLabel="funding round"
           onRestore={handleRestore}
         />
+      )}
+
+      {/* FUND-07: round-detail panel — investors for every round, and the
+          milestone tracker for grant rounds. roundType stays read-only here
+          (immutability contract). Milestones disburse per user-marked hitDate
+          regardless of the match-shortfall warning (Phase 2 D §D5 — the warning
+          is surfaced as data only, never gating). */}
+      {detailRound && (
+        <Modal
+          open={!!detailRound}
+          onClose={() => setDetailRound(null)}
+          title={detailRound.name}
+        >
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${roundTypeColors[detailRound.type] ?? "bg-surface-100 text-surface-600"}`}>
+                {roundTypeLabels[detailRound.type] ?? detailRound.type}
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-surface-900">
+                {formatCurrency(detailRound.amount, currency, undefined, { compact: true })}
+              </span>
+            </div>
+
+            {detailRound.type === "grant" && (detailRound.milestones?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-surface-900">Milestones</div>
+                <MilestoneTracker
+                  roundId={detailRound.id}
+                  milestones={detailRound.milestones ?? []}
+                  onUpdate={() => router.refresh()}
+                />
+              </div>
+            )}
+
+            <InvestorList roundId={detailRound.id} />
+          </div>
+        </Modal>
       )}
 
       {/* Edit funding round modal */}

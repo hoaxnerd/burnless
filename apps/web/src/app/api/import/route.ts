@@ -103,6 +103,10 @@ const importTransactionSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   vendor: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  // DATA-08: optional per-row category override from the import preview. When
+  // present it wins over server-side re-categorization; persisted in metadata
+  // (transactions have no dedicated category column).
+  category: z.string().optional(),
 });
 
 // columnMapping values are usually a single source-column name, but the
@@ -295,6 +299,14 @@ export const POST = withErrorHandler(async (request: Request) => {
         categoryConfidence = result.confidence;
         categorySource = result.source;
       }
+    }
+    // DATA-08: an explicit per-row category override wins over the auto result.
+    // Recorded as a high-confidence "manual" categorization so downstream
+    // consumers treat it as user-confirmed rather than a guess.
+    if (tx.category) {
+      suggestedCategory = tx.category;
+      categoryConfidence = 1;
+      categorySource = "manual";
     }
 
     prepared.push({

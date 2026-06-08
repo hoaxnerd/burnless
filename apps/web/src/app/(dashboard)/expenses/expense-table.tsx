@@ -91,6 +91,24 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     return Array.from(accountMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [accountMap]);
 
+  const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
+
+  // EXP-06: Full distinct category list derived from ALL lineItems (not just
+  // top-N spend-ordered subcategories). Used for the inline per-row re-
+  // categorize select so low/zero-spend categories (e.g. COGS) are reachable.
+  // The spend-ordered `subcategories` prop is kept for the top filter + chart.
+  const allCategories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const item of lineItems) {
+      seen.add(item.subcategory);
+    }
+    // Merge with the prop list (which may include categories not in lineItems)
+    for (const c of subcategories) {
+      seen.add(c);
+    }
+    return Array.from(seen).sort();
+  }, [lineItems, subcategories]);
+
   // Filter and sort
   const filtered = useMemo(() => {
     let items = lineItems;
@@ -125,6 +143,14 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     return items;
   }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir, accountMap]);
 
+  // EXP-02: Synthetic rows (headcount-synthetic) must NOT be bulk-selectable.
+  // Build a memoized list of selectable (non-synthetic) filtered items so that
+  // toggleAll, header state, and the count exclude the synthetic row.
+  const selectableItems = useMemo(
+    () => filtered.filter((i) => !isSynthetic(i)),
+    [filtered],
+  );
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -142,17 +168,17 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     });
   };
 
+  // EXP-02: toggleAll operates only on selectable (non-synthetic) items.
   const toggleAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((i) => i.id)));
+    if (selected.size === selectableItems.length && selectableItems.length > 0)
+      setSelected(new Set());
+    else setSelected(new Set(selectableItems.map((i) => i.id)));
   };
 
   const sortIcon = (col: SortKey) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
-
-  const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
 
   async function handleDeleteConfirm() {
     if (!deletingItem) return;
@@ -365,14 +391,20 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
           <thead>
             <tr className="border-b border-surface-200 bg-surface-50">
               <th scope="col" className="w-10 px-4 py-3">
+                {/* EXP-02: header state is driven by selectableItems (excludes synthetic). */}
                 <button onClick={toggleAll} aria-label="Select all expenses" className="flex items-center justify-center">
                   <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-                    selected.size === filtered.length && filtered.length > 0
+                    selectableItems.length > 0 && selected.size === selectableItems.length
                       ? "bg-brand-600 border-brand-600"
-                      : "border-surface-300"
+                      : selected.size > 0 && selected.size < selectableItems.length
+                        ? "bg-brand-300 border-brand-600"
+                        : "border-surface-300"
                   }`}>
-                    {selected.size === filtered.length && filtered.length > 0 && (
+                    {selectableItems.length > 0 && selected.size === selectableItems.length && (
                       <Check className="h-3 w-3 text-white" />
+                    )}
+                    {selected.size > 0 && selected.size < selectableItems.length && (
+                      <span className="h-0.5 w-2 bg-white rounded-full" aria-hidden />
                     )}
                   </div>
                 </button>
@@ -430,8 +462,12 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                       ? "No expenses match your filters."
                       : "No expenses recorded yet."}
                   </p>
+                  {/* EXP-05: mirror the primary condition — show broaden/clear
+                      guidance whenever ANY filter is active, not just search. */}
                   <p className="text-xs text-surface-400 mt-1">
-                    {search ? "Try broadening your search." : "Add expenses to start tracking spend."}
+                    {search || categoryFilter !== "all" || typeFilter !== "all"
+                      ? "Try broadening your search or clearing filters."
+                      : "Add expenses to start tracking spend."}
                   </p>
                 </td>
               </tr>
@@ -453,13 +489,20 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""} ${rowBorderClass}`}
                   >
                     <td className="w-10 px-4 py-3">
-                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-                          isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
-                        }`}>
-                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                      {/* EXP-02: disable checkbox for synthetic rows */}
+                      {synthetic ? (
+                        <div className="flex items-center justify-center">
+                          <div className="h-4 w-4 rounded border border-surface-200 bg-surface-100 cursor-not-allowed" aria-hidden />
                         </div>
-                      </button>
+                      ) : (
+                        <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
+                          <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
+                            isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
@@ -495,7 +538,13 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                             onBlur={() => setEditingCategoryId(null)}
                             className="px-2 py-0.5 text-[10px] font-medium"
                           >
-                            {subcategories.map((c) => (
+                            {/* EXP-06: use allCategories (full distinct list
+                                from lineItems) so low/zero-spend categories
+                                (e.g. COGS) are reachable. Pre-selects the
+                                row's current category via defaultValue above,
+                                even when it's outside the top-N subcategories
+                                prop used by the chart filter. */}
+                            {allCategories.map((c) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </Select>

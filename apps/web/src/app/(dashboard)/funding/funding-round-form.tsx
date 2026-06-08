@@ -19,6 +19,20 @@ import { GrantFields } from "./round-fields/GrantFields";
 
 const today = new Date().toISOString().slice(0, 10);
 
+// FUND-10: human labels for the immutable round-type badge. No internal spec
+// refs in UI strings — the badge reads "<Type> (immutable)".
+const roundTypeLabels: Record<FundingRoundType, string> = {
+  pre_seed: "Pre-Seed",
+  seed: "Seed",
+  series_a: "Series A",
+  series_b: "Series B",
+  series_c_plus: "Series C+",
+  safe: "SAFE",
+  convertible: "Convertible Note",
+  debt: "Debt",
+  grant: "Grant",
+};
+
 export interface FundingRoundFormValues {
   name: string;
   roundType: FundingRoundType;
@@ -123,7 +137,7 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
             Round type
           </span>
           <div className="text-sm text-muted">
-            {values.roundType} (immutable)
+            {(roundTypeLabels[values.roundType] ?? values.roundType)} (immutable)
           </div>
         </div>
       ) : (
