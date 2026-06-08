@@ -53,6 +53,12 @@ export interface DashboardLayoutState {
   secondaryMetrics: string[];
   /** Swap a hero card with a new metric */
   swapHeroCard: (index: number, newSlug: string) => Promise<void>;
+  /**
+   * Reset a hero card at `index` back to its engine default metric.
+   * DASH-01: pairs with the per-card display-mode reset so 'Reset to default'
+   * restores BOTH the slug and the mode (no Save+Reset contradiction).
+   */
+  resetHeroCard: (index: number) => Promise<void>;
   /** Reorder hero cards */
   reorderHeroCards: (cards: string[]) => void;
   /** Add a metric as a new dashboard card (hero slot) */
@@ -230,6 +236,26 @@ export function DashboardLayoutProvider({
     [updatePrefs]
   );
 
+  // DASH-01: restore a hero card to its engine-default metric. swapHeroCard
+  // permanently rewrites heroCards[index] and never records the original, so
+  // the only safe restore baseline is the canonical engine default at that
+  // position. Persists + revalidates via the same updatePrefs → savePrefs path
+  // swapHeroCard uses (PATCH /api/dashboard-preferences + router.refresh()).
+  // If the index is out of the default-cards range (custom-added hero slot
+  // with no engine default), this is a no-op rather than writing `undefined`.
+  const resetHeroCard = useCallback(
+    (index: number) =>
+      updatePrefs((p) => {
+        const defaultSlug = DEFAULT_HERO_CARDS[index];
+        if (defaultSlug == null) return p;
+        if (p.heroCards[index] === defaultSlug) return p;
+        const cards = [...p.heroCards];
+        cards[index] = defaultSlug;
+        return { ...p, heroCards: cards };
+      }),
+    [updatePrefs]
+  );
+
   const addHeroCard = useCallback(
     (slug: string) =>
       updatePrefs((p) => ({
@@ -310,6 +336,7 @@ export function DashboardLayoutProvider({
       heroCards: prefs.heroCards,
       secondaryMetrics: prefs.secondaryMetrics,
       swapHeroCard,
+      resetHeroCard,
       addHeroCard,
       removeHeroCard,
       reorderHeroCards,
@@ -326,6 +353,7 @@ export function DashboardLayoutProvider({
       prefs.secondaryMetrics,
       hasIntelligenceCards,
       swapHeroCard,
+      resetHeroCard,
       addHeroCard,
       removeHeroCard,
       reorderHeroCards,

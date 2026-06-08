@@ -128,6 +128,7 @@ export {
 // Metric registry — catalog, definitions, dependency graph, formatting
 export {
   METRIC_REGISTRY,
+  FORMAT_LABELS,
   CATEGORY_META,
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,

@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { chartColors, chartDefaults, formatMonth, formatCompactCurrency } from "./chart-theme";
+import { chartColors, chartDefaults, makeMonthTickFormatter, formatCompactCurrency } from "./chart-theme";
 import { MoMTooltipContent } from "./chart-tooltip";
 
 interface MultiLineChartProps {
@@ -30,6 +30,11 @@ export function MultiLineChart({
   height = 280,
   formatValue = formatCompactCurrency,
 }: MultiLineChartProps) {
+  // SCN-06 + RPT-09: include the year in tick labels only for ambiguous
+  // (multi-year / >12-month) windows, computed from the actual data months.
+  const tickFormatter = makeMonthTickFormatter(
+    data.map((d) => String(d.month ?? ""))
+  );
   return (
     <div>
       {/* Inline legend — direct labels per CRED spec */}
@@ -71,10 +76,12 @@ export function MultiLineChart({
           <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
           <XAxis
             dataKey="month"
-            tickFormatter={(v) => formatMonth(String(v))}
+            tickFormatter={(v) => tickFormatter(String(v))}
             tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
             axisLine={false}
             tickLine={false}
+            interval={0}
+            minTickGap={0}
           />
           <YAxis
             tickFormatter={(v) => formatValue(v)} // [Phase 4 E Task 7] wrap to drop Recharts' implicit index arg

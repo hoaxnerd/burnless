@@ -15,7 +15,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { formatCompactCurrency } from "../chart-theme";
+import {
+  formatCompactCurrency,
+  shouldShowYearInTicks,
+  makeMonthTickFormatter,
+} from "../chart-theme";
 
 describe("formatCompactCurrency (Phase 4 E Task 7)", () => {
   it("formats 120000 as '$120k'", () => {
@@ -54,5 +58,63 @@ describe("formatCompactCurrency (Phase 4 E Task 7)", () => {
     for (const f of formatted) {
       expect(f).not.toMatch(/\d{4,}/); // no 4+ digit runs
     }
+  });
+});
+
+// ── SCN-06: explicit ticks — formatter applied to every month ─────────────────
+
+describe("makeMonthTickFormatter (SCN-06: all ticks present)", () => {
+  it("produces a label for all 12 months of a single year (no auto-skip in our formatter)", () => {
+    const months = Array.from({ length: 12 }, (_, i) => `2025-${String(i + 1).padStart(2, "0")}`);
+    const fmt = makeMonthTickFormatter(months);
+    const labels = months.map((m) => fmt(m));
+    // Every month renders a non-empty label (Nov included — SCN-06 root issue).
+    expect(labels).toHaveLength(12);
+    for (const l of labels) expect(l.length).toBeGreaterThan(0);
+    // Single-year window keeps the SHORT month form (no year digits).
+    expect(fmt("2025-11")).toBe("Nov");
+    for (const l of labels) expect(l).not.toMatch(/\d{2,}/);
+  });
+});
+
+// ── RPT-09: year-in-label disambiguation across a year boundary ───────────────
+
+describe("shouldShowYearInTicks / makeMonthTickFormatter (RPT-09: distinct labels)", () => {
+  it("does not show year for a single-year window", () => {
+    const months = ["2025-01", "2025-06", "2025-12"];
+    expect(shouldShowYearInTicks(months)).toBe(false);
+  });
+
+  it("shows year when the window crosses a calendar year boundary", () => {
+    const months = ["2025-11", "2025-12", "2026-01"];
+    expect(shouldShowYearInTicks(months)).toBe(true);
+  });
+
+  it("shows year when the window spans more than 12 months", () => {
+    const months = Array.from({ length: 14 }, (_, i) => {
+      const total = 10 + i; // 2025-11 .. 2026-12 (offset)
+      const year = 2025 + Math.floor(total / 12);
+      const month = (total % 12) + 1;
+      return `${year}-${String(month).padStart(2, "0")}`;
+    });
+    expect(shouldShowYearInTicks(months)).toBe(true);
+  });
+
+  it("renders DISTINCT labels for 2025-11..2026-12 (Nov-25 vs Nov-26 no longer identical)", () => {
+    const months: string[] = [];
+    // 2025-11, 2025-12, then 2026-01 .. 2026-12
+    months.push("2025-11", "2025-12");
+    for (let m = 1; m <= 12; m++) months.push(`2026-${String(m).padStart(2, "0")}`);
+
+    const fmt = makeMonthTickFormatter(months);
+    const labels = months.map((m) => fmt(m));
+
+    // The two November ticks must differ once year is included.
+    expect(fmt("2025-11")).not.toBe(fmt("2026-11"));
+    // All labels are unique across the multi-year window.
+    expect(new Set(labels).size).toBe(labels.length);
+    // Year is present in multi-year labels.
+    expect(fmt("2025-11")).toMatch(/25/);
+    expect(fmt("2026-11")).toMatch(/26/);
   });
 });

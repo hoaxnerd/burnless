@@ -157,6 +157,11 @@ export function WidgetCard({
             isOverride={isOverride}
             aiEnabled={aiEnabled}
             catalogProps={catalog ?? undefined}
+            onResetForCard={
+              slug && catalog?.onResetForCard
+                ? () => catalog.onResetForCard?.(slug)
+                : undefined
+            }
             onSaveForCard={slug && pageId && metrics
               ? (selectedSlug: string) => {
                   if (catalog?.onSaveForCard) {

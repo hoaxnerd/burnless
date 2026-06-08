@@ -4,6 +4,7 @@ import { useState } from "react";
 import { pctChange, formatMetricValue } from "@burnless/engine";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
 import { AreaChartWidget, chartColors, formatPercent, formatNumber } from "@/components/charts";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { useLocale } from "@/components/locale/locale-context";
 
 type MetricCategory = "revenue" | "saas" | "cash" | "profitability" | "growth" | "efficiency";
@@ -127,10 +128,50 @@ export function MetricsExplorer({
 
   const categories: (MetricCategory | "all")[] = ["all", "revenue", "saas", "cash", "profitability", "growth", "efficiency"];
 
+  // RPT-10: standardize on the shared ExportDropdown (CSV + PDF). Export the
+  // current month's value for each filtered metric (label, category, value).
+  const buildExportRows = (): { headers: string[]; rows: string[][] } => {
+    const headers = ["Metric", "Category", "Value"];
+    const rows = filteredMetrics.map((def) => {
+      const data = metrics[def.key] as MetricValue[];
+      const currentIdx = data.findIndex((d) => d.month === currentMonth);
+      const resolvedIdx = currentIdx >= 0 ? currentIdx : data.length - 1;
+      const current = data[resolvedIdx]?.value ?? 0;
+      return [def.label, categoryLabels[def.category], makeMetricFormatter(def.format, fmtCurrency)(current)];
+    });
+    return { headers, rows };
+  };
+
+  const handleExportCSV = () => {
+    const { headers, rows } = buildExportRows();
+    const csvRows = [headers.join(",")];
+    for (const row of rows) {
+      csvRows.push(row.map((v) => (v.includes(",") ? `"${v}"` : v)).join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "metrics.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = async () => {
+    const { generateTablePDF, downloadPDF } = await import("@/lib/pdf-export");
+    const { headers, rows } = buildExportRows();
+    const doc = await generateTablePDF(headers, rows, {
+      title: "Metrics",
+      companyName: "Company",
+      scenarioName: "Base",
+    });
+    downloadPDF(doc, "metrics");
+  };
+
   return (
     <div className="space-y-6">
       {/* Category filter tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {categories.map((cat) => (
           <button
             key={cat}
@@ -144,6 +185,9 @@ export function MetricsExplorer({
             {cat === "all" ? "All Metrics" : categoryLabels[cat]}
           </button>
         ))}
+        <div className="ml-auto">
+          <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
+        </div>
       </div>
 
       {/* Metrics grid */}

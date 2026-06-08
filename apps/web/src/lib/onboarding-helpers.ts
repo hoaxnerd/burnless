@@ -9,7 +9,7 @@ import { z } from "zod";
  * ONB-02 — sane upper bounds for AI-enriched / user-edited financial inputs.
  *
  * The AI research agent (and a fat-fingered user) can emit absurd values
- * (e.g. $9.8B monthly revenue) that ripple into engine runway/burn math and
+ * (e.g. 9.8B/mo monthly revenue) that ripple into engine runway/burn math and
  * the dashboard headlines. These are deliberately generous — they catch only
  * truly-impossible inputs, never a legitimately-large enterprise figure.
  *

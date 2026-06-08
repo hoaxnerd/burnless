@@ -70,6 +70,23 @@ describe("<BonusesList>", () => {
     expect(screen.getByText("No bonuses recorded.")).toBeTruthy();
   });
 
+  it("labels the column header 'Payout date' (TEAM-06) to match the date control", () => {
+    render(
+      <BonusesList
+        headcountId="h1"
+        bonuses={[{ id: "a", payoutMonth: "2026-01-01", amount: 1000, type: "signing" }]}
+      />,
+    );
+    expect(screen.getByText("Payout date")).toBeTruthy();
+    expect(screen.queryByText("Payout month")).toBeNull();
+  });
+
+  it("labels the date field 'Payout date' (TEAM-06)", () => {
+    render(<BonusesList headcountId="h1" bonuses={[]} />);
+    fireEvent.click(screen.getByTestId("open-add-bonus"));
+    expect(screen.getByLabelText("Payout date")).toBeTruthy();
+  });
+
   it("opens modal, POSTs body, and refreshes on success", async () => {
     const { apiFetch } = await import("@/lib/api-fetch");
     (apiFetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -80,7 +97,7 @@ describe("<BonusesList>", () => {
     render(<BonusesList headcountId="h1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
-    fireEvent.change(screen.getByLabelText("Payout month"), {
+    fireEvent.change(screen.getByLabelText("Payout date"), {
       target: { value: "2026-06-01" },
     });
     fireEvent.change(screen.getByLabelText("Amount"), {
@@ -142,7 +159,7 @@ describe("<BonusesList>", () => {
     render(<BonusesList headcountId="h1" bonuses={[]} />);
 
     fireEvent.click(screen.getByTestId("open-add-bonus"));
-    fireEvent.change(screen.getByLabelText("Payout month"), {
+    fireEvent.change(screen.getByLabelText("Payout date"), {
       target: { value: "2026-06-01" },
     });
     fireEvent.change(screen.getByLabelText("Amount"), {

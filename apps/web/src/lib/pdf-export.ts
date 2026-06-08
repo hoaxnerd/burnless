@@ -560,6 +560,39 @@ export async function generateInvestorDataRoomPDF(
 }
 
 /**
+ * RPT-10: generic table PDF for report views that don't have a bespoke
+ * statement generator (Budget vs Actuals, Metrics Explorer). Rows are already
+ * formatted strings — the caller owns currency/locale formatting (engine never
+ * formats), keeping this helper format-agnostic and reusable.
+ */
+export async function generateTablePDF(
+  headers: string[],
+  rows: string[][],
+  opts: PDFReportOptions
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+  addPDFHeader(doc, opts);
+
+  autoTable(doc, {
+    startY: 66,
+    head: [headers],
+    body: rows,
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 4, textColor: [71, 85, 105] },
+    headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
+    columnStyles: Object.fromEntries(
+      headers.map((_, i) => [i, i === 0 ? { halign: "left" as const } : { halign: "right" as const }])
+    ),
+    margin: { left: 20, right: 20 },
+  });
+
+  addPDFFooter(doc);
+  return doc;
+}
+
+/**
  * Trigger a PDF download in the browser.
  */
 export function downloadPDF(doc: jsPDFType, filename: string) {

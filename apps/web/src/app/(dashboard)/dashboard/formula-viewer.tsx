@@ -13,6 +13,7 @@ import {
   getMetricDependencyTree,
   getMetricDependents,
   CATEGORY_META,
+  FORMAT_LABELS,
   type MetricDefinition,
   type MetricTier,
 } from "@burnless/engine";
@@ -230,8 +231,8 @@ function MetricNode({
         <span className={`text-sm font-medium ${isCenter ? "text-brand-700" : "text-surface-900"}`}>
           {metric.name}
         </span>
-        <span className="text-[10px] text-surface-400 uppercase">
-          {metric.format}
+        <span className="text-[10px] text-surface-400">
+          {FORMAT_LABELS[metric.format]}
         </span>
       </div>
       <p className="text-[10px] text-surface-500 mt-0.5 line-clamp-1">

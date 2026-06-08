@@ -14,7 +14,7 @@ const { mockSelect, mockFrom, mockWhere, mockLimit, mockVerifyPassword, mockUpda
 
 vi.mock("@burnless/db", () => ({
   db: { select: mockSelect, update: mockUpdate },
-  users: { id: "id", email: "email", emailVerified: "emailVerified" },
+  users: { id: "id", email: "email", emailVerified: "emailVerified", name: "name", image: "image" },
   eq: vi.fn(),
 }));
 
@@ -231,6 +231,50 @@ describe("auth.config callbacks", () => {
     const token = { sub: "existing-id" };
     const result = await authConfig.callbacks!.jwt!({ token, user: undefined } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]);
     expect(result).toMatchObject({ sub: "existing-id" });
+  });
+
+  // ── RPT-12: name/picture refresh on trigger 'update' ─────────────────────
+  it("jwt callback refreshes token.name + token.picture on trigger 'update'", async () => {
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockReturnValue({ limit: mockLimit });
+    mockLimit.mockResolvedValue([
+      { emailVerified: new Date(), name: "Morgan Pro", image: "https://example.com/new.png" },
+    ]);
+
+    const token = { sub: "user-1", name: "N", picture: null, customField: "keep-me" };
+    const result = await authConfig.callbacks!.jwt!({ token, trigger: "update" } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]) as Record<string, unknown>;
+
+    expect(result.name).toBe("Morgan Pro");
+    expect(result.picture).toBe("https://example.com/new.png");
+    // Existing unrelated fields preserved.
+    expect(result.sub).toBe("user-1");
+    expect(result.customField).toBe("keep-me");
+    expect(result.isEmailVerified).toBe(true);
+  });
+
+  it("jwt callback does NOT overwrite name/picture when the DB row is not found", async () => {
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockReturnValue({ limit: mockLimit });
+    mockLimit.mockResolvedValue([]); // no row
+
+    const token = { sub: "user-1", name: "Existing", picture: "https://example.com/keep.png" };
+    const result = await authConfig.callbacks!.jwt!({ token, trigger: "update" } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]) as Record<string, unknown>;
+
+    expect(result.name).toBe("Existing");
+    expect(result.picture).toBe("https://example.com/keep.png");
+  });
+
+  it("jwt callback does NOT hit the DB on a plain request (no user, no update trigger)", async () => {
+    vi.clearAllMocks();
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockReturnValue({ limit: mockLimit });
+
+    const token = { sub: "user-1", name: "Existing" };
+    await authConfig.callbacks!.jwt!({ token } as unknown as Parameters<NonNullable<typeof authConfig.callbacks>["jwt"]>[0]);
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it("session callback injects user id from token.sub", () => {

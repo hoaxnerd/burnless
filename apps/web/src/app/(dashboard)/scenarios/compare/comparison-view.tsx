@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { Button, Select } from "@/components/ui";
 import {
@@ -31,9 +32,22 @@ export function ComparisonView({
   initialIds: string[];
   currency: CurrencyCode;
 }) {
+  const router = useRouter();
   const [baseId, setBaseId] = useState(initialIds[0] ?? "");
   const [compareId, setCompareId] = useState(initialIds[1] ?? "");
   const [activeTab, setActiveTab] = useState<Tab>("metrics");
+
+  // SCN-07: mirror the selected pair into the URL so refresh/share reproduces it.
+  // URL query only — this is unrelated to the active-scenario cookie / X-Scenario-Id
+  // single-source contract (apiFetch remains the sole header injector). router.replace
+  // (not push) avoids polluting history on every dropdown change.
+  useEffect(() => {
+    if (baseId && compareId) {
+      router.replace(`/scenarios/compare?ids=${baseId},${compareId}`, {
+        scroll: false,
+      });
+    }
+  }, [baseId, compareId, router]);
 
   // SCN-05 / DFL-01: read the comparison (incl. the data-diff change counter)
   // from the shared SWR cache instead of a hand-rolled fetch-in-effect snapshot,

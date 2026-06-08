@@ -61,6 +61,11 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
 
   const deptMap = new Map(departments.map((d) => [d.id, d.name]));
 
+  // TEAM-01: department ids still referenced by a headcount plan. DELETE
+  // /api/departments cascade-deletes those plans (FK onDelete: "cascade"), so the
+  // Manage-departments panel disables delete for referenced departments.
+  const referencedDeptIds = Array.from(new Set(plans.map((p) => p.departmentId)));
+
   // Phase A: read the snapped "as of" month from the engine pipeline so the Team
   // page agrees with Dashboard/Expenses instead of recomputing the calendar month.
   const { currentMonth, prevMonth } = data;
@@ -252,6 +257,8 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
         resolvedSlotData={resolvedSlotData}
         scenarioId={scenarioId}
         departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+        manageDepartments={departments.map((d) => ({ id: d.id, name: d.name, parentId: d.parentId }))}
+        referencedDeptIds={referencedDeptIds}
         companyBenefitsRates={companyBenefitsRates}
         currency={currency}
       />

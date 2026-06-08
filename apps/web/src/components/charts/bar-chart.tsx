@@ -10,7 +10,7 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
-import { chartColors, chartDefaults, formatMonth, formatCompactCurrency, tooltipStyle } from "./chart-theme";
+import { chartColors, chartDefaults, formatMonth, makeMonthTickFormatter, formatCompactCurrency, tooltipStyle } from "./chart-theme";
 import { MoMTooltipContent } from "./chart-tooltip";
 
 interface BarChartProps {
@@ -31,6 +31,10 @@ export function BarChartWidget({
   height = 240,
   formatValue = formatCompactCurrency,
 }: BarChartProps) {
+  // SCN-06 + RPT-09: parity with MultiLineChart — explicit ticks + year when ambiguous.
+  const tickFormatter = makeMonthTickFormatter(
+    data.map((d) => String(d.month ?? ""))
+  );
   return (
     <div>
       {/* Inline legend — direct labels per CRED spec */}
@@ -55,10 +59,12 @@ export function BarChartWidget({
           <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
           <XAxis
             dataKey="month"
-            tickFormatter={(v) => formatMonth(String(v))}
+            tickFormatter={(v) => tickFormatter(String(v))}
             tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
             axisLine={false}
             tickLine={false}
+            interval={0}
+            minTickGap={0}
           />
           <YAxis
             tickFormatter={(v) => formatValue(v)} // [Phase 4 E Task 7] wrap to drop Recharts' implicit index arg
@@ -110,16 +116,20 @@ export function VarianceBarChart({
   height = 200,
   formatValue = formatCompactCurrency,
 }: VarianceBarChartProps) {
+  // SCN-06 + RPT-09: explicit ticks + year-when-ambiguous, matching the other charts.
+  const tickFormatter = makeMonthTickFormatter(data.map((d) => String(d.month ?? "")));
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={chartDefaults.gridStroke} vertical={false} />
         <XAxis
           dataKey="month"
-          tickFormatter={(v) => formatMonth(String(v))}
+          tickFormatter={(v) => tickFormatter(String(v))}
           tick={{ fontSize: chartDefaults.fontSize, fill: chartDefaults.axisStroke }}
           axisLine={false}
           tickLine={false}
+          interval={0}
+          minTickGap={0}
         />
         <YAxis
           tickFormatter={(v) => formatValue(v)} // [Phase 4 E Task 7] wrap to drop Recharts' implicit index arg

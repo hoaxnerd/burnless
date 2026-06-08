@@ -238,14 +238,19 @@ export function SidebarInner({
           )}
         </div>
         {collapsed && (
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="mt-2 w-full flex justify-center rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          // SHELL-02: keep the theme toggle reachable in the collapsed rail. It's
+          // already an icon-only, aria-labeled button, so it works centered here.
+          <div className="mt-2 flex flex-col items-center gap-1">
+            <ThemeToggle />
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="w-full flex justify-center rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
     </>

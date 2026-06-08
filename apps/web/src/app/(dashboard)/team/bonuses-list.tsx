@@ -115,7 +115,7 @@ export function BonusesList({ headcountId, bonuses }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-surface-600">
-              <th className="py-2">Payout month</th>
+              <th className="py-2">Payout date</th>
               <th className="py-2">Amount</th>
               <th className="py-2">Type</th>
               <th className="py-2">Notes</th>
@@ -154,7 +154,7 @@ export function BonusesList({ headcountId, bonuses }: Props) {
       <Modal open={open} onClose={close} title="Add bonus">
         <div className="space-y-3">
           <SingleDateInput
-            label="Payout month"
+            label="Payout date"
             value={payoutMonth}
             onChange={setPayoutMonth}
           />

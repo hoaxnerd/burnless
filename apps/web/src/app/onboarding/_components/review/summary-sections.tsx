@@ -14,7 +14,7 @@ interface SummaryProps {
 /**
  * ONB-02 — non-blocking display threshold for the soft-warning chip. The
  * server hard-max (SANE_MAX_AMOUNT) REJECTS; this only WARNS, well below the
- * hard max, so an absurd-but-not-impossible value (e.g. $9.8B monthly revenue)
+ * hard max, so an absurd-but-not-impossible value (e.g. 9.8B/mo monthly revenue)
  * is flagged for double-checking without ever blocking submit.
  */
 const REVENUE_WARN_THRESHOLD = 1e9;

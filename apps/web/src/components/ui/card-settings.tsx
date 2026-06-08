@@ -102,6 +102,12 @@ export interface CardSettingsProps {
   catalogProps?: CatalogProps;
   /** Called when user saves a metric selection for this specific card. */
   onSaveForCard?: (selectedSlug: string) => void;
+  /**
+   * DASH-01: called when user resets this specific card to its default metric
+   * (dashboard hero path). When provided, 'Reset to default' restores the slug
+   * in addition to clearing the per-card display-mode override.
+   */
+  onResetForCard?: () => void;
 }
 
 export function CardSettings({
@@ -111,6 +117,7 @@ export function CardSettings({
   aiEnabled = false,
   catalogProps,
   onSaveForCard,
+  onResetForCard,
 }: CardSettingsProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -159,6 +166,7 @@ export function CardSettings({
         aiEnabled={aiEnabled}
         catalogProps={catalogProps}
         onSaveForCard={onSaveForCard}
+        onResetForCard={onResetForCard}
       />
     </div>
   );
@@ -175,6 +183,7 @@ function SettingsModal({
   aiEnabled,
   catalogProps,
   onSaveForCard,
+  onResetForCard,
 }: {
   open: boolean;
   onClose: () => void;
@@ -184,6 +193,7 @@ function SettingsModal({
   aiEnabled: boolean;
   catalogProps?: CatalogProps;
   onSaveForCard?: (selectedSlug: string) => void;
+  onResetForCard?: () => void;
 }) {
   const [stagedSlug, setStagedSlug] = useState<string | null>(null);
 
@@ -195,9 +205,18 @@ function SettingsModal({
   );
 
   const handleReset = useCallback(() => {
+    // DASH-01: clear the per-card display-MODE override AND restore the card's
+    // default metric slug together, so 'Reset to default' leaves no contradiction
+    // between the shown metric and the 'Using global default' state.
     onModeChange(null);
+    onResetForCard?.();
     onClose();
-  }, [onModeChange, onClose]);
+  }, [onModeChange, onResetForCard, onClose]);
+
+  // DASH-01: a hero card can always be reset to its default metric even when no
+  // per-card display-mode override exists (a slug-only swap leaves isOverride
+  // false), so surface the reset affordance whenever a slug-reset is available.
+  const canReset = isOverride || !!onResetForCard;
 
   return (
     <Modal
@@ -230,7 +249,7 @@ function SettingsModal({
 
         {/* Footer actions */}
         <div className="flex items-center justify-between pt-2 border-t border-surface-100">
-          {isOverride ? (
+          {canReset ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();

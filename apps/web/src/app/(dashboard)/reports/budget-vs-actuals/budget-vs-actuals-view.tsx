@@ -6,7 +6,7 @@ import { formatPercent } from "@burnless/types";
 import type { BudgetVsActuals, ResolvedSlotData } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, ConnectedPageGrid, SwappableMetricCard, type DefaultLayoutItem } from "@/components/ui";
-import { ExportCSVButton } from "@/components/reports/export-button";
+import { ExportDropdown } from "@/components/reports/export-dropdown";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
@@ -39,6 +39,37 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
     for (const a of item.actual) row[`Actual ${a.month}`] = a.value;
     return row;
   });
+
+  // RPT-10: standardize on the shared ExportDropdown (CSV + PDF).
+  const handleExportCSV = () => {
+    const csvRows = [headers.join(",")];
+    for (const row of csvData) {
+      const values = headers.map((h) => {
+        const val = row[h];
+        if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+        return String(val ?? "");
+      });
+      csvRows.push(values.join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "budget-vs-actuals.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = async () => {
+    const { generateTablePDF, downloadPDF } = await import("@/lib/pdf-export");
+    const rows = csvData.map((row) => headers.map((h) => String(row[h] ?? "")));
+    const doc = await generateTablePDF(headers, rows, {
+      title: "Budget vs Actuals",
+      companyName: "Company",
+      scenarioName: "Base",
+    });
+    downloadPDF(doc, "budget-vs-actuals");
+  };
 
   // ── PageGrid layout ──────────────────────────────────────────────────────
 
@@ -103,7 +134,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
       <div className="rounded-xl bg-surface-0 border border-surface-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-surface-900">Variance by Account</h2>
-          <ExportCSVButton data={csvData} headers={headers} filename="budget-vs-actuals" />
+          <ExportDropdown onExportCSV={handleExportCSV} onExportPDF={handleExportPDF} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -146,7 +177,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
         </div>
       </div>
     ),
-  }), [slotById, summaryChartData, totalVariance, lineItems, csvData, headers]);
+  }), [slotById, summaryChartData, totalVariance, lineItems, csvData, headers, handleExportCSV, handleExportPDF]);
 
   // Empty state: show before PageGrid
   if (lineItems.length === 0) {

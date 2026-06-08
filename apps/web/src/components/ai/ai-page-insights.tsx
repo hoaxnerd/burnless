@@ -332,25 +332,29 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
+/**
+ * RPT-13: COMPACT skeleton. The previous skeleton reserved a tall, multi-bar
+ * block (3 full insight cards) that dominated the viewport for ~5s and read as
+ * "half-loaded" — especially on the Board Update where server KPIs paint first.
+ * This compact variant reserves a single slim row: enough to avoid layout shift
+ * once the cached insight renders, without visually dominating the page.
+ */
 function InsightsSkeleton() {
   return (
     <div className="rounded-2xl border border-surface-200 bg-surface-0 p-4 mb-6 animate-pulse">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2">
         <div className="h-3.5 w-3.5 rounded bg-surface-200" />
         <div className="h-3 w-20 rounded bg-surface-200" />
+        <div className="ml-auto h-2.5 w-2.5 rounded-full bg-surface-100" />
       </div>
-      <div className="space-y-2">
-        {[1, 2, 3].map((n) => (
-          <div key={n} className="rounded-xl border border-surface-100 bg-surface-50/50 p-3.5">
-            <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-surface-200 flex-shrink-0" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-4 w-3/4 rounded bg-surface-200" />
-                <div className="h-3 w-full rounded bg-surface-100" />
-              </div>
-            </div>
+      <div className="mt-3 rounded-xl border border-surface-100 bg-surface-50/50 p-3">
+        <div className="flex items-start gap-3">
+          <div className="h-4 w-4 rounded bg-surface-200 flex-shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3.5 w-2/3 rounded bg-surface-200" />
+            <div className="h-3 w-full rounded bg-surface-100" />
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

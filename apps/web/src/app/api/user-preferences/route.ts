@@ -45,34 +45,22 @@ export const PATCH = withErrorHandler(async (request: Request) => {
 
   const body = patchSchema.parse(await request.json());
 
-  // Upsert — create if missing, update if exists
-  const [existing] = await db
-    .select({ id: userPreferences.id })
-    .from(userPreferences)
-    .where(
-      and(
-        eq(userPreferences.userId, ctx.userId),
-        eq(userPreferences.companyId, ctx.companyId)
-      )
-    )
-    .limit(1);
-
-  if (existing) {
-    const [updated] = await db
-      .update(userPreferences)
-      .set(body)
-      .where(eq(userPreferences.id, existing.id))
-      .returning();
-    return NextResponse.json(updated);
-  }
-
-  const [created] = await db
+  // SHELL-01: atomic upsert. The shell fires multiple concurrent fire-and-forget
+  // PATCHes on first write; a SELECT-then-INSERT races and the loser 500s on the
+  // unique (userId, companyId) index. onConflictDoUpdate is a single atomic
+  // statement that never collides. `set: body` only updates the provided keys, so
+  // partial-PATCH semantics are preserved (unset columns keep their stored value).
+  const [upserted] = await db
     .insert(userPreferences)
     .values({
       userId: ctx.userId,
       companyId: ctx.companyId,
       ...body,
     })
+    .onConflictDoUpdate({
+      target: [userPreferences.userId, userPreferences.companyId],
+      set: body,
+    })
     .returning();
-  return NextResponse.json(created, { status: 201 });
+  return NextResponse.json(upserted);
 });

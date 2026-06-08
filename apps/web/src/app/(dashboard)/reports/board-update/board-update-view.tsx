@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArrowLeft, Download, Printer, Sparkles } from "lucide-react";
+import { ArrowLeft, FolderOpen, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
@@ -101,7 +101,17 @@ function generateRevenueNarrative(r: BoardData["revenue"]): string {
   return parts.join(" ");
 }
 
-function generateExpenseNarrative(e: BoardData["expenses"]): string {
+// RPT-06: "Uncategorized" is a catch-all bucket, not a real spend category. It
+// must never headline the board narrative as the "largest category", and when
+// it dominates we surface a categorization prompt instead.
+const UNCATEGORIZED_LABEL = "Uncategorized";
+const UNCATEGORIZED_PROMPT_THRESHOLD = 25; // % of total spend
+
+function isUncategorized(cat: SubcategoryBreakdown): boolean {
+  return cat.subcategory.trim().toLowerCase() === UNCATEGORIZED_LABEL.toLowerCase();
+}
+
+export function generateExpenseNarrative(e: BoardData["expenses"]): string {
   const parts: string[] = [];
   if (e.changePercent > 5) {
     parts.push(`Total spend increased ${formatPercent(e.changePercent)} to ${formatCompactCurrency(e.current)}/mo.`);
@@ -111,9 +121,17 @@ function generateExpenseNarrative(e: BoardData["expenses"]): string {
     parts.push(`Spend is stable at ${formatCompactCurrency(e.current)}/mo.`);
   }
 
-  if (e.topCategories.length > 0) {
-    const top = e.topCategories[0]!;
-    parts.push(`Largest category: ${top.subcategory} at ${formatCompactCurrency(top.amount)} (${formatPercent(top.percentage, undefined, 0)} of total).`);
+  // RPT-06: when Uncategorized exceeds the threshold, prompt to categorize
+  // rather than naming it as the largest category.
+  const uncategorized = e.topCategories.find(isUncategorized);
+  if (uncategorized && uncategorized.percentage >= UNCATEGORIZED_PROMPT_THRESHOLD) {
+    parts.push(`${formatPercent(uncategorized.percentage, undefined, 0)} of spend is uncategorized — categorize for a sharper breakdown.`);
+  }
+
+  // Pick the largest NAMED category (skip the Uncategorized catch-all).
+  const topNamed = e.topCategories.find((c) => !isUncategorized(c));
+  if (topNamed) {
+    parts.push(`Largest category: ${topNamed.subcategory} at ${formatCompactCurrency(topNamed.amount)} (${formatPercent(topNamed.percentage, undefined, 0)} of total).`);
   }
 
   if (e.anomalyCount > 0) {
@@ -121,6 +139,16 @@ function generateExpenseNarrative(e: BoardData["expenses"]): string {
   }
 
   return parts.join(" ");
+}
+
+/**
+ * RPT-06: order Top Categories with named categories first (by original order)
+ * and the Uncategorized catch-all pushed to the end, so it never visually leads.
+ */
+function orderedTopCategories(cats: SubcategoryBreakdown[]): SubcategoryBreakdown[] {
+  const named = cats.filter((c) => !isUncategorized(c));
+  const unc = cats.filter(isUncategorized);
+  return [...named, ...unc];
 }
 
 function generateCashNarrative(c: BoardData["cash"]): string {
@@ -201,7 +229,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "ai-insights", x: 0, w: 12, h: 8, minH: 4 },
+    { i: "ai-insights", x: 0, w: 12, h: 5, minH: 3 },
     { i: "revenue-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 12, h: 14, minH: 8 },
@@ -213,7 +241,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "ai-insights", x: 0, w: 6, h: 8, minH: 4 },
+    { i: "ai-insights", x: 0, w: 6, h: 5, minH: 3 },
     { i: "revenue-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 6, h: 14, minH: 8 },
@@ -296,22 +324,26 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
           <div>
             <h4 className="text-xs font-medium text-surface-500 uppercase mb-3">Top Categories</h4>
             <div className="space-y-2">
-              {d.expenses.topCategories.map((cat) => (
-                <div key={cat.subcategory} className="flex items-center justify-between">
-                  <span className="text-xs text-surface-700">{cat.subcategory}</span>
-                  <div className="flex items-center gap-3">
-                    <div className="w-20 h-1.5 rounded-full bg-surface-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-surface-400"
-                        style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                      />
+              {orderedTopCategories(d.expenses.topCategories).map((cat) => {
+                // RPT-06: render the Uncategorized catch-all greyed / last.
+                const greyed = isUncategorized(cat);
+                return (
+                  <div key={cat.subcategory} className="flex items-center justify-between">
+                    <span className={`text-xs ${greyed ? "text-surface-400 italic" : "text-surface-700"}`}>{cat.subcategory}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-20 h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${greyed ? "bg-surface-300" : "bg-surface-400"}`}
+                          style={{ width: `${Math.min(cat.percentage, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-semibold tabular-nums w-14 text-right ${greyed ? "text-surface-400" : "text-surface-900"}`}>
+                        {formatCompactCurrency(cat.amount)}
+                      </span>
                     </div>
-                    <span className="text-xs font-semibold tabular-nums text-surface-900 w-14 text-right">
-                      {formatCompactCurrency(cat.amount)}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -417,12 +449,14 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                   <Printer className="w-3.5 h-3.5" />
                   Print
                 </button>
+                {/* RPT-10: this navigates to the data room — it does not export
+                    this report. Label and icon reflect navigation, not export. */}
                 <Link
                   href="/data-room"
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  Export Package
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Open Data Room
                 </Link>
               </div>
             </div>

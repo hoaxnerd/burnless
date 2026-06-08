@@ -5,6 +5,7 @@ import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { TeamRoster, PlannedHiresSection, HiringInsightTip } from "./team-details";
+import { ManageDepartmentsPanel } from "./manage-departments-panel";
 import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { PageProvider } from "@/components/providers/page-context";
 import { CardCatalogProvider, type CardCatalogValue } from "@/components/providers/card-catalog-context";
@@ -71,6 +72,10 @@ interface TeamViewProps {
   resolvedSlotData: ResolvedSlotData[];
   scenarioId: string | null;
   departments: Array<{ id: string; name: string }>;
+  /** Full department rows (incl. parentId) for the Manage-departments hierarchy panel (TEAM-01). */
+  manageDepartments: Array<{ id: string; name: string; parentId: string | null }>;
+  /** Department ids with ≥1 headcount plan referencing them — delete is gated for these. */
+  referencedDeptIds: string[];
   companyBenefitsRates: BenefitsBreakdown;
   currency: CurrencyCode;
 }
@@ -88,9 +93,12 @@ export function TeamView({
   resolvedSlotData,
   scenarioId,
   departments,
+  manageDepartments,
+  referencedDeptIds,
   companyBenefitsRates,
   currency,
 }: TeamViewProps) {
+  const referencedDeptIdSet = useMemo(() => new Set(referencedDeptIds), [referencedDeptIds]);
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
     const map = new Map<string, ResolvedSlotData>();
@@ -199,6 +207,13 @@ export function TeamView({
   }), [slotById, departmentBreakdown, plannedHires, totalMonthlyCost, scenarioId, departments, companyBenefitsRates, currency]);
 
   return (
+    <>
+      <div className="mb-4 flex justify-end">
+        <ManageDepartmentsPanel
+          departments={manageDepartments}
+          referencedDeptIds={referencedDeptIdSet}
+        />
+      </div>
     <PageLayoutProvider pageId="team">
       <ComputedMetricsProvider slotData={resolvedSlotData}>
         <PageProvider pageId="team">
@@ -213,5 +228,6 @@ export function TeamView({
         </PageProvider>
       </ComputedMetricsProvider>
     </PageLayoutProvider>
+    </>
   );
 }

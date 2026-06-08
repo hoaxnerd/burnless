@@ -18,6 +18,12 @@ import { ContractorFields } from "./employee-type-fields/ContractorFields";
 import { BenefitsBreakdownEditor } from "./benefits-breakdown-editor";
 import { DateRangePicker } from "@/components/forms/primitives";
 
+/**
+ * Canonical label for the add-headcount action. Empty-state copy MUST reference
+ * this so the call-to-action text can't drift from the real button (SHELL-05 / TEAM-10).
+ */
+export const ADD_HIRE_LABEL = "Add hire";
+
 interface Department {
   id: string;
   name: string;
@@ -158,7 +164,7 @@ export function HeadcountForm({
           data-testid="open-headcount-form"
           className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
         >
-          Add hire
+          {ADD_HIRE_LABEL}
         </button>
       )}
       <Modal open={open} onClose={handleClose} title={isEditMode ? "Edit hire" : "Add hire"} size="xl">

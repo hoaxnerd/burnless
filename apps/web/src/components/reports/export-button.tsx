@@ -46,12 +46,30 @@ export function statementToCSVRows(
 ): { headers: string[]; data: Record<string, unknown>[] } {
   if (sections.length === 0) return { headers: ["Item"], data: [] };
 
-  const months = sections[0]!.values.map((v) => v.month);
+  // RPT-11: build the header-month UNION across ALL sections, not just the
+  // first. Transaction-only sections (e.g. COGS) have shorter values arrays;
+  // taking months from sections[0] left their later months as blank cells.
+  // Preserve first-seen month order across sections.
+  const months: string[] = [];
+  const seen = new Set<string>();
+  for (const section of sections) {
+    for (const val of section.values) {
+      if (!seen.has(val.month)) {
+        seen.add(val.month);
+        months.push(val.month);
+      }
+    }
+  }
   const headers = ["Item", ...months];
   const data = sections.map((section) => {
     const row: Record<string, unknown> = { Item: section.name };
     for (const val of section.values) {
       row[val.month] = val.value;
+    }
+    // RPT-11: default any missing month cell to 0 (matches the UI table's zero
+    // fallback). CSV writes raw numbers — engine never formats — so 0 is correct.
+    for (const month of months) {
+      if (!(month in row)) row[month] = 0;
     }
     return row;
   });

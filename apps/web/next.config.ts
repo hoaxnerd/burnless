@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
   },
   // Point to monorepo root so Next.js doesn't infer /Users/X/ from a parent lockfile
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  // XC-03: legacy short report slugs were never real routes (the folders are
+  // profit-loss/cash-flow/balance-sheet/budget-vs-actuals). External bookmarks to
+  // the short forms 404 on the branded page; redirect them to the real slugs.
+  // permanent: true → 308.
+  redirects: async () => [
+    { source: "/reports/pl", destination: "/reports/profit-loss", permanent: true },
+    { source: "/reports/cf", destination: "/reports/cash-flow", permanent: true },
+    { source: "/reports/bs", destination: "/reports/balance-sheet", permanent: true },
+    { source: "/reports/bvA", destination: "/reports/budget-vs-actuals", permanent: true },
+  ],
   headers: async () => [
     {
       source: "/(.*)",

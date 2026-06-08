@@ -501,8 +501,14 @@ function HistoryPaneContent({
               onClick={() => onLoad(conv.id)}
               className="w-full text-left rounded-lg px-3 py-2 text-sm text-surface-700 hover:bg-surface-100 transition-colors"
             >
-              {conv.title ?? "Untitled conversation"}
-              <span className="ml-2 text-xs text-surface-400">
+              {/* AI-10: title attr + truncate so long titles clip cleanly with a hover reveal */}
+              <span
+                className="block truncate"
+                title={conv.title ?? "Untitled conversation"}
+              >
+                {conv.title ?? "Untitled conversation"}
+              </span>
+              <span className="text-xs text-surface-400">
                 {fmtDate(conv.updatedAt)}
               </span>
             </button>

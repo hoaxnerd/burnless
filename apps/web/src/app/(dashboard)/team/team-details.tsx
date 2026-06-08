@@ -11,7 +11,7 @@ import { toUserMessage } from "@/lib/api-error";
 import { pctOfTotal, computeMemberMonthlyCost, type HeadcountPlanInput } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { CurrencyCode } from "@burnless/types";
-import { HeadcountForm, type EditableHeadcount } from "./headcount-form";
+import { HeadcountForm, ADD_HIRE_LABEL, type EditableHeadcount } from "./headcount-form";
 import { SalaryChangesList, type SalaryChange } from "./salary-changes-list";
 import { BonusesList, type Bonus } from "./bonuses-list";
 import { EquityGrantsList, type EquityGrant } from "./equity-grants-list";
@@ -223,7 +223,7 @@ export function TeamRoster({
             Add your current team to see how headcount affects your burn rate and runway.
           </p>
           <p className="text-xs text-surface-400">
-            Use the &quot;Add Team Member&quot; button above to get started.
+            Use the &quot;{ADD_HIRE_LABEL}&quot; button above to get started.
           </p>
         </div>
       </div>
@@ -501,7 +501,7 @@ export function PlannedHiresSection({
           </div>
           <h3 className="text-base font-semibold text-surface-900 mb-2">No planned hires yet</h3>
           <p className="text-sm text-surface-500 leading-relaxed">
-            Use the Add Hire button above to plan future team growth.
+            Use the {ADD_HIRE_LABEL} button above to plan future team growth.
           </p>
         </div>
       </div>
