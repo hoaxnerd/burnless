@@ -19,21 +19,23 @@ import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
 import { usePlanLimit } from "@/hooks/use-plan-limit";
 import { ChatMessageList } from "./_components/chat-message-list";
 import { ChatInput } from "./_components/chat-input";
-import { InsightCard } from "./_components/insights-panel";
+import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
 import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
 import type {
-  Insight,
   Conversation,
+  Message,
   PendingPermission,
   PendingInput,
   PendingPlan,
   UiBlockClient,
+  TimelineNodeClient,
 } from "./_components/types";
 import { useScenario } from "@/components/scenarios/scenario-context";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { useLocale } from "@/components/locale/locale-context";
 import { useChatSession } from "@/components/ai/chat-session-context";
+import { computeAwaitingDecision, restoreConversationMessages } from "./awaiting-decision";
 
 /* ─── AI Credits Configuration ────────────────────────────────────── */
 // AI credits ratio: how many cents equal 1 AI credit.
@@ -109,7 +111,6 @@ export default function AiCompanionPage() {
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [insights, setInsights] = useState<Insight[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activePane, setActivePane] = useState<AiPane | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -130,17 +131,7 @@ export default function AiCompanionPage() {
   // The provider owns the streams; the page renders the slice for the current view.
   const { messages, isLoading } = session.get(conversationId);
   const isEmptyState = messages.length === 0;
-  const awaitingDecision = messages.some(
-    (m) =>
-      (m.pendingPermission && !m.pendingPermission.resolved) ||
-      (m.timeline?.some(
-        (n) =>
-          (n.kind === "diff_gate" && n.pending && !n.pending.resolved) ||
-          (n.kind === "plan" && n.plan && !n.plan.resolved) ||
-          (n.kind === "input" && n.input && !n.input.resolved)
-      ) ??
-        false)
-  );
+  const awaitingDecision = computeAwaitingDecision(messages);
 
   // ?prompt= pre-fills input without sending; ?send= pre-fills and auto-submits
   useEffect(() => {
@@ -172,9 +163,6 @@ export default function AiCompanionPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
-  useEffect(() => {
-    fetchInsights();
-  }, []);
 
   // #2: auto-load the most recent conversation on mount. Guarded so it runs once
   // and never clobbers an in-progress draft.
@@ -189,15 +177,6 @@ export default function AiCompanionPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function fetchInsights() {
-    try {
-      const res = await apiFetch("/api/insights", { method: "POST" });
-      if (res.ok) setInsights((await res.json()).insights ?? []);
-    } catch (e) {
-      toastError(toUserMessage(e));
-    }
-  }
 
   async function loadConversations() {
     setHistoryLoading(true);
@@ -219,7 +198,7 @@ export default function AiCompanionPage() {
       const res = await apiFetch(`/api/chat/history?conversationId=${id}`);
       if (res.ok) {
         const data = await res.json();
-        const restoredMessages = data.messages
+        const restoredMessages: Message[] = data.messages
           .filter((m: { role: string }) => m.role !== "system")
           .map(
             (m: {
@@ -228,60 +207,21 @@ export default function AiCompanionPage() {
               createdAt?: string;
               uiBlocks?: UiBlockClient[];
               timeline?: unknown[];
-            }) => ({
+            }): Message => ({
               role: m.role as "user" | "assistant",
               content: m.content,
-              createdAt: m.createdAt
-                ? new Date(m.createdAt).getTime()
-                : Date.now(),
+              // AI-08: keep missing timestamps null — do NOT substitute Date.now(),
+              // which makes restored old turns falsely read "just now".
+              createdAt: m.createdAt ? new Date(m.createdAt).getTime() : null,
               // Re-render persisted genui display blocks after reload (spec §6/§8).
               ...(m.uiBlocks ? { uiBlocks: m.uiBlocks } : {}),
-              ...(m.timeline ? { timeline: m.timeline } : {}),
+              ...(m.timeline ? { timeline: m.timeline as TimelineNodeClient[] } : {}),
             })
           );
-        // #3: re-show a pending gate persisted server-side, attached in-stream to
-        // the last assistant message's timeline (so it renders as a gate node).
-        const attachGate = (node: {
-          id: string;
-          kind: "diff_gate" | "input" | "plan";
-          pending?: PendingPermission;
-          input?: PendingInput;
-          plan?: PendingPlan;
-        }) => {
-          const msgs = [...restoredMessages];
-          let lastIdx = msgs.length - 1;
-          if (lastIdx < 0 || msgs[lastIdx].role !== "assistant") {
-            msgs.push({ role: "assistant", content: "", createdAt: Date.now(), timeline: [] });
-            lastIdx = msgs.length - 1;
-          }
-          const tl = [...(msgs[lastIdx].timeline ?? []), node];
-          msgs[lastIdx] = { ...msgs[lastIdx], timeline: tl };
-          session.setMessages(id, msgs);
-        };
-        if (data.pendingTimeline && Array.isArray(data.pendingTimeline) && data.pendingTimeline.length) {
-          // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
-          // pause-time. The gate node carries its own (unresolved) payload, so it
-          // renders live + actionable; this also restores the pre-pause worklog.
-          const msgs = [...restoredMessages];
-          let lastIdx = msgs.length - 1;
-          if (lastIdx < 0 || msgs[lastIdx].role !== "assistant") {
-            msgs.push({ role: "assistant", content: "", createdAt: Date.now(), timeline: [] });
-            lastIdx = msgs.length - 1;
-          }
-          msgs[lastIdx] = { ...msgs[lastIdx], timeline: data.pendingTimeline };
-          session.setMessages(id, msgs);
-        } else if (data.pendingPermission) {
-          const p = data.pendingPermission as PendingPermission;
-          attachGate({ id: p.pauseId, kind: "diff_gate", pending: p });
-        } else if (data.pendingInput) {
-          const p = data.pendingInput as PendingInput;
-          attachGate({ id: p.pauseId, kind: "input", input: p });
-        } else if (data.pendingPlan) {
-          const p = data.pendingPlan as PendingPlan;
-          attachGate({ id: p.pauseId, kind: "plan", plan: p });
-        } else {
-          session.setMessages(id, restoredMessages);
-        }
+        // AI-09: attach any persisted pending gate, restoring it LIVE only when
+        // the server reports it resumable; a stale historical gate is restored
+        // INERT (resolved) so the composer stays enabled.
+        session.setMessages(id, restoreConversationMessages(restoredMessages, data));
         setConversationId(id);
         setActivePane(null);
         setMobileNavOpen(false);
@@ -324,8 +264,30 @@ export default function AiCompanionPage() {
       // Thread the server-assigned id so follow-ups + the rendered view track it.
       setConversationId((cur) => cur ?? id);
     });
-    fetchInsights();
   }
+
+  // AI-02: locally dismiss an advisory plan node (no server resume). Mirrors the
+  // optimistic-resolve pattern in chat-session-context: mark the matching plan
+  // node resolved so it renders inert and never re-locks the composer.
+  const handlePlanDismiss = useCallback(
+    (pending: PendingPlan) => {
+      const { messages: cur } = session.get(conversationId);
+      const next = cur.map((m) =>
+        m.timeline?.some((n) => n.kind === "plan" && n.id === pending.pauseId)
+          ? {
+              ...m,
+              timeline: m.timeline.map((n) =>
+                n.kind === "plan" && n.id === pending.pauseId && n.plan
+                  ? { ...n, plan: { ...n.plan, resolved: true } }
+                  : n
+              ),
+            }
+          : m
+      );
+      session.setMessages(conversationId, next);
+    },
+    [session, conversationId]
+  );
 
   const handlePermissionDecision = useCallback(
     async (
@@ -333,7 +295,6 @@ export default function AiCompanionPage() {
       decisions: { requestId: string; decision: "once" | "session" | "deny" }[]
     ) => {
       await session.decide(pending.conversationId, pending, decisions);
-      fetchInsights();
     },
     [session]
   );
@@ -358,12 +319,10 @@ export default function AiCompanionPage() {
         fmtDate={fmtDate}
       />
     ) : activePane === "insights" ? (
-      <div className="p-3 space-y-3">
-        {insights.length === 0 ? (
-          <p className="text-sm text-surface-400 px-1">No insights yet</p>
-        ) : (
-          insights.map((ins, i) => <InsightCard key={i} insight={ins} />)
-        )}
+      // AI-07: use the shared AiPageInsights so the /ai insights pane inherits the
+      // staleness banner, manual Refresh, and stale-figure de-emphasis (Cluster D).
+      <div className="p-3">
+        <AiPageInsights page="dashboard" scenarioId={activeScenarioId} />
       </div>
     ) : activePane === "settings" ? (
       <AiPermissionsPanel conversationId={conversationId} />
@@ -481,6 +440,7 @@ export default function AiCompanionPage() {
                 session.submitInput(pending.conversationId, pending, data)
               }
               onPlanSubmit={(pending, plan) => session.submitPlan(pending.conversationId, pending, plan)}
+              onPlanDismiss={(pending) => handlePlanDismiss(pending)}
               onDecide={(pending, decisions) => handlePermissionDecision(pending, decisions)}
             />
             {planLimit && (

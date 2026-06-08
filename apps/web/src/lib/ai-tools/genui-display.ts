@@ -30,7 +30,7 @@ export const genuiDisplayHandlers: Record<string, ToolHandler> = {};
 
 /** Resolve the scenario id: active chat scenario → explicit arg → company default. */
 async function resolveScenarioId(
-  ctx: { companyId: string; scenarioId?: string },
+  ctx: { companyId: string; scenarioId?: string | null },
   given?: unknown
 ): Promise<string | null> {
   // Single-source rule: data-bound display tools must render the chat's ACTIVE

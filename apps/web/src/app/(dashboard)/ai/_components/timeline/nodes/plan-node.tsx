@@ -10,12 +10,15 @@ export interface PlanNodeProps {
   pending: PendingPlan;
   disabled: boolean;
   onSubmit: (plan: PendingPlan["spec"]) => void;
+  /** Dismiss the advisory plan locally (no server resume) so it stops being shown
+   *  as actionable. Plans don't lock the composer (AI-02, two-gates contract). */
+  onDismiss?: () => void;
 }
 
 /** Plan-preview worklog node with editing (remove + reorder + edit step text). The
  *  steps are advisory intent — the model re-derives the real write at the diff-gate;
  *  editing only refines what the model attempts (spec §4.1, two-gates contract). */
-export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
+export function PlanNode({ pending, disabled, onSubmit, onDismiss }: PlanNodeProps) {
   const [steps, setSteps] = useState<PlanStepClient[]>(pending.spec.steps);
   const resolved = pending.resolved;
   const editable = !resolved && !disabled;
@@ -97,7 +100,12 @@ export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
           </li>
         ))}
       </ol>
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex justify-end gap-2">
+        {onDismiss && !resolved ? (
+          <Button size="sm" variant="ghost" onClick={onDismiss} disabled={disabled}>
+            Dismiss
+          </Button>
+        ) : null}
         <Button size="sm" onClick={() => onSubmit({ ...pending.spec, steps })} disabled={disabled || resolved}>
           {resolved ? "Started" : "Proceed"}
         </Button>

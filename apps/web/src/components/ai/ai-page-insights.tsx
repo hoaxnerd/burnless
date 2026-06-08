@@ -286,11 +286,24 @@ export function AiPageInsights({ page, scenarioId, pageData, widgetId = "ai-insi
                       <p className="text-sm font-semibold text-surface-900 leading-snug">
                         {insight.title}
                       </p>
-                      <MarkdownRenderer
-                        content={insight.summary}
-                        variant="compact"
-                        className="mt-1"
-                      />
+                      {/* Cluster D / AI-07: when stale, de-emphasize the precise
+                          figures in the summary so they no longer read as a hard
+                          contradiction of the live KPI cards (opacity keeps the
+                          text available to screen readers — no display:none). The
+                          manual Refresh button (header) stays the only way to spend
+                          credits; we never auto-refresh (founder decision #12). */}
+                      <div className={isStale ? "opacity-60 text-surface-400" : undefined}>
+                        <MarkdownRenderer
+                          content={insight.summary}
+                          variant="compact"
+                          className="mt-1"
+                        />
+                      </div>
+                      {isStale ? (
+                        <p className="mt-1 text-[11px] italic text-surface-400">
+                          Based on earlier data — refresh for current figures
+                        </p>
+                      ) : null}
                     </div>
                     {isStale ? (
                       <div className="flex-shrink-0 mt-0.5" title={cache.staleReason && STALE_REASON_LABELS[cache.staleReason] ? `Data changed: ${STALE_REASON_LABELS[cache.staleReason]}` : "Data may have changed since this insight was generated"}>

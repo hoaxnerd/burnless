@@ -52,7 +52,6 @@ vi.mock("../index", () => ({
 }));
 
 import {
-  getDefaultScenario,
   scenarioInsert,
   getResolvedData,
 } from "../queries";
@@ -79,20 +78,15 @@ import { createCompanyContext, createScenario } from "./factories";
  * GREEN — keeping the helper a faithful mirror of the route is the contract.
  */
 async function resolveChatWriteTarget(
-  companyId: string,
+  _companyId: string,
   bodyScenarioId: string | null,
 ): Promise<string | null> {
-  // Base view: body.scenarioId is null. route.ts:135-137 takes the
-  // getDefaultScenario(companyId) fallback (the oldest "Base Case" scenario).
-  // For an explicit bodyScenarioId the route would look it up and fall back to
-  // the default if not found (route.ts:130-134); this test only exercises the
-  // base-view (null) branch, which is where the defect lives.
-  const scenario = bodyScenarioId
-    ? null /* not exercised here */
-    : await getDefaultScenario(companyId);
-  // route.ts:168 — scenario.id is passed verbatim as the write target
-  // (ToolContext.scenarioId → mutateInsert → scenarioInsert).
-  return scenario ? scenario.id : null;
+  // FIXED route (AI-01): base view (bodyScenarioId === null) resolves a NULL write
+  // target so the tool handler writes to the base table. An explicit,
+  // company-validated scenario resolves to its own id (not exercised in this
+  // base-view test). Mirrors apps/web/src/lib/ai-write-target.ts resolveWriteScenarioId.
+  const writeScenarioId = bodyScenarioId ? bodyScenarioId : null;
+  return writeScenarioId;
 }
 
 describe("AI-01: AI base write (no active scenario) must hit the base table, not an override", () => {

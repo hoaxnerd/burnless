@@ -233,20 +233,23 @@ Rules: Lead with numbers. Be specific. No filler. If data is insufficient for an
 Return ONLY the JSON array, no markdown fences.`;
 }
 
-function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
+export function buildTeamPrompt(snapshot: FinancialSnapshot, pageData?: Record<string, unknown>): string {
   const { keyMetrics, company } = snapshot;
   const currency = isValidCurrency(company.currency) ? company.currency : "USD";
   const locale = company.locale;
 
   const departments = pageData?.departments as Array<{
-    name: string;
+    department?: string;
+    name?: string;
     headcount: number;
     monthlyCost: number;
   }> | undefined;
 
-  const deptLines = departments
-    ?.map((d) => `  ${d.name}: ${d.headcount} people, ${formatCurrency(d.monthlyCost, currency, locale)}/mo`)
-    .join("\n") ?? "  No department data";
+  const deptLines = departments?.length
+    ? departments
+        .map((d) => `  ${d.department ?? d.name ?? "Unassigned"}: ${d.headcount} people, ${formatCurrency(d.monthlyCost, currency, locale)}/mo`)
+        .join("\n")
+    : "  No department data";
 
   const plannedHires = pageData?.plannedHires as number | undefined;
 

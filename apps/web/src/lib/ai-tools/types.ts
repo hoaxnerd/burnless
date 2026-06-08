@@ -8,7 +8,11 @@ import { z } from "zod";
 
 export interface ToolContext {
   companyId?: string;
-  scenarioId?: string;
+  /** AI-01: the WRITE target. `null`/`undefined` = base view → the scenario-mutate
+   *  facade writes to base tables (`ctx.scenarioId ?? null`); a non-null id targets
+   *  that scenario's overlay. Nullable (not just optional) so the chat route can
+   *  thread an explicit base-view null distinct from an absent value. */
+  scenarioId?: string | null;
   userId: string;
   conversationId?: string;
   /** How this call was authorized — recorded in the audit log. */

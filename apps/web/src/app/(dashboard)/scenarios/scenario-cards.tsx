@@ -11,6 +11,7 @@ import {
   Copy,
   MoreHorizontal,
   Trash2,
+  Pencil,
   Clock,
   Shield,
   History,
@@ -20,6 +21,7 @@ import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { useToast } from "@/components/ui/toast";
 import { useLocale } from "@/components/locale/locale-context";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
+import { Modal, FormField, Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   useScenarios,
@@ -147,6 +149,10 @@ export function ScenarioCards({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [keepingId, setKeepingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  // SCN-03: rename modal state
+  const [renameTarget, setRenameTarget] = useState<{ id: string; currentName: string } | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const router = useRouter();
   const toast = useToast();
 
@@ -209,7 +215,15 @@ export function ScenarioCards({
         throw new Error(body?.error ?? "Failed to delete scenario");
       }
       toast.success("Scenario deleted");
-      router.refresh();
+      // SCN-01: if the deleted scenario was active, exitScenario() clears the
+      // cookie + sessionStorage, resets React state, broadcasts cross-tab sync,
+      // and calls router.refresh() — so it replaces the bare refresh here.
+      // For any other scenario, only a bare refresh is needed.
+      if (id === activeScenarioId) {
+        exitScenario();
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to delete scenario"
@@ -239,6 +253,44 @@ export function ScenarioCards({
       );
     } finally {
       setKeepingId(null);
+    }
+  };
+
+  // SCN-03: open rename modal pre-filled with the scenario's current name
+  const openRename = (id: string, currentName: string) => {
+    setMenuOpenId(null);
+    setRenameTarget({ id, currentName });
+    setRenameName(currentName);
+  };
+
+  const submitRename = async () => {
+    if (!renameTarget) return;
+    const trimmed = renameName.trim();
+    // No-op: empty name or unchanged name — just close
+    if (!trimmed || trimmed === renameTarget.currentName) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenamingId(renameTarget.id);
+    try {
+      const res = await apiFetch(`/api/scenarios/${renameTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to rename scenario");
+      }
+      toast.success("Scenario renamed");
+      setRenameTarget(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to rename scenario"
+      );
+    } finally {
+      setRenamingId(null);
     }
   };
 
@@ -373,6 +425,16 @@ export function ScenarioCards({
                   open={menuOpenId === scenario.id}
                   onClose={() => setMenuOpenId(null)}
                 >
+                  {/* SCN-03: Rename item — only for active, non-backup scenarios */}
+                  <DropdownItem
+                    onClick={() => openRename(scenario.id, scenario.name)}
+                    disabled={renamingId === scenario.id}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Pencil className="h-3 w-3" />
+                      Rename
+                    </span>
+                  </DropdownItem>
                   <DropdownItem
                     onClick={() => {
                       setMenuOpenId(null);
@@ -590,6 +652,41 @@ export function ScenarioCards({
           </div>
         </div>
       )}
+
+      {/* SCN-03: Rename modal */}
+      <Modal
+        open={renameTarget !== null}
+        onClose={() => setRenameTarget(null)}
+        title="Rename Scenario"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <FormField
+            label="Scenario name"
+            value={renameName}
+            onChange={setRenameName}
+            placeholder="e.g. Best Case Q3"
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <Button
+              variant="ghost"
+              onClick={() => setRenameTarget(null)}
+              disabled={renamingId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void submitRename()}
+              disabled={renamingId !== null}
+              state={renamingId !== null ? "loading" : "idle"}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

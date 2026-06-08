@@ -88,6 +88,7 @@ function buildSeedTimeline(timeline: unknown, pauseId: string): TimelineNode[] {
 async function resumeStream(args: {
   ctx: { companyId: string; userId: string };
   scenario: { id: string; name: string; source: string | null };
+  writeScenarioId: string | null;
   conversationId: string;
   assistantBlocks: ContentBlock[];
   completedResults: ContentBlock[];
@@ -96,7 +97,7 @@ async function resumeStream(args: {
   seedTimeline?: TimelineNode[];
   activatedScenarios?: { scenarioId: string; name: string }[];
 }): Promise<Response> {
-  const { ctx, scenario, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, seedTimeline, activatedScenarios } = args;
+  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, seedTimeline, activatedScenarios } = args;
 
   const history = await db
     .select()
@@ -138,6 +139,7 @@ async function resumeStream(args: {
     companyId: ctx.companyId,
     userId: ctx.userId,
     scenarioId: scenario.id,
+    writeScenarioId,
     conversationId,
     messages,
     financialContext,
@@ -233,6 +235,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
       scenario,
+      writeScenarioId: pendingRow.writeScenarioId ?? null,
       conversationId: body.conversationId,
       assistantBlocks,
       completedResults,
@@ -260,6 +263,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
       scenario,
+      writeScenarioId: pendingRow.writeScenarioId ?? null,
       conversationId: body.conversationId,
       assistantBlocks,
       completedResults,
@@ -300,7 +304,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     const cat = categorizeToolName(a.toolName);
     return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
   });
-  if (headerScenarioId && hasApprovedOverlayWrite && headerScenarioId !== pendingRow.scenarioId) {
+  if (headerScenarioId && hasApprovedOverlayWrite && pendingRow.writeScenarioId && headerScenarioId !== pendingRow.scenarioId) {
     const [activeScn] = await db
       .select({ aiConversationId: scenariosTable.aiConversationId, name: scenariosTable.name })
       .from(scenariosTable)
@@ -345,7 +349,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
     const result = await executeToolCall(action.toolName, action.toolInput, {
       companyId: ctx.companyId,
-      scenarioId: scenario.id,
+      scenarioId: pendingRow.writeScenarioId ?? null,
       userId: ctx.userId,
       conversationId: body.conversationId,
       permissionDecision: decision === "session" ? "granted_session" : "granted_once",
@@ -360,6 +364,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   return resumeStream({
     ctx: { companyId: ctx.companyId, userId: ctx.userId },
     scenario,
+    writeScenarioId: pendingRow.writeScenarioId ?? null,
     conversationId: body.conversationId,
     assistantBlocks,
     completedResults,

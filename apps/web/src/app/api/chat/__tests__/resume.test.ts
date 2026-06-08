@@ -164,6 +164,10 @@ describe("POST /api/chat/resume — integration (PGLite)", () => {
       conversationId,
       pauseId,
       scenarioId: pausedScenario.id,
+      // AI-01: the turn was operating inside the NON-default scenario as a WRITE
+      // target, so resume must execute held tools against THIS overlay. The write
+      // target is threaded via writeScenarioId (distinct from scenarioId = read ctx).
+      writeScenarioId: pausedScenario.id,
       assistantBlocks: [
         { type: "tool_use", id: requestId, name: "create_scenario", input: { name: "X" } },
       ],
