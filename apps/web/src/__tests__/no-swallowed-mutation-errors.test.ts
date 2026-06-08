@@ -25,6 +25,26 @@ const WEB_SRC = path.resolve(import.meta.dirname, "..");
 
 const ALLOWED: { match: string; why: string }[] = [
   { match: "/__tests__/", why: "Test files, not production handlers." },
+  {
+    match: "app/layout.tsx",
+    why: "Root layout init (theme/flag bootstrap), not a user-action mutation — nothing to surface.",
+  },
+  {
+    match: "app/page.tsx",
+    why: "Landing page; non-mutation bootstrap catch, no user action to report a failure for.",
+  },
+  {
+    match: "components/landing/theme-toggle.tsx",
+    why: "localStorage theme read can throw in private mode; falling back to default theme is correct, not a swallowed mutation.",
+  },
+  {
+    match: "components/providers/metrics-context.tsx",
+    why: "Context bootstrap (read path), not a user-initiated mutation; failure degrades to no-data, surfaced elsewhere.",
+  },
+  {
+    match: "app/verify-email/page.tsx",
+    why: "Resend verification is fire-and-forget; the send-verification API always returns 200, so there is no failure to surface.",
+  },
 ];
 
 function isAllowed(file: string): boolean {

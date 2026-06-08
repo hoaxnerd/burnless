@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, SkipForward, Sparkles, AlertTriangle, RotateCcw } from "lucide-react";
 import { useLocale } from "@/components/locale/locale-context";
 import type {
@@ -54,6 +54,7 @@ export function ReviewStep({
 
   const [userName, setUserName] = useState("");
   const [nameBlurred, setNameBlurred] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const nameError = nameBlurred && !fields.company_name.value.trim()
     ? "Company name is required"
     : undefined;
@@ -66,6 +67,13 @@ export function ReviewStep({
   const aiFieldCount = Object.values(fields).filter((f) => f.source === "ai").length;
 
   const handleSubmit = () => {
+    // ONB-05: block submit on empty company name — mark the field invalid and
+    // focus it so the error is both perceivable and actionable.
+    if (!fields.company_name.value.trim()) {
+      setNameBlurred(true);
+      nameInputRef.current?.focus();
+      return;
+    }
     onCreate({
       userName,
       founders: initialFounders,
@@ -90,6 +98,7 @@ export function ReviewStep({
             onUpdateField={onUpdateField}
             nameError={nameError}
             onNameBlur={() => setNameBlurred(true)}
+            nameInputRef={nameInputRef}
             userName={userName}
             onUserNameChange={setUserName}
             suggestedFounders={initialFounders}

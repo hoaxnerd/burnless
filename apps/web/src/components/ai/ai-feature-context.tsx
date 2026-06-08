@@ -153,13 +153,11 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
           // Revert optimistic update on failure
           setFlags(prevFlags);
           setProviderConfig(prevProvider);
-          console.error(`AI feature update failed: ${res.status}`);
         }
       } catch {
         // Revert optimistic update on network error
         setFlags(prevFlags);
         setProviderConfig(prevProvider);
-        console.error("AI feature update failed: network error");
       }
     },
     [flags, providerConfig]

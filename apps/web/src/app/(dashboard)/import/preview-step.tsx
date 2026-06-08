@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Sparkles, Pencil, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import type { Step, PreviewTransaction } from "./import-utils";
 import { useLocale } from "@/components/locale/locale-context";
 
@@ -147,12 +147,13 @@ export function PreviewStep({
                     </td>
                     <td className="py-2 px-3 text-right">
                       {isEditing ? (
-                        <input
+                        <Input
                           type="number"
                           step="0.01"
+                          aria-label="Amount"
                           defaultValue={t.amount}
                           onBlur={(e) => updatePreviewRow(i, "amount", e.target.value)}
-                          className="w-24 rounded border border-brand-300 bg-surface-0 dark:bg-surface-900 px-2 py-0.5 text-right text-sm font-mono"
+                          className="w-24 px-2 py-0.5 text-right text-sm font-mono"
                           autoFocus
                         />
                       ) : (
@@ -163,11 +164,12 @@ export function PreviewStep({
                     </td>
                     <td className="py-2 px-3 max-w-xs">
                       {isEditing ? (
-                        <input
+                        <Input
                           type="text"
+                          aria-label="Description"
                           defaultValue={t.description || ""}
                           onBlur={(e) => updatePreviewRow(i, "description", e.target.value)}
-                          className="w-full rounded border border-brand-300 bg-surface-0 dark:bg-surface-900 px-2 py-0.5 text-sm"
+                          className="w-full px-2 py-0.5 text-sm"
                         />
                       ) : (
                         <span className="text-surface-600 dark:text-surface-400 truncate block">{t.description || "\u2014"}</span>

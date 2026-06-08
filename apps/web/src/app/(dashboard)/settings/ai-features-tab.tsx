@@ -6,6 +6,7 @@ import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type
 import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
 import { AiPermissionsPanel } from "@/app/(dashboard)/ai/_components/ai-permissions-panel";
 import { ProviderSection } from "./ai-provider-section";
+import { Input } from "@/components/ui";
 
 interface AiFeaturesTabProps {
   flags: AiFeatureFlagsState;
@@ -276,14 +277,15 @@ function CompanionNameField({ value, onChange }: { value: string; onChange: (v: 
       <div className="mt-4">
         {editing ? (
           <div className="flex items-center gap-2">
-            <input
+            <Input
               autoFocus
+              aria-label="Companion name"
               type="text"
               maxLength={50}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(value); setEditing(false); } }}
-              className="flex-1 rounded-lg border border-surface-300 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              className="flex-1"
             />
             <button onClick={save} className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors">Save</button>
             <button onClick={() => { setDraft(value); setEditing(false); }} className="rounded-lg border border-surface-300 px-3 py-2 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-colors">Cancel</button>

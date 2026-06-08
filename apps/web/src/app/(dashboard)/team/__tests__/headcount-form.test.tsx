@@ -17,6 +17,20 @@ vi.mock("@/components/ui", () => ({
         {children}
       </div>
     ) : null,
+  Input: ({ label, error, showOptional, hint, ...props }: { label?: string; error?: string; showOptional?: boolean; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <label>
+      {label && <span>{label}</span>}
+      <input aria-label={label} {...props} />
+      {error && <span role="alert">{error}</span>}
+    </label>
+  ),
+  Select: ({ label, error, children, ...props }: { label?: string; error?: string; children?: React.ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) => (
+    <label>
+      {label && <span>{label}</span>}
+      <select aria-label={label} {...props}>{children}</select>
+      {error && <span role="alert">{error}</span>}
+    </label>
+  ),
 }));
 
 vi.mock("@/components/locale/locale-context", () => ({

@@ -23,7 +23,13 @@ function humanizeEntity(entityType: string): string {
 function formatVal(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "Yes" : "No";
-  if (typeof v === "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return v.map(formatVal).join(", ");
+  if (typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>)
+      .filter(([k]) => !HIDDEN_FIELDS.has(k))
+      .map(([k, val]) => `${humanizeKey(k)}: ${formatVal(val)}`)
+      .join(", ");
+  }
   return String(v);
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import Link from "next/link";
 import {
   Sparkles,
@@ -111,7 +112,7 @@ export function AiCommandCenter({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "AI request failed" }));
-        setError(err.error || `Error: ${res.status}`);
+        setError(toUserMessage(err) || `Error: ${res.status}`);
         setIsStreaming(false);
         return;
       }
@@ -146,7 +147,8 @@ export function AiCommandCenter({
               setError(event.content);
             }
           } catch {
-            // skip malformed SSE lines
+            // skip malformed SSE lines — not a user-action failure
+            continue;
           }
         }
       }
@@ -154,7 +156,7 @@ export function AiCommandCenter({
       if (err instanceof DOMException && err.name === "AbortError") {
         // User cancelled — not an error
       } else {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+        setError(toUserMessage(err));
       }
     } finally {
       setIsStreaming(false);

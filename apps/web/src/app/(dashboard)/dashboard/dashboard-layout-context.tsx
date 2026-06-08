@@ -24,6 +24,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
 import {
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
@@ -98,6 +100,7 @@ export function DashboardLayoutProvider({
 }: ProviderProps) {
   const { mode } = useMetrics();
   const router = useRouter();
+  const toast = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -148,7 +151,7 @@ export function DashboardLayoutProvider({
   const savePrefs = useCallback(
     (updated: DashboardCardPreferences | undefined): Promise<void> => {
       if (!updated) {
-        console.warn("savePrefs called with undefined — skipping");
+        // No-op guard: nothing to persist.
         return Promise.resolve();
       }
       setIsSaving(true);
@@ -177,7 +180,7 @@ export function DashboardLayoutProvider({
               setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
             );
           }
-          console.error("Failed to save dashboard card preferences:", err);
+          toast.error(toUserMessage(err));
         });
 
       isSavePendingRef.current = true;
@@ -196,7 +199,7 @@ export function DashboardLayoutProvider({
       saveQueueRef.current = thisPromise;
       return thisPromise;
     },
-    []
+    [router, toast]
   );
 
   const updatePrefs = useCallback(

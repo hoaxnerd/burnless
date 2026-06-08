@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import {
   Sparkles,
   BarChart3,
@@ -124,7 +125,7 @@ export default function AiCompanionPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const handledParamRef = useRef<string | null>(null);
   const autoloadedRef = useRef(false);
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
 
   // The provider owns the streams; the page renders the slice for the current view.
   const { messages, isLoading } = session.get(conversationId);
@@ -193,8 +194,8 @@ export default function AiCompanionPage() {
     try {
       const res = await apiFetch("/api/insights", { method: "POST" });
       if (res.ok) setInsights((await res.json()).insights ?? []);
-    } catch {
-      /* non-critical */
+    } catch (e) {
+      toastError(toUserMessage(e));
     }
   }
 
@@ -206,8 +207,8 @@ export default function AiCompanionPage() {
         const json = await res.json();
         setConversations(json.data ?? []);
       }
-    } catch {
-      /* non-critical */
+    } catch (e) {
+      toastError(toUserMessage(e));
     } finally {
       setHistoryLoading(false);
     }
@@ -285,8 +286,8 @@ export default function AiCompanionPage() {
         setActivePane(null);
         setMobileNavOpen(false);
       }
-    } catch {
-      /* non-critical */
+    } catch (e) {
+      toastError(toUserMessage(e));
     }
   }
 

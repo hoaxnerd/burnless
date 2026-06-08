@@ -15,6 +15,8 @@ import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-se
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
 import { useLocale } from "@/components/locale/locale-context";
 import { apiFetch } from "@/lib/api-fetch";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
+import { useToast } from "@/components/ui/toast";
 
 interface FundingRound {
   id: string;
@@ -193,6 +195,7 @@ export function FundingRoundsList({
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
   const { fmtDate } = useLocale();
+  const toast = useToast();
   const router = useRouter();
   // Edit modal state
   const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
@@ -217,13 +220,11 @@ export function FundingRoundsList({
     try {
       const res = await apiFetch(`/api/funding-rounds/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "Failed to delete");
+        throw new Error(await extractApiError(res));
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete funding round:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);

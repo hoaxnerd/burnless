@@ -1,6 +1,7 @@
 import { RefObject } from "react";
 import { Globe, Sparkles, SkipForward } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { Input } from "@/components/ui";
 
 interface WebsiteStepProps {
   websiteUrl: string;
@@ -53,14 +54,15 @@ export function WebsiteStep({
 
         <form onSubmit={onSubmit} className="mt-8">
           <div className="relative">
-            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400" />
-            <input
+            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400 z-10" />
+            <Input
               ref={inputRef}
+              aria-label="Company website"
               type="text"
               value={websiteUrl}
               onChange={(e) => onWebsiteUrlChange(e.target.value)}
               placeholder="yourcompany.com"
-              className="w-full rounded-2xl border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-800 pl-12 pr-4 py-4 text-base text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              className="rounded-2xl pl-12 pr-4 py-4 text-base"
             />
           </div>
           <button

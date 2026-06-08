@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal } from "@/components/ui";
+import { Modal, Input, Select } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import {
   defaultHeadcountForm,
   validateHeadcountForm,
@@ -138,7 +139,7 @@ export function HeadcountForm({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setSubmitError(body.error ?? "Failed to save");
+        setSubmitError(toUserMessage(body));
         return;
       }
       handleClose();
@@ -162,69 +163,48 @@ export function HeadcountForm({
       )}
       <Modal open={open} onClose={handleClose} title={isEditMode ? "Edit hire" : "Add hire"} size="xl">
         <div className="space-y-4">
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Title</span>
-            <input
-              value={state.title}
-              onChange={(e) => onChange({ title: e.target.value })}
-              aria-invalid={!!errors.title}
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            {errors.title && (
-              <span className="mt-1.5 block text-xs font-medium text-danger-600 field-error" role="alert">
-                {errors.title}
-              </span>
-            )}
-          </label>
+          <Input
+            label="Title"
+            value={state.title}
+            onChange={(e) => onChange({ title: e.target.value })}
+            error={errors.title}
+          />
 
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Name (optional)</span>
-            <input
-              value={state.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </label>
+          <Input
+            label="Name"
+            showOptional
+            value={state.name}
+            onChange={(e) => onChange({ name: e.target.value })}
+          />
 
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Department</span>
-            <select
-              value={state.departmentId}
-              onChange={(e) => onChange({ departmentId: e.target.value })}
-              aria-invalid={!!errors.departmentId}
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select…</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            {errors.departmentId && (
-              <span className="mt-1.5 block text-xs font-medium text-danger-600 field-error" role="alert">
-                {errors.departmentId}
-              </span>
-            )}
-          </label>
+          <Select
+            label="Department"
+            value={state.departmentId}
+            onChange={(e) => onChange({ departmentId: e.target.value })}
+            error={errors.departmentId}
+          >
+            <option value="">Select…</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
 
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Employee type</span>
-            <select
-              value={state.employeeType}
-              onChange={(e) =>
-                onChange({
-                  employeeType: e.target.value as HeadcountFormState["employeeType"],
-                })
-              }
-              data-testid="employee-type-select"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="full_time">Full-time</option>
-              <option value="part_time">Part-time</option>
-              <option value="contractor">Contractor</option>
-            </select>
-          </label>
+          <Select
+            label="Employee type"
+            value={state.employeeType}
+            onChange={(e) =>
+              onChange({
+                employeeType: e.target.value as HeadcountFormState["employeeType"],
+              })
+            }
+            data-testid="employee-type-select"
+          >
+            <option value="full_time">Full-time</option>
+            <option value="part_time">Part-time</option>
+            <option value="contractor">Contractor</option>
+          </Select>
 
           {state.employeeType === "full_time" && (
             <FullTimeFields state={state} errors={errors} onChange={onChange} />

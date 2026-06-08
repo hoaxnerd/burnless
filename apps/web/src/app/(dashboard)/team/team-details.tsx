@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
 import { pctOfTotal } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { CurrencyCode } from "@burnless/types";
@@ -96,6 +98,7 @@ export function TeamRoster({
   currency,
 }: TeamRosterProps) {
   const router = useRouter();
+  const toast = useToast();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -157,8 +160,7 @@ export function TeamRoster({
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete headcount entry:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -379,6 +381,7 @@ export function PlannedHiresSection({
   currency,
 }: PlannedHiresSectionProps) {
   const router = useRouter();
+  const toast = useToast();
   const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -439,8 +442,7 @@ export function PlannedHiresSection({
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete headcount entry:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);

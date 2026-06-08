@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles, Check, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
 import { confidenceColor, confidenceLabel, getAmountColumn } from "./import-utils";
 import type { ParsedRow, ColumnMapping, MappingConfidence, AccountOption } from "./import-utils";
 
@@ -101,7 +101,7 @@ export function MapStep({
             {isSplitAmount ? (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <select
+                  <Select
                     value={(mapping.amount as { debit: string; credit: string }).debit}
                     onChange={(e) =>
                       setMapping((m) => ({
@@ -113,14 +113,13 @@ export function MapStep({
                       }))
                     }
                     aria-label="Debit column"
-                    className="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 px-3 py-2 text-sm text-surface-900 dark:text-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Debit column...</option>
                     {headers.map((h) => (
                       <option key={h} value={h}>{h}</option>
                     ))}
-                  </select>
-                  <select
+                  </Select>
+                  <Select
                     value={(mapping.amount as { debit: string; credit: string }).credit}
                     onChange={(e) =>
                       setMapping((m) => ({
@@ -132,38 +131,38 @@ export function MapStep({
                       }))
                     }
                     aria-label="Credit column"
-                    className="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 px-3 py-2 text-sm text-surface-900 dark:text-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Credit column...</option>
                     {headers.map((h) => (
                       <option key={h} value={h}>{h}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <p className="mt-1.5 text-xs text-surface-500 dark:text-surface-400">
                   Amount will be synthesized as: credit &minus; debit
                 </p>
               </>
             ) : (
-              <select
+              <Select
                 value={amountCol ?? ""}
+                aria-label="Amount column"
                 onChange={(e) => {
                   setMapping((m) => ({ ...m, amount: e.target.value }));
                   setMappingConfidence((c) => ({ ...c, amount: e.target.value ? 1 : 0 }));
                 }}
-                className={`w-full rounded-lg border px-3 py-2 text-sm bg-surface-0 dark:bg-surface-900 text-surface-900 dark:text-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${
+                className={
                   amountCol && mappingConfidence.amount >= 0.8
                     ? "border-success-300 dark:border-success-700"
                     : amountCol && mappingConfidence.amount >= 0.5
                       ? "border-warning-300 dark:border-warning-700"
-                      : "border-surface-300 dark:border-surface-600"
-                }`}
+                      : ""
+                }
               >
                 <option value="">Select column...</option>
                 {headers.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
-              </select>
+              </Select>
             )}
           </div>
 
@@ -232,16 +231,16 @@ export function MapStep({
             <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
               Import into account <span className="text-danger-500">*</span>
             </label>
-            <select
+            <Select
               value={targetAccountId}
+              aria-label="Import into account"
               onChange={(e) => setTargetAccountId(e.target.value)}
-              className="w-full rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 px-3 py-2 text-sm text-surface-900 dark:text-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Select account...</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name} ({a.category})</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       </div>
@@ -353,22 +352,23 @@ function SimpleSelectRow({
           </span>
         )}
       </div>
-      <select
+      <Select
         value={value}
+        aria-label={label}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border px-3 py-2 text-sm bg-surface-0 dark:bg-surface-900 text-surface-900 dark:text-surface-50 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${
+        className={
           value && confidence >= 0.8
             ? "border-success-300 dark:border-success-700"
             : value && confidence >= 0.5
               ? "border-warning-300 dark:border-warning-700"
-              : "border-surface-300 dark:border-surface-600"
-        }`}
+              : ""
+        }
       >
         <option value="">{required ? "Select column..." : "(none)"}</option>
         {headers.map((h) => (
           <option key={h} value={h}>{h}</option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }

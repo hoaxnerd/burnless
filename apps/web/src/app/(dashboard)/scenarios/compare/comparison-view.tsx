@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
 import { MultiLineChart, VarianceBarChart, chartColors } from "@/components/charts";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
@@ -46,13 +47,12 @@ export function ComparisonView({
         `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`
       );
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to compare scenarios");
+        throw new Error(await extractApiError(res));
       }
       const json = await res.json();
       setData(json);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setError(toUserMessage(e));
     } finally {
       setLoading(false);
     }
@@ -97,10 +97,10 @@ export function ComparisonView({
           <label className="block text-xs font-medium text-surface-500 mb-1">
             Base scenario
           </label>
-          <select
+          <Select
             value={baseId}
+            aria-label="Base scenario"
             onChange={(e) => setBaseId(e.target.value)}
-            className="w-full rounded-lg border border-surface-200 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Select scenario...</option>
             <option value="base">Base (current plan)</option>
@@ -109,7 +109,7 @@ export function ComparisonView({
                 {s.name} ({s.source})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <span className="text-sm font-medium text-surface-400 mb-2">vs</span>
@@ -118,10 +118,10 @@ export function ComparisonView({
           <label className="block text-xs font-medium text-surface-500 mb-1">
             Compare with
           </label>
-          <select
+          <Select
             value={compareId}
+            aria-label="Compare with"
             onChange={(e) => setCompareId(e.target.value)}
-            className="w-full rounded-lg border border-surface-200 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Select scenario...</option>
             {scenarios
@@ -131,7 +131,7 @@ export function ComparisonView({
                   {s.name} ({s.source})
                 </option>
               ))}
-          </select>
+          </Select>
         </div>
 
         <button

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import {
   Loader2,
   Plus,
@@ -99,7 +100,7 @@ export function InviteCodesTab() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setCreateError(data.error || "Failed to create");
+        setCreateError(toUserMessage(data) || "Failed to create");
         return;
       }
       setCreateOpen(false);
@@ -135,7 +136,7 @@ export function InviteCodesTab() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setEditError(data.error || "Failed to update");
+        setEditError(toUserMessage(data) || "Failed to update");
         return;
       }
       setEditCode(null);

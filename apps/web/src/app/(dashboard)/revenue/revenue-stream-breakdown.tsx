@@ -7,7 +7,8 @@ import { useToast } from "@/components/ui/toast";
 import { Pencil, Trash2 } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, Modal } from "@/components/ui";
+import { ChartCard, Modal, useConfirm } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
 import { RevenueStreamForm, type RevenueStreamFormValues } from "./revenue-stream-form";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
@@ -60,6 +61,7 @@ export function RevenueStreamBreakdown({
 }: RevenueStreamBreakdownProps) {
   const router = useRouter();
   const { error: toastError } = useToast();
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const {
@@ -109,7 +111,13 @@ export function RevenueStreamBreakdown({
   });
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this revenue stream? This action cannot be undone.")) return;
+    const ok = await askConfirm({
+      title: "Delete revenue stream?",
+      body: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
 
     setDeletingId(id);
     try {
@@ -120,7 +128,7 @@ export function RevenueStreamBreakdown({
       }
       router.refresh();
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Failed to delete revenue stream");
+      toastError(toUserMessage(err));
     } finally {
       setDeletingId(null);
     }
@@ -262,6 +270,8 @@ export function RevenueStreamBreakdown({
           />
         </Modal>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

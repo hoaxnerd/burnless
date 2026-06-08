@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal } from "@/components/ui";
+import { Modal, Input, Select, useConfirm } from "@/components/ui";
 import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
+import { toUserMessage } from "@/lib/api-error";
 
 export type BonusType = "signing" | "performance" | "retention" | "other";
 
@@ -23,6 +24,7 @@ interface Props {
 
 export function BonusesList({ headcountId, bonuses }: Props) {
   const router = useRouter();
+  const { confirm: askConfirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [payoutMonth, setPayoutMonth] = useState("");
   const [amount, setAmount] = useState<number | null>(null);
@@ -64,7 +66,7 @@ export function BonusesList({ headcountId, bonuses }: Props) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Failed to save");
+        setError(toUserMessage(body));
         return;
       }
       close();
@@ -75,13 +77,19 @@ export function BonusesList({ headcountId, bonuses }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this bonus?")) return;
+    const ok = await askConfirm({
+      title: "Delete bonus?",
+      body: "This bonus will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await apiFetch(`/api/headcount/${headcountId}/bonuses/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to delete");
+      setError(toUserMessage(body));
       return;
     }
     router.refresh();
@@ -156,30 +164,25 @@ export function BonusesList({ headcountId, bonuses }: Props) {
             onChange={(next) => setAmount(next)}
             min={0}
           />
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Type</span>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as BonusType)}
-              data-testid="bonus-type"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            >
-              <option value="signing">Signing</option>
-              <option value="performance">Performance</option>
-              <option value="retention">Retention</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Notes (optional)</span>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              data-testid="bonus-notes"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
+          <Select
+            label="Type"
+            value={type}
+            onChange={(e) => setType(e.target.value as BonusType)}
+            data-testid="bonus-type"
+          >
+            <option value="signing">Signing</option>
+            <option value="performance">Performance</option>
+            <option value="retention">Retention</option>
+            <option value="other">Other</option>
+          </Select>
+          <Input
+            label="Notes"
+            showOptional
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            data-testid="bonus-notes"
+          />
           {error && (
             <div role="alert" className="rounded-lg bg-danger-50 border border-danger-500/20 px-3 py-2 text-xs text-danger-600">
               {error}
@@ -205,6 +208,7 @@ export function BonusesList({ headcountId, bonuses }: Props) {
           </div>
         </div>
       </Modal>
+      {dialog}
     </div>
   );
 }

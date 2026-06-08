@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { type CompanyProfile, type ConnectedIntegration, tabs } from "./settings-data";
 import { GeneralTab } from "./general-tab";
@@ -103,11 +104,11 @@ export default function SettingsPage() {
 
       if (res.status === 409 && data.requiresConfirmation) {
         // API is asking for explicit confirmation — show the generic confirm dialog
-        setConfirmState({ open: true, message: data.error });
+        setConfirmState({ open: true, message: toUserMessage(data) });
         return;
       }
       if (!res.ok) {
-        setSaveError(data.error || "Failed to save");
+        setSaveError(toUserMessage(data) || "Failed to save");
         return;
       }
       // Success

@@ -1,4 +1,5 @@
 import { RefObject } from "react";
+import { Input } from "@/components/ui";
 import { SocialLoginButtons } from "./social-login-buttons";
 
 interface EmailStepProps {
@@ -19,25 +20,17 @@ export function EmailStep({
   return (
     <div style={{ animation: "fadeSlideIn 300ms ease-out" }}>
       <form onSubmit={onSubmit} className="space-y-5">
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-surface-700 mb-2"
-          >
-            Email address
-          </label>
-          <input
-            ref={emailRef}
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            placeholder="you@startup.com"
-            required
-            autoFocus
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
-          />
-        </div>
+        <Input
+          ref={emailRef}
+          id="email"
+          label="Email address"
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          placeholder="you@startup.com"
+          required
+          autoFocus
+        />
         <button
           type="submit"
           disabled={isChecking || !email}

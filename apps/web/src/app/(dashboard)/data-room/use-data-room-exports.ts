@@ -191,7 +191,6 @@ export function useDataRoomExports(props: DataRoomViewProps) {
       setExported((prev) => new Set(prev).add(id));
       toastSuccess("Export complete", { description: `${id === "full-deck" ? "Full Financial Package" : id} downloaded.` });
     } catch (err) {
-      console.error("Export failed:", err);
       toastError("Export failed", { description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again." });
     } finally {
       setExporting(null);

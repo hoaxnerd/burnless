@@ -29,7 +29,7 @@ describe("AiPermissionsPanel", () => {
     render(<AiPermissionsPanel conversationId={null} />);
     await waitFor(() => expect(screen.getByText(/Create \/ update/i)).toBeTruthy());
     // Choose "Allow for session" for the Write category.
-    fireEvent.click(screen.getAllByRole("button", { name: /Allow for session/i })[0]!);
+    fireEvent.click(screen.getAllByRole("radio", { name: /Allow for session/i })[0]!);
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/ai/permissions",
@@ -42,7 +42,7 @@ describe("AiPermissionsPanel", () => {
     render(<AiPermissionsPanel conversationId={null} />);
     await waitFor(() => expect(screen.getByText(/Delete/i)).toBeTruthy());
     // There are fewer "Always allow" buttons than categories because delete omits it.
-    const always = screen.queryAllByRole("button", { name: /Always allow/i });
+    const always = screen.queryAllByRole("radio", { name: /Always allow/i });
     expect(always.length).toBe(4); // read, write, web_search, browser_use
   });
 });

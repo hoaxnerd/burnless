@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import { formatCompactCurrency } from "@/components/charts";
-import { Modal } from "@/components/ui";
+import { Modal, Input, Select } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import { ExpenseFormModal } from "./expense-form-modal";
 import type { ExpenseRow } from "./expense-form";
 import type { ForecastMethod } from "@/lib/expense-params";
@@ -169,7 +170,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setDeletingItem(null);
       router.refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Something went wrong");
+      setDeleteError(toUserMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -197,9 +198,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setBulkDeleteOpen(false);
       router.refresh();
     } catch (err) {
-      setBulkDeleteError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setBulkDeleteError(toUserMessage(err));
     } finally {
       setBulkDeleting(false);
     }
@@ -229,9 +228,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setBulkAccountId("");
       router.refresh();
     } catch (err) {
-      setBulkCategorizeError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setBulkCategorizeError(toUserMessage(err));
     } finally {
       setBulkCategorizing(false);
     }
@@ -253,28 +250,30 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
             {/* Search */}
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-surface-400" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search expenses..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-surface-200 bg-surface-50 pl-9 pr-3 py-1.5 text-xs text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                aria-label="Search expenses"
+                className="pl-9 pr-3 py-1.5 text-xs"
               />
             </div>
 
             {/* Category filter */}
             <div className="relative">
               <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-surface-400 pointer-events-none" />
-              <select
+              <Select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none rounded-lg border border-surface-200 bg-surface-50 pl-7 pr-6 py-1.5 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 cursor-pointer"
+                aria-label="Filter by category"
+                className="pl-7 py-1.5 text-xs"
               >
                 <option value="all">All categories</option>
                 {subcategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Type filter pills */}
@@ -313,7 +312,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
             <label className="inline-flex items-center gap-1.5">
               <Tag className="h-3 w-3 text-brand-700" aria-hidden />
               <span className="sr-only">Reassign to account</span>
-              <select
+              <Select
                 aria-label="Reassign selected expenses to account"
                 value={bulkAccountId}
                 disabled={bulkCategorizing}
@@ -322,13 +321,13 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                   setBulkAccountId(next);
                   if (next) void handleBulkCategorize(next);
                 }}
-                className="appearance-none rounded-md border border-brand-200 bg-white px-2 py-1 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 cursor-pointer disabled:opacity-50"
+                className="px-2 py-1 text-[10px] font-medium"
               >
                 <option value="">Reassign to...</option>
                 {accountOptions.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
 
@@ -470,8 +469,9 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     <td className="px-4 py-3">
                       <div className="relative flex items-center gap-1.5">
                         {editingCategoryId === item.id ? (
-                          <select
+                          <Select
                             autoFocus
+                            aria-label={`Change category for ${displayName}`}
                             defaultValue={overrides[item.id] ?? item.subcategory}
                             onChange={(e) => {
                               const newCat = e.target.value;
@@ -491,12 +491,12 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                               }).catch(() => {});
                             }}
                             onBlur={() => setEditingCategoryId(null)}
-                            className="rounded-md border border-brand-300 bg-white px-2 py-0.5 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                            className="px-2 py-0.5 text-[10px] font-medium"
                           >
                             {subcategories.map((c) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
-                          </select>
+                          </Select>
                         ) : (
                           <button
                             onClick={() => setEditingCategoryId(item.id)}

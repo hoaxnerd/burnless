@@ -1,4 +1,5 @@
 import { Building2 } from "lucide-react";
+import type { RefObject } from "react";
 import type { CompanyFields } from "../types";
 import { FIELD_LABELS, FIELD_PLACEHOLDERS, STAGE_OPTIONS, MODEL_OPTIONS } from "../constants";
 import { ConfidenceBadge } from "../confidence-badge";
@@ -9,6 +10,8 @@ interface Props {
   onUpdateField: (name: keyof CompanyFields, value: string) => void;
   nameError?: string;
   onNameBlur: () => void;
+  /** Focused when submit is blocked by an empty company name (ONB-05). */
+  nameInputRef?: RefObject<HTMLInputElement | null>;
   userName: string;
   onUserNameChange: (next: string) => void;
   /** Suggested founder names — clicking a chip fills `userName`. */
@@ -20,6 +23,7 @@ export function CompanyIdentitySection({
   onUpdateField,
   nameError,
   onNameBlur,
+  nameInputRef,
   userName,
   onUserNameChange,
   suggestedFounders,
@@ -33,6 +37,7 @@ export function CompanyIdentitySection({
           placeholder={FIELD_PLACEHOLDERS.company_name}
           onChange={(v) => onUpdateField("company_name", v)}
           onBlur={onNameBlur}
+          inputRef={nameInputRef}
           required
           error={nameError}
           badge={<ConfidenceBadge {...fields.company_name} />}

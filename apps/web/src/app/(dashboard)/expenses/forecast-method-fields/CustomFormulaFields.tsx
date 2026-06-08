@@ -9,6 +9,8 @@
  */
 
 import { useState } from "react";
+import { Input, Textarea } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 
 interface CustomFormulaParams {
   expression: string;
@@ -20,9 +22,6 @@ interface CustomFormulaFieldsProps {
   onChange: (next: CustomFormulaParams) => void;
   disabled?: boolean;
 }
-
-const inputClass =
-  "w-full rounded-lg border border-surface-300 px-3 py-2 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500";
 
 function stringifyVars(v?: Record<string, number | string>): string {
   if (!v || Object.keys(v).length === 0) return "";
@@ -68,7 +67,9 @@ export function CustomFormulaFields({
       setVarsError(null);
       onChange({ ...params, variables: parsed as Record<string, number | string> });
     } catch (e) {
-      setVarsError(e instanceof Error ? e.message : "Invalid JSON");
+      // JSON.parse SyntaxError — surface a clean, user-safe message (never the
+      // raw machine-y parser text). [ERR-02]
+      setVarsError(toUserMessage(e) || "Invalid JSON");
     }
   }
 
@@ -78,13 +79,12 @@ export function CustomFormulaFields({
         <label htmlFor="cf-expr" className="block text-sm font-medium text-surface-700 mb-1">
           Expression
         </label>
-        <input
+        <Input
           id="cf-expr"
           type="text"
           value={params.expression}
           disabled={disabled}
           onChange={(e) => onChange({ ...params, expression: e.target.value })}
-          className={inputClass}
           placeholder="Revenue * 0.3 + 1000"
         />
         <p className="mt-1 text-xs text-surface-500">
@@ -95,14 +95,14 @@ export function CustomFormulaFields({
         <label htmlFor="cf-vars" className="block text-sm font-medium text-surface-700 mb-1">
           Variables JSON <span className="text-surface-400 font-normal">(optional)</span>
         </label>
-        <textarea
+        <Textarea
           id="cf-vars"
           rows={3}
           value={varsText}
           disabled={disabled}
           onChange={(e) => setVarsText(e.target.value)}
           onBlur={(e) => commitVars(e.target.value)}
-          className={`${inputClass} font-mono`}
+          className="font-mono"
           placeholder='{ "x": 1, "y": 2 }'
         />
         {varsError && (

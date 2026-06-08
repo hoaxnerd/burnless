@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Input, Select } from "@/components/ui";
 import { DateRangePicker } from "@/components/forms/primitives";
 import {
   defaultParamsForType,
@@ -80,37 +81,28 @@ export function RevenueStreamForm({
       className="space-y-4"
       aria-label={mode === "add" ? "Add revenue stream" : "Edit revenue stream"}
     >
-      <label className="block text-sm">
-        <span className="text-surface-700 dark:text-surface-300">
-          Name <span className="text-danger-500">*</span>
-        </span>
-        <input
-          type="text"
-          required
-          value={values.name}
-          onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-          className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
-          aria-label="Revenue stream name"
-        />
-      </label>
+      <Input
+        type="text"
+        label="Name"
+        required
+        value={values.name}
+        onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+        aria-label="Revenue stream name"
+      />
 
-      <label className="block text-sm">
-        <span className="text-surface-700 dark:text-surface-300">
-          Type <span className="text-danger-500">*</span>
-        </span>
-        <select
-          value={values.type}
-          onChange={(e) => setType(e.target.value as RevenueStreamType)}
-          className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
-          aria-label="Revenue stream type"
-        >
-          {(Object.keys(TYPE_LABELS) as RevenueStreamType[]).map((t) => (
-            <option key={t} value={t}>
-              {TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        label="Type"
+        required
+        value={values.type}
+        onChange={(e) => setType(e.target.value as RevenueStreamType)}
+        aria-label="Revenue stream type"
+      >
+        {(Object.keys(TYPE_LABELS) as RevenueStreamType[]).map((t) => (
+          <option key={t} value={t}>
+            {TYPE_LABELS[t]}
+          </option>
+        ))}
+      </Select>
 
       <DateRangePicker
         startDate={values.startDate}

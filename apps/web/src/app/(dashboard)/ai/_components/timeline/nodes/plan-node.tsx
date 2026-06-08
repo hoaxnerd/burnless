@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ListChecks, X, ArrowDown, ArrowUp, Wrench, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui";
 import type { PendingPlan, PlanStepClient } from "../../types";
 
 export interface PlanNodeProps {
@@ -58,21 +59,21 @@ export function PlanNode({ pending, disabled, onSubmit }: PlanNodeProps) {
               {editable ? (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <input
+                    <Input
                       aria-label={`Step title: ${step.title}`}
                       value={step.title}
                       onChange={(e) => patch(step.id, "title", e.target.value)}
-                      className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm text-surface-800 hover:border-surface-200 focus:border-accent-300 focus:outline-none"
+                      className="px-1 py-0.5 text-sm text-surface-800"
                     />
                     {step.confidence ? <ConfChip c={step.confidence} /> : null}
                   </div>
                   {step.rationale !== undefined ? (
-                    <input
+                    <Input
                       aria-label={`Step rationale: ${step.title}`}
                       value={step.rationale}
                       onChange={(e) => patch(step.id, "rationale", e.target.value)}
                       placeholder="rationale"
-                      className="mt-0.5 w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-surface-500 hover:border-surface-200 focus:border-accent-300 focus:outline-none"
+                      className="mt-0.5 px-1 py-0.5 text-xs text-surface-500"
                     />
                   ) : null}
                 </>

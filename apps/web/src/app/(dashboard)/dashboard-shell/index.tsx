@@ -34,6 +34,7 @@ import { KeyboardShortcutsProvider } from "@/components/ui/keyboard-shortcuts";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ToastProvider } from "@/components/ui/toast";
 import { CommandPalette } from "@/components/ui/command-palette";
+import { Overlay } from "@/components/ui/overlay";
 import { LocaleProvider } from "@/components/locale/locale-context";
 import { useProactiveAlerts } from "@/components/ai/use-proactive-alerts";
 import { MetricsProvider } from "@/components/providers/metrics-context";
@@ -303,13 +304,52 @@ function DashboardContent({
         <div className="w-9" />
       </div>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden animate-fade-in"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {/* Mobile sidebar — drawer via shared <Overlay> (portal + scrim + Escape +
+          scroll-lock + focus-restore). Headless so the drawer keeps its own
+          left-anchored layout instead of the centered dialog frame. */}
+      <Overlay
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        headless
+        className="lg:hidden !items-stretch !justify-start !p-0"
+        scrimClassName="bg-black/40 fixed inset-0 z-40 lg:hidden animate-fade-in"
+      >
+        {(panelProps) => (
+          <aside
+            {...panelProps}
+            className="
+              w-64 h-full bg-surface-0 flex flex-col flex-shrink-0
+              z-50 rounded-r-2xl shadow-2xl border-r border-surface-200/60
+              animate-fade-in outline-none
+            "
+            role="navigation"
+            aria-label="Main navigation"
+          >
+            <SidebarInner
+              collapsed={false}
+              onToggleCollapse={handleToggleSidebar}
+              onClose={() => setMobileOpen(false)}
+              isMobile={true}
+              orderedNavItems={orderedNavItems}
+              navOrder={navOrder}
+              pathname={pathname}
+              sensors={sensors}
+              onDragEnd={handleDragEnd}
+              masterEnabled={masterEnabled}
+              chatEnabled={chatEnabled}
+              quickActionMode={quickActionMode}
+              onSetQuickActionMode={handleSetQuickActionMode}
+              quickActions={quickActions}
+              quickActionModeOverrides={quickActionModeOverrides}
+              onSetQuickActionItemMode={handleSetQuickActionItemMode}
+              onOpenSearch={() => setCommandPaletteOpen(true)}
+              onToggleAI={navigateToAi}
+              user={user}
+              dndContextId="sidebar-dnd-mobile"
+            />
+          </aside>
+        )}
+      </Overlay>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Floating Sidebar — desktop */}
@@ -347,42 +387,6 @@ function DashboardContent({
             />
           </aside>
         </div>
-
-        {/* Mobile sidebar — overlay */}
-        <aside
-          className={`
-            w-64 bg-surface-0 flex flex-col flex-shrink-0
-            fixed inset-y-0 left-0 z-50
-            rounded-r-2xl shadow-2xl border-r border-surface-200/60
-            lg:hidden transition-transform duration-300
-            ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          `}
-          role="navigation"
-          aria-label="Main navigation"
-        >
-          <SidebarInner
-            collapsed={false}
-            onToggleCollapse={handleToggleSidebar}
-            onClose={() => setMobileOpen(false)}
-            isMobile={true}
-            orderedNavItems={orderedNavItems}
-            navOrder={navOrder}
-            pathname={pathname}
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            masterEnabled={masterEnabled}
-            chatEnabled={chatEnabled}
-            quickActionMode={quickActionMode}
-            onSetQuickActionMode={handleSetQuickActionMode}
-            quickActions={quickActions}
-            quickActionModeOverrides={quickActionModeOverrides}
-            onSetQuickActionItemMode={handleSetQuickActionItemMode}
-            onOpenSearch={() => setCommandPaletteOpen(true)}
-            onToggleAI={navigateToAi}
-            user={user}
-            dndContextId="sidebar-dnd-mobile"
-          />
-        </aside>
 
         {/* Main content — floats on desktop to match sidebar, full-bleed on mobile */}
         <main

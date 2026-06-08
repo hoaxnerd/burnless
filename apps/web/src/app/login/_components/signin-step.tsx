@@ -1,5 +1,6 @@
 import { RefObject } from "react";
 import Link from "next/link";
+import { Input } from "@/components/ui";
 
 interface SignInStepProps {
   email: string;
@@ -23,27 +24,17 @@ export function SignInStep({
   return (
     <div style={{ animation: "fadeSlideIn 300ms ease-out" }}>
       <form onSubmit={onSubmit} className="space-y-5">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-surface-700"
-            >
-              Password
-            </label>
-          </div>
-          <input
-            ref={passwordRef}
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => onPasswordChange(e.target.value)}
-            placeholder="Enter your password"
-            required
-            minLength={8}
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
-          />
-        </div>
+        <Input
+          ref={passwordRef}
+          id="password"
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          placeholder="Enter your password"
+          required
+          minLength={8}
+        />
         <button
           type="submit"
           disabled={isLoading}

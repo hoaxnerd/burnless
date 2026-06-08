@@ -11,7 +11,8 @@
  * `ToggleGroup`     — segmented button group for enum-like fields.
  */
 
-import type { ReactNode, ElementType } from "react";
+import type { ReactNode, ElementType, RefObject } from "react";
+import { Input, Select } from "@/components/ui";
 
 export function SectionCard({
   icon: Icon,
@@ -92,6 +93,7 @@ export function InlineField({
   prefix,
   error,
   onBlur,
+  inputRef,
 }: {
   label: string;
   field: { value: string; source: string };
@@ -105,6 +107,7 @@ export function InlineField({
   prefix?: string;
   error?: string;
   onBlur?: () => void;
+  inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   return (
     <div>
@@ -117,11 +120,13 @@ export function InlineField({
       </div>
       <div className="relative">
         {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 z-10 text-sm text-surface-400">
             {prefix}
           </span>
         )}
-        <input
+        <Input
+          ref={inputRef}
+          aria-label={label}
           type={type}
           value={field.value}
           onChange={(e) => onChange(e.target.value)}
@@ -129,12 +134,12 @@ export function InlineField({
           placeholder={placeholder}
           min={min}
           step={step}
-          className={`w-full rounded-lg border bg-surface-0 dark:bg-surface-900 ${prefix ? "pl-7 pr-3" : "px-3"} py-2 text-sm text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors ${
-            error
-              ? "border-danger-500"
-              : field.source === "ai"
-                ? "border-accent-300 dark:border-accent-700"
-                : "border-surface-300 dark:border-surface-600"
+          invalid={!!error}
+          aria-invalid={error ? true : undefined}
+          className={`${prefix ? "pl-7" : ""} ${
+            !error && field.source === "ai"
+              ? "border-accent-300 dark:border-accent-700"
+              : ""
           }`}
         />
       </div>
@@ -199,12 +204,13 @@ export function MiniInput({
   className?: string;
 }) {
   return (
-    <input
+    <Input
+      aria-label={placeholder ?? "Value"}
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1 text-xs focus:ring-2 focus:ring-brand-500 ${className}`}
+      className={`px-2 py-1 text-xs ${className}`}
     />
   );
 }
@@ -222,17 +228,18 @@ export function MiniSelect<T extends string>({
   className?: string;
 }) {
   return (
-    <select
+    <Select
+      aria-label="Select an option"
       value={value}
       onChange={(e) => onChange(e.target.value as T)}
-      className={`rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1 text-xs focus:ring-2 focus:ring-brand-500 ${className}`}
+      className={`px-2 py-1 text-xs ${className}`}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
@@ -250,14 +257,15 @@ export function CurrencyInput({
 }) {
   return (
     <div className={`relative ${className}`}>
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-surface-400">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-xs text-surface-400">
         {symbol}
       </span>
-      <input
+      <Input
+        aria-label="Amount"
         type="number"
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 pl-5 pr-2 py-1 text-xs focus:ring-2 focus:ring-brand-500"
+        className="pl-5 pr-2 py-1 text-xs"
       />
     </div>
   );

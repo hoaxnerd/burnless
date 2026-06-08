@@ -1,11 +1,24 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import {
+  render as rtlRender,
+  screen,
+  fireEvent,
+  type RenderOptions,
+} from "@testing-library/react";
+import { type ReactElement } from "react";
 import {
   BoardMeetingButton,
   BoardMeetingOverlay,
   type BoardMeetingData,
 } from "../board-meeting-mode";
+import { ToastProvider } from "@/components/ui/toast";
 import { formatCompactAmount } from "@burnless/types";
+
+// BoardMeetingOverlay now surfaces clipboard/PDF failures via useToast, which
+// requires a ToastProvider in the tree.
+function render(ui: ReactElement, options?: RenderOptions) {
+  return rtlRender(<ToastProvider>{ui}</ToastProvider>, options);
+}
 
 // Mock keyboard shortcuts hook
 vi.mock("@/components/ui/keyboard-shortcuts", () => ({

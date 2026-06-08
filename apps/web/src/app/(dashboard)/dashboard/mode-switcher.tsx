@@ -46,7 +46,11 @@ export function ModeSwitcher() {
   const { masterEnabled: aiEnabled } = useAiFlags();
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-xl bg-surface-100 p-1 border border-surface-200">
+    <div
+      role="radiogroup"
+      aria-label="Dashboard mode"
+      className="inline-flex items-center gap-1 rounded-xl bg-surface-100 p-1 border border-surface-200"
+    >
       {modes.map((m) => {
         const Icon = m.icon;
         const isActive = mode === m.value;
@@ -55,6 +59,8 @@ export function ModeSwitcher() {
         return (
           <button
             key={m.value}
+            role="radio"
+            aria-checked={isActive}
             onClick={() => !isDisabled && setMode(m.value)}
             disabled={isDisabled}
             title={isDisabled ? "Enable AI to use Intelligence mode" : m.description}

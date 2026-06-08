@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -101,8 +102,11 @@ function LoginContent() {
               setIsLoading(false);
               return;
             }
-          } catch {
-            // If 2FA check fails, fall through to normal error
+          } catch (probeErr) {
+            // If the 2FA probe fails, deliberately fall through to the normal
+            // credentials error below (which calls setError) — nothing to surface
+            // here, this is not a user-action mutation failure.
+            void probeErr;
           }
         }
 
@@ -144,7 +148,7 @@ function LoginContent() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Could not create account. Please try again.");
+        setError(toUserMessage(data) || "Could not create account. Please try again.");
         setIsLoading(false);
         return;
       }

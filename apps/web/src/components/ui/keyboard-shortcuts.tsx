@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, createContext, useContext, useRef, us
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
+import { Overlay } from "./overlay";
+import { IconButton } from "./icon-button";
 
 interface Shortcut {
   key: string;
@@ -162,19 +164,25 @@ export function KeyboardShortcutsProvider({
       {children}
 
       {/* Shortcuts help modal */}
-      {showHelp && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowHelp(false)} />
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-            <div className="bg-surface-0 rounded-2xl shadow-xl border border-surface-200 w-full max-w-md animate-scale-in">
+      <Overlay
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+        ariaLabel="Keyboard shortcuts"
+        scrimClassName="bg-black/40 fixed inset-0 z-50"
+        className="z-50"
+      >
+        {(panelProps) => (
+            <div
+              {...panelProps}
+              className="bg-surface-0 rounded-2xl shadow-xl border border-surface-200 w-full max-w-md animate-scale-in outline-none"
+            >
               <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
                 <h2 className="text-sm font-semibold text-surface-900">Keyboard Shortcuts</h2>
-                <button
+                <IconButton
+                  aria-label="Close"
                   onClick={() => setShowHelp(false)}
-                  className="rounded-lg p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                  icon={<X />}
+                />
               </div>
               <div className="p-6 space-y-5 max-h-[60vh] overflow-auto">
                 <div>
@@ -208,9 +216,8 @@ export function KeyboardShortcutsProvider({
                 </p>
               </div>
             </div>
-          </div>
-        </>
-      )}
+        )}
+      </Overlay>
 
       {/* "Go to..." indicator */}
       {goPending && (

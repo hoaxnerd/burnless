@@ -4,6 +4,8 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { Cpu, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import type { AiProviderConfig } from "@/components/ai/ai-feature-context";
+import { Input } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 
 const PROVIDERS = [
   { value: "anthropic", label: "Anthropic", desc: "Claude models (default)" },
@@ -83,7 +85,7 @@ export function ProviderSection({
         setTestStatus("success");
       } else {
         setTestStatus("error");
-        setTestError(data.error || "Connection failed");
+        setTestError(toUserMessage(data) || "Connection failed");
       }
     } catch {
       setTestStatus("error");
@@ -158,12 +160,13 @@ export function ProviderSection({
         ) : (
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <input
+              <Input
+                aria-label="API key"
                 type={showKey ? "text" : "password"}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={`Enter your ${PROVIDERS.find((p) => p.value === selectedProvider)?.label} API key`}
-                className="w-full px-3 py-2 pr-10 rounded-lg border border-surface-300 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                className="w-full pr-10"
               />
               <button
                 type="button"
@@ -209,14 +212,15 @@ export function ProviderSection({
           Model override <span className="text-surface-400 font-normal">(optional)</span>
         </label>
         <div className="flex items-center gap-2">
-          <input
+          <Input
+            aria-label="Model override"
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
             onBlur={handleSaveModel}
             onKeyDown={(e) => e.key === "Enter" && handleSaveModel()}
             placeholder={selectedProvider === "openai" ? "gpt-4o" : selectedProvider === "openrouter" ? "anthropic/claude-sonnet-4-20250514" : selectedProvider === "ollama" ? "gemma3:12b" : "claude-sonnet-4-20250514"}
-            className="flex-1 px-3 py-2 rounded-lg border border-surface-300 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            className="flex-1"
           />
         </div>
       </div>
@@ -227,14 +231,15 @@ export function ProviderSection({
           <label className="block text-sm font-medium text-surface-700">
             Base URL <span className="text-surface-400 font-normal">(optional)</span>
           </label>
-          <input
+          <Input
+            aria-label="Base URL"
             type="text"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             onBlur={handleSaveBaseUrl}
             onKeyDown={(e) => e.key === "Enter" && handleSaveBaseUrl()}
             placeholder={selectedProvider === "ollama" ? "http://localhost:11434/v1" : "https://openrouter.ai/api/v1"}
-            className="w-full px-3 py-2 rounded-lg border border-surface-300 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            className="w-full"
           />
         </div>
       )}

@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   ShieldOff,
 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 
 type Step = "idle" | "loading" | "qr" | "backup" | "disable";
 
@@ -74,7 +75,7 @@ export function SecurityTab() {
       setSecret(data.secret);
       setStep("qr");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start 2FA setup");
+      setError(toUserMessage(err));
       setStep("idle");
     }
   };
@@ -98,7 +99,7 @@ export function SecurityTab() {
       setTfa({ enabled: true, loaded: true });
       setStep("backup");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
+      setError(toUserMessage(err));
       setStep("qr");
     } finally {
       setConfirming(false);
@@ -122,7 +123,7 @@ export function SecurityTab() {
       setStep("idle");
       setDisableCode("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to disable 2FA");
+      setError(toUserMessage(err));
     }
   };
 
@@ -254,14 +255,15 @@ export function SecurityTab() {
                 2. Enter the 6-digit code from your app
               </p>
               <div className="flex gap-3">
-                <input
+                <Input
+                  aria-label="6-digit authentication code"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   placeholder="000000"
-                  className="w-36 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-center text-lg font-mono tracking-[0.3em] text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
+                  className="w-36 text-center text-lg font-mono tracking-[0.3em]"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") confirmSetup();
@@ -367,7 +369,8 @@ export function SecurityTab() {
               </p>
             </div>
             <div className="flex gap-3">
-              <input
+              <Input
+                aria-label="Current TOTP code"
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
@@ -376,7 +379,7 @@ export function SecurityTab() {
                   setDisableCode(e.target.value.replace(/\D/g, ""))
                 }
                 placeholder="000000"
-                className="w-36 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-center text-lg font-mono tracking-[0.3em] text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-danger-500/40 focus:border-danger-500 transition-all"
+                className="w-36 text-center text-lg font-mono tracking-[0.3em]"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") disable2FA();

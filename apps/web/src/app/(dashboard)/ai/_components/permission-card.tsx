@@ -19,6 +19,28 @@ interface Decision {
   decision: PermissionDecisionKind;
 }
 
+/** Turn a camelCase / snake_case input key into a readable label. */
+function humanizeKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
+/** Render a tool-input value without dumping raw JSON to the approval surface. */
+function humanizeValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (Array.isArray(v)) return v.map(humanizeValue).join(", ");
+  if (typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${humanizeKey(k)}: ${humanizeValue(val)}`)
+      .join(", ");
+  }
+  return String(v);
+}
+
 export function PermissionCard({
   pending,
   onDecide,
@@ -76,9 +98,30 @@ export function PermissionCard({
         {showInput ? "Hide details" : "Show details"}
       </button>
       {showInput && (
-        <pre className="mb-3 max-h-40 overflow-auto rounded-lg bg-surface-100 p-3 text-[11px] text-surface-600">
-          {JSON.stringify(pending.actions.map((a) => ({ tool: a.tool, input: a.input })), null, 2)}
-        </pre>
+        <div className="mb-3 max-h-40 overflow-auto rounded-lg bg-surface-100 p-3 text-[11px] text-surface-600 space-y-2">
+          {pending.actions.map((a) => {
+            const entries = Object.entries(
+              (a.input as Record<string, unknown> | undefined) ?? {},
+            );
+            return (
+              <div key={a.requestId}>
+                <p className="font-medium text-surface-700">{humanizeKey(a.tool)}</p>
+                {entries.length === 0 ? (
+                  <p className="text-surface-400">No parameters.</p>
+                ) : (
+                  <ul className="mt-0.5 space-y-0.5">
+                    {entries.map(([k, val]) => (
+                      <li key={k} className="grid grid-cols-[minmax(0,8rem)_1fr] gap-2">
+                        <span className="truncate text-surface-500">{humanizeKey(k)}</span>
+                        <span className="break-words tabular-nums">{humanizeValue(val)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">

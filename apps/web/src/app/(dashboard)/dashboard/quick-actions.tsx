@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
-import { Modal } from "@/components/ui";
+import { Modal, Input, Select } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import {
   Plus,
   TrendingUp,
@@ -84,7 +85,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
       setExpenseOpen(false);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(toUserMessage(err));
     } finally {
       setSaving(false);
     }
@@ -124,7 +125,7 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
       setRevenueOpen(false);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(toUserMessage(err));
     } finally {
       setSaving(false);
     }
@@ -252,43 +253,32 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
               {error}
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">Name</label>
-            <input
-              type="text"
-              value={expName}
-              onChange={(e) => setExpName(e.target.value)}
-              placeholder="e.g. AWS, Office Rent"
-              required
-              className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">
-              Monthly Amount ($)
-            </label>
-            <input
-              type="number"
-              value={expAmount}
-              onChange={(e) => setExpAmount(e.target.value)}
-              placeholder="5000"
-              required
-              min="0"
-              step="0.01"
-              className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">Category</label>
-            <select
-              value={expCategory}
-              onChange={(e) => setExpCategory(e.target.value)}
-              className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-            >
-              <option value="operating_expense">Operating Expense</option>
-              <option value="cogs">Cost of Goods Sold</option>
-            </select>
-          </div>
+          <Input
+            label="Name"
+            type="text"
+            value={expName}
+            onChange={(e) => setExpName(e.target.value)}
+            placeholder="e.g. AWS, Office Rent"
+            required
+          />
+          <Input
+            label="Monthly Amount ($)"
+            type="number"
+            value={expAmount}
+            onChange={(e) => setExpAmount(e.target.value)}
+            placeholder="5000"
+            required
+            min="0"
+            step="0.01"
+          />
+          <Select
+            label="Category"
+            value={expCategory}
+            onChange={(e) => setExpCategory(e.target.value)}
+          >
+            <option value="operating_expense">Operating Expense</option>
+            <option value="cogs">Cost of Goods Sold</option>
+          </Select>
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -320,59 +310,43 @@ export function QuickActions({ scenarioId, accounts: _accounts, context }: Quick
               {error}
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">Name</label>
-            <input
-              type="text"
-              value={revName}
-              onChange={(e) => setRevName(e.target.value)}
-              placeholder="e.g. Pro Plan, Setup Fees"
-              required
-              className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">Type</label>
-            <select
-              value={revType}
-              onChange={(e) => setRevType(e.target.value)}
-              className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-            >
-              <option value="subscription">Subscription</option>
-              <option value="one_time">One-Time</option>
-              <option value="services">Services</option>
-              <option value="usage_based">Usage-Based</option>
-            </select>
-          </div>
+          <Input
+            label="Name"
+            type="text"
+            value={revName}
+            onChange={(e) => setRevName(e.target.value)}
+            placeholder="e.g. Pro Plan, Setup Fees"
+            required
+          />
+          <Select
+            label="Type"
+            value={revType}
+            onChange={(e) => setRevType(e.target.value)}
+          >
+            <option value="subscription">Subscription</option>
+            <option value="one_time">One-Time</option>
+            <option value="services">Services</option>
+            <option value="usage_based">Usage-Based</option>
+          </Select>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-surface-700 mb-1.5">
-                {revType === "subscription" ? "Monthly Price ($)" : "Unit Price ($)"}
-              </label>
-              <input
-                type="number"
-                value={revPrice}
-                onChange={(e) => setRevPrice(e.target.value)}
-                placeholder="99"
-                required
-                min="0"
-                step="0.01"
-                className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-surface-700 mb-1.5">
-                {revType === "subscription" ? "Starting Customers" : "Units/Month"}
-              </label>
-              <input
-                type="number"
-                value={revCustomers}
-                onChange={(e) => setRevCustomers(e.target.value)}
-                placeholder={revType === "subscription" ? "50" : "10"}
-                min="0"
-                className="w-full rounded-xl border border-surface-300 bg-surface-0 px-3.5 py-2.5 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-              />
-            </div>
+            <Input
+              label={revType === "subscription" ? "Monthly Price ($)" : "Unit Price ($)"}
+              type="number"
+              value={revPrice}
+              onChange={(e) => setRevPrice(e.target.value)}
+              placeholder="99"
+              required
+              min="0"
+              step="0.01"
+            />
+            <Input
+              label={revType === "subscription" ? "Starting Customers" : "Units/Month"}
+              type="number"
+              value={revCustomers}
+              onChange={(e) => setRevCustomers(e.target.value)}
+              placeholder={revType === "subscription" ? "50" : "10"}
+              min="0"
+            />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button

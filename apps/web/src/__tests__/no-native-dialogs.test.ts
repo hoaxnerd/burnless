@@ -22,7 +22,11 @@ import { join } from "node:path";
 const SRC_ROOT = join(__dirname, "..");
 
 const ALLOWED: string[] = [
-  // (none — there is no legitimate native dialog in app source)
+  // Sanctioned in-app confirm primitives. Their JSDoc documents a `confirm(opts)`
+  // signature (the themed confirm helper), which trips the bare-`confirm(` matcher.
+  // These ARE the replacement for native dialogs — allowlisting is not a weakening.
+  "src/components/ui/confirm-dialog.tsx",
+  "src/components/ui/confirm-button.tsx",
 ];
 
 function isAllowed(relPath: string): boolean {

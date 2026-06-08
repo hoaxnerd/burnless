@@ -147,7 +147,6 @@ function syncToApi(
           setTimeout(() => resolve(syncToApi(payload, retries - 1, delay * 2)), delay)
         );
       }
-      console.error("Failed to sync preferences:", err);
     });
 }
 

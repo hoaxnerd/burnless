@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useState } from "react";
 import { useLocale } from "@/components/locale/locale-context";
 import { CurrencyInput } from "@/components/forms/primitives";
+import { Input } from "@/components/ui";
 
 interface Investor {
   id: string;
@@ -62,10 +63,21 @@ export function InvestorList({ roundId }: { roundId: string }) {
       </ul>
       {adding ? (
         <div className="flex gap-2 items-end">
-          {/* No text primitive yet — see primitives/README.md promotion rule */}
-          <input className="input-sm flex-1" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          {/* No text primitive yet — see primitives/README.md promotion rule */}
-          <input className="input-sm flex-1" placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input
+            className="flex-1"
+            aria-label="Investor name"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Input
+            className="flex-1"
+            type="email"
+            aria-label="Investor email (optional)"
+            placeholder="Email (optional)"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
           <div className="w-48">
             <CurrencyInput
               label="Amount"

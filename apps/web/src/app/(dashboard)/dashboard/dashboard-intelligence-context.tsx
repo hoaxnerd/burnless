@@ -21,6 +21,8 @@ import {
   type ReactNode,
 } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
 import {
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
@@ -160,6 +162,7 @@ export function DashboardIntelligenceProvider({
   children,
   initialPreferences,
 }: ProviderProps) {
+  const toast = useToast();
   const [isLoading, setIsLoading] = useState(!initialPreferences);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -267,7 +270,7 @@ export function DashboardIntelligenceProvider({
               setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
             );
           }
-          console.error("Failed to save dashboard preferences:", err);
+          toast.error(toUserMessage(err));
         });
 
       const savePromise = attempt(2, 500).finally(() => {
@@ -277,7 +280,7 @@ export function DashboardIntelligenceProvider({
       pendingSaveRef.current = savePromise;
       return savePromise;
     },
-    []
+    [toast]
   );
 
   const updatePrefs = useCallback(

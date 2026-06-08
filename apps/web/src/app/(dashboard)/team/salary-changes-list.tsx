@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal } from "@/components/ui";
+import { Modal, Input, useConfirm } from "@/components/ui";
 import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
+import { toUserMessage } from "@/lib/api-error";
 
 export interface SalaryChange {
   id: string;
@@ -20,6 +21,7 @@ interface Props {
 
 export function SalaryChangesList({ headcountId, changes }: Props) {
   const router = useRouter();
+  const { confirm: askConfirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState("");
   const [newSalary, setNewSalary] = useState<number | null>(null);
@@ -60,7 +62,7 @@ export function SalaryChangesList({ headcountId, changes }: Props) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Failed to save");
+        setError(toUserMessage(body));
         return;
       }
       close();
@@ -71,7 +73,13 @@ export function SalaryChangesList({ headcountId, changes }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this salary change?")) return;
+    const ok = await askConfirm({
+      title: "Delete salary change?",
+      body: "This salary change will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await apiFetch(
       `/api/headcount/${headcountId}/salary-changes/${id}`,
       {
@@ -80,7 +88,7 @@ export function SalaryChangesList({ headcountId, changes }: Props) {
     );
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to delete");
+      setError(toUserMessage(body));
       return;
     }
     router.refresh();
@@ -153,16 +161,14 @@ export function SalaryChangesList({ headcountId, changes }: Props) {
             onChange={(next) => setNewSalary(next)}
             min={0}
           />
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Reason (optional)</span>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              data-testid="salary-change-reason"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            />
-          </label>
+          <Input
+            label="Reason"
+            showOptional
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            data-testid="salary-change-reason"
+          />
           {error && (
             <div role="alert" className="rounded-lg bg-danger-50 border border-danger-500/20 px-3 py-2 text-xs text-danger-600">
               {error}
@@ -188,6 +194,7 @@ export function SalaryChangesList({ headcountId, changes }: Props) {
           </div>
         </div>
       </Modal>
+      {dialog}
     </div>
   );
 }

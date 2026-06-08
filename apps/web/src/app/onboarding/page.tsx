@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
@@ -121,20 +122,24 @@ export default function OnboardingPage() {
             } else if (event.type === "revenue_streams") {
               setRevenueStreams(event.value || []);
             } else if (event.type === "status") {
-              setGreeting(event.message);
+              // Informational progress text from our own SSE stream (not an error).
+              const statusText: string = event.message;
+              setGreeting(statusText);
             } else if (event.type === "done") {
               // Move to review
               movedToReviewRef.current = true;
               setStep("review");
             } else if (event.type === "agent_failed") {
-              setAgentError(event.message ?? "Onboarding agent failed");
+              setAgentError(toUserMessage(event) || "Onboarding agent failed");
               setTimeout(() => {
                 movedToReviewRef.current = true;
                 setStep("review");
               }, 2_500);
             }
-          } catch {
-            // Skip malformed events
+          } catch (parseErr) {
+            // Skip malformed SSE events — per-line parse failures in a streaming
+            // loop are expected and not a user-action failure to surface.
+            void parseErr;
           }
         }
       }

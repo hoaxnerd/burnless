@@ -5,7 +5,9 @@ import { apiFetch } from "@/lib/api-fetch";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
 import { useLocale } from "@/components/locale/locale-context";
 import Papa from "papaparse";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
@@ -48,6 +50,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [showBankSync, setShowBankSync] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -57,8 +60,10 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         setAccounts(data);
         if (data.length > 0 && !targetAccountId) setTargetAccountId(data[0].id);
       }
-    } catch { /* silent */ }
-  }, [targetAccountId]);
+    } catch (e) {
+      toast.error(toUserMessage(e));
+    }
+  }, [targetAccountId, toast]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -68,9 +73,11 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         const json = await res.json();
         setHistory(json.data ?? json);
       }
-    } catch { /* silent */ }
+    } catch (e) {
+      toast.error(toUserMessage(e));
+    }
     finally { setHistoryLoading(false); }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
@@ -88,7 +95,9 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         transformHeader: (h: string) => h.trim(),
         complete: (results) => {
           if (results.errors.length > 0 && results.data.length === 0) {
-            setError(`Parse error: ${results.errors[0]?.message ?? "Unknown error"}`);
+            setError(
+              "We couldn't read that file. Please check it's a valid CSV/TSV and try again.",
+            );
             return;
           }
           const parsedHeaders = results.meta.fields || [];
@@ -142,8 +151,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         }),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Failed to preview funding import");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -176,8 +184,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       clearInterval(progressInterval);
       setImportProgress(100);
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Import failed");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -242,8 +249,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         body: JSON.stringify({ transactions: mapped, dryRun: true, fileName, columnMapping: mapping }),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Failed to preview import");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -283,8 +289,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       clearInterval(progressInterval);
       setImportProgress(100);
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Import failed");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -300,8 +305,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       const res = await apiFetch(`/api/imports/${batchId}`, { method: "DELETE" });
       if (res.ok) { loadHistory(); }
       else {
-        const data = await res.json();
-        setError(data.error || "Rollback failed");
+        setError(await extractApiError(res));
       }
     } catch { setError("Rollback failed"); }
   };
@@ -390,7 +394,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           <label htmlFor="import-target" className="text-sm font-medium text-surface-700 dark:text-surface-300 shrink-0">
             Import type
           </label>
-          <select
+          <Select
             id="import-target"
             value={target}
             onChange={(e) => {
@@ -399,11 +403,10 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
               setMapping({ date: "", amount: "", description: "", category: "" });
               setFundingPreview([]);
             }}
-            className="rounded-md border border-surface-300 bg-white px-3 py-1.5 text-sm text-surface-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-50"
           >
             <option value="transactions">Transactions</option>
             <option value="funding-rounds">Funding Rounds</option>
-          </select>
+          </Select>
         </div>
       )}
 

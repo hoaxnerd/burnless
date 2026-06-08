@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Eye, Pencil, Trash2, Globe, MonitorPlay, RotateCcw } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui";
 
 type Mode = "ask" | "session" | "always";
 
@@ -96,25 +97,13 @@ export function AiPermissionsPanel({ conversationId }: { conversationId: string 
               <p className="text-[11px] text-surface-500">{cat.hint}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {cat.modes.map((m) => {
-              const selected = defaults[cat.key] === m.value;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMode(cat.key, m.value)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
-                    selected
-                      ? "border-brand-500 bg-brand-50 text-brand-600"
-                      : "border-surface-200 text-surface-600 hover:bg-surface-50"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedControl<Mode>
+            label={cat.label}
+            size="sm"
+            value={defaults[cat.key] as Mode}
+            onChange={(v) => setMode(cat.key, v)}
+            options={cat.modes.map((m) => ({ value: m.value, label: m.label }))}
+          />
         </div>
       ))}
       {conversationId && (

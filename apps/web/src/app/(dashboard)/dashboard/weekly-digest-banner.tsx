@@ -88,8 +88,10 @@ export function WeeklyDigestBanner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "dismiss", digestId: digest!.id }),
       });
-    } catch {
-      // Non-critical
+    } catch (err) {
+      // Non-critical: the banner is already hidden optimistically. Report so a
+      // persistent server-side dismiss failure is still observable.
+      captureException(err);
     }
   }
 

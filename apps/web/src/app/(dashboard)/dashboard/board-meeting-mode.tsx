@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { X, Download, Copy, Check, Presentation } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { Download, Copy, Check, Presentation, X } from "lucide-react";
+import { Overlay, IconButton } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
+import { useToast } from "@/components/ui/toast";
 import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
 import { useLocale } from "@/components/locale/locale-context";
 
@@ -226,9 +228,8 @@ export function BoardMeetingOverlay({
 }) {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const { fmtCompact, fmtDate } = useLocale();
+  const toast = useToast();
 
   // Safely build metrics with fallback defaults
   const safeData: BoardMeetingData = useMemo(() => ({
@@ -244,67 +245,48 @@ export function BoardMeetingOverlay({
   }), [data]);
   const metrics = buildMetrics(safeData, fmtCompact);
 
-  // Wait for client-side mount before rendering portal (avoids SSR/hydration mismatch)
-  useEffect(() => { setMounted(true); }, []);
-
-  // Lock body scroll while overlay is open
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, []);
-
-  // Close on Escape
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
   const handleCopy = useCallback(async () => {
     try {
       const text = toClipboardText(safeData, metrics);
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
       // Clipboard API may not be available in non-HTTPS contexts
+      toast.error(toUserMessage(err));
     }
-  }, [safeData, metrics]);
+  }, [safeData, metrics, toast]);
 
   const handleExportPDF = useCallback(async () => {
     setExporting(true);
     try {
       await generateBoardPDF(safeData, metrics, fmtDate);
-    } catch {
-      // PDF generation may fail if jspdf can't load — silently degrade
+    } catch (err) {
+      // PDF generation may fail if jspdf can't load — surface the failure
+      toast.error(toUserMessage(err));
     } finally {
       setExporting(false);
     }
-  }, [safeData, metrics]);
+  }, [safeData, metrics, fmtDate, toast]);
 
-  // Portal to document.body to escape any parent CSS transform containing blocks
-  // (e.g. animate-page-enter uses transform which breaks position:fixed)
-  if (!mounted) return null;
-  return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] animate-fade-in"
-        onClick={onClose}
-      />
-      {/* Modal */}
-      <div
-        ref={overlayRef}
-        className="fixed inset-0 flex items-center justify-center z-[60] p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Board Meeting Mode"
-      >
+  // <Overlay> owns the portal, scrim, Escape-to-close, focus-trap, scroll-lock
+  // and focus-restore (MODAL-SYS-01). Raised to z-[60] so it stacks over other
+  // overlays; scrim matches the original blurred backdrop.
+  return (
+    <Overlay
+      open
+      onClose={onClose}
+      ariaLabel="Board Meeting Mode"
+      className="z-[60]"
+      // Scrim styling is config passed to the shared <Overlay> primitive (which
+      // owns the portal/Escape/focus-trap); raised to z-[60] + blur to sit over
+      // other overlays.
+      scrimClassName="bg-black/60 fixed inset-0 backdrop-blur-sm z-[60] animate-fade-in"
+    >
+      {(panelProps) => (
         <div
-          className="bg-surface-0 rounded-2xl shadow-2xl border border-surface-200 w-full max-w-lg animate-scale-in"
-          onClick={(e) => e.stopPropagation()}
+          {...panelProps}
+          className="bg-surface-0 rounded-2xl shadow-2xl border border-surface-200 w-full max-w-lg animate-scale-in outline-none"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-surface-100">
@@ -314,12 +296,12 @@ export function BoardMeetingOverlay({
                 Financial Snapshot &mdash; {safeData.monthLabel}
               </p>
             </div>
-            <button
+            <IconButton
+              aria-label="Close"
               onClick={onClose}
-              className="rounded-lg p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+              size="lg"
+              icon={<X />}
+            />
           </div>
 
           {/* Metrics */}
@@ -380,9 +362,8 @@ export function BoardMeetingOverlay({
             </p>
           </div>
         </div>
-      </div>
-    </>,
-    document.body
+      )}
+    </Overlay>
   );
 }
 

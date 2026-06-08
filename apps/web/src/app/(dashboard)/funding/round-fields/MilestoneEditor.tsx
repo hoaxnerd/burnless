@@ -1,6 +1,7 @@
 "use client";
 
 import { CurrencyInput, SingleDateInput } from "@/components/forms/primitives";
+import { Input } from "@/components/ui";
 
 interface Milestone {
   id: string;
@@ -30,8 +31,9 @@ export function MilestoneEditor({ milestones, onChange }: MilestoneEditorProps) 
       <div className="text-sm font-medium">Milestones</div>
       {milestones.map((m, i) => (
         <div key={m.id} className="grid grid-cols-12 gap-2 items-end p-2 border rounded">
-          <input
-            className="col-span-4 input-sm"
+          <Input
+            className="col-span-4"
+            aria-label="Milestone label"
             placeholder="Milestone label"
             value={m.label}
             onChange={(e) => updateAt(i, { label: e.target.value })}

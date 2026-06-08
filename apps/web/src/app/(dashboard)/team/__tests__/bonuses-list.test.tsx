@@ -14,6 +14,21 @@ vi.mock("@/components/ui", () => ({
         {children}
       </div>
     ) : null,
+  Input: ({ label, error, showOptional, hint, ...props }: { label?: string; error?: string; showOptional?: boolean; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <label>
+      {label && <span>{label}</span>}
+      <input aria-label={label} {...props} />
+      {error && <span role="alert">{error}</span>}
+    </label>
+  ),
+  Select: ({ label, error, children, ...props }: { label?: string; error?: string; children?: React.ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) => (
+    <label>
+      {label && <span>{label}</span>}
+      <select aria-label={label} {...props}>{children}</select>
+      {error && <span role="alert">{error}</span>}
+    </label>
+  ),
+  useConfirm: () => ({ confirm: () => Promise.resolve(true), dialog: null }),
 }));
 vi.mock("@/components/locale/locale-context", () => ({
   useLocale: () => ({
@@ -100,7 +115,6 @@ describe("<BonusesList>", () => {
       ok: true,
       json: async () => ({}),
     });
-    window.confirm = vi.fn(() => true);
 
     render(
       <BonusesList
@@ -112,7 +126,6 @@ describe("<BonusesList>", () => {
     fireEvent.click(screen.getByTestId("delete-bonus-a"));
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(window.confirm).toHaveBeenCalled();
     const [url, init] = (apiFetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("/api/headcount/h1/bonuses/a");
     expect(init.method).toBe("DELETE");

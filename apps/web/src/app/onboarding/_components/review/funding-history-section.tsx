@@ -3,6 +3,7 @@ import { DollarSign, Sparkles } from "lucide-react";
 import type { FundingRound } from "../types";
 import { SectionCard, SuggestionCard } from "./primitives";
 import type { SuggestionListApi } from "./use-suggestions";
+import { Input, Select } from "@/components/ui";
 
 const ROUND_TYPE_OPTIONS = [
   { value: "pre_seed", label: "Pre-Seed" },
@@ -90,27 +91,29 @@ export function FundingHistorySection({ api, currencySymbol, fmtCurrency }: Prop
                 {isExpanded && (
                   <div className="border-t border-surface-200 dark:border-surface-700 p-4 grid grid-cols-2 gap-3 bg-surface-50/50 dark:bg-surface-900/50 rounded-b-xl">
                     <ExpandedField label="Round Name" colSpan={2}>
-                      <input
+                      <Input
+                        aria-label="Round Name"
                         type="text"
                         value={round.name}
                         onChange={(e) => api.updateField(round.id, "name", e.target.value)}
-                        className="w-full mt-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500"
+                        className="mt-1 px-3 py-1.5 text-xs"
                       />
                     </ExpandedField>
                     <ExpandedField label="Round Type">
-                      <select
+                      <Select
+                        aria-label="Round Type"
                         value={round.type}
                         onChange={(e) =>
                           api.updateField(round.id, "type", e.target.value as FundingRound["type"])
                         }
-                        className="w-full mt-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500"
+                        className="mt-1 px-3 py-1.5 text-xs"
                       >
                         {ROUND_TYPE_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </ExpandedField>
                     <ExpandedField label="Amount Raised">
                       <PrefixedNumber
@@ -120,11 +123,12 @@ export function FundingHistorySection({ api, currencySymbol, fmtCurrency }: Prop
                       />
                     </ExpandedField>
                     <ExpandedField label="Date Raised">
-                      <input
+                      <Input
+                        aria-label="Date Raised"
                         type="date"
                         value={round.date}
                         onChange={(e) => api.updateField(round.id, "date", e.target.value)}
-                        className="w-full mt-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500"
+                        className="mt-1 px-3 py-1.5 text-xs"
                       />
                     </ExpandedField>
                     <ExpandedField label="Pre-Money Valuation">
@@ -173,14 +177,15 @@ function PrefixedNumber({
 }) {
   return (
     <div className="relative mt-1">
-      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-surface-400">
+      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10 text-xs text-surface-400">
         {symbol}
       </span>
-      <input
+      <Input
+        aria-label="Amount"
         type="number"
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 pl-6 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500"
+        className="pl-6 pr-3 py-1.5 text-xs"
       />
     </div>
   );

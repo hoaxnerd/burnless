@@ -2,9 +2,11 @@
 
 import { useState, Suspense } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
+import { Input } from "@/components/ui";
 
 type Step = "request" | "sent" | "reset" | "success";
 
@@ -74,7 +76,7 @@ function ResetPasswordContent() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Could not reset password.");
+        setError(toUserMessage(data) || "Could not reset password.");
         setIsLoading(false);
         return;
       }
@@ -146,24 +148,16 @@ function ResetPasswordContent() {
 
           {step === "request" && (
             <form onSubmit={handleRequestReset} className="space-y-5">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-surface-700 mb-2"
-                >
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@startup.com"
-                  required
-                  autoFocus
-                  className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
-                />
-              </div>
+              <Input
+                id="email"
+                label="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@startup.com"
+                required
+                autoFocus
+              />
               <button
                 type="submit"
                 disabled={isLoading || !email}
@@ -211,14 +205,9 @@ function ResetPasswordContent() {
           {step === "reset" && (
             <form onSubmit={handleResetPassword} className="space-y-5">
               <div>
-                <label
-                  htmlFor="new-password"
-                  className="block text-sm font-medium text-surface-700 mb-2"
-                >
-                  New password
-                </label>
-                <input
+                <Input
                   id="new-password"
+                  label="New password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -226,7 +215,6 @@ function ResetPasswordContent() {
                   required
                   minLength={8}
                   autoFocus
-                  className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
                 />
                 {password.length > 0 && (
                   <div className="mt-2 flex items-center gap-2">
@@ -275,24 +263,16 @@ function ResetPasswordContent() {
                   </div>
                 )}
               </div>
-              <div>
-                <label
-                  htmlFor="confirm-password"
-                  className="block text-sm font-medium text-surface-700 mb-2"
-                >
-                  Confirm password
-                </label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  required
-                  minLength={8}
-                  className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
-                />
-              </div>
+              <Input
+                id="confirm-password"
+                label="Confirm password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter password"
+                required
+                minLength={8}
+              />
               <button
                 type="submit"
                 disabled={isLoading || password.length < 8}
