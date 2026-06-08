@@ -19,8 +19,50 @@ import { useScenario } from "@/components/scenarios/scenario-context";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { useToast } from "@/components/ui/toast";
 import { useLocale } from "@/components/locale/locale-context";
+import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
 import { apiFetch } from "@/lib/api-fetch";
+import {
+  useScenarios,
+  revalidate,
+  revalidateOnFinancialMutation,
+  KEYS,
+  type Scenario,
+} from "@/lib/swr";
 import type { ScenarioItem } from "./scenarios-view";
+
+/**
+ * Raw row shape from `GET /api/scenarios` — a superset of the SWR `Scenario`
+ * type (adds the override count + backup/auto-delete fields the cards need).
+ * Dates arrive as ISO strings over JSON.
+ */
+interface ScenarioRow {
+  id: string;
+  name: string;
+  description: string | null;
+  source: string;
+  status: string;
+  color: string | null;
+  overrideCount?: number;
+  autoDeleteAt?: string | null;
+  sourceScenarioId?: string | null;
+  createdAt: string;
+}
+
+/** Normalize a raw `/api/scenarios` row into the card view-model. */
+function toScenarioItem(s: ScenarioRow): ScenarioItem {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    source: s.source,
+    status: s.status,
+    color: s.color,
+    overrideCount: s.overrideCount ?? 0,
+    autoDeleteAt: s.autoDeleteAt ?? null,
+    sourceScenarioId: s.sourceScenarioId ?? null,
+    createdAt: s.createdAt,
+  };
+}
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
@@ -93,7 +135,11 @@ function DropdownItem({
 
 /* ── Main component ───────────────────────────────────────────────────── */
 
-export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
+export function ScenarioCards({
+  scenarios: initialScenarios,
+}: {
+  scenarios: ScenarioItem[];
+}) {
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
   const { fmtDate } = useLocale();
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -103,6 +149,29 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const router = useRouter();
   const toast = useToast();
+
+  // SCN-04: read the live scenario list from the shared SWR cache so a scenario
+  // created elsewhere (the New Scenario modal) appears without a hard reload.
+  // The server-rendered prop seeds `fallbackData`, so first paint matches SSR.
+  const {
+    data: rows,
+    error,
+    isLoading,
+    mutate: mutateScenarios,
+  } = useScenarios({
+    fallbackData: initialScenarios as unknown as Scenario[],
+  });
+
+  // Revalidate when ANY scenario-domain mutation fires on the bus — covers the
+  // create from the New Scenario modal (a different component) as well as the
+  // delete/duplicate below (PMR-1, preserving the "other" domain exclusion).
+  useEffect(() => {
+    return revalidateOnFinancialMutation([KEYS.scenarios]);
+  }, []);
+
+  const scenarios: ScenarioItem[] = (rows ?? []).map((s) =>
+    toScenarioItem(s as ScenarioRow),
+  );
 
   /* ── Actions ─────────────────────────────────────────────────────── */
 
@@ -117,6 +186,7 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
         throw new Error(body?.error ?? "Failed to duplicate scenario");
       }
       toast.success("Scenario duplicated");
+      await revalidate(KEYS.scenarios);
       router.refresh();
     } catch (err) {
       toast.error(
@@ -190,6 +260,19 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   const activeScenarios = nonBackup.filter((s) => s.status === "active");
   const promotedScenarios = nonBackup.filter((s) => s.status === "promoted");
   const archivedScenarios = nonBackup.filter((s) => s.status === "archived");
+
+  /* ── Error state (ESL-3) ────────────────────────────────────────── */
+
+  if (error && scenarios.length === 0) {
+    return (
+      <DataLoadError
+        message={"We couldn't load your scenarios."}
+        variant={classifyError(error)}
+        onRetry={() => void mutateScenarios()}
+        retrying={isLoading}
+      />
+    );
+  }
 
   /* ── Empty state ────────────────────────────────────────────────── */
 

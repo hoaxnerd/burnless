@@ -1,58 +1,33 @@
 "use client";
 
 import { AlertTriangle, X, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
 import { useScenario } from "./scenario-context";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
+import { useScenario as useScenarioSWR, useOverrideCount } from "@/lib/swr";
 
 export function ScenarioBanner() {
   const { isInScenarioMode, activeScenarioId, activeScenarioName, exitScenario } = useScenario();
-  const [fetchedName, setFetchedName] = useState<string | undefined>(undefined);
-  const [fetchedCount, setFetchedCount] = useState<number | null>(null);
   const router = useRouter();
 
+  // If we have an ID but no name (e.g. direct URL navigation), read it from the
+  // shared SWR cache rather than a private snapshot fetch — only when the context
+  // didn't already supply a name.
+  const { data: fetchedScenario } = useScenarioSWR(
+    activeScenarioId && !activeScenarioName ? activeScenarioId : null,
+  );
+
+  // Live override count via the shared SWR cache (SCN-05). Keyed on the scenario
+  // id, so a delete/add of an override on any surface revalidates this badge
+  // (KEYS.scenarioOverrideCount) without a reload.
+  const { data: countData } = useOverrideCount(activeScenarioId ?? null);
+
   // Derive display name: prefer context name, fall back to fetched name
-  const resolvedName = activeScenarioName ?? fetchedName;
+  const resolvedName = activeScenarioName ?? fetchedScenario?.name;
 
   // Derive override count: only valid when there is an active scenario
-  const overrideCount = activeScenarioId ? fetchedCount : null;
-
-  // If we have an ID but no name (e.g., direct URL navigation), fetch it
-  useEffect(() => {
-    if (!activeScenarioId || activeScenarioName) return;
-    let cancelled = false;
-    apiFetch(`/api/scenarios/${activeScenarioId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.name) setFetchedName(data.name);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [activeScenarioId, activeScenarioName]);
-
-  // Fetch live override count
-  useEffect(() => {
-    if (!activeScenarioId) return;
-
-    let cancelled = false;
-
-    apiFetch(`/api/scenarios/overrides?scenarioId=${activeScenarioId}&count=true`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data && typeof data.count === "number") {
-          setFetchedCount(data.count);
-        }
-      })
-      .catch(() => {
-        // Endpoint may not exist yet — leave count as null
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeScenarioId]);
+  const overrideCount =
+    activeScenarioId && typeof countData?.count === "number" ? countData.count : null;
 
   if (!isInScenarioMode) return null;
 

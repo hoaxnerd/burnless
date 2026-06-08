@@ -3,18 +3,19 @@
 import { useEffect, useState } from "react";
 import { Eye, Pencil, Trash2, Globe, MonitorPlay, RotateCcw } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useAiPermissions, revalidate, KEYS } from "@/lib/swr";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui";
 
 type Mode = "ask" | "session" | "always";
 
-interface Defaults {
+type Defaults = {
   readMode: Mode;
   writeMode: Mode;
   deleteMode: "ask" | "session";
   webSearchMode: Mode;
   browserUseMode: Mode;
-}
+};
 
 const FULL_MODES: { value: Mode; label: string }[] = [
   { value: "ask", label: "Ask" },
@@ -38,26 +39,22 @@ const CATEGORIES: {
 ];
 
 export function AiPermissionsPanel({ conversationId }: { conversationId: string | null }) {
-  const [defaults, setDefaults] = useState<Defaults | null>(null);
+  const { data, error } = useAiPermissions();
+  // Local optimistic overlay on top of the SWR-loaded defaults so segmented
+  // controls react instantly; reconciled with the cache on the next revalidation.
+  const [overlay, setOverlay] = useState<Partial<Defaults>>({});
   const [saving, setSaving] = useState(false);
 
+  // Reset the optimistic overlay whenever fresh server data arrives.
   useEffect(() => {
-    let active = true;
-    apiFetch("/api/ai/permissions")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (active && j) setDefaults(j.defaults);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+    setOverlay({});
+  }, [data]);
+
+  const defaults: Defaults | null = data ? { ...data.defaults, ...overlay } : null;
 
   async function setMode(key: keyof Defaults, value: Mode) {
     if (!defaults) return;
-    const next = { ...defaults, [key]: value } as Defaults;
-    setDefaults(next);
+    setOverlay((prev) => ({ ...prev, [key]: value }));
     setSaving(true);
     try {
       await apiFetch("/api/ai/permissions", {
@@ -65,6 +62,7 @@ export function AiPermissionsPanel({ conversationId }: { conversationId: string 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [key]: value }),
       });
+      await revalidate(KEYS.aiPermissions);
     } finally {
       setSaving(false);
     }
@@ -77,6 +75,14 @@ export function AiPermissionsPanel({ conversationId }: { conversationId: string 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversationId }),
     });
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-red-500">
+        Could not load permissions. Reopen this panel to retry.
+      </div>
+    );
   }
 
   if (!defaults) {

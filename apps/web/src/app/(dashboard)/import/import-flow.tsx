@@ -8,6 +8,7 @@ import Papa from "papaparse";
 import { Button, Select } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { extractApiError, toUserMessage } from "@/lib/api-error";
+import { useImports, useAccounts, revalidate, KEYS } from "@/lib/swr";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { autoMapColumns, resolveAmount } from "./import-utils";
 import type {
@@ -37,7 +38,6 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
   const [fundingPreview, setFundingPreview] = useState<Array<Record<string, unknown>>>([]);
   const [targetAccountId, setTargetAccountId] = useState("");
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [preview, setPreview] = useState<PreviewTransaction[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,41 +45,34 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const [dragActive, setDragActive] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<ImportBatch[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [showBankSync, setShowBankSync] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  const loadAccounts = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/accounts");
-      if (res.ok) {
-        const data = await res.json();
-        setAccounts(data);
-        if (data.length > 0 && !targetAccountId) setTargetAccountId(data[0].id);
-      }
-    } catch (e) {
-      toast.error(toUserMessage(e));
-    }
-  }, [targetAccountId, toast]);
+  // Accounts dropdown (target-account picker) — shared SWR cache, so an account
+  // created elsewhere shows up here without a reload.
+  const { data: accountsData, error: accountsError } = useAccounts();
+  const accounts = (accountsData ?? []) as unknown as AccountOption[];
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    try {
-      const res = await apiFetch("/api/imports");
-      if (res.ok) {
-        const json = await res.json();
-        setHistory(json.data ?? json);
-      }
-    } catch (e) {
-      toast.error(toUserMessage(e));
-    }
-    finally { setHistoryLoading(false); }
-  }, [toast]);
+  // Default the target account to the first one once accounts load.
+  useEffect(() => {
+    if (accounts.length > 0 && !targetAccountId) setTargetAccountId(accounts[0]!.id);
+  }, [accounts, targetAccountId]);
 
-  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => {
+    if (accountsError) toast.error(toUserMessage(accountsError));
+  }, [accountsError, toast]);
+
+  // DATA-02: import history from the shared SWR cache. Revalidated after every
+  // completed import / rollback so the History panel never shows a stale list.
+  const {
+    data: importsData,
+    error: historyError,
+    isLoading: historyLoading,
+    mutate: mutateImports,
+  } = useImports();
+  const history = (importsData?.data ?? []) as unknown as ImportBatch[];
 
   const handleFile = useCallback(
     (file: File) => {
@@ -106,12 +99,13 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           const { mapping: autoMap, confidence } = autoMapColumns(parsedHeaders, { target });
           setMapping(autoMap as ColumnMapping);
           setMappingConfidence(confidence);
-          loadAccounts();
+          // Refresh the accounts dropdown before showing the Map step.
+          void revalidate(KEYS.accounts);
           setStep("map");
         },
       });
     },
-    [loadAccounts]
+    [target]
   );
 
   const handleDrop = useCallback(
@@ -190,6 +184,8 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       }
       const data = await res.json();
       setResult({ imported: data.imported, skipped: data.skipped, errors: data.errors ?? [] });
+      // DATA-02: refresh import history so the new batch appears immediately.
+      await mutateImports();
       setStep("result");
     } catch { setError("Import failed"); }
     finally { setLoading(false); }
@@ -295,6 +291,8 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       }
       const data = await res.json();
       setResult(data);
+      // DATA-02: refresh import history so the new batch appears immediately.
+      await mutateImports();
       setStep("result");
     } catch { setError("Import failed"); }
     finally { setLoading(false); }
@@ -303,7 +301,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const rollbackBatch = async (batchId: string) => {
     try {
       const res = await apiFetch(`/api/imports/${batchId}`, { method: "DELETE" });
-      if (res.ok) { loadHistory(); }
+      if (res.ok) { await mutateImports(); }
       else {
         setError(await extractApiError(res));
       }
@@ -363,7 +361,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="ghost" size="sm" icon={<History className="h-4 w-4" />}
-              onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
+              onClick={() => { setShowHistory(!showHistory); if (!showHistory) void mutateImports(); }}>
               History
             </Button>
             {/* TODO: Bank Sync — future release */}
@@ -375,17 +373,24 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       {embedded && (
         <div className="flex items-center gap-2 mb-4">
           <Button variant="ghost" size="sm" icon={<History className="h-4 w-4" />}
-            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
+            onClick={() => { setShowHistory(!showHistory); if (!showHistory) void mutateImports(); }}>
             History
           </Button>
           {/* TODO: Bank Sync — future release */}
         </div>
       )}
 
-      {showHistory && (
+      {showHistory && historyError ? (
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950 dark:text-danger-300">
+          <span>{toUserMessage(historyError)}</span>
+          <Button variant="ghost" size="sm" onClick={() => void mutateImports()}>
+            Retry
+          </Button>
+        </div>
+      ) : showHistory ? (
         <ImportHistoryPanel history={history} historyLoading={historyLoading}
           setShowHistory={setShowHistory} rollbackBatch={rollbackBatch} />
-      )}
+      ) : null}
       {/* TODO: Bank Sync — future release */}
 
       {/* Target selector — only visible on upload step (changing mid-flow would reset state) */}

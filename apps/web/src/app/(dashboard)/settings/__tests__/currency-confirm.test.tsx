@@ -1,11 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SWRConfig } from "swr";
+import { fetcher } from "@/lib/swr/fetcher";
+import type { ReactElement } from "react";
 
 // Mock apiFetch before importing the component
 vi.mock("@/lib/api-fetch", () => ({
   apiFetch: vi.fn(),
 }));
+
+// Render helper: the settings page reads company + integrations via the shared
+// SWR cache (DFL-01), so the page must be wrapped in an SWRConfig whose fetcher
+// routes through the mocked apiFetch. A fresh Map cache isolates each test.
+function renderWithSWR(ui: ReactElement) {
+  return render(
+    <SWRConfig
+      value={{
+        fetcher,
+        provider: () => new Map(),
+        dedupingInterval: 0,
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        errorRetryCount: 0,
+      }}
+    >
+      {ui}
+    </SWRConfig>,
+  );
+}
 
 // Mock useAiFlags (used by SettingsPage)
 vi.mock("@/components/ai/ai-feature-context", () => ({
@@ -79,8 +102,11 @@ describe("Currency change confirm dialog", () => {
       .mockResolvedValueOnce(integrationsGET)  // GET /api/integrations
       .mockResolvedValueOnce(conflictResponse) // PATCH → 409
       .mockResolvedValueOnce(successPatchResponse); // PATCH?confirm=true → 200
+    // Any trailing SWR revalidation (e.g. revalidate(KEYS.company) after save)
+    // resolves to the company GET shape so the fetcher never sees `undefined`.
+    mockApiFetch.mockResolvedValue(baseCompanyGET);
 
-    render(<SettingsPage />);
+    renderWithSWR(<SettingsPage />);
 
     // Wait for company data to load — currency select shows "USD (…)"
     // getByDisplayValue matches the currently selected option's text
@@ -128,8 +154,10 @@ describe("Currency change confirm dialog", () => {
       .mockResolvedValueOnce(baseCompanyGET)   // GET /api/company
       .mockResolvedValueOnce(integrationsGET)  // GET /api/integrations
       .mockResolvedValueOnce(conflictResponse); // PATCH → 409
+    // Any further SWR read resolves to the company shape (defensive default).
+    mockApiFetch.mockResolvedValue(baseCompanyGET);
 
-    render(<SettingsPage />);
+    renderWithSWR(<SettingsPage />);
 
     await waitFor(() =>
       expect(screen.getByDisplayValue(/^USD/)).toBeInTheDocument()
@@ -167,7 +195,10 @@ describe("Currency change confirm dialog", () => {
       screen.queryByText(/changing currency from USD to EUR/i)
     ).not.toBeInTheDocument();
 
-    // No 4th apiFetch call (only 3: GET company, GET integrations, PATCH)
-    expect(mockApiFetch).toHaveBeenCalledTimes(3);
+    // The PATCH (409) is not retried on cancel — exactly one PATCH was issued.
+    const patchCalls = (mockApiFetch.mock.calls as [string, RequestInit?][]).filter(
+      ([, init]) => init?.method === "PATCH",
+    );
+    expect(patchCalls).toHaveLength(1);
   });
 });

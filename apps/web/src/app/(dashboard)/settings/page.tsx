@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { apiFetch } from "@/lib/api-fetch";
+import { KEYS, revalidate } from "@/lib/swr";
 import { toUserMessage } from "@/lib/api-error";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
 import { type CompanyProfile, type ConnectedIntegration, tabs } from "./settings-data";
@@ -32,7 +34,6 @@ export default function SettingsPage() {
     businessModel: "saas",
     fiscalYearEnd: 12,
   });
-  const [companyLoaded, setCompanyLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -44,50 +45,40 @@ export default function SettingsPage() {
   type ConfirmState = { open: false } | { open: true; message: string };
   const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false });
 
-  // Integrations state
-  const [connectedIntegrations, setConnectedIntegrations] = useState<ConnectedIntegration[]>([]);
-  const [_integrationsLoaded, setIntegrationsLoaded] = useState(false);
   const [notifiedIntegrations, setNotifiedIntegrations] = useState<Set<string>>(new Set());
 
-  // Load company profile
-  useEffect(() => {
-    apiFetch("/api/company")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) {
-          const currency = data.currency || "USD";
-          setCompany({
-            name: data.name || "",
-            stage: data.stage || "pre_seed",
-            currency,
-            locale: data.locale || "en-US",
-            timezone: data.timezone || "America/New_York",
-            region: data.region || "us-east",
-            industry: data.industry,
-            businessModel: data.businessModel || "saas",
-            fiscalYearEnd: data.fiscalYearEnd ?? 12,
-          });
-          setLoadedCurrency(currency);
-        }
-        setCompanyLoaded(true);
-      })
-      .catch(() => setCompanyLoaded(true));
-  }, []);
+  // ── Reads on the shared SWR cache (DFL-01) ──────────────────────────────────
+  // Company profile is read-only here; the editable `company` state is seeded
+  // from this read below. The integrations list is derived straight from SWR so
+  // a connect/disconnect mutation revalidates it without a manual reload.
+  const { data: companyData, isLoading: companyLoading } =
+    useSWR<CompanyProfile & { currency?: string }>(KEYS.company);
+  const companyLoaded = !companyLoading && companyData !== undefined;
 
-  // Load integrations
-  const loadIntegrations = useCallback(() => {
-    apiFetch("/api/integrations")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        setConnectedIntegrations(data);
-        setIntegrationsLoaded(true);
-      })
-      .catch(() => setIntegrationsLoaded(true));
-  }, []);
+  const { data: integrationsData } = useSWR<ConnectedIntegration[]>(KEYS.integrations);
+  const connectedIntegrations = integrationsData ?? [];
 
+  // Seed the editable company form once the read resolves (and re-seed if the
+  // server copy changes). Local edits live in `company`; the SWR entry stays the
+  // canonical server snapshot.
   useEffect(() => {
-    loadIntegrations();
-  }, [loadIntegrations]);
+    if (!companyData) return;
+    const currency = companyData.currency || "USD";
+    setCompany({
+      name: companyData.name || "",
+      stage: companyData.stage || "pre_seed",
+      currency,
+      locale: companyData.locale || "en-US",
+      timezone: companyData.timezone || "America/New_York",
+      region: companyData.region || "us-east",
+      industry: companyData.industry,
+      businessModel: companyData.businessModel || "saas",
+      fiscalYearEnd: companyData.fiscalYearEnd ?? 12,
+    });
+    setLoadedCurrency(currency);
+  }, [companyData]);
+
+  const reloadIntegrations = () => revalidate(KEYS.integrations);
 
   // Save company profile — accepts an optional confirm flag for the 409 retry path
   const saveCompany = async (confirm = false) => {
@@ -118,6 +109,8 @@ export default function SettingsPage() {
         setLoadedCurrency(data.currency);
       }
       setConfirmState({ open: false });
+      // Keep the shared cache in sync with the saved profile (PMR-1).
+      void revalidate(KEYS.company);
     } catch {
       setSaveError("Failed to save");
     } finally {
@@ -128,7 +121,7 @@ export default function SettingsPage() {
   // Disconnect integration
   const disconnectIntegration = async (id: string) => {
     const res = await apiFetch(`/api/integrations/${id}`, { method: "DELETE" });
-    if (res.ok) loadIntegrations();
+    if (res.ok) reloadIntegrations();
   };
 
   const getIntegrationStatus = (type: string, implemented: boolean): "available" | "coming_soon" | "connected" => {

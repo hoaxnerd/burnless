@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useSecurityStatus, revalidate, KEYS } from "@/lib/swr";
 import {
   Shield,
   Lock,
@@ -19,13 +20,21 @@ import { toUserMessage } from "@/lib/api-error";
 
 type Step = "idle" | "loading" | "qr" | "backup" | "disable";
 
-interface TwoFactorStatus {
-  enabled: boolean;
-  loaded: boolean;
-}
-
 export function SecurityTab() {
-  const [tfa, setTfa] = useState<TwoFactorStatus>({ enabled: false, loaded: false });
+  // 2FA enrollment status now reads from the shared SWR cache (DFL-01).
+  // `enabledOverride` lets enable/disable flip the UI instantly; we also
+  // revalidate the cache key so any other consumer stays in sync.
+  const { data: statusData, error: statusError, isLoading } = useSecurityStatus();
+  const [enabledOverride, setEnabledOverride] = useState<boolean | null>(null);
+  const loaded = !isLoading && (statusData !== undefined || statusError !== undefined);
+  const enabled =
+    enabledOverride ?? (statusError ? false : statusData?.enabled ?? false);
+
+  const setEnabled = (next: boolean) => {
+    setEnabledOverride(next);
+    void revalidate(KEYS.twoFactorStatus);
+  };
+
   const [step, setStep] = useState<Step>("idle");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
@@ -36,26 +45,6 @@ export function SecurityTab() {
   const [copied, setCopied] = useState(false);
   const [disableCode, setDisableCode] = useState("");
 
-  // Load 2FA status on mount
-  const loadStatus = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/auth/two-factor/status");
-      if (res.ok) {
-        const data = await res.json();
-        setTfa({ enabled: data.enabled, loaded: true });
-      } else {
-        setTfa({ enabled: false, loaded: true });
-      }
-    } catch {
-      setTfa({ enabled: false, loaded: true });
-    }
-  }, []);
-
-  // Trigger load on first render
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
-
   const startSetup = async () => {
     setStep("loading");
     setError(null);
@@ -64,7 +53,7 @@ export function SecurityTab() {
       if (!res.ok) {
         const data = await res.json();
         if (data.error?.includes("already enabled")) {
-          setTfa({ enabled: true, loaded: true });
+          setEnabled(true);
           setStep("idle");
           return;
         }
@@ -96,7 +85,7 @@ export function SecurityTab() {
       }
       const data = await res.json();
       setBackupCodes(data.backupCodes);
-      setTfa({ enabled: true, loaded: true });
+      setEnabled(true);
       setStep("backup");
     } catch (err) {
       setError(toUserMessage(err));
@@ -119,7 +108,7 @@ export function SecurityTab() {
         const data = await res.json();
         throw new Error(data.error || "Failed to disable 2FA");
       }
-      setTfa({ enabled: false, loaded: true });
+      setEnabled(false);
       setStep("idle");
       setDisableCode("");
     } catch (err) {
@@ -151,15 +140,15 @@ export function SecurityTab() {
               </p>
             </div>
           </div>
-          {tfa.loaded && (
+          {loaded && (
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                tfa.enabled
+                enabled
                   ? "bg-success-50 text-success-700"
                   : "bg-surface-100 text-surface-500"
               }`}
             >
-              {tfa.enabled ? (
+              {enabled ? (
                 <>
                   <ShieldCheck className="h-3 w-3" />
                   Enabled
@@ -181,8 +170,16 @@ export function SecurityTab() {
           </div>
         )}
 
+        {/* ESL-3 — surface a read failure instead of silently showing "Disabled". */}
+        {statusError && enabledOverride === null && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-700">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            Couldn&apos;t load your two-factor status. Showing the default state — refresh to retry.
+          </div>
+        )}
+
         {/* Idle state — show enable/disable button */}
-        {step === "idle" && tfa.loaded && !tfa.enabled && (
+        {step === "idle" && loaded && !enabled && (
           <div className="space-y-4">
             <p className="text-sm text-surface-600">
               Protect your financial data with TOTP-based two-factor authentication.
@@ -199,7 +196,7 @@ export function SecurityTab() {
           </div>
         )}
 
-        {step === "idle" && tfa.loaded && tfa.enabled && (
+        {step === "idle" && loaded && enabled && (
           <div className="space-y-4">
             <p className="text-sm text-success-700 bg-success-50 rounded-lg px-3 py-2">
               Two-factor authentication is active. Your account requires a TOTP code on every login.

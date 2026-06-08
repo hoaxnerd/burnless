@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { apiFetch } from "@/lib/api-fetch";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 import { Button, Select } from "@/components/ui";
-import { extractApiError, toUserMessage } from "@/lib/api-error";
+import {
+  useScenarioComparison,
+  revalidateOnFinancialMutation,
+  KEYS,
+} from "@/lib/swr";
+import { toUserMessage } from "@/lib/api-error";
 import { MultiLineChart, VarianceBarChart, chartColors } from "@/components/charts";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
@@ -29,38 +33,34 @@ export function ComparisonView({
 }) {
   const [baseId, setBaseId] = useState(initialIds[0] ?? "");
   const [compareId, setCompareId] = useState(initialIds[1] ?? "");
-  const [data, setData] = useState<ComparisonData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("metrics");
 
-  const fetchComparison = useCallback(async () => {
-    if (!baseId || !compareId || baseId === compareId) {
-      setData(null);
-      return;
-    }
+  // SCN-05 / DFL-01: read the comparison (incl. the data-diff change counter)
+  // from the shared SWR cache instead of a hand-rolled fetch-in-effect snapshot,
+  // so an override edit elsewhere restales the diff without a manual reload.
+  // The hook nulls the key (and skips fetching) unless both ids are present and
+  // distinct — preserving the original "same scenario → no fetch" guard.
+  const canCompare = !!baseId && !!compareId && baseId !== compareId;
+  const {
+    data,
+    error: swrError,
+    isLoading,
+    mutate: mutateComparison,
+  } = useScenarioComparison<ComparisonData>(
+    canCompare ? baseId : null,
+    canCompare ? compareId : null,
+  );
 
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(
-        `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`
-      );
-      if (!res.ok) {
-        throw new Error(await extractApiError(res));
-      }
-      const json = await res.json();
-      setData(json);
-    } catch (e) {
-      setError(toUserMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [baseId, compareId]);
-
+  // Restale the comparison when any scenario-domain mutation fires (an override
+  // change on either scenario flips the diff). Preserves the "other" exclusion.
   useEffect(() => {
-    fetchComparison();
-  }, [fetchComparison]);
+    return revalidateOnFinancialMutation([
+      ...(canCompare ? [KEYS.scenarioComparison(baseId, compareId)] : []),
+    ]);
+  }, [canCompare, baseId, compareId]);
+
+  const loading = isLoading && canCompare;
+  const error = swrError ? toUserMessage(swrError) : null;
 
   if (scenarios.length < 1) {
     return (
@@ -154,8 +154,11 @@ export function ComparisonView({
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-6 flex items-center justify-between gap-4">
           <p className="text-sm text-red-700">{error}</p>
+          <Button variant="secondary" size="sm" onClick={() => void mutateComparison()}>
+            Retry
+          </Button>
         </div>
       )}
 

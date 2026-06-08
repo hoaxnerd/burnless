@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useAlerts } from "@/lib/swr";
 import { toUserMessage } from "@/lib/api-error";
 import Link from "next/link";
 import {
@@ -55,8 +56,14 @@ export function AiCommandCenter({
     }
   }, [isReady, loaded, reportWidgetReady, reportWidgetNotReady]);
 
-  const [alerts, setAlerts] = useState<AlertData[]>([]);
-  const [alertsLoaded, setAlertsLoaded] = useState(false);
+  const { data: alertsData, error: alertsError, isLoading: alertsLoading } = useAlerts();
+  // Only surface critical/warning anomalies in the command-center row.
+  const alerts: AlertData[] = (alertsData?.alerts ?? []).filter(
+    (a) => a.severity === "critical" || a.severity === "warning",
+  );
+  // "Loaded" once SWR settles (data or error) — an alerts fetch failure must not
+  // hide the rest of the command center, so we treat error as a settled empty row.
+  const alertsLoaded = !alertsLoading || Boolean(alertsError);
   const [query, setQuery] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [response, setResponse] = useState("");
@@ -65,25 +72,6 @@ export function AiCommandCenter({
   const inputRef = useRef<HTMLInputElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-
-  // Fetch anomaly alerts
-  useEffect(() => {
-    const controller = new AbortController();
-    apiFetch("/api/alerts", { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.alerts) {
-          setAlerts(
-            data.alerts.filter(
-              (a: AlertData) => a.severity === "critical" || a.severity === "warning",
-            ),
-          );
-        }
-      })
-      .catch(() => {})
-      .finally(() => setAlertsLoaded(true));
-    return () => controller.abort();
-  }, []);
 
   const insights = generateInsights(runway, burnRate, mrr, mrrGrowth, cash, currency, locale);
   const placeholder = getPlaceholder(runway, mrr, burnRate);

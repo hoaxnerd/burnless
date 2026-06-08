@@ -447,7 +447,14 @@ export function FundingRoundsList({
               notes: null,
               isProjected: editingRound.isProjected,
             }}
-            onClose={() => setEditingRound(null)}
+            // FUND-06: funding-details is RSC-backed (rounds come from a server
+            // prop), so refresh the route on close to pull the edited values into
+            // the card. The form calls onClose on a successful save; refreshing
+            // here is also a harmless no-op on Cancel.
+            onClose={() => {
+              setEditingRound(null);
+              router.refresh();
+            }}
           />
         </Modal>
       )}

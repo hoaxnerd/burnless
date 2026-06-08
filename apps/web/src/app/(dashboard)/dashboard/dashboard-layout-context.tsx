@@ -24,6 +24,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDashboardPreferences as useDashboardPreferencesSWR } from "@/lib/swr";
 import { useToast } from "@/components/ui/toast";
 import { toUserMessage } from "@/lib/api-error";
 import {
@@ -116,25 +117,30 @@ export function DashboardLayoutProvider({
     customMetrics: initialPreferences?.customMetrics ?? [],
   }));
 
-  // Load preferences from API if not provided server-side
+  // Load card preferences via the shared SWR cache when not provided
+  // server-side. Suspended (paused) when initialPreferences seeded state so
+  // SSR'd dashboards never refetch. ESL-3: a load error leaves the engine-default
+  // card config in place (this provider has no loading flag — defaults render).
+  const { data: swrPrefs } = useDashboardPreferencesSWR(
+    initialPreferences ? { isPaused: () => true } : undefined,
+  );
+
+  // Syncing local mutable prefs from the external SWR cache — sanctioned
+  // "sync from external system" effect-setState (cf. dashboard-shell). Optimistic
+  // edits flow through updatePrefs, so the state can't be purely derived.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (initialPreferences) return;
-    let cancelled = false;
-    apiFetch("/api/dashboard-preferences")
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setPrefs({
-          heroCards: data.heroCards?.length ? data.heroCards : DEFAULT_HERO_CARDS,
-          secondaryMetrics: data.secondaryMetrics?.length
-            ? data.secondaryMetrics
-            : DEFAULT_SECONDARY_METRICS,
-          customMetrics: data.customMetrics ?? [],
-        });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [initialPreferences]);
+    if (initialPreferences || !swrPrefs) return;
+    const data = swrPrefs;
+    setPrefs({
+      heroCards: data.heroCards?.length ? data.heroCards : DEFAULT_HERO_CARDS,
+      secondaryMetrics: data.secondaryMetrics?.length
+        ? data.secondaryMetrics
+        : DEFAULT_SECONDARY_METRICS,
+      customMetrics: data.customMetrics ?? [],
+    });
+  }, [initialPreferences, swrPrefs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Track pending save for beforeunload guard
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());

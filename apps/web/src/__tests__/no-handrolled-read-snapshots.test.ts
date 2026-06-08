@@ -55,6 +55,45 @@ const ALLOWED: { match: string; why: string }[] = [
     match: "/scenarios/scenario-context.tsx",
     why: "Intentional header-less adopt-cookie GET (DFL-02): must bypass apiFetch by design; not a snapshot read to migrate.",
   },
+  {
+    match: "/team/headcount-form.tsx",
+    why: "Heuristic false-positive: its useEffect only syncs local form state from the server-rendered `departments` prop (RSC-supplied, not a read-snapshot fetch), and its only apiFetch is the create/edit MUTATION. No read-in-effect to migrate; the form deliberately receives dropdown data from its RSC parent rather than client-fetching it.",
+  },
+  {
+    match: "/ai/page.tsx",
+    why: "AI companion: every apiFetch is chat-session logic (chat/history list+restore, per-conversation reload, insights POST-regen) owned by the chat-session provider — not a shareable cross-surface read snapshot, and there is no GET-read SWR hook for chat history. The flagged effects load/restore an in-progress conversation, which a generic SWR cache key would clobber. Migrating chat/scenario logic is explicitly out of scope for this surface.",
+  },
+  // ── Data-context-layer ratchet entries ─────────────────────────────────────
+  // These are NOT ad-hoc per-component snapshots: each is a single React CONTEXT
+  // PROVIDER (or a bespoke cache hook) that OWNS its domain's fetch+cache for its
+  // whole subtree — it is itself the single source. Converting to a plain SWR
+  // read would be a larger architectural change (optimistic writes, retry/save
+  // queues, localStorage merge, grace-period tickers) with no staleness symptom,
+  // because the provider is mounted once and feeds its value down via context.
+  {
+    match: "/components/locale/locale-context.tsx",
+    why: "LocaleProvider — the app-wide currency/locale data-layer. Its one effect fetches /api/company once and transforms the row into LocaleSettings fed to every formatter via context. It is the single source for its subtree, not a per-component snapshot; currency changes already drive a full settings flow, so there is no cross-surface staleness symptom to fix.",
+  },
+  {
+    match: "/components/providers/metrics-context.tsx",
+    why: "MetricsProvider — THE single source for card-mode switching + per-card scenario/slot overrides. It does far more than a read: merges /api/dashboard-preferences with localStorage, applies optimistic per-card writes, and owns a retry+beforeunload save queue. A plain useDashboardPreferences SWR read would discard that write machinery; it is the context/data-layer owner, not a snapshot.",
+  },
+  {
+    match: "/components/providers/page-layout-context.tsx",
+    why: "PageLayoutProvider — per-pageId layout data-layer. Owns its own save queue, beforeunload guard, and server-initial-layouts hydration; its lone read effect only runs when no server-initial data was supplied. Single provider owning its domain's persistence, not a per-component read snapshot.",
+  },
+  {
+    match: "/components/ai/ai-feature-context.tsx",
+    why: "AiFeatureProvider — single source for AI feature flags + credits + (masked) provider config from /api/ai-features. Owns optimistic updateFlags with rollback; there is no GET-read SWR hook for ai-features, and the provider is mounted once and fed down via context. Data-layer owner, not a snapshot.",
+  },
+  {
+    match: "/components/ai/use-insight-cache.ts",
+    why: "Bespoke stale-while-revalidate insight cache: grace-period countdown ticker, mutation-bus subscription, single-flight auto-regen, and a POST regen path. A generic SWR cache key would clobber the in-progress generation/grace state (same rationale as ai/page.tsx). It IS the insight read+cache layer, not an ad-hoc snapshot.",
+  },
+  {
+    match: "/components/ai/use-proactive-alerts.ts",
+    why: "Heuristic false-positive: it has no read-snapshot useState — the matched `set[A-Z]` is `setTimeout`, and the alerts payload is consumed-and-discarded into staggered toasts with sessionStorage dedupe (fire-once-per-session side effect), not stored for render. SWR revalidation would re-fire toasts. Nothing to migrate.",
+  },
 ];
 
 function isAllowed(file: string): boolean {
