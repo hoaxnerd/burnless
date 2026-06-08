@@ -15,7 +15,7 @@ import {
   type ComputedMetrics,
   type ResolvedSlotData,
 } from "@burnless/engine";
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatNumber, formatPercent, type CurrencyCode } from "@burnless/types";
 
 /**
  * Metric-level dynamic sub-label (a value-derived description) for a metric.
@@ -208,14 +208,14 @@ export function buildSlotMetricCard(
       // Show as "+5.0pp" (percentage points)
       const diff = currentVal - prevVal;
       if (diff !== 0 && Number.isFinite(diff)) {
-        change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+        change = `${diff >= 0 ? "+" : ""}${formatNumber(diff, locale, { decimals: 1 })}pp`;
         changeLabel = "vs last month";
       }
     } else {
       // Show as "+12.5%" (percentage change)
       const pct = pctChange(currentVal, prevVal) ?? 0;
       if (pct !== 0 && Number.isFinite(pct)) {
-        change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+        change = `${pct >= 0 ? "+" : ""}${formatPercent(pct, locale, 1)}`;
         changeLabel = "vs last month";
       }
     }

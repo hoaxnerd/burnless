@@ -7,7 +7,7 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { METRIC_REGISTRY, pctOfTotal } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, formatPercent } from "@burnless/types";
 import type { CurrencyCode } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { TeamView } from "./team-view";
@@ -197,7 +197,7 @@ async function TeamContent({ companyId, scenarioId, scenarioName, companyBenefit
       content: { type: "metric", slug: "monthlyPeopleCost" },
       label: "Monthly People Cost",
       value: formatCurrency(totalMonthlyCost, currency, undefined, { compact: true }),
-      description: costPercentOfBurn > 0 ? `${costPercentOfBurn.toFixed(0)}% of total burn` : "Incl. salary + benefits",
+      description: costPercentOfBurn > 0 ? `${formatPercent(costPercentOfBurn, undefined, 0)} of total burn` : "Incl. salary + benefits",
       hasData: totalMonthlyCost > 0,
       metricStyle: { icon: "DollarSign", color: "emerald", href: "/team" },
     },

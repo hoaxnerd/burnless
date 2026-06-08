@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
+import { ratioToPct } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { ScenarioBadge } from "./scenario-badge";
 import { Skeleton } from "@/components/ui";
@@ -77,7 +79,7 @@ function formatValue(value: unknown): string {
   if (typeof value === "number") {
     // Format percentages nicely
     if (Math.abs(value) < 1 && value !== 0) {
-      return `${(value * 100).toFixed(1)}%`;
+      return formatPercent(ratioToPct(value));
     }
     return value.toLocaleString();
   }

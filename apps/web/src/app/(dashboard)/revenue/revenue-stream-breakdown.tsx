@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { Pencil, Trash2 } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
+import { useLocale } from "@/components/locale/locale-context";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, Modal, useConfirm } from "@/components/ui";
 import { toUserMessage } from "@/lib/api-error";
@@ -60,6 +61,7 @@ export function RevenueStreamBreakdown({
   scenarioId,
 }: RevenueStreamBreakdownProps) {
   const router = useRouter();
+  const { fmtPercent } = useLocale();
   const { error: toastError } = useToast();
   const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
@@ -181,7 +183,7 @@ export function RevenueStreamBreakdown({
                         {formatCompactCurrency(stream.currentRevenue)}
                       </span>
                       <span className={`text-[10px] font-medium ${changeColor}`}>
-                        {changeIcon}{Math.abs(ratioToPct(stream.changePercent)).toFixed(0)}%
+                        {changeIcon}{fmtPercent(Math.abs(ratioToPct(stream.changePercent)), 0)}
                       </span>
                       {/* Edit/delete actions — visible on hover. Hidden for the
                           synthetic residual row (not a DB entity; would 404). */}

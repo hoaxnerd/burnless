@@ -157,7 +157,7 @@ export function RevenueStreamsList({
 }
 
 function StreamParams({ type, params }: { type: string; params: Record<string, unknown> }) {
-  const { fmtCurrency } = useLocale();
+  const { fmtCurrency, fmtPercent } = useLocale();
 
   if (type === "subscription") {
     const price = params.monthlyPrice ?? 0;
@@ -165,7 +165,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const churn = params.monthlyChurnRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        {fmtCurrency(Number(price))}/mo &middot; {Number(customers)} customers &middot; {ratioToPct(Number(churn)).toFixed(1)}% churn
+        {fmtCurrency(Number(price))}/mo &middot; {Number(customers)} customers &middot; {fmtPercent(ratioToPct(Number(churn)), 1)} churn
       </span>
     );
   }
@@ -201,7 +201,7 @@ function StreamParams({ type, params }: { type: string; params: Record<string, u
     const takeRate = params.takeRate ?? 0;
     return (
       <span className="text-xs text-surface-600">
-        GMV {fmtCurrency(Number(gmv))} &times; {ratioToPct(Number(takeRate)).toFixed(1)}% take rate
+        GMV {fmtCurrency(Number(gmv))} &times; {fmtPercent(ratioToPct(Number(takeRate)), 1)} take rate
       </span>
     );
   }

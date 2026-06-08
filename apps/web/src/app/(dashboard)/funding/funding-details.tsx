@@ -66,6 +66,7 @@ interface OwnershipChartProps {
 }
 
 export function OwnershipChart({ foundersOwnership, completedRounds }: OwnershipChartProps) {
+  const { fmtPercent } = useLocale();
   const capTableSegments = useMemo(() => {
     const segments: Array<{ label: string; percent: number; color: string }> = [];
     segments.push({ label: "Founders", percent: foundersOwnership, color: segmentColors[0]! });
@@ -139,7 +140,7 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-2xl font-bold tabular-nums text-surface-900">
-              {foundersOwnership.toFixed(0)}%
+              {fmtPercent(foundersOwnership, 1)}
             </span>
             <span className="text-[10px] text-surface-400 uppercase tracking-wider">
               Founders
@@ -159,7 +160,7 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
               <span className="text-xs text-surface-600">{seg.label}</span>
             </div>
             <span className="text-xs tabular-nums font-medium text-surface-900">
-              {seg.percent.toFixed(1)}%
+              {fmtPercent(seg.percent, 1)}
             </span>
           </div>
         ))}
@@ -194,7 +195,7 @@ export function FundingRoundsList({
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
-  const { fmtDate } = useLocale();
+  const { fmtDate, fmtPercent } = useLocale();
   const toast = useToast();
   const router = useRouter();
   // Edit modal state
@@ -327,7 +328,7 @@ export function FundingRoundsList({
                             )}
                             {round.dilutionPercent && (
                               <span className="text-[10px] text-surface-400">
-                                {round.dilutionPercent.toFixed(1)}% dilution
+                                {fmtPercent(round.dilutionPercent, 1)} dilution
                               </span>
                             )}
                           </div>
@@ -403,7 +404,7 @@ export function FundingRoundsList({
                           </p>
                           {round.dilutionPercent && (
                             <span className="text-[10px] text-surface-400 italic">
-                              ~{round.dilutionPercent.toFixed(0)}% dilution
+                              ~{fmtPercent(round.dilutionPercent, 1)} dilution
                             </span>
                           )}
                         </div>
@@ -472,6 +473,7 @@ export function DilutionCalculator({
   calcDilution: { dilution: number; postMoney: number; newOwnership: number };
   currency: CurrencyCode;
 }) {
+  const { fmtPercent } = useLocale();
   return (
     <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
       <div className="px-6 py-5 border-b border-surface-100">
@@ -532,7 +534,7 @@ export function DilutionCalculator({
               Dilution
             </p>
             <p className="text-xl font-bold tabular-nums text-danger-600">
-              {calcDilution.dilution.toFixed(1)}%
+              {fmtPercent(calcDilution.dilution, 1)}
             </p>
           </div>
           <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
@@ -548,10 +550,10 @@ export function DilutionCalculator({
               New Founder %
             </p>
             <p className="text-xl font-bold tabular-nums text-brand-600">
-              {calcDilution.newOwnership.toFixed(1)}%
+              {fmtPercent(calcDilution.newOwnership, 1)}
             </p>
             <p className="text-[10px] text-surface-400 mt-0.5">
-              was {foundersOwnership.toFixed(1)}%
+              was {fmtPercent(foundersOwnership, 1)}
             </p>
           </div>
         </div>

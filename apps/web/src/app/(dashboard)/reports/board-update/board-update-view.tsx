@@ -12,6 +12,7 @@ import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
 import { useLocale } from "@/components/locale/locale-context";
+import { formatPercent } from "@burnless/types";
 import type { ResolvedSlotData } from "@burnless/engine";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
 
@@ -45,7 +46,8 @@ interface BoardData {
   };
   cash: {
     position: number;
-    burnRate: number;
+    // FMT-3: the net burn series (max(0, gross − revenue)); never the gross series.
+    netBurnRate: number;
     runway: number;
     totalFunding: number;
     netIncome: number;
@@ -80,9 +82,9 @@ function formatMonthYear(monthKey: string, fmtDate: FmtDate): string {
 function generateRevenueNarrative(r: BoardData["revenue"]): string {
   const parts: string[] = [];
   if (r.growthPercent > 0) {
-    parts.push(`Revenue grew ${r.growthPercent.toFixed(1)}% month-over-month to ${formatCompactCurrency(r.current)}/mo.`);
+    parts.push(`Revenue grew ${formatPercent(r.growthPercent)} month-over-month to ${formatCompactCurrency(r.current)}/mo.`);
   } else if (r.growthPercent < 0) {
-    parts.push(`Revenue declined ${Math.abs(r.growthPercent).toFixed(1)}% to ${formatCompactCurrency(r.current)}/mo.`);
+    parts.push(`Revenue declined ${formatPercent(Math.abs(r.growthPercent))} to ${formatCompactCurrency(r.current)}/mo.`);
   } else {
     parts.push(`Revenue held steady at ${formatCompactCurrency(r.current)}/mo.`);
   }
@@ -90,9 +92,9 @@ function generateRevenueNarrative(r: BoardData["revenue"]): string {
   if (r.hasSaaS) {
     parts.push(`MRR stands at ${formatCompactCurrency(r.mrr)} (ARR: ${formatCompactCurrency(r.arr)}) across ${Math.round(r.customers)} customers at ${formatCompactCurrency(r.arpa)} ARPA.`);
     if (r.churnRate > 5) {
-      parts.push(`Churn at ${r.churnRate.toFixed(1)}% requires attention.`);
+      parts.push(`Churn at ${formatPercent(r.churnRate)} requires attention.`);
     } else if (r.churnRate > 0) {
-      parts.push(`Churn is healthy at ${r.churnRate.toFixed(1)}%.`);
+      parts.push(`Churn is healthy at ${formatPercent(r.churnRate)}.`);
     }
   }
 
@@ -102,16 +104,16 @@ function generateRevenueNarrative(r: BoardData["revenue"]): string {
 function generateExpenseNarrative(e: BoardData["expenses"]): string {
   const parts: string[] = [];
   if (e.changePercent > 5) {
-    parts.push(`Total spend increased ${e.changePercent.toFixed(1)}% to ${formatCompactCurrency(e.current)}/mo.`);
+    parts.push(`Total spend increased ${formatPercent(e.changePercent)} to ${formatCompactCurrency(e.current)}/mo.`);
   } else if (e.changePercent < -5) {
-    parts.push(`Spend decreased ${Math.abs(e.changePercent).toFixed(1)}% to ${formatCompactCurrency(e.current)}/mo — good cost discipline.`);
+    parts.push(`Spend decreased ${formatPercent(Math.abs(e.changePercent))} to ${formatCompactCurrency(e.current)}/mo — good cost discipline.`);
   } else {
     parts.push(`Spend is stable at ${formatCompactCurrency(e.current)}/mo.`);
   }
 
   if (e.topCategories.length > 0) {
     const top = e.topCategories[0]!;
-    parts.push(`Largest category: ${top.subcategory} at ${formatCompactCurrency(top.amount)} (${top.percentage.toFixed(0)}% of total).`);
+    parts.push(`Largest category: ${top.subcategory} at ${formatCompactCurrency(top.amount)} (${formatPercent(top.percentage, undefined, 0)} of total).`);
   }
 
   if (e.anomalyCount > 0) {
@@ -125,8 +127,8 @@ function generateCashNarrative(c: BoardData["cash"]): string {
   const parts: string[] = [];
   parts.push(`Cash position: ${formatCompactCurrency(c.position)}.`);
 
-  if (c.burnRate > 0) {
-    parts.push(`Net burn rate: ${formatCompactCurrency(c.burnRate)}/mo.`);
+  if (c.netBurnRate > 0) {
+    parts.push(`Net burn rate: ${formatCompactCurrency(c.netBurnRate)}/mo.`);
     if (c.runway > 36) {
       parts.push("Runway exceeds 36 months — strong position.");
     } else if (c.runway >= 18) {
@@ -274,7 +276,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                 </div>
                 <div className="rounded-lg border border-surface-200 p-3">
                   <p className="text-[10px] font-medium text-surface-500 uppercase">Churn</p>
-                  <p className="text-lg font-bold text-surface-900 tabular-nums">{d.revenue.churnRate.toFixed(1)}%</p>
+                  <p className="text-lg font-bold text-surface-900 tabular-nums">{formatPercent(d.revenue.churnRate)}</p>
                 </div>
               </div>
             </div>
@@ -332,7 +334,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
               </div>
               <div className="rounded-lg border border-surface-200 p-3">
                 <p className="text-[10px] font-medium text-surface-500 uppercase">Net Burn Rate</p>
-                <p className="text-lg font-bold text-surface-900 tabular-nums">{formatCompactCurrency(d.cash.burnRate)}/mo</p>
+                <p className="text-lg font-bold text-surface-900 tabular-nums">{formatCompactCurrency(d.cash.netBurnRate)}/mo</p>
               </div>
               <div className="rounded-lg border border-surface-200 p-3">
                 <p className="text-[10px] font-medium text-surface-500 uppercase">Runway</p>

@@ -40,6 +40,7 @@ vi.mock("@/components/locale/locale-context", () => ({
     locale: "en-US",
     fmtCurrency: (n: number) => `$${n.toFixed(2)}`,
     fmtCompact: (n: number) => `$${n}`,
+    fmtPercent: (n: number, decimals = 1) => `${n.toFixed(decimals)}%`,
     currencySettings: { currency: "USD", locale: "en-US" },
   }),
   LocaleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,

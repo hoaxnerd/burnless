@@ -22,10 +22,11 @@ interface RunwayViewProps {
   startingCash: number;
   companyName?: string;
   scenarioName?: string;
+  currentMonth: string;
   resolvedSlotData: ResolvedSlotData[];
 }
 
-export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, resolvedSlotData }: RunwayViewProps) {
+export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, startingCash, companyName, scenarioName, currentMonth, resolvedSlotData }: RunwayViewProps) {
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
     const map = new Map<string, ResolvedSlotData>();
@@ -33,9 +34,13 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
     return map;
   }, [resolvedSlotData]);
 
-  const latest = cashPosition[cashPosition.length - 1];
-  const latestBurn = netBurnRate[netBurnRate.length - 1];
-  const latestRunway = runway[runway.length - 1];
+  // FMT-2: read headline KPIs at the REAL current calendar month (currentMonth),
+  // not the end of the now-full-horizon series (Phase B horizon contract).
+  const atMonth = (series: MetricValue[]) =>
+    series.find((m) => m.month === currentMonth) ?? series[series.length - 1];
+  const latest = atMonth(cashPosition);
+  const latestBurn = atMonth(netBurnRate);
+  const latestRunway = atMonth(runway);
 
   // Find zero-cash month
   const zeroCashMonth = cashPosition.find((c) => c.value <= 0);
@@ -74,7 +79,7 @@ export function RunwayView({ cashPosition, netBurnRate, runway, grossBurnRate, s
       {
         startingCash,
         netBurnRate: latestBurn?.value ?? 0,
-        grossBurnRate: grossBurnRate[grossBurnRate.length - 1]?.value ?? 0,
+        grossBurnRate: atMonth(grossBurnRate)?.value ?? 0,
         runwayMonths: latestRunway?.value ?? 0,
         cashPosition,
       },

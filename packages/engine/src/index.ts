@@ -23,6 +23,7 @@ export {
   parseMonthKey,
   previousMonthKey,
   projectActualsForward,
+  valueAtMonth,
   round2,
   isActiveInMonth,
   proratedFraction,
@@ -88,6 +89,7 @@ export {
 export {
   computeHeadcountPlanCost,
   computeAllHeadcountCosts,
+  computeMemberMonthlyCost,
   reconcileHeadcountWithActuals,
   type HeadcountPlanInput,
   type HeadcountCostBreakdown,

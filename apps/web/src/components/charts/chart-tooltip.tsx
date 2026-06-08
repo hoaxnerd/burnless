@@ -1,6 +1,7 @@
 "use client";
 
 import { pctChange } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import { tooltipStyle, formatMonth, formatCompactCurrency } from "./chart-theme";
 
 /**
@@ -33,8 +34,10 @@ function computeMoMDelta(current: number, previous: number): string | null {
   if (previous === 0) return current > 0 ? "+∞" : null;
   const delta = pctChange(current, previous) ?? 0;
   if (!isFinite(delta)) return null;
+  // formatPercent renders a leading "-" for negatives; prepend "+" only for
+  // non-negatives so the downstream `startsWith("+"|"-")` coloring still works.
   const sign = delta >= 0 ? "+" : "";
-  return `${sign}${delta.toFixed(1)}%`;
+  return `${sign}${formatPercent(delta)}`;
 }
 
 export function MoMTooltipContent({

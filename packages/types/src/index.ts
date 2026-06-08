@@ -121,9 +121,20 @@ export function formatCompactAmount(
     return `${sign}${symbol}${abs.toFixed(0)}`;
   }
 
-  // Western numbering: millions and thousands
-  if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(0)}k`;
+  // Western numbering: millions and thousands.
+  // Promote to the M-tier whenever the value rounds to >= 1.0M at 1-decimal
+  // display precision — this catches sub-million values like 999_500 / 999_999
+  // that would otherwise render as "1000k" in the k-tier. Fractional thousands
+  // are preserved (1_500 -> "1.5k", never truncated to "2k").
+  if (abs >= 1_000_000 || Math.round(abs / 100_000) / 10 >= 1) {
+    return `${sign}${symbol}${(abs / 1_000_000).toFixed(1)}M`;
+  }
+  if (abs >= 1_000) {
+    // Keep 1 fractional digit but drop a trailing ".0" so round thousands
+    // render "$750k" (not "$750.0k") while "$1.5k" / "$12.3k" are preserved.
+    const k = (abs / 1_000).toFixed(1).replace(/\.0$/, "");
+    return `${sign}${symbol}${k}k`;
+  }
   return `${sign}${symbol}${abs.toFixed(0)}`;
 }
 

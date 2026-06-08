@@ -7,7 +7,8 @@ import { db } from "@burnless/db";
 import { fundingRounds, fundingRoundInvestors, companies } from "@burnless/db";
 import { mutateInsert, mutateUpdate, mutateDelete, planResultJson } from "./scenario-mutate";
 import { eq, and } from "drizzle-orm";
-import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatPercent, isValidCurrency, type CurrencyCode } from "@burnless/types";
+import { ratioToPct } from "@burnless/engine";
 import {
   CreateFundingRoundSchema,
   UpdateFundingRoundSchema,
@@ -260,6 +261,6 @@ export const modelDilution: ToolHandler = async (input, context) => {
     },
     capTable,
     existingRounds: data.existingRounds ?? [],
-    message: `Modeled dilution for ${formatCurrency(roundAmount, currency, locale)} round at ${formatCurrency(preMoneyValuation, currency, locale)} pre-money. Founders diluted from ${(existingOwnership * 100).toFixed(1)}% to ${(founderPostRound * 100).toFixed(1)}%.`,
+    message: `Modeled dilution for ${formatCurrency(roundAmount, currency, locale)} round at ${formatCurrency(preMoneyValuation, currency, locale)} pre-money. Founders diluted from ${formatPercent(ratioToPct(existingOwnership), locale, 1)} to ${formatPercent(ratioToPct(founderPostRound), locale, 1)}.`,
   });
 };

@@ -2,8 +2,10 @@
 
 import { ratioToPct } from "@burnless/engine";
 import type { CapTable } from "@burnless/engine";
+import { useLocale } from "@/components/locale/locale-context";
 
 export function CapTableView({ capTable }: { capTable: CapTable }) {
+  const { fmtPercent } = useLocale();
   const fd = capTable.totalFullyDiluted;
 
   return (
@@ -37,7 +39,7 @@ export function CapTableView({ capTable }: { capTable: CapTable }) {
               <td className="p-2">{r.holder}</td>
               <td className="p-2">{r.shareClass}</td>
               <td className="p-2 text-right">{r.shares.toLocaleString()}</td>
-              <td className="p-2 text-right">{ratioToPct(r.ownershipPercent).toFixed(2)}%</td>
+              <td className="p-2 text-right">{fmtPercent(ratioToPct(r.ownershipPercent), 2)}</td>
             </tr>
           ))}
         </tbody>
@@ -47,10 +49,11 @@ export function CapTableView({ capTable }: { capTable: CapTable }) {
 }
 
 function Stat({ label, pct }: { label: string; pct: number }) {
+  const { fmtPercent } = useLocale();
   return (
     <div className="p-3 border rounded">
       <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-semibold">{ratioToPct(pct).toFixed(1)}%</div>
+      <div className="text-2xl font-semibold">{fmtPercent(ratioToPct(pct), 1)}</div>
     </div>
   );
 }

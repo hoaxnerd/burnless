@@ -97,7 +97,9 @@ describe("BoardMeetingOverlay", () => {
 
   it("renders runway value", () => {
     render(<BoardMeetingOverlay data={sampleData} onClose={vi.fn()} />);
-    expect(screen.getByText("16.7 mo")).toBeInTheDocument();
+    // DASH-07: runway routes through the canonical formatMetricValue(_, "months"),
+    // which rounds to whole months (16.7 → "17 mo") for parity with the hero card.
+    expect(screen.getByText("17 mo")).toBeInTheDocument();
   });
 
   it("shows green signal for healthy runway (>12 months)", () => {

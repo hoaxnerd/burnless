@@ -37,6 +37,7 @@ import {
   type ProfitAndLoss,
   type CashFlowStatement,
   type BalanceSheet,
+  type WorkingCapitalAdjustments,
   addSeries,
   subtractSeries,
   monthKey,
@@ -471,6 +472,8 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
 
   // Add derived balance sheet accounts so generateBalanceSheet has data.
   const months = Array.from(netIncome.keys()).sort();
+  // A/P balance per month — built below, routed via workingCapitalAdjustments.
+  const accountsPayable: MonthlySeries = new Map();
   if (months.length > 0) {
     accountDataList.push({ id: "bs-cash", name: "Cash & Equivalents", category: "asset", values: cashPosition });
 
@@ -491,14 +494,25 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     accountDataList.push({ id: "bs-paid-in-capital", name: "Paid-in Capital", category: "equity", values: paidInCapital });
 
     // Liability: Accounts Payable — approximate as 1 month of total expenses (Net-30 terms).
-    const accountsPayable: MonthlySeries = new Map();
     for (const m of months) {
       accountsPayable.set(m, dRound2(D(totalExpenses.get(m) ?? 0)));
     }
-    accountDataList.push({ id: "bs-accounts-payable", name: "Accounts Payable", category: "liability", values: accountsPayable });
+    // RPT-01: route A/P through workingCapitalAdjustments (NOT a standalone
+    // liability AccountData row). The engine adds A/P to BOTH current liabilities
+    // AND current assets (cash held back because the bill is unpaid — the
+    // double-entry counterpart), so Assets == Liabilities + Equity holds.
+    // Injecting it only as a liability row would dangle the balance sheet.
   }
 
-  const balanceSheet = generateBalanceSheet(accountDataList);
+  const workingCapitalAdjustments: WorkingCapitalAdjustments = {
+    arChange: new Map(),
+    apChange: new Map(),
+    depreciation: new Map(),
+    accountsReceivable: new Map(),
+    accountsPayable,
+    capitalExpenditures: new Map(),
+  };
+  const balanceSheet = generateBalanceSheet(accountDataList, workingCapitalAdjustments);
 
   const hasData = fLines.length > 0 || revStreams.length > 0 || hcPlans.length > 0;
 

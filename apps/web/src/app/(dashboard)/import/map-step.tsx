@@ -2,6 +2,7 @@
 
 import { Sparkles, Check, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button, Select } from "@/components/ui";
+import { useLocale } from "@/components/locale/locale-context";
 import { confidenceColor, confidenceLabel, getAmountColumn } from "./import-utils";
 import type { ParsedRow, ColumnMapping, MappingConfidence, AccountOption } from "./import-utils";
 
@@ -36,6 +37,7 @@ export function MapStep({
   reset,
   generatePreview,
 }: MapStepProps) {
+  const { fmtNumber } = useLocale();
   const amountCol = getAmountColumn(mapping);
   const isSplitAmount = typeof mapping.amount === "object";
   const amountReady = isSplitAmount
@@ -267,14 +269,20 @@ export function MapStep({
               </thead>
               <tbody>
                 {rows.slice(0, 5).map((row, i) => {
+                  // DATA-07: both preview branches render the amount with the
+                  // same 2-decimal precision (split = credit \u2212 debit; single =
+                  // the parsed raw cell) so the column has no trailing-zero
+                  // inconsistency. Non-numeric cells fall back to the raw value.
                   let amountDisplay = "\u2014";
                   if (isSplitAmount) {
                     const { debit, credit } = mapping.amount as { debit: string; credit: string };
                     const d = parseFloat((row[debit] ?? "0").replace(/[$,\u20ac\u00a3()]/g, "")) || 0;
                     const c = parseFloat((row[credit] ?? "0").replace(/[$,\u20ac\u00a3()]/g, "")) || 0;
-                    amountDisplay = (c - d).toFixed(2);
+                    amountDisplay = fmtNumber(c - d, { decimals: 2 });
                   } else if (amountCol && row[amountCol]) {
-                    amountDisplay = row[amountCol]!;
+                    const raw = row[amountCol]!;
+                    const parsed = parseFloat(raw.replace(/[$,\u20ac\u00a3()]/g, ""));
+                    amountDisplay = Number.isFinite(parsed) ? fmtNumber(parsed, { decimals: 2 }) : raw;
                   }
                   return (
                     <tr key={i} className="border-b border-surface-100 dark:border-surface-700/50">

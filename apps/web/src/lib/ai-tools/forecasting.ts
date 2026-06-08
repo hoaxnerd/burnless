@@ -9,7 +9,8 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { CreateExpenseSchema, UpdateExpenseSchema } from "@burnless/ai";
 import { computeDashboardData } from "../compute-dashboard";
-import { seriesToArray } from "@burnless/engine";
+import { seriesToArray, ratioToPct } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import { getDefaultScenario } from "../data";
 import type { ToolContext, ToolHandler } from "./types";
 import {
@@ -246,7 +247,7 @@ async function forecastRevenue(
         ? (forecast[forecast.length - 1]!.projected - lastValue) / lastValue
         : null,
     },
-    message: `Projected ${months} months of revenue using ${effectiveMethod} method. Average historical growth: ${(avgGrowth * 100).toFixed(1)}%/month.`,
+    message: `Projected ${months} months of revenue using ${effectiveMethod} method. Average historical growth: ${formatPercent(ratioToPct(avgGrowth), undefined, 1)}/month.`,
   });
 }
 

@@ -9,7 +9,7 @@ import { computeExpenseDetails } from "@/lib/compute-expenses";
 import { seriesToArray, monthKey, METRIC_REGISTRY, pctChange, pctOfTotal, dSum } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
-import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatPercent, isValidCurrency, type CurrencyCode } from "@burnless/types";
 import { BoardUpdateView } from "./board-update-view";
 import { SetupPrompt, ScenarioPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
@@ -55,7 +55,9 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
   const currentNet = netIncome.get(currentMonth) ?? 0;
   const currentCash = cashPosition.get(currentMonth) ?? 0;
 
-  const burnRate = metrics.burnRate.find((m) => m.month === currentMonth)?.value ?? 0;
+  // FMT-3: "Net Burn" surfaces must bind the NET series (max(0, gross − revenue)),
+  // never gross burnRate. Net burn != gross burn whenever revenue > 0.
+  const netBurnRate = metrics.netBurnRate.find((m) => m.month === currentMonth)?.value ?? 0;
   const runway = metrics.cashRunwayMonths.find((m) => m.month === currentMonth)?.value ?? 0;
   const grossMargin = metrics.grossMarginPercent.find((m) => m.month === currentMonth)?.value ?? 0;
 
@@ -87,7 +89,8 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
     },
     cash: {
       position: currentCash,
-      burnRate,
+      // FMT-3: board-update-view renders this under a "Net Burn Rate" label.
+      netBurnRate,
       runway,
       totalFunding,
       netIncome: currentNet,
@@ -130,7 +133,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       content: { type: "metric", slug: "revenue" },
       label: "Revenue",
       value: formatCurrency(currentRev, currency, safeLocale, { compact: true }),
-      change: `${revGrowth > 0 ? "+" : ""}${revGrowth.toFixed(1)}%`,
+      change: `${revGrowth > 0 ? "+" : ""}${formatPercent(revGrowth)}`,
       changeLabel: "MoM",
       hasData: currentRev > 0,
       sparkData: spark(revTimeline),
@@ -140,9 +143,9 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       slotId: "metric-1",
       content: { type: "metric", slug: "netBurn" },
       label: "Net Burn",
-      value: formatCurrency(burnRate, currency, safeLocale, { compact: true }),
+      value: formatCurrency(netBurnRate, currency, safeLocale, { compact: true }),
       description: "/month",
-      hasData: burnRate > 0,
+      hasData: netBurnRate > 0,
       sparkData: spark(metrics.netBurnRate),
       metricStyle: { icon: "TrendingDown", color: "orange", href: "/reports/runway" },
     },
@@ -160,7 +163,7 @@ async function BoardUpdateContent({ companyId, scenarioId, companyName, scenario
       slotId: "metric-3",
       content: { type: "metric", slug: "grossMargin" },
       label: "Gross Margin",
-      value: `${grossMargin.toFixed(1)}%`,
+      value: formatPercent(grossMargin),
       description: grossMargin >= 60 ? "Healthy" : grossMargin >= 40 ? "Average" : "Below benchmark",
       hasData: true,
       sparkData: spark(metrics.grossMarginPercent),

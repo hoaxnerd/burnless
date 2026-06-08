@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { pctOfTotal } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import type { BudgetVsActuals, ResolvedSlotData } from "@burnless/engine";
 import { MultiLineChart, VarianceBarChart, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, ConnectedPageGrid, SwappableMetricCard, type DefaultLayoutItem } from "@/components/ui";
@@ -135,7 +136,7 @@ export function BudgetVsActualsView({ bva, resolvedSlotData }: { bva: BudgetVsAc
                       {formatCompactCurrency(varianceTotal)}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums ${isMostlyFavorable ? "text-green-600" : "text-red-600"}`}>
-                      {budgetTotal !== 0 ? `${pctOfTotal(varianceTotal, Math.abs(budgetTotal)).toFixed(1)}%` : "-"}
+                      {budgetTotal !== 0 ? formatPercent(pctOfTotal(varianceTotal, Math.abs(budgetTotal))) : "-"}
                     </td>
                   </tr>
                 );

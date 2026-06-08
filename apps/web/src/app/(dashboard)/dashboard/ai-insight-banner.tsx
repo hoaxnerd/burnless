@@ -4,6 +4,7 @@ import { AlertTriangle, TrendingUp, ArrowRight, Sparkles, ShieldAlert, Info } fr
 import Link from "next/link";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useLocale } from "@/components/locale/locale-context";
+import { formatPercent } from "@burnless/types";
 
 interface AiInsightBannerProps {
   runway: number;
@@ -151,14 +152,14 @@ function generateInsight(
   }
   if (mrrGrowth > 10) {
     return {
-      title: `Revenue surging ${mrrGrowth.toFixed(1)}% month-over-month`,
+      title: `Revenue surging ${formatPercent(mrrGrowth)} month-over-month`,
       message: `Exceptional growth trajectory. At this rate, you'll double revenue in ${Math.ceil(72 / mrrGrowth)} months.`,
       severity: "info",
     };
   }
   if (mrrGrowth > 5) {
     return {
-      title: `Healthy ${mrrGrowth.toFixed(1)}% MoM revenue growth`,
+      title: `Healthy ${formatPercent(mrrGrowth)} MoM revenue growth`,
       message: `Strong and sustainable growth. You're in the top quartile for early-stage startups.`,
       severity: "info",
     };

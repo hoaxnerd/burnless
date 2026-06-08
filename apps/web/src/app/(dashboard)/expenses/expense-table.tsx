@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import { formatCompactCurrency } from "@/components/charts";
+import { useLocale } from "@/components/locale/locale-context";
 import { Modal, Input, Select } from "@/components/ui";
 import { toUserMessage } from "@/lib/api-error";
 import { ExpenseFormModal } from "./expense-form-modal";
@@ -41,6 +42,7 @@ type SortDir = "asc" | "desc";
 
 export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete, onCategoryOverride }: ExpenseTableProps) {
   const router = useRouter();
+  const { fmtPercent } = useLocale();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "recurring" | "anomaly">("all");
@@ -537,7 +539,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     <td className="px-4 py-3 text-right">
                       <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
                         <span className="sr-only">{changeLabel}</span>
-                        {changeIcon} {Math.abs(ratioToPct(item.changePercent)).toFixed(0)}%
+                        {changeIcon} {fmtPercent(Math.abs(ratioToPct(item.changePercent)), 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

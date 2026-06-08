@@ -10,7 +10,7 @@ import { MultiLineChart, VarianceBarChart, chartColors } from "@/components/char
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
 import { ratioToPct } from "@burnless/engine";
-import type { CurrencyCode } from "@burnless/types";
+import { formatPercent, type CurrencyCode } from "@burnless/types";
 import type { ScenarioOption, ComparisonData, DataDiffGroup, DataDiffItem } from "./comparison-types";
 import { formatCurrency, formatMonth } from "./comparison-types";
 import { ComparisonRow } from "./comparison-row";
@@ -395,7 +395,7 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "\u2014";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") {
-    if (Math.abs(value) < 1 && value !== 0) return `${ratioToPct(value).toFixed(1)}%`;
+    if (Math.abs(value) < 1 && value !== 0) return formatPercent(ratioToPct(value));
     return value.toLocaleString();
   }
   if (typeof value === "object") return JSON.stringify(value);

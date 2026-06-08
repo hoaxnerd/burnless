@@ -145,6 +145,14 @@ export function sum(values: number[]): number {
 /** A monthly time series: month key -> value. */
 export type MonthlySeries = Map<string, number>;
 
+/**
+ * FMT-2: safe read of a single month from a series. Returns 0 when the month is
+ * absent (or the value is nullish), so callers never propagate `undefined`.
+ */
+export function valueAtMonth(series: MonthlySeries, month: string): number {
+  return series.get(month) ?? 0;
+}
+
 /** Create an empty monthly series for a date range. */
 export function emptySeries(start: Date | string, end: Date | string): MonthlySeries {
   const series: MonthlySeries = new Map();

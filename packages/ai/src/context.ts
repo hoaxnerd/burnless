@@ -107,10 +107,20 @@ interface ContextInput {
   expenseLines?: ExpenseLineLike[];
 }
 
-/** Get the latest value from a MetricValue array. */
-function latestMetricValue(values: Array<{ month: string; value: number }> | undefined): number | null {
+/**
+ * FMT-2: read a metric series at the REAL current calendar month (dashboard↔AI
+ * parity). After Phase B the series spans the full horizon, so the LAST element
+ * is an end-of-horizon projection, not "today" — the AI snapshot must read at
+ * `period.currentMonth`, matching the dashboard headline. Falls back to the last
+ * element when the month is absent.
+ */
+function metricValueAtMonth(
+  values: Array<{ month: string; value: number }> | undefined,
+  currentMonth: string,
+): number | null {
   if (!values || values.length === 0) return null;
-  return values[values.length - 1]!.value;
+  const atMonth = values.find((v) => v.month === currentMonth);
+  return (atMonth ?? values[values.length - 1]!).value;
 }
 
 /** Sum all values in a StatementLineItem's values array. */
@@ -122,25 +132,26 @@ function sumLineItem(values: Array<{ month: string; value: number }> | undefined
 /** Build the financial snapshot for AI context. */
 export function buildFinancialSnapshot(input: ContextInput): FinancialSnapshot {
   const { metrics, profitAndLoss } = input;
+  const cm = input.period.currentMonth;
 
   return {
     company: input.company,
     scenario: input.scenario,
     period: input.period,
     keyMetrics: {
-      mrr: latestMetricValue(metrics.mrr),
-      arr: latestMetricValue(metrics.arr),
-      burnRate: latestMetricValue(metrics.burnRate),
-      netBurn: latestMetricValue(metrics.netBurnRate),
-      runway: latestMetricValue(metrics.cashRunwayMonths),
-      cashPosition: latestMetricValue(metrics.cashPosition),
-      revenueGrowth: latestMetricValue(metrics.revenueGrowthRate),
-      grossMargin: latestMetricValue(metrics.grossMarginPercent),
-      headcount: latestMetricValue(metrics.revenuePerEmployee) !== null ? null : null, // Headcount comes from the series
-      ltv: latestMetricValue(metrics.ltv),
-      cac: latestMetricValue(metrics.cac),
-      ltvCacRatio: latestMetricValue(metrics.ltvCacRatio),
-      churnRate: latestMetricValue(metrics.customerChurnRate),
+      mrr: metricValueAtMonth(metrics.mrr, cm),
+      arr: metricValueAtMonth(metrics.arr, cm),
+      burnRate: metricValueAtMonth(metrics.burnRate, cm),
+      netBurn: metricValueAtMonth(metrics.netBurnRate, cm),
+      runway: metricValueAtMonth(metrics.cashRunwayMonths, cm),
+      cashPosition: metricValueAtMonth(metrics.cashPosition, cm),
+      revenueGrowth: metricValueAtMonth(metrics.revenueGrowthRate, cm),
+      grossMargin: metricValueAtMonth(metrics.grossMarginPercent, cm),
+      headcount: metricValueAtMonth(metrics.revenuePerEmployee, cm) !== null ? null : null, // Headcount comes from the series
+      ltv: metricValueAtMonth(metrics.ltv, cm),
+      cac: metricValueAtMonth(metrics.cac, cm),
+      ltvCacRatio: metricValueAtMonth(metrics.ltvCacRatio, cm),
+      churnRate: metricValueAtMonth(metrics.customerChurnRate, cm),
     },
     revenueByMonth: seriesToArray(input.totalRevenue).map((v) => ({ month: v.month, amount: v.value })),
     revenueStreams: (input.revenueStreams ?? []).map((s) => {

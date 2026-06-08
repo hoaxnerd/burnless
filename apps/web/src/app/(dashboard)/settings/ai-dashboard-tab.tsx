@@ -74,7 +74,7 @@ interface DashboardData {
 export function AiDashboardTab() {
   const [days, setDays] = useState(30);
   const { data, isLoading: loading } = useAiDashboard<DashboardData>(days);
-  const { fmtCurrency } = useLocale();
+  const { fmtCurrency, fmtPercent } = useLocale();
 
   if (loading) {
     return (
@@ -131,7 +131,7 @@ export function AiDashboardTab() {
         <SummaryCard
           icon={<Zap className="h-4 w-4" />}
           label="Credits Used"
-          value={`${data.credits.percentUsed.toFixed(1)}%`}
+          value={fmtPercent(data.credits.percentUsed, 1)}
           color={data.credits.exceeded ? "red" : data.credits.warning ? "amber" : "green"}
         />
         <SummaryCard
@@ -230,7 +230,7 @@ export function AiDashboardTab() {
                           />
                         </div>
                         <span className="text-surface-500 tabular-nums w-10 text-right">
-                          {f.percentOfTotal.toFixed(1)}%
+                          {fmtPercent(f.percentOfTotal, 1)}
                         </span>
                       </div>
                     </td>

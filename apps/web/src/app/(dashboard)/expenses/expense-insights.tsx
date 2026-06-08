@@ -3,6 +3,7 @@
 import { TrendingDown, AlertTriangle, RotateCw, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ratioToPct, pctOfTotal, dSum } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import { AiGate } from "@/components/ai/ai-gate";
 import { formatCompactCurrency } from "@/components/charts";
 import type { SubcategoryBreakdown, ExpenseLineItem } from "@/lib/compute-expenses";
@@ -29,7 +30,7 @@ function generateInsights(
     insights.push({
       type: "warning",
       title: `${anomalies.length} expense${anomalies.length > 1 ? "s" : ""} spiked this month`,
-      message: `${worst.accountName} increased ${ratioToPct(worst.changePercent).toFixed(0)}% MoM — from ${formatCompactCurrency(worst.prevAmount)} to ${formatCompactCurrency(worst.currentAmount)}. Review for unexpected charges.`,
+      message: `${worst.accountName} increased ${formatPercent(ratioToPct(worst.changePercent), undefined, 0)} MoM — from ${formatCompactCurrency(worst.prevAmount)} to ${formatCompactCurrency(worst.currentAmount)}. Review for unexpected charges.`,
       icon: "alert",
     });
   }
@@ -40,11 +41,11 @@ function generateInsights(
     insights.push({
       type: "info",
       title: `${largest.subcategory} is your #1 spend category`,
-      message: `At ${formatCompactCurrency(largest.amount)}/mo (${largest.percentage.toFixed(0)}% of total), this is your largest expense bucket. ${
+      message: `At ${formatCompactCurrency(largest.amount)}/mo (${formatPercent(largest.percentage, undefined, 0)} of total), this is your largest expense bucket. ${
         largest.changePercent > 0.05
-          ? `It grew ${ratioToPct(largest.changePercent).toFixed(0)}% from last month.`
+          ? `It grew ${formatPercent(ratioToPct(largest.changePercent), undefined, 0)} from last month.`
           : largest.changePercent < -0.05
-            ? `Good news — it decreased ${Math.abs(ratioToPct(largest.changePercent)).toFixed(0)}% from last month.`
+            ? `Good news — it decreased ${formatPercent(Math.abs(ratioToPct(largest.changePercent)), undefined, 0)} from last month.`
             : "It's been stable month-over-month."
       }`,
       icon: "trend",
@@ -55,11 +56,11 @@ function generateInsights(
   const recurringItems = lineItems.filter((i) => i.isRecurring);
   const recurringTotal = dSum(recurringItems.map((i) => i.currentAmount));
   if (recurringItems.length >= 2) {
-    const pct = totalMonthly > 0 ? pctOfTotal(recurringTotal, totalMonthly).toFixed(0) : "0";
+    const pct = totalMonthly > 0 ? formatPercent(pctOfTotal(recurringTotal, totalMonthly), undefined, 0) : formatPercent(0, undefined, 0);
     insights.push({
       type: "neutral",
       title: `${recurringItems.length} recurring expenses totaling ${formatCompactCurrency(recurringTotal)}/mo`,
-      message: `Fixed costs make up ${pct}% of your monthly spend. Predictable burn is good for forecasting. Consider negotiating annual contracts for potential savings.`,
+      message: `Fixed costs make up ${pct} of your monthly spend. Predictable burn is good for forecasting. Consider negotiating annual contracts for potential savings.`,
       icon: "recurring",
     });
   }
@@ -70,7 +71,7 @@ function generateInsights(
     insights.push({
       type: "info",
       title: "Software spend above typical benchmarks",
-      message: `At ${softwareSpend.percentage.toFixed(0)}% of total expenses, your software costs are above the 10-15% benchmark for seed-stage startups. Review for unused or overlapping tools.`,
+      message: `At ${formatPercent(softwareSpend.percentage, undefined, 0)} of total expenses, your software costs are above the 10-15% benchmark for seed-stage startups. Review for unused or overlapping tools.`,
       icon: "trend",
     });
   }

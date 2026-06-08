@@ -3,6 +3,7 @@
 import { ratioToPct } from "@burnless/engine";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import { PercentageInput } from "@/components/forms/primitives";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface Props {
   value: BenefitsBreakdown;
@@ -23,6 +24,7 @@ const SLOTS: Array<{ key: keyof BenefitsBreakdown; label: string }> = [
  * "Clear" removes all per-employee overrides (legacy benefitsRate is then used).
  */
 export function BenefitsBreakdownEditor({ value, companyDefaults, onChange }: Props) {
+  const { fmtPercent } = useLocale();
   const total = SLOTS.reduce((s, { key }) => s + (value[key] ?? 0), 0);
 
   return (
@@ -45,13 +47,13 @@ export function BenefitsBreakdownEditor({ value, companyDefaults, onChange }: Pr
             min={0}
             max={1}
             step={0.1}
-            hint={`Default: ${ratioToPct(companyDefaults[key] ?? 0).toFixed(2)}%`}
+            hint={`Default: ${fmtPercent(ratioToPct(companyDefaults[key] ?? 0), 2)}`}
           />
         ))}
       </div>
       <div className="flex items-center justify-between">
         <div data-testid="breakdown-total" className="text-xs text-surface-500">
-          Total: {ratioToPct(total).toFixed(2)}%
+          Total: {fmtPercent(ratioToPct(total), 2)}
         </div>
         <div className="flex gap-2">
           <button

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { pctChange } from "@burnless/engine";
+import { pctChange, formatMetricValue } from "@burnless/engine";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
 import { AreaChartWidget, chartColors, formatPercent, formatNumber } from "@/components/charts";
 import { useLocale } from "@/components/locale/locale-context";
@@ -89,11 +89,25 @@ function makeMetricFormatter(
 ): (value: number) => string {
   switch (format) {
     case "currency": return (v) => fmtCurrency(v, { compact: true });
-    case "percent": return (v) => formatPercent(v);
+    // RPT-04: adaptive precision so a small nonzero rate (e.g. 0.04% churn) is not
+    // flattened to "0.0%" by the 1-decimal formatter.
+    case "percent": return (v) => formatPercentAdaptive(v);
     case "months": return (v) => v >= 999 ? "\u221e" : `${Math.round(v)}mo`;
-    case "ratio": return (v) => `${v.toFixed(1)}x`;
+    case "ratio": return (v) => formatMetricValue(v, "multiple");
     case "number": return (v) => formatNumber(v);
   }
+}
+
+/**
+ * RPT-04: percent formatter with adaptive precision. The default 1-decimal
+ * formatPercent renders any 0<|v|<0.05 as "0.0%", hiding a real nonzero churn
+ * rate. Surface "<0.1%" (sign-aware) for those near-zero magnitudes instead.
+ */
+function formatPercentAdaptive(value: number): string {
+  if (value !== 0 && Math.abs(value) < 0.05) {
+    return value < 0 ? ">-0.1%" : "<0.1%";
+  }
+  return formatPercent(value);
 }
 
 export function MetricsExplorer({
@@ -203,7 +217,7 @@ function TrendIndicator({ current, previous }: { current: number; previous: numb
 
   return (
     <span className={`text-xs font-medium ${isPositive ? "text-green-600" : "text-red-600"}`}>
-      {isPositive ? "\u2191" : "\u2193"} {Math.abs(change).toFixed(1)}%
+      {isPositive ? "\u2191" : "\u2193"} {formatPercent(Math.abs(change))}
     </span>
   );
 }

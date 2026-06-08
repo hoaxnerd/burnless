@@ -5,7 +5,7 @@ import {
   ShieldAlert,
   Zap,
 } from "lucide-react";
-import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
+import { formatCompactAmount, formatPercent, type CurrencyCode } from "@burnless/types";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -95,28 +95,28 @@ export function generateInsights(
   if (mrrGrowth > 10) {
     insights.push({
       title: "Exceptional Growth",
-      message: `MRR grew ${mrrGrowth.toFixed(0)}% this month — exceptional momentum.`,
+      message: `MRR grew ${formatPercent(mrrGrowth, undefined, 0)} this month — exceptional momentum.`,
       severity: "success",
       icon: Zap,
     });
   } else if (mrrGrowth > 5) {
     insights.push({
       title: "Strong MRR Growth",
-      message: `MRR grew ${mrrGrowth.toFixed(0)}% month-over-month — strong and steady.`,
+      message: `MRR grew ${formatPercent(mrrGrowth, undefined, 0)} month-over-month — strong and steady.`,
       severity: "success",
       icon: TrendingUp,
     });
   } else if (mrrGrowth > 0 && mrr > 0) {
     insights.push({
       title: "MRR Trending Up",
-      message: `MRR is up ${mrrGrowth.toFixed(1)}% month-over-month.`,
+      message: `MRR is up ${formatPercent(mrrGrowth)} month-over-month.`,
       severity: "info",
       icon: TrendingUp,
     });
   } else if (mrrGrowth < -5 && mrr > 0) {
     insights.push({
       title: "MRR Declining",
-      message: `MRR declined ${Math.abs(mrrGrowth).toFixed(1)}% — worth investigating.`,
+      message: `MRR declined ${formatPercent(Math.abs(mrrGrowth))} — worth investigating.`,
       severity: "warning",
       icon: ShieldAlert,
     });

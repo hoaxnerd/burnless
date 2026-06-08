@@ -7,6 +7,8 @@ import { toUserMessage } from "@/lib/api-error";
 import { useToast } from "@/components/ui/toast";
 import { usePageShortcuts } from "@/components/ui/keyboard-shortcuts";
 import { useLocale } from "@/components/locale/locale-context";
+import { formatMetricValue } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 
 /* ── Types ──────────────────────────────────────────────────────────────────── */
 
@@ -65,9 +67,9 @@ function getGrowthSignal(growthPct: number): { signal: Signal; note: string } {
 
 function getMrrSignal(mrr: number, growthPct: number): { signal: Signal; note: string } {
   if (mrr <= 0) return { signal: "neutral", note: "No revenue yet" };
-  if (growthPct >= 10) return { signal: "green", note: `Growing ${growthPct.toFixed(0)}% MoM` };
-  if (growthPct >= 0) return { signal: "amber", note: `+${growthPct.toFixed(0)}% MoM` };
-  return { signal: "red", note: `${growthPct.toFixed(0)}% MoM` };
+  if (growthPct >= 10) return { signal: "green", note: `Growing ${formatPercent(growthPct, undefined, 0)} MoM` };
+  if (growthPct >= 0) return { signal: "amber", note: `+${formatPercent(growthPct, undefined, 0)} MoM` };
+  return { signal: "red", note: `${formatPercent(growthPct, undefined, 0)} MoM` };
 }
 
 function getHeadcountSignal(delta: number): { signal: Signal; note: string } {
@@ -91,13 +93,15 @@ function buildMetrics(data: BoardMeetingData, fmtCompact: (v: number) => string)
     { label: "Burn", value: `${fmtCompact(data.burn)}/mo`, ...burnSig },
     {
       label: "Runway",
-      value: data.runway >= 999 ? "\u221e" : `${data.runway.toFixed(1)} mo`,
+      // DASH-07: route runway through the canonical months formatter for parity
+      // with the hero card (was toFixed(1) here vs Math.round elsewhere).
+      value: formatMetricValue(data.runway, "months"),
       ...runwaySig,
     },
     { label: "MRR", value: fmtCompact(data.mrr), ...mrrSig },
     {
       label: "Growth",
-      value: `${data.mrrGrowth >= 0 ? "+" : ""}${data.mrrGrowth.toFixed(1)}%`,
+      value: `${data.mrrGrowth >= 0 ? "+" : ""}${formatPercent(data.mrrGrowth)}`,
       ...growthSig,
     },
     { label: "Headcount", value: `${data.headcount}`, ...hcSig },

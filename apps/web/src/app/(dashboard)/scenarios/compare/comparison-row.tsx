@@ -1,6 +1,7 @@
 "use client";
 
 import type { CurrencyCode } from "@burnless/types";
+import { useLocale } from "@/components/locale/locale-context";
 import type { ComparisonLine } from "./comparison-types";
 import { formatCurrency, formatDelta } from "./comparison-types";
 
@@ -17,6 +18,7 @@ export function ComparisonRow({
   isCurrency: boolean;
   currency: CurrencyCode;
 }) {
+  const { fmtPercent } = useLocale();
   const fmt = (v: number) =>
     isCurrency ? formatCurrency(v, currency, undefined, { compact: true }) : String(Math.round(v));
 
@@ -68,7 +70,7 @@ export function ComparisonRow({
               {pct !== 0 && (
                 <span className="ml-1 text-[10px] opacity-70">
                   ({pct >= 0 ? "+" : ""}
-                  {pct.toFixed(0)}%)
+                  {fmtPercent(pct, 0)})
                 </span>
               )}
             </td>

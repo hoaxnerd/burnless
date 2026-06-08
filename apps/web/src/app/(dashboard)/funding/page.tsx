@@ -7,7 +7,7 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, previousMonthKey, METRIC_REGISTRY, dSum } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, formatPercent } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { FundingView } from "./funding-view";
 import { AddFundingButton } from "./add-funding-button";
@@ -110,8 +110,8 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
       slotId: "metric-3",
       content: { type: "metric", slug: "founderOwnership" },
       label: "Founder Ownership",
-      value: completedRounds.length > 0 ? `${foundersOwnership.toFixed(0)}%` : "--%",
-      description: completedRounds.length > 0 ? `After ${totalDilution.toFixed(0)}% dilution` : "Add a funding round",
+      value: completedRounds.length > 0 ? formatPercent(foundersOwnership, undefined, 1) : "--%",
+      description: completedRounds.length > 0 ? `After ${formatPercent(totalDilution, undefined, 1)} dilution` : "Add a funding round",
       hasData: completedRounds.length > 0,
       metricStyle: { icon: "PieChart", color: "violet", href: "/funding" },
     },

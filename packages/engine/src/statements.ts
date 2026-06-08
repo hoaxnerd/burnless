@@ -501,10 +501,23 @@ export function generateBalanceSheet(
   const liabilitySeries = sumByCategory(accounts, "liability");
   const equitySeries = sumByCategory(accounts, "equity");
 
+  // RPT-01: Accounts Payable is money owed but NOT yet paid out. The Cash asset
+  // (cash position) already deducted the FULL expense each month, so the cash you
+  // still hold because you haven't paid suppliers is missing from assets. Route
+  // A/P back into current assets as that retained cash — the double-entry
+  // counterpart to the A/P liability — so Assets == Liabilities + Equity holds.
+  // Scope: A/P-to-cash (the equity-only common case). Debt funding is NOT
+  // reclassified here (separate follow-up).
+  const accountsPayable = workingCapitalAdjustments?.accountsPayable;
+
   // Current assets = cash + A/R + other current assets
   let currentAssetsSeries = assetSeries;
   if (workingCapitalAdjustments?.accountsReceivable) {
     currentAssetsSeries = addSeries(currentAssetsSeries, workingCapitalAdjustments.accountsReceivable);
+  }
+  // A/P offsetting asset: cash held back because the bill is unpaid.
+  if (accountsPayable) {
+    currentAssetsSeries = addSeries(currentAssetsSeries, accountsPayable);
   }
 
   // Fixed assets (net of depreciation) — tracked via asset accounts
@@ -512,8 +525,8 @@ export function generateBalanceSheet(
 
   // Current liabilities = A/P + other current liabilities
   let currentLiabilitiesSeries = liabilitySeries;
-  if (workingCapitalAdjustments?.accountsPayable) {
-    currentLiabilitiesSeries = addSeries(currentLiabilitiesSeries, workingCapitalAdjustments.accountsPayable);
+  if (accountsPayable) {
+    currentLiabilitiesSeries = addSeries(currentLiabilitiesSeries, accountsPayable);
   }
 
   // Long-term liabilities (none separated for now — placeholder)
@@ -530,17 +543,54 @@ export function generateBalanceSheet(
     value: dRound2(D(v.value).div(100)),
   }));
 
+  const totalAssetsSeries = addSeries(currentAssetsSeries, fixedAssetsSeries);
+  const totalLiabilitiesSeries = addSeries(currentLiabilitiesSeries, longTermLiabilitiesSeries);
+
+  // RPT-01 dev invariant (non-throwing): the accounting identity
+  // Assets === Liabilities + Equity must hold for every month. Warn instead of
+  // throw so a transient input shape never crashes a render; the guard test
+  // (balance-sheet-balances.test.ts) enforces the hard contract.
+  assertBalanceSheetBalances(totalAssetsSeries, totalLiabilitiesSeries, equitySeries);
+
   return {
-    assets: buildLineItem("Total Assets", addSeries(currentAssetsSeries, fixedAssetsSeries), filterByCategory(accounts, "asset")),
+    assets: buildLineItem("Total Assets", totalAssetsSeries, filterByCategory(accounts, "asset")),
     currentAssets: buildLineItem("Current Assets", currentAssetsSeries),
     fixedAssets: buildLineItem("Fixed Assets", fixedAssetsSeries),
-    liabilities: buildLineItem("Total Liabilities", addSeries(currentLiabilitiesSeries, longTermLiabilitiesSeries), filterByCategory(accounts, "liability")),
+    liabilities: buildLineItem("Total Liabilities", totalLiabilitiesSeries, filterByCategory(accounts, "liability")),
     currentLiabilities: buildLineItem("Current Liabilities", currentLiabilitiesSeries),
     longTermLiabilities: buildLineItem("Long-term Liabilities", longTermLiabilitiesSeries),
     equity: buildLineItem("Total Equity", equitySeries, filterByCategory(accounts, "equity")),
     workingCapital: seriesToArray(workingCapitalSeries),
     currentRatio: currentRatioFixed,
   };
+}
+
+/**
+ * RPT-01 dev invariant: warn (never throw) if the balance sheet does not balance
+ * within 0.01 for any month. Silent in production; logs once per offending month
+ * in non-production so drift surfaces during development and tests.
+ */
+function assertBalanceSheetBalances(
+  assets: MonthlySeries,
+  liabilities: MonthlySeries,
+  equity: MonthlySeries,
+): void {
+  if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") return;
+  const months = Array.from(
+    new Set([...assets.keys(), ...liabilities.keys(), ...equity.keys()])
+  ).sort();
+  for (const m of months) {
+    const a = assets.get(m) ?? 0;
+    const l = liabilities.get(m) ?? 0;
+    const e = equity.get(m) ?? 0;
+    const diff = Math.abs(a - (l + e));
+    if (diff >= 0.01) {
+      console.warn(
+        `[RPT-01] Balance sheet does not balance for ${m}: ` +
+          `assets=${a} liabilities=${l} equity=${e} diff=${diff.toFixed(2)}`
+      );
+    }
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
