@@ -43,6 +43,36 @@ export async function requireCompanyAccess() {
   } as const;
 }
 
+/**
+ * ERR-01: turn a ZodError into a human-readable sentence instead of leaking the
+ * raw JSON issue array (ZodError.message). Used by parseBody (the 72-route path)
+ * AND withErrorHandler so a validation 400 never ships machine output to users.
+ * Guarded by apps/web/src/__tests__/parsebody-returns-friendly-error.test.ts.
+ */
+export function friendlyZodMessage(err: unknown): string {
+  if (err instanceof ZodError) {
+    const parts = err.errors.map((issue) => {
+      const field = issue.path.join(".");
+      return field ? `${field}: ${issue.message}` : issue.message;
+    });
+    return parts.length ? parts.join("; ") : "Invalid request body";
+  }
+  return "Invalid request body";
+}
+
+/**
+ * AUTHZ-01: auth + company context AND editor+ write authority. editor/admin/owner
+ * may write; viewer is blocked. A solo founder is owner so is never locked out.
+ * Returns the ctx on success, or `{ error }` (401/403) to bail.
+ */
+export async function requireCompanyWrite() {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return { error: roleErr } as const;
+  return ctx;
+}
+
 /** Role hierarchy for RBAC checks. */
 type MemberRole = "owner" | "admin" | "editor" | "viewer";
 const ROLE_LEVEL: Record<MemberRole, number> = {
@@ -107,7 +137,7 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
       // Return 400 for validation errors instead of 500
       if (error instanceof ZodError) {
         return NextResponse.json(
-          { error: error.errors[0]?.message ?? "Invalid request body" },
+          { error: friendlyZodMessage(error) },
           { status: 400 }
         );
       }
@@ -178,7 +208,8 @@ export async function parseBody<T>(
     const data = schema.parse(body);
     return { data };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Invalid request body";
-    return { error: errorResponse(message, 400) };
+    // ERR-01: ZodError -> friendly sentence; bad JSON / other -> generic. Never
+    // leak ZodError.message (the raw issue-array JSON) to the user.
+    return { error: errorResponse(friendlyZodMessage(e), 400) };
   }
 }

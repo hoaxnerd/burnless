@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockParseBody, mockErrorResponse } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireWrite, mockParseBody, mockErrorResponse } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
+  mockRequireWrite: vi.fn(),
   mockParseBody: vi.fn(),
   mockErrorResponse: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
+  requireCompanyWrite: mockRequireWrite,
   parseBody: mockParseBody,
   errorResponse: mockErrorResponse,
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
@@ -53,6 +55,10 @@ vi.mock("@burnless/db", () => ({
     merchantPattern: "merchantPattern",
     updatedAt: "updatedAt",
   },
+  financialAccounts: {
+    id: "id",
+    companyId: "companyId",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -70,14 +76,26 @@ describe("/api/merchant-mappings", () => {
       companyId: "c1",
       role: "owner",
     });
+    // POST gates on requireCompanyWrite — default to a passing write ctx.
+    mockRequireWrite.mockResolvedValue({
+      userId: "u1",
+      companyId: "c1",
+      role: "owner",
+    });
 
-    // Select chain: select().from().where().orderBy() or .limit()
+    // Select chain: select().from().where() — `where` is thenable (AUTHZ-02
+    // ownership lookup awaits it, default = one row found) AND exposes
+    // .orderBy (GET list) and .limit (existing-mapping lookup).
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
-    mockWhere.mockImplementation(() => ({
-      orderBy: mockOrderBy,
-      limit: mockLimit,
-    }));
+    mockWhere.mockImplementation(() => {
+      const result: Record<string, unknown> = {
+        orderBy: mockOrderBy,
+        limit: mockLimit,
+      };
+      result.then = (resolve: (v: unknown) => unknown) => resolve([{ id: "acc-1" }]);
+      return result;
+    });
 
     // Insert chain
     mockInsert.mockReturnValue({ values: mockValues });
@@ -173,13 +191,34 @@ describe("/api/merchant-mappings", () => {
     });
 
     it("returns auth error when not authenticated", async () => {
-      mockRequireCompanyAccess.mockResolvedValue({
+      mockRequireWrite.mockResolvedValue({
         error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       });
 
       const req = new Request("http://localhost:3000/api/merchant-mappings", { method: "POST" });
       const res = await POST(req);
       expect(res.status).toBe(401);
+    });
+
+    it("returns 403 when accountId belongs to another company", async () => {
+      mockParseBody.mockResolvedValue({ data: { description: "GOOGLE CLOUD", accountId: "foreign-acc", category: "operating_expense", subcategory: "Cloud" } });
+      mockErrorResponse.mockImplementation((msg: string, status: number) =>
+        NextResponse.json({ error: msg }, { status }),
+      );
+      // Ownership lookup returns no rows → foreign account.
+      mockWhere.mockImplementation(() => {
+        const result: Record<string, unknown> = { orderBy: mockOrderBy, limit: mockLimit };
+        result.then = (resolve: (v: unknown) => unknown) => resolve([]);
+        return result;
+      });
+
+      const req = new Request("http://localhost:3000/api/merchant-mappings", { method: "POST" });
+      const res = await POST(req);
+      const body = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(body.error).toContain("does not belong");
+      expect(mockInsert).not.toHaveBeenCalled();
     });
 
     it("returns parse error for invalid body", async () => {

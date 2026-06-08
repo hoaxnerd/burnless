@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { forecastLines, scenarioUpdate, scenarioDelete } from "@burnless/db";
 import { updateForecastLineSchema } from "@burnless/types";
+import { validateFormula } from "@burnless/engine";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
@@ -21,6 +22,16 @@ export const PATCH = withErrorHandler(async (
 
   const parsed = await parseBody(request, updateForecastLineSchema);
   if ("error" in parsed) return parsed.error;
+
+  // VAL-02: validate a custom_formula expression at the boundary, but only when
+  // one is actually present in this update payload.
+  if (parsed.data.method === "custom_formula") {
+    const expression = (parsed.data.parameters as Record<string, unknown> | undefined)?.expression;
+    if (typeof expression === "string") {
+      const reason = validateFormula(expression);
+      if (reason) return errorResponse(`Invalid formula: ${reason}`, 400);
+    }
+  }
 
   const row = await scenarioUpdate("forecast_line", forecastLines, id, parsed.data, scenarioId, ctx.companyId);
   if (!row) return errorResponse("Forecast line not found", 404);

@@ -46,8 +46,11 @@ export const POST = withErrorHandler(async (request: Request) => {
   const parsed = await parseBody(request, createFundingRoundSchema);
   if ("error" in parsed) return parsed.error;
 
+  // FUND-01: schema yields `roundType`; the DB column is `type`. Map it.
+  const { roundType, ...rest } = parsed.data;
   const data = {
-    ...parsed.data,
+    ...rest,
+    type: roundType,
     companyId: ctx.companyId,
     amount: String(parsed.data.amount),
     preMoneyValuation: parsed.data.preMoneyValuation != null ? String(parsed.data.preMoneyValuation) : null,

@@ -1,4 +1,4 @@
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatDate, type CurrencyCode } from "@burnless/types";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -187,7 +187,7 @@ export function paymentFailedEmail(): { subject: string; html: string; text: str
 export function subscriptionCanceledEmail(
   periodEnd: Date
 ): { subject: string; html: string; text: string } {
-  const endStr = periodEnd.toLocaleDateString("en-US", {
+  const endStr = formatDate(periodEnd, undefined, {
     month: "long",
     day: "numeric",
     year: "numeric",

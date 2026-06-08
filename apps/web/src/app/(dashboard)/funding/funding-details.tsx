@@ -13,6 +13,7 @@ import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
+import { useLocale } from "@/components/locale/locale-context";
 import { apiFetch } from "@/lib/api-fetch";
 
 interface FundingRound {
@@ -191,6 +192,7 @@ export function FundingRoundsList({
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
+  const { fmtDate } = useLocale();
   const router = useRouter();
   // Edit modal state
   const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
@@ -280,7 +282,7 @@ export function FundingRoundsList({
                           </span>
                         </div>
                         <p className="text-xs text-surface-400">
-                          {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                          {fmtDate(new Date(round.date), { month: "long", year: "numeric" })}
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
@@ -362,7 +364,7 @@ export function FundingRoundsList({
                           </span>
                         </div>
                         <p className="text-xs text-surface-400">
-                          {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                          {fmtDate(new Date(round.date), { month: "long", year: "numeric" })}
                         </p>
                       </div>
                       <div className="flex items-start gap-3">

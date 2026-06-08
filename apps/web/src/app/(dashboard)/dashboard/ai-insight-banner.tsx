@@ -13,8 +13,8 @@ interface AiInsightBannerProps {
 }
 
 export function AiInsightBanner({ runway, burnRate, mrrGrowth, cash }: AiInsightBannerProps) {
-  const { fmtCompact } = useLocale();
-  const insight = generateInsight(runway, burnRate, mrrGrowth, cash, fmtCompact);
+  const { fmtCompact, fmtDate } = useLocale();
+  const insight = generateInsight(runway, burnRate, mrrGrowth, cash, fmtCompact, fmtDate);
   if (!insight) return null;
 
   const styles = severityStyles[insight.severity];
@@ -133,18 +133,19 @@ function generateInsight(
   mrrGrowth: number,
   cash: number,
   fmtCompact: (v: number) => string,
+  fmtDate: (date: Date | string, options?: Intl.DateTimeFormatOptions) => string,
 ): { title: string; message: string; severity: Severity } | null {
   if (runway <= 3 && runway > 0) {
     return {
       title: `${Math.round(runway)} months of runway remaining`,
-      message: `At ${fmtCompact(burnRate)}/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway)}.`,
+      message: `At ${fmtCompact(burnRate)}/mo burn, you need to reduce costs or raise capital. Cash exhaustion projected by ${getExhaustionDate(runway, fmtDate)}.`,
       severity: "critical",
     };
   }
   if (runway <= 6 && runway > 0) {
     return {
       title: `Runway at ${Math.round(runway)} months — start fundraising conversations`,
-      message: `At current burn rate, cash will be depleted by ${getExhaustionDate(runway)}. Typical fundraise takes 3-6 months.`,
+      message: `At current burn rate, cash will be depleted by ${getExhaustionDate(runway, fmtDate)}. Typical fundraise takes 3-6 months.`,
       severity: "warning",
     };
   }
@@ -179,8 +180,11 @@ function generateInsight(
   return null;
 }
 
-function getExhaustionDate(months: number): string {
+function getExhaustionDate(
+  months: number,
+  fmtDate: (date: Date | string, options?: Intl.DateTimeFormatOptions) => string,
+): string {
   const date = new Date();
   date.setMonth(date.getMonth() + Math.round(months));
-  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  return fmtDate(date, { month: "short", year: "numeric" });
 }

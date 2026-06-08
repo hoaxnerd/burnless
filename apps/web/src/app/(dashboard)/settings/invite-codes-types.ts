@@ -1,5 +1,5 @@
 /* ── Invite Codes – types, helpers & constants ────────────────── */
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatDate as formatDateLocale, type CurrencyCode } from "@burnless/types";
 
 export interface Redemption {
   id: string;
@@ -52,8 +52,8 @@ export const statusColors: Record<CodeStatus, string> = {
   inactive: "bg-danger-100 text-danger-700",
 };
 
-export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+export function formatDate(iso: string, locale?: string) {
+  return formatDateLocale(new Date(iso), locale, {
     month: "short",
     day: "numeric",
     year: "numeric",

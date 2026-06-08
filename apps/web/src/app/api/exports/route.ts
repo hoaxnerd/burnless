@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, exportLogs } from "@burnless/db";
 import { eq, and, gte, count } from "drizzle-orm";
-import { requireCompanyAccess, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireCompanyWrite, getCompanyPlan, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { getPlanLimits } from "@burnless/ai";
 
@@ -57,7 +57,7 @@ const postSchema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
-  const ctx = await requireCompanyAccess();
+  const ctx = await requireCompanyWrite();
   if ("error" in ctx) return ctx.error;
 
   let body: z.infer<typeof postSchema>;

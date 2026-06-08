@@ -7,6 +7,7 @@ import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { useAiFeature } from "@/components/ai/ai-feature-context";
+import { useLocale } from "@/components/locale/locale-context";
 
 interface DigestData {
   id: string;
@@ -22,6 +23,7 @@ export function WeeklyDigestBanner() {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const { enabled: aiEnabled, loaded: aiLoaded } = useAiFeature("weeklyDigest");
+  const { fmtDate } = useLocale();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,7 +71,7 @@ export function WeeklyDigestBanner() {
     ? digest.narrative
     : digest.deterministicSummary;
   const isAI = aiEnabled && !!digest.narrative;
-  const weekDate = new Date(digest.weekStart).toLocaleDateString("en-US", {
+  const weekDate = fmtDate(new Date(digest.weekStart), {
     month: "short",
     day: "numeric",
     year: "numeric",

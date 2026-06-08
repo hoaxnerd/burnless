@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, merchantCategoryMappings } from "@burnless/db";
+import { db, merchantCategoryMappings, financialAccounts } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { requireCompanyAccess, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireCompanyWrite, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { extractMerchantKey } from "@burnless/engine";
 
 /** GET /api/merchant-mappings — list all merchant→category mappings for the company */
@@ -31,11 +31,25 @@ const upsertSchema = z.object({
 
 /** POST /api/merchant-mappings — create or update a merchant mapping (user override) */
 export const POST = withErrorHandler(async (request: Request) => {
-  const ctx = await requireCompanyAccess();
+  const ctx = await requireCompanyWrite();
   if ("error" in ctx) return ctx.error;
 
   const parsed = await parseBody(request, upsertSchema);
   if ("error" in parsed) return parsed.error;
+
+  // AUTHZ-02: verify the body-supplied accountId belongs to the caller's company.
+  const accCheck = await db
+    .select({ id: financialAccounts.id })
+    .from(financialAccounts)
+    .where(
+      and(
+        eq(financialAccounts.companyId, ctx.companyId),
+        eq(financialAccounts.id, parsed.data.accountId),
+      ),
+    );
+  if (accCheck.length === 0) {
+    return errorResponse("accountId does not belong to your company", 403);
+  }
 
   const merchantPattern = extractMerchantKey(parsed.data.description);
   if (!merchantPattern) {

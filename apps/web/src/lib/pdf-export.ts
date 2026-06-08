@@ -5,7 +5,7 @@
  */
 
 import type jsPDFType from "jspdf";
-import { formatCurrency, formatCompactAmount, formatMonthKey, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatCompactAmount, formatMonthKey, formatDate, type CurrencyCode } from "@burnless/types";
 
 // Lazy-load jsPDF + autoTable only when PDF generation is triggered
 async function loadJsPDF() {
@@ -73,7 +73,7 @@ function addPDFHeader(doc: jsPDFType, opts: PDFReportOptions) {
   doc.setTextColor(100, 116, 139);
   const subtitle = opts.subtitle ?? `${opts.scenarioName} scenario`;
   doc.text(subtitle, 20, 50);
-  doc.text(`Generated ${date.toLocaleDateString(opts.locale ?? "en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 50, { align: "right" });
+  doc.text(`Generated ${formatDate(date, opts.locale, { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 50, { align: "right" });
 
   // Divider
   doc.setDrawColor(226, 232, 240); // surface-200
