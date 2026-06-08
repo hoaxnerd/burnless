@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export interface DateRangePickerProps {
   startDate: string; // ISO YYYY-MM-DD
@@ -37,7 +38,7 @@ export function DateRangePicker({
             {startLabel}
             {required && <span className="text-danger-500"> *</span>}
           </label>
-          <input
+          <Input
             id="drp-start"
             type="date"
             value={startDate}
@@ -49,7 +50,7 @@ export function DateRangePicker({
                 endDate: hasEnd ? endDate : null,
               })
             }
-            className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800 px-2 py-1"
+            className="mt-1"
             aria-label={startLabel}
           />
         </div>
@@ -62,7 +63,7 @@ export function DateRangePicker({
           >
             {endLabel}
           </label>
-          <input
+          <Input
             id="drp-end"
             type="date"
             value={endDate ?? ""}
@@ -70,7 +71,7 @@ export function DateRangePicker({
             onChange={(e) =>
               onChange({ startDate, endDate: e.target.value || null })
             }
-            className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800 px-2 py-1"
+            className="mt-1"
             aria-label={endLabel}
           />
           <div className="mt-2 flex items-center gap-2">

@@ -1,5 +1,7 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+
 export interface NumberInputProps {
   value: number | null;
   onChange: (next: number | null) => void;
@@ -31,7 +33,7 @@ export function NumberInput({
         {label}
         {required && <span className="text-danger-500"> *</span>}
       </span>
-      <input
+      <Input
         type="number"
         value={value === null ? "" : value}
         min={min}
@@ -40,6 +42,7 @@ export function NumberInput({
         required={required}
         disabled={disabled}
         aria-label={label}
+        className="mt-1"
         onChange={(e) => {
           const raw = e.target.value;
           if (raw === "") {
@@ -56,7 +59,6 @@ export function NumberInput({
           if (max !== undefined && max !== null) parsed = Math.min(max, parsed);
           onChange(parsed);
         }}
-        className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
       />
       {hint && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
     </label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale } from "@/components/locale/locale-context";
+import { Input } from "@/components/ui/input";
 
 export interface CurrencyInputProps {
   value: number;
@@ -34,7 +35,7 @@ export function CurrencyInput({
         <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-surface-500 text-xs pointer-events-none">
           {currencySymbol}
         </span>
-        <input
+        <Input
           type="number"
           min={min}
           step={step}
@@ -46,7 +47,7 @@ export function CurrencyInput({
             const raw = parseFloat(e.target.value);
             onChange(Number.isNaN(raw) ? 0 : raw);
           }}
-          className="block w-full rounded-md border border-surface-300 dark:bg-surface-800 pl-7"
+          className="pl-7"
         />
       </div>
       <p

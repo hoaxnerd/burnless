@@ -1,5 +1,7 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+
 export interface PercentageInputProps {
   value: number; // 0-1 engine value
   onChange: (next: number) => void;
@@ -48,7 +50,7 @@ export function PercentageInput({
         {required && <span className="text-danger-500"> *</span>}
       </label>
       <div className="relative">
-        <input
+        <Input
           type="number"
           aria-label={label}
           value={display}
@@ -58,7 +60,7 @@ export function PercentageInput({
           required={required}
           disabled={disabled}
           onChange={handleChange}
-          className="block w-full rounded-md border border-surface-300 bg-white py-2 pl-3 pr-8 text-sm text-surface-900 placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-surface-500"
+          className="pr-10"
         />
         <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-surface-500">
           %
