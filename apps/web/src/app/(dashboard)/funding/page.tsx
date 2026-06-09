@@ -7,6 +7,8 @@ import { computeDashboardData } from "@/lib/compute-dashboard";
 import { monthKey, previousMonthKey, METRIC_REGISTRY, dSum } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
+import { computeCapTableForCompany } from "@/lib/compute-cap-table";
+import { deriveFounderOwnershipFromCapTable } from "@/lib/compute-funding-page";
 import { formatCurrency, formatPercent } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import Link from "next/link";
@@ -31,9 +33,12 @@ export default async function FundingPage() {
 async function FundingContent({ companyId, scenarioId: paramScenarioId, currency }: { companyId: string; scenarioId?: string; currency: ReturnType<typeof companyCurrency> }) {
   const scenario = await getActiveScenario(companyId, paramScenarioId);
   const activeScenarioId = paramScenarioId ?? null;
-  const [fundingRounds, data] = await Promise.all([
+  const [fundingRounds, data, capTable] = await Promise.all([
     getFundingRounds(companyId, activeScenarioId),
     scenario ? computeDashboardData(companyId, activeScenarioId) : null,
+    // H3 (Task 2.7): single source for founder ownership — the SAME reconciled
+    // engine cap table the /funding/cap-table page renders. Scenario-aware.
+    computeCapTableForCompany(companyId, activeScenarioId),
   ]);
 
   const currentMonth = data?.currentMonth ?? monthKey(new Date());
@@ -44,9 +49,12 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
   const completedRounds = fundingRounds.filter((r) => !r.isProjected);
   const totalRaised = dSum(completedRounds.map((r) => Number(r.amount)));
 
-  // Cap-table dilution (simplified ownership model).
-  const totalDilution = dSum(completedRounds.map((r) => Number(r.dilutionPercent ?? 0)));
-  const foundersOwnership = Math.max(0, 100 - totalDilution);
+  // H3 (Task 2.7): founder ownership reads the reconciled engine cap table — the
+  // single source the /funding/cap-table page renders — so the two surfaces can
+  // never show contradictory founder %s. The legacy Σ dilutionPercent model
+  // (hand-entered per-round deltas) is no longer the headline source.
+  const foundersOwnership = deriveFounderOwnershipFromCapTable(capTable);
+  const totalDilution = Math.max(0, 100 - foundersOwnership);
 
   const roundsForDisplay = fundingRounds.map((r) => ({
     id: r.id,

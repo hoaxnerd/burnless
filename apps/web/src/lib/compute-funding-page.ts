@@ -1,4 +1,21 @@
-import type { GrantMatchWarning } from "@burnless/engine";
+import { ratioToPct, type CapTable, type GrantMatchWarning } from "@burnless/engine";
+
+/**
+ * H3 (Task 2.7): single-source founder ownership.
+ *
+ * `/funding` previously derived founder ownership from `Σ fundingRounds.dilutionPercent`
+ * — a stored, hand-entered model that drifts from the reconciled engine cap table
+ * (`computeCapTable`), so the `/funding` headline and `/funding/cap-table` could show
+ * contradictory founder %s. This reads the SAME engine cap-table "Founders" row that
+ * the cap-table page renders, converting its 0-1 fully-diluted `ownershipPercent` to a
+ * 0-100 percent via the engine `ratioToPct` helper (no inline *100). Both surfaces now
+ * share one source. Returns 0 when there is no Founders row (empty cap table).
+ */
+export function deriveFounderOwnershipFromCapTable(capTable: CapTable): number {
+  const foundersRow = capTable.rows.find((r) => r.holder === "Founders");
+  if (!foundersRow) return 0;
+  return ratioToPct(foundersRow.ownershipPercent);
+}
 
 interface MilestoneShape {
   id: string;
