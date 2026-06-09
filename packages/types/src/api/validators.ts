@@ -46,6 +46,20 @@ export const nullableDateString = () =>
     .default(null);
 
 /**
+ * Phase 4 §4.1: sanitized forecast-line identifier. Used as a stable name a
+ * `custom_formula` expression can reference (`CloudCosts * 2`). Must be a valid
+ * bare identifier so the formula parser can tokenize it: starts with a letter or
+ * underscore, then letters/digits/underscores; trimmed; 1–64 chars.
+ */
+export const forecastLineName = () =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
+/**
  * VAL-03/DATE-03: cross-field date-range invariant. Wraps a ZodObject and rejects
  * an `endDate` earlier than `startDate` when BOTH are present (non-null). An absent
  * or null endDate (open-ended) is allowed, and an absent startDate (e.g. partial

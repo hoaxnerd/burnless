@@ -33,8 +33,20 @@ const isoDate = z.string().date();
  * `id` is required; all other fields are optional patches.
  * `null` on nullable fields explicitly clears the value.
  */
+/**
+ * Phase 4 §4.1 — stable forecast-line identifier referenced by other lines'
+ * custom_formula. Mirrors `forecastLineName()` in @burnless/types/validators.
+ */
+const ForecastLineName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
 export const UpdateExpenseSchema = z.object({
   id: z.string().min(1),
+  name: ForecastLineName.nullable().optional(),
   notes: z.string().nullable().optional(),
   vendor: z.string().nullable().optional(),
   departmentId: z.string().nullable().optional(),
@@ -54,6 +66,7 @@ export const UpdateExpenseSchema = z.object({
  */
 export const CreateExpenseSchema = z.object({
   accountId: z.string().min(1),
+  name: ForecastLineName.nullable().optional(),
   method: ForecastMethodSchema,
   parameters: z.record(z.unknown()).default({}),
   startDate: isoDate,

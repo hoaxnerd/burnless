@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { positiveAmount, percentage, ratio, dateString, nullableDateString, withDateRange } from "./validators";
+import { positiveAmount, percentage, ratio, dateString, nullableDateString, withDateRange, forecastLineName } from "./validators";
 
 // ── Shared Enums (Zod + inferred TS types) ─────────────────────────────────
 
@@ -282,6 +282,8 @@ export const createForecastLineSchema = withDateRange(
     parameters: z.record(z.unknown()).default({}),
     startDate: dateString(),
     endDate: nullableDateString(),
+    // Phase 4 §4.1 — stable identifier referenced by other lines' custom_formula.
+    name: forecastLineName().nullable().optional(),
     // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
     notes: z.string().nullable().optional(),
     vendor: z.string().nullable().optional(),
@@ -301,6 +303,8 @@ export const updateForecastLineSchema = z.object({
   parameters: z.record(z.unknown()).optional(),
   startDate: dateString().optional(),
   endDate: z.string().nullable().transform((s) => (s ? new Date(s) : null)).optional(),
+  // Phase 4 §4.1 — stable identifier referenced by other lines' custom_formula.
+  name: forecastLineName().nullable().optional(),
   // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
   notes: z.string().nullable().optional(),
   vendor: z.string().nullable().optional(),

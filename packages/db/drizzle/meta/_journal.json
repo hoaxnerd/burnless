@@ -15,6 +15,13 @@
       "when": 1781023449756,
       "tag": "0001_zippy_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781027228074,
+      "tag": "0002_demonic_metal_master",
+      "breakpoints": true
     }
   ]
 }

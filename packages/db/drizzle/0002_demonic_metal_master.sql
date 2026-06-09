@@ -1,0 +1,2 @@
+ALTER TABLE "forecast_lines" ADD COLUMN "name" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "forecast_lines_company_name_idx" ON "forecast_lines" USING btree ("company_id","name") WHERE "forecast_lines"."name" IS NOT NULL;

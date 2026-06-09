@@ -531,6 +531,12 @@ export const forecastLines = pgTable(
     parameters: jsonb("parameters").notNull().default({}),
     startDate: timestamp("start_date", { mode: "date" }).notNull(),
     endDate: timestamp("end_date", { mode: "date" }),
+    /**
+     * Phase 4 §4.1 — stable identifier a `custom_formula` expression can
+     * reference (`CloudCosts * 2`). Sanitized `^[A-Za-z_][A-Za-z0-9_]*$`;
+     * unique per company when non-null (see partial index below).
+     */
+    name: text("name"),
     // ── Phase 1 additions (§2.C) ─────────────────────────────────────────
     notes: text("notes"),
     vendor: text("vendor"),
@@ -571,6 +577,10 @@ export const forecastLines = pgTable(
       table.departmentId
     ),
     index("forecast_lines_vendor_idx").on(table.companyId, table.vendor),
+    // Phase 4 §4.1 — line names are unique per company when set (NULL allowed).
+    uniqueIndex("forecast_lines_company_name_idx")
+      .on(table.companyId, table.name)
+      .where(sql`${table.name} IS NOT NULL`),
   ]
 );
 
