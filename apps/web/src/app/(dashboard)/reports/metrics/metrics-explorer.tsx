@@ -136,8 +136,15 @@ export function MetricsExplorer({
       const data = metrics[def.key] as MetricValue[];
       const currentIdx = data.findIndex((d) => d.month === currentMonth);
       const resolvedIdx = currentIdx >= 0 ? currentIdx : data.length - 1;
-      const current = data[resolvedIdx]?.value ?? 0;
-      return [def.label, categoryLabels[def.category], makeMetricFormatter(def.format, fmtCurrency)(current)];
+      // Task 6.8: mirror the render cell (~:204) — a NaN-gated dark metric (or a
+      // null after the unstable_cache JSON round-trip) must export the em-dash
+      // ghost, never a NaN or misleading zero dollar figure. `?? 0` catches null
+      // but NOT NaN, so gate on Number.isFinite of the RAW value like the grid.
+      const rawCurrent = data[resolvedIdx]?.value;
+      const value = Number.isFinite(rawCurrent)
+        ? makeMetricFormatter(def.format, fmtCurrency)(rawCurrent as number)
+        : "—";
+      return [def.label, categoryLabels[def.category], value];
     });
     return { headers, rows };
   };

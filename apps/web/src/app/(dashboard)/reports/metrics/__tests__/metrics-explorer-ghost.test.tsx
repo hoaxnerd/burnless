@@ -12,7 +12,7 @@
  * Number.isFinite(null) === false, so a cached NaN metric STILL ghosts.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import type { ComputedMetrics, MetricValue } from "@burnless/engine";
 
 // Charts are lazy recharts widgets; stub so the explorer mounts cleanly in
@@ -26,7 +26,13 @@ vi.mock("@/components/charts", () => ({
 }));
 
 vi.mock("@/components/reports/export-dropdown", () => ({
-  ExportDropdown: () => <div data-testid="export-dropdown" />,
+  // Expose the CSV export callback so a test can drive the export path and
+  // assert the generated CSV does NOT leak "$NaN" for a dark/gated metric.
+  ExportDropdown: ({ onExportCSV }: { onExportCSV: () => void }) => (
+    <button data-testid="export-csv" onClick={onExportCSV}>
+      export
+    </button>
+  ),
 }));
 
 vi.mock("@/components/locale/locale-context", () => ({
@@ -126,5 +132,67 @@ describe("Phase 5 §5.7 — metrics explorer ghosts NaN dark metrics", () => {
     const card = getByText("CAC").closest("button")!;
     expect(card.textContent).toContain("—");
     expect(card.textContent).not.toContain("$0");
+  });
+});
+
+/**
+ * Task 6.8 (cleanup) — the EXPORT path must ghost the same NaN-gated metrics the
+ * render cell does. Phase 5 sealed the render cell (Number.isFinite gate on
+ * line ~204) but `buildExportRows` (~:139) still used `data[resolvedIdx]?.value
+ * ?? 0` — `?? 0` does NOT catch NaN, so a dark/gated metric exported "$NaN"
+ * (or, post unstable_cache JSON round-trip where NaN→null, "$NaN" via the
+ * formatter coercing null→NaN). The fix gates buildExportRows on
+ * Number.isFinite of the raw value, emitting the ghost string for non-finite.
+ */
+describe("Task 6.8 — metrics explorer EXPORT ghosts NaN dark metrics", () => {
+  /** Drive the CSV export button and capture the Blob text passed to URL.createObjectURL. */
+  function exportCsvText(metrics: ComputedMetrics): Promise<string> {
+    let captured: Blob | null = null;
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      captured = blob;
+      return "blob:mock";
+    }) as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL;
+
+    const { getByTestId } = render(
+      <MetricsExplorer metrics={metrics} currentMonth={MONTH} />,
+    );
+    fireEvent.click(getByTestId("export-csv"));
+
+    URL.createObjectURL = origCreate;
+    URL.revokeObjectURL = origRevoke;
+    if (!captured) throw new Error("export did not produce a Blob");
+    return (captured as Blob).text();
+  }
+
+  it("CSV export of a NaN cac yields a ghost cell, never '$NaN' or '$0'", async () => {
+    const csv = await exportCsvText(buildMetrics(NaN));
+    expect(csv).not.toContain("$NaN");
+    // The CAC row must carry the ghost string, not a misleading $0.
+    const cacLine = csv.split("\n").find((l) => l.startsWith("CAC,"));
+    expect(cacLine).toBeDefined();
+    expect(cacLine).toContain("—");
+    expect(cacLine).not.toContain("$0");
+  });
+
+  it("CSV export of a finite cac keeps the dollar value (control)", async () => {
+    const csv = await exportCsvText(buildMetrics(600));
+    const cacLine = csv.split("\n").find((l) => l.startsWith("CAC,"));
+    expect(cacLine).toContain("$600");
+    expect(cacLine).not.toContain("—");
+  });
+
+  it("CSV export survives the unstable_cache NaN→null round-trip and STILL ghosts", async () => {
+    const metrics = buildMetrics(NaN);
+    const cac = (metrics as unknown as Record<string, MetricValue[]>).cac!;
+    cac[0] = { month: PREV, value: null as unknown as number };
+    cac[1] = { month: MONTH, value: null as unknown as number };
+    const csv = await exportCsvText(metrics);
+    expect(csv).not.toContain("$NaN");
+    const cacLine = csv.split("\n").find((l) => l.startsWith("CAC,"));
+    expect(cacLine).toContain("—");
+    expect(cacLine).not.toContain("$0");
   });
 });

@@ -89,7 +89,14 @@ export function sumValues(values: Array<{ month: string; value: number }>): numb
 /** Get latest value from a MetricValue array. */
 export function latest(arr: Array<{ month: string; value: number }> | undefined): number | null {
   if (!arr || arr.length === 0) return null;
-  return arr[arr.length - 1]!.value;
+  // Task 6.8: dark/gated metrics (cac with no acquisitionSpend, ltvCacRatio
+  // inheriting it, ltv with non-positive churn, magicNumber with no prior-qtr
+  // spend) arrive from the engine as non-finite (NaN/Infinity). The genui
+  // metric_card/kpi_grid handlers and the analytics JSON payload read this raw,
+  // so coerce non-finite to null (same convention as context.ts:metricValueAtMonth,
+  // Phase 5 §5.6) — never surface "NaN" to the model.
+  const v = arr[arr.length - 1]!.value;
+  return Number.isFinite(v) ? v : null;
 }
 
 // ── Tool handler type ────────────────────────────────────────────────────────
