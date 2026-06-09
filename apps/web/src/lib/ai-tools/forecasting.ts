@@ -9,7 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { CreateExpenseSchema, UpdateExpenseSchema } from "@burnless/ai";
 import { computeDashboardData } from "../compute-dashboard";
-import { seriesToArray, ratioToPct } from "@burnless/engine";
+import { seriesToArray, ratioToPct, validateFormula } from "@burnless/engine";
 import { formatPercent } from "@burnless/types";
 import { getDefaultScenario } from "../data";
 import type { ToolContext, ToolHandler } from "./types";
@@ -63,9 +63,30 @@ async function createForecastLine(
   const data = parsed.data;
   const ctx = requireCompanyId(context);
 
+  // Phase 4 §4.5: validate a custom_formula expression at the AI-tool boundary,
+  // including that every reference resolves to a known company line name.
+  if (data.method === "custom_formula") {
+    const expression = (data.parameters as Record<string, unknown>)?.expression;
+    const nameRows = await db
+      .select({ name: forecastLines.name })
+      .from(forecastLines)
+      .where(eq(forecastLines.companyId, ctx.companyId));
+    const knownNames = new Set(
+      nameRows.map((r) => r.name).filter((n): n is string => !!n)
+    );
+    const reason = validateFormula(
+      typeof expression === "string" ? expression : "",
+      knownNames
+    );
+    if (reason) {
+      return JSON.stringify({ success: false, error: `Invalid formula: ${reason}` });
+    }
+  }
+
   const res = await mutateInsert(ctx, "forecast_line", forecastLines, {
     companyId: ctx.companyId,
     accountId: data.accountId,
+    name: data.name ?? null,
     method: data.method,
     parameters: data.parameters,
     startDate: new Date(data.startDate),
@@ -274,7 +295,28 @@ async function updateForecastLine(
     return JSON.stringify({ success: false, error: "Forecast line not found or access denied" });
   }
 
+  // Phase 4 §4.5: validate a custom_formula expression at the AI-tool boundary,
+  // including that every reference resolves to a known company line name.
+  if (data.method === "custom_formula") {
+    const expression = (data.parameters as Record<string, unknown> | undefined)?.expression;
+    const nameRows = await db
+      .select({ name: forecastLines.name })
+      .from(forecastLines)
+      .where(eq(forecastLines.companyId, ctx.companyId));
+    const knownNames = new Set(
+      nameRows.map((r) => r.name).filter((n): n is string => !!n)
+    );
+    const reason = validateFormula(
+      typeof expression === "string" ? expression : "",
+      knownNames
+    );
+    if (reason) {
+      return JSON.stringify({ success: false, error: `Invalid formula: ${reason}` });
+    }
+  }
+
   const updates: Record<string, unknown> = {};
+  if (data.name !== undefined) updates.name = data.name;
   if (data.method !== undefined) updates.method = data.method;
   if (data.parameters !== undefined) updates.parameters = data.parameters;
   if (data.startDate !== undefined) updates.startDate = new Date(data.startDate);

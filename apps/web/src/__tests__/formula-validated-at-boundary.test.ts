@@ -21,11 +21,16 @@ import path from "node:path";
  */
 
 const API_DIR = path.resolve(import.meta.dirname, "../app/api");
+const LIB_DIR = path.resolve(import.meta.dirname, "../lib");
 
 const FORECAST_WRITE_ROUTES = [
   "forecast-lines/route.ts", // POST
   "forecast-lines/[id]/route.ts", // PATCH
 ];
+
+// The AI-tool create/update path persists forecast lines too (Phase 4 §4.5),
+// so it must validate `custom_formula` expressions at its own boundary.
+const AI_TOOL_FORECAST_PATH = "ai-tools/forecasting.ts";
 
 // Any of these tokens proves boundary-level method/formula validation is wired.
 const VALIDATOR_TOKENS = [
@@ -54,5 +59,17 @@ describe("forecast-line writes validate formula/params at the boundary (VAL-02)"
       `Forecast-line write routes missing boundary formula/param validation ` +
         `— ${offenders.length} found:\n${offenders.join("\n")}`
     ).toEqual([]);
+  });
+
+  it("AI-tool forecast-line create/update references a formula validator (Phase 4 §4.5)", () => {
+    const src = readFileSync(path.join(LIB_DIR, AI_TOOL_FORECAST_PATH), "utf8");
+    const validated = VALIDATOR_TOKENS.some((t) => src.includes(t));
+
+    expect(
+      validated,
+      `apps/web/src/lib/${AI_TOOL_FORECAST_PATH}: persists forecast-line parameters ` +
+        `via create_forecast_line/update_forecast_line with NO boundary validation ` +
+        `(no validateFormula / validateForecastParams / validateExpenseParams)`
+    ).toBe(true);
   });
 });
