@@ -115,15 +115,103 @@ describe("Magic Number — hand-calculated", () => {
   });
 });
 
+// ── Net New MRR — 5-term re-derivation (Phase 6 §6.1) ────────────────────────
+
+describe("Net New MRR — re-derived from 5 components", () => {
+  // Canonical: New + Expansion + Reactivation − Churned − Contraction.
+  // The engine MUST re-derive from the components and IGNORE any value carried
+  // on the subDetail's own netNewMrr field (which a buggy/poisoned producer
+  // could set wrong).
+  it("re-derives from all 5 components, ignoring poisoned subDetail.netNewMrr", () => {
+    // 1000 + 200 + 50 − 300 − 80 = 870 (NOT the poisoned 9999)
+    const details: SubscriptionDetail[] = [
+      sub({
+        month: "2026-01",
+        mrr: 5000,
+        newMrr: 1000,
+        expansionMrr: 200,
+        reactivationMrr: 50,
+        churnedMrr: 300,
+        contractionMrr: 80,
+        netNewMrr: 9999, // poisoned — must be ignored
+      }),
+    ];
+    const input: MetricsInput = {
+      revenue: s({ "2026-01": 5000 }),
+      subscriptionDetails: details,
+      totalExpenses: s({ "2026-01": 8000 }),
+      cogs: s({ "2026-01": 1000 }),
+      operatingExpenses: s({ "2026-01": 7000 }),
+      cashPosition: s({ "2026-01": 100000 }),
+      netIncome: s({ "2026-01": -3000 }),
+      headcount: s({ "2026-01": 5 }),
+    };
+    const m = computeAllMetrics(input);
+    expect(m.netNewMrr[0]?.value).toBe(870);
+  });
+
+  it("uses downgradeMrr as the contraction alias when contractionMrr absent", () => {
+    // 1000 + 200 + 0 − 300 − 80 = 820 (no reactivation; downgrade=80 is contraction)
+    const details: SubscriptionDetail[] = [
+      sub({
+        month: "2026-01",
+        mrr: 5000,
+        newMrr: 1000,
+        expansionMrr: 200,
+        churnedMrr: 300,
+        downgradeMrr: 80, // alias for contractionMrr
+        netNewMrr: 9999, // poisoned — must be ignored
+      }),
+    ];
+    const input: MetricsInput = {
+      revenue: s({ "2026-01": 5000 }),
+      subscriptionDetails: details,
+      totalExpenses: s({ "2026-01": 8000 }),
+      cogs: s({ "2026-01": 1000 }),
+      operatingExpenses: s({ "2026-01": 7000 }),
+      cashPosition: s({ "2026-01": 100000 }),
+      netIncome: s({ "2026-01": -3000 }),
+      headcount: s({ "2026-01": 5 }),
+    };
+    const m = computeAllMetrics(input);
+    expect(m.netNewMrr[0]?.value).toBe(820);
+  });
+
+  it("3-term collapse: new − churned when contraction/reactivation absent", () => {
+    // 250 + 0 + 0 − 50 − 0 = 200
+    const details: SubscriptionDetail[] = [
+      sub({
+        month: "2026-01",
+        mrr: 3000,
+        newMrr: 250,
+        churnedMrr: 50,
+        netNewMrr: 9999, // poisoned — must be ignored
+      }),
+    ];
+    const input: MetricsInput = {
+      revenue: s({ "2026-01": 3000 }),
+      subscriptionDetails: details,
+      totalExpenses: s({ "2026-01": 5000 }),
+      cogs: s({ "2026-01": 800 }),
+      operatingExpenses: s({ "2026-01": 4200 }),
+      cashPosition: s({ "2026-01": 100000 }),
+      netIncome: s({ "2026-01": -2000 }),
+      headcount: s({ "2026-01": 4 }),
+    };
+    const m = computeAllMetrics(input);
+    expect(m.netNewMrr[0]?.value).toBe(200);
+  });
+});
+
 // ── Burn Multiple ────────────────────────────────────────────────────────────
 
 describe("Burn Multiple — hand-calculated", () => {
   it("Burn Multiple = Net Burn / Net New MRR", () => {
     // Net Burn = max(0, expenses - revenue) = max(0, 20000 - 12000) = 8000
-    // Net New MRR = 1500
+    // Net New MRR = 1500 (re-derived: newMrr 1500, no churn/contraction)
     // Burn Multiple = 8000 / 1500 ≈ 5.33
     const details: SubscriptionDetail[] = [
-      sub({ month: "2026-01", mrr: 12000, netNewMrr: 1500 }),
+      sub({ month: "2026-01", mrr: 12000, newMrr: 1500, netNewMrr: 1500 }),
     ];
     const input: MetricsInput = {
       revenue: s({ "2026-01": 12000 }),
@@ -140,8 +228,9 @@ describe("Burn Multiple — hand-calculated", () => {
   });
 
   it("returns 999 sentinel when Net New MRR ≤ 0 and burning cash", () => {
+    // Net New MRR = -500 (re-derived: churnedMrr 500, no new/expansion)
     const details: SubscriptionDetail[] = [
-      sub({ month: "2026-01", mrr: 10000, netNewMrr: -500 }),
+      sub({ month: "2026-01", mrr: 10000, churnedMrr: 500, netNewMrr: -500 }),
     ];
     const input: MetricsInput = {
       revenue: s({ "2026-01": 10000 }),
@@ -158,8 +247,9 @@ describe("Burn Multiple — hand-calculated", () => {
   });
 
   it("returns 0 when profitable (no burn)", () => {
+    // Net New MRR = 2000 (re-derived: newMrr 2000, no churn/contraction)
     const details: SubscriptionDetail[] = [
-      sub({ month: "2026-01", mrr: 50000, netNewMrr: 2000 }),
+      sub({ month: "2026-01", mrr: 50000, newMrr: 2000, netNewMrr: 2000 }),
     ];
     const input: MetricsInput = {
       revenue: s({ "2026-01": 50000 }),

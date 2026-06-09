@@ -194,10 +194,21 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     month: m,
     value: subDetails.get(m)?.churnedMrr ?? 0,
   }));
-  const netNewMrr = months.map((m) => ({
-    month: m,
-    value: subDetails.get(m)?.netNewMrr ?? 0,
-  }));
+  // Net New MRR is RE-DERIVED from its 5 components rather than echoing the
+  // subDetail's own netNewMrr field — a buggy/poisoned producer could set that
+  // field wrong, and the canonical identity is the source of truth:
+  //   New + Expansion + Reactivation − Churned − Contraction
+  // contraction = contractionMrr ?? downgradeMrr ?? 0 (downgrade is the alias).
+  const netNewMrr = months.map((m) => {
+    const d = subDetails.get(m);
+    const contraction = d?.contractionMrr ?? d?.downgradeMrr ?? 0;
+    const value = D(d?.newMrr ?? 0)
+      .plus(d?.expansionMrr ?? 0)
+      .plus(d?.reactivationMrr ?? 0)
+      .minus(d?.churnedMrr ?? 0)
+      .minus(contraction);
+    return { month: m, value: dRound2(value) };
+  });
 
   // Customer metrics
   const totalCustomers = months.map((m) => ({

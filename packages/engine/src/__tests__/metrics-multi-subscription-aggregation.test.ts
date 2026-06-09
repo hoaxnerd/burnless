@@ -17,6 +17,11 @@ describe("metrics — multi-stream subscription detail aggregation", () => {
   }
 
   it("sums MRR across multiple subscription streams in the same month", () => {
+    // Stream a carries contraction + reactivation; stream b carries expansion +
+    // reactivation. Aggregated components: new 250, expansion 20, reactivation 30,
+    // churned 50, contraction 30. netNewMrr is RE-DERIVED from the summed
+    // components (Phase 6 §6.1): 250 + 20 + 30 − 50 − 30 = 220 — NOT the sum of
+    // the (now-poisoned) per-stream netNewMrr fields (190 + 9999).
     const a: SubscriptionDetail = {
       month: "2026-01",
       customers: 100,
@@ -26,7 +31,9 @@ describe("metrics — multi-stream subscription detail aggregation", () => {
       newMrr: 250,
       expansionMrr: 0,
       churnedMrr: 50,
-      netNewMrr: 200,
+      contractionMrr: 30,
+      reactivationMrr: 20,
+      netNewMrr: 190, // 250 + 0 + 20 − 50 − 30
     };
     const b: SubscriptionDetail = {
       month: "2026-01",
@@ -35,9 +42,10 @@ describe("metrics — multi-stream subscription detail aggregation", () => {
       churnedCustomers: 0,
       mrr: 10000,
       newMrr: 0,
-      expansionMrr: 0,
+      expansionMrr: 20,
       churnedMrr: 0,
-      netNewMrr: 0,
+      reactivationMrr: 10,
+      netNewMrr: 9999, // poisoned — must be ignored, engine re-derives
     };
 
     const metrics = computeAllMetrics(makeInput([a, b]));
@@ -48,7 +56,7 @@ describe("metrics — multi-stream subscription detail aggregation", () => {
     expect(metrics.churnedCustomersPerMonth[0]?.value).toBe(1);
     expect(metrics.newMrr[0]?.value).toBe(250);
     expect(metrics.churnedMrr[0]?.value).toBe(50);
-    expect(metrics.netNewMrr[0]?.value).toBe(200);
+    expect(metrics.netNewMrr[0]?.value).toBe(220);
   });
 
   it("keeps optional fields undefined when no stream provides them", () => {
