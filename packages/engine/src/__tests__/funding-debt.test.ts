@@ -64,6 +64,49 @@ describe("computeDebt", () => {
     expect(result.principalPayments.get("2026-12")).toBe(120_000);
   });
 
+  it("amortized: equal P+I payment of 10,661.85; declining interest, growing principal; Σprincipal=120000", () => {
+    const result = computeDebt({
+      principal: 120_000,
+      debtParams: { interestRate: 0.12, termMonths: 12, repaymentSchedule: "amortized" },
+      issueDate: "2026-01-01",
+      months,
+    });
+    // month 1: interest 1200, principal 9461.85, payment 10661.85
+    expect(result.interestExpense.get("2026-01")).toBe(1_200);
+    expect(result.principalPayments.get("2026-01")).toBe(9_461.85);
+    // month 2: interest 1105.38, principal 9556.47
+    expect(result.interestExpense.get("2026-02")).toBe(1_105.38);
+    expect(result.principalPayments.get("2026-02")).toBe(9_556.47);
+    // month 12 (final, residual): interest 105.56, principal 10556.35
+    expect(result.interestExpense.get("2026-12")).toBe(105.56);
+    expect(result.principalPayments.get("2026-12")).toBe(10_556.35);
+    // P+I level for non-final months
+    for (let i = 0; i < 11; i++) {
+      const pay =
+        (result.interestExpense.get(months[i]) ?? 0) +
+        (result.principalPayments.get(months[i]) ?? 0);
+      expect(Math.round(pay * 100) / 100).toBe(10_661.85);
+    }
+    // Σprincipal === principal exactly (final month residual absorbs drift)
+    const sum = months.reduce((acc, m) => acc + (result.principalPayments.get(m) ?? 0), 0);
+    expect(Math.round(sum * 100) / 100).toBe(120_000);
+  });
+
+  it("amortized zero-rate: even principal split, no interest", () => {
+    const result = computeDebt({
+      principal: 120_000,
+      debtParams: { interestRate: 0, termMonths: 12, repaymentSchedule: "amortized" },
+      issueDate: "2026-01-01",
+      months,
+    });
+    for (let i = 0; i < 12; i++) {
+      expect(result.principalPayments.get(months[i])).toBe(10_000);
+      expect(result.interestExpense.get(months[i]) ?? 0).toBe(0);
+    }
+    const sum = months.reduce((acc, m) => acc + (result.principalPayments.get(m) ?? 0), 0);
+    expect(Math.round(sum * 100) / 100).toBe(120_000);
+  });
+
   it("no payments before first scheduled payment date", () => {
     const result = computeDebt({
       principal: 60_000,

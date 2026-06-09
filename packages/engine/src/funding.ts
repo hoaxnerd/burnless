@@ -10,7 +10,7 @@
  * Integration point: statements.ts:generateCashFlow (Task 15).
  */
 import Decimal from "decimal.js";
-import { D, dAdd, dMul, dRound2 } from "./decimal";
+import { D, dAdd, dMul, dDiv, dPow, dRound2 } from "./decimal";
 import type { MonthlySeries } from "./utils";
 
 // --- Discriminated round-type parameter shapes (mirrors Phase 2 D §1.1 D3) ---
@@ -488,7 +488,9 @@ export interface DebtComputeResult {
  * Schedule kinds:
  *   - straight_line: principal evenly split across termMonths; interest on declining balance.
  *   - interest_only: interest only until final month, full principal balloon at term end.
- *   - amortized: equal monthly P+I payment (mortgage-style). Implemented in Task 10.5 if needed.
+ *   - amortized: equal monthly P+I payment (mortgage-style), M = P·r/(1−(1+r)^−n);
+ *     final scheduled month pays the residual balance so Σprincipal === principal exactly.
+ *     Zero-rate degenerates to an even principal split (P/term).
  */
 export function computeDebt(input: DebtComputeInput): DebtComputeResult {
   const { principal, debtParams, issueDate, months } = input;
@@ -511,6 +513,11 @@ export function computeDebt(input: DebtComputeInput): DebtComputeResult {
   const term = debtParams.termMonths;
   if (term <= 0) return { draws, interestExpense, principalPayments };
 
+  // Phase 3.2 §3.2: level payment M = P·r/(1−(1+r)^−n); zero-rate → even principal split.
+  const levelPayment = monthlyRate.isZero()
+    ? dDiv(principal, term)
+    : dDiv(dMul(principal, monthlyRate), D(1).minus(dPow(D(1).plus(monthlyRate), -term)));
+
   let balance = D(principal);
   let monthsPaid = 0;
   for (const m of months) {
@@ -528,6 +535,8 @@ export function computeDebt(input: DebtComputeInput): DebtComputeResult {
       roundedPrincipal = isFinalScheduled ? dRound2(balance) : dRound2(D(principal).div(term));
     } else if (schedule === "interest_only") {
       if (isFinalScheduled) roundedPrincipal = dRound2(balance);
+    } else if (schedule === "amortized") {
+      roundedPrincipal = isFinalScheduled ? dRound2(balance) : dRound2(levelPayment.minus(interest));
     }
     principalPayments.set(m, Number(roundedPrincipal));
     balance = balance.minus(roundedPrincipal);
