@@ -1,7 +1,7 @@
 import { beforeAll, afterAll } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { readFileSync, readdirSync } from "node:fs";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as schema from "../schema";
@@ -25,38 +25,16 @@ export function getTestDb() {
 }
 
 /**
- * Run all Drizzle SQL migrations against the PGLite instance in order.
- * Each migration file may contain multiple statements separated by `--> statement-breakpoint`.
+ * Apply the Drizzle migration baseline to the PGLite instance using drizzle's
+ * own PGLite migrator (reads drizzle/meta/_journal.json — same code path as
+ * prod `db:migrate`). Replaces the prior hand-rolled SQL-file glob.
  */
 async function runMigrations(client: PGlite) {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const migrationsDir = join(__dirname, "../../drizzle");
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-
-  for (const file of files) {
-    const sql = readFileSync(join(migrationsDir, file), "utf-8");
-    const statements = sql
-      .split("--> statement-breakpoint")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    for (const stmt of statements) {
-      try {
-        await client.exec(stmt);
-      } catch (err: unknown) {
-        // Tolerate "already exists" errors from overlapping migrations
-        // (e.g. enum created in both a manual and drizzle-generated migration)
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("already exists") || msg.includes("duplicate_object")) {
-          continue;
-        }
-        throw new Error(`Migration ${file} failed: ${msg}`);
-      }
-    }
-  }
+  const migrationsFolder = join(__dirname, "../../drizzle");
+  const dbForMigrate = drizzle(client, { schema });
+  await migrate(dbForMigrate, { migrationsFolder });
 }
 
 // Vitest global setup — runs once before all tests in this package.

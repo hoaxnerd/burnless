@@ -31,7 +31,7 @@
 
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { readFileSync, readdirSync } from "node:fs";
+import { migrate } from "drizzle-orm/pglite/migrator";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, afterAll } from "vitest";
@@ -58,31 +58,14 @@ const testDb = drizzle(pglite, { schema });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Apply the Drizzle migration baseline via drizzle's own PGLite migrator
+// (reads packages/db/drizzle/meta/_journal.json — same code path as prod
+// `db:migrate`). Replaces the prior hand-rolled SQL-file glob (H1: kept in
+// lockstep with packages/db/src/__tests__/setup.ts).
 async function runMigrations(client: PGlite) {
-  const migrationsDir = join(__dirname, "../../packages/db/drizzle");
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-
-  for (const file of files) {
-    const sql = readFileSync(join(migrationsDir, file), "utf-8");
-    const statements = sql
-      .split("--> statement-breakpoint")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    for (const stmt of statements) {
-      try {
-        await client.exec(stmt);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("already exists") || msg.includes("duplicate_object")) {
-          continue;
-        }
-        throw new Error(`Migration ${file} failed: ${msg}`);
-      }
-    }
-  }
+  const migrationsFolder = join(__dirname, "../../packages/db/drizzle");
+  const dbForMigrate = drizzle(client, { schema });
+  await migrate(dbForMigrate, { migrationsFolder });
 }
 
 beforeAll(async () => {
