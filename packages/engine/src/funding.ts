@@ -530,7 +530,7 @@ export function computeDebt(input: DebtComputeInput): DebtComputeResult {
     // Phase 3.1 §3.1: final scheduled month pays the remaining balance (residual)
     // so Σprincipal === principal exactly (no rounding drift).
     const isFinalScheduled = monthsPaid === term - 1;
-    let roundedPrincipal = D(0);
+    let roundedPrincipal = 0;
     if (schedule === "straight_line") {
       roundedPrincipal = isFinalScheduled ? dRound2(balance) : dRound2(D(principal).div(term));
     } else if (schedule === "interest_only") {
