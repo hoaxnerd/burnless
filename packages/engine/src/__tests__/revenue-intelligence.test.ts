@@ -643,8 +643,13 @@ describe("Revenue intelligence — dashboard metrics completeness", () => {
 
     // ── LTV & CAC ──
     expect(m.cac[0]?.value).toBe(200); // 4000/20
-    expect(m.ltv[0]?.value).toBeGreaterThan(0);
-    expect(m.ltvCacRatio[0]?.value).toBeGreaterThan(0);
+    // Phase 5.4: month 0 has no prior-month MRR, so revenue-churn rate is 0 →
+    // infinite LTV → NaN (re-baselined from the old $1M sentinel). LTV becomes a
+    // finite positive number from month 1 onward, where churn is measurable.
+    expect(Number.isNaN(m.ltv[0]?.value)).toBe(true);
+    expect(Number.isNaN(m.ltvCacRatio[0]?.value)).toBe(true);
+    expect(m.ltv[1]?.value).toBeGreaterThan(0);
+    expect(m.ltvCacRatio[1]?.value).toBeGreaterThan(0);
 
     // ── Retention ──
     expect(m.netRevenueRetention[1]?.value).toBeCloseTo(96.33, 0); // (16650-2200)/15000*100

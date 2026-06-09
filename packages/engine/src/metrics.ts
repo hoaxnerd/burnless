@@ -260,16 +260,19 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // LTV = (ARPA × Gross Margin%) / Revenue Churn Rate
-  // When churn ≤ 0 (zero churn = 100% retention, negative = net expansion),
-  // LTV is effectively infinite. Cap at a high sentinel value.
-  const LTV_CAP = 999999;
+  // Phase 5.4: when churn ≤ 0 (zero churn = 100% retention, negative = net
+  // expansion), LTV is mathematically infinite. Emit NaN instead of a $1M
+  // sentinel so isMetricDataAvailable ghosts the card with a hint rather than
+  // showing a misleading concrete dollar figure. The no-revenue case
+  // (ARPA = 0, so churn is also 0) is a distinct "no LTV data" state → 0.
   const ltv = months.map((m, i) => {
     const arpaVal = D(arpa[i]?.value ?? 0);
     const gmFraction = D(grossMarginPercent[i]?.value ?? 0).div(100);
     const revChurnFraction = D(revenueChurnRate[i]?.value ?? 0).div(100);
     if (revChurnFraction.lte(0)) {
-      // Zero or negative churn → infinite LTV; return cap if there's revenue, 0 otherwise
-      return { month: m, value: arpaVal.gt(0) ? LTV_CAP : 0 };
+      // No revenue/ARPA → no LTV to compute (0). Revenue present but zero
+      // churn → infinite LTV → NaN (ghost the card).
+      return { month: m, value: arpaVal.gt(0) ? NaN : 0 };
     }
     return { month: m, value: dRound2(arpaVal.mul(gmFraction).div(revChurnFraction)) };
   });

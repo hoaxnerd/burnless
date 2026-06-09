@@ -438,7 +438,11 @@ describe("metrics — edge cases", () => {
       expect(metrics.ltv[1]?.value).toBeCloseTo(1520, -2);
     });
 
-    it("returns capped LTV when no revenue churn (100% retention)", () => {
+    // Phase 5.4: zero churn → infinite LTV. Re-baselined from the $1M sentinel
+    // (999999) to NaN so isMetricDataAvailable ghosts the card with a hint
+    // instead of showing a misleading concrete "$999,999 LTV". The dependent
+    // ltvCacRatio that divides into LTV also goes NaN that month.
+    it("emits NaN LTV when no revenue churn (100% retention → infinite)", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
@@ -466,10 +470,13 @@ describe("metrics — edge cases", () => {
       const input = makeBasicInput({
         revenue: new Map([["2026-01", 9000], ["2026-02", 10000]]),
         subscriptionDetails: subDetails,
+        acquisitionSpend: new Map([["2026-01", 5000], ["2026-02", 6000]]),
       });
       const metrics = computeAllMetrics(input);
-      // No revenue churn → LTV is infinite, capped at sentinel
-      expect(metrics.ltv[1]?.value).toBe(999999);
+      // No revenue churn → LTV is infinite → NaN (not a $1M sentinel).
+      expect(Number.isNaN(metrics.ltv[1]?.value)).toBe(true);
+      // ltvCacRatio divides LTV/CAC; an infinite (NaN) LTV must inherit NaN.
+      expect(Number.isNaN(metrics.ltvCacRatio[1]?.value)).toBe(true);
     });
 
     it("computes normal LTV when churn is positive (even with expansion)", () => {
@@ -507,7 +514,9 @@ describe("metrics — edge cases", () => {
       // ARPA = 10000/100 = 100, GM = 80%
       // LTV = (100 * 0.80) / 0.0211 ≈ 3800
       expect(metrics.ltv[1]?.value).toBeGreaterThan(3500);
-      expect(metrics.ltv[1]?.value).toBeLessThan(999999);
+      // Phase 5.4: positive churn → a finite real LTV (no $1M sentinel ceiling).
+      expect(Number.isFinite(metrics.ltv[1]?.value)).toBe(true);
+      expect(metrics.ltv[1]?.value).toBeLessThan(5000);
     });
 
     it("returns 0 LTV when no revenue (even with zero churn)", () => {
