@@ -179,6 +179,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
     id: fl.id,
     accountId: fl.accountId,
+    name: fl.name ?? null, // Phase 4 §4.7: custom_formula refs other lines by name
     method: fl.method,
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
     startDate: new Date(fl.startDate),

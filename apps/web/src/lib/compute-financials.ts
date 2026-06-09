@@ -65,7 +65,7 @@ export interface RevenueByType {
  */
 export interface FinancialsInput {
   accounts: Array<{ id: string; name: string; category: string; isSystem?: boolean | null; coversHeadcount?: boolean | null }>;
-  forecastLines: Array<{ id: string; accountId: string; method: string; parameters?: unknown; startDate: Date | string; endDate?: Date | string | null; isOneTime?: boolean | null }>;
+  forecastLines: Array<{ id: string; accountId: string; name?: string | null; method: string; parameters?: unknown; startDate: Date | string; endDate?: Date | string | null; isOneTime?: boolean | null }>;
   forecastValues: Array<{ forecastLineId: string; month: Date | string; amount: unknown; isOverride?: boolean | null }>;
   revenueStreams: Array<{ id: string; name: string; type: string; parameters?: unknown; startDate: Date | string; endDate?: Date | string | null }>;
   headcountPlans: Array<{
@@ -160,6 +160,7 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
   const forecastInputs: ForecastLineInput[] = fLines.map((fl) => ({
     id: fl.id,
     accountId: fl.accountId,
+    name: fl.name ?? null, // Phase 4 §4.7: custom_formula refs other lines by name
     method: fl.method as ForecastLineInput["method"],
     parameters: (fl.parameters ?? {}) as Record<string, unknown>,
     startDate: new Date(fl.startDate),
