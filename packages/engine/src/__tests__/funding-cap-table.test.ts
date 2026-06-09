@@ -16,13 +16,22 @@ describe("computeCapTable", () => {
       pendingSafes: [],
       pendingConvertibles: [],
     });
-    expect(ct.totalFullyDiluted).toBe(15_000_000);
+    // Overhang = reserved − granted (granted shares already live in commonStock).
+    expect(ct.totalFullyDiluted).toBe(14_500_000);
     expect(ct.totals.commonStock).toBe(10_000_000);
     expect(ct.totals.preferredStock).toBe(3_000_000);
-    expect(ct.totals.optionPoolOverhang).toBe(2_000_000);
+    expect(ct.totals.optionPoolOverhang).toBe(1_500_000);
     expect(ct.totals.safeOverhang).toBe(0);
     const founders = ct.rows.find((r) => r.holder === "Founders");
-    expect(founders?.ownershipPercent).toBeCloseTo(10_000_000 / 15_000_000, 4);
+    expect(founders?.ownershipPercent).toBeCloseTo(10_000_000 / 14_500_000, 4);
+    // Option-pool row shows unissued (overhang) only, not the full reserve.
+    const poolRow = ct.rows.find((r) => r.shareClass === "Option Pool");
+    expect(poolRow?.shares).toBe(1_500_000);
+    // Cap table foots to 100%: Σ row shares === totalFullyDiluted, Σ ownership ≈ 1.0.
+    const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
+    expect(sumShares).toBe(ct.totalFullyDiluted);
+    const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);
+    expect(sumOwnership).toBeCloseTo(1.0, 6);
   });
 
   it("models pending SAFE as overhang at its cap", () => {

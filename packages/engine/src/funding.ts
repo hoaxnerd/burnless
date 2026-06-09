@@ -161,10 +161,11 @@ export function computeCapTable(input: CapTableInput): CapTable {
   const preferredStock = input.shareClasses
     .filter((s) => !/common/i.test(s.name))
     .reduce((sum, s) => sum + s.totalIssued, 0);
-  // Fully-diluted option pool = entire reserved pool (not just ungranted portion).
-  // Granted shares are already counted in commonStock; the pool overhang = total reserved.
+  // Option-pool overhang = unissued reserve only (reserved − granted).
+  // Granted shares are already counted in commonStock, so adding the full
+  // reserve would double-count the granted portion (FAIL-3).
   const optionPoolOverhang = input.optionPools.reduce(
-    (sum, p) => sum + p.totalReserved,
+    (sum, p) => sum + Math.max(0, p.totalReserved - p.totalGranted),
     0,
   );
   const preMoneyFD = commonStock + preferredStock + optionPoolOverhang;
@@ -202,11 +203,12 @@ export function computeCapTable(input: CapTableInput): CapTable {
     });
   }
   for (const p of input.optionPools) {
+    const unissued = Math.max(0, p.totalReserved - p.totalGranted);
     rows.push({
       holder: p.name,
       shareClass: "Option Pool",
-      shares: p.totalReserved,
-      ownershipPercent: totalFullyDiluted > 0 ? p.totalReserved / totalFullyDiluted : 0,
+      shares: unissued,
+      ownershipPercent: totalFullyDiluted > 0 ? unissued / totalFullyDiluted : 0,
     });
   }
 
