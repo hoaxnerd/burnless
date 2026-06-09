@@ -88,11 +88,24 @@ export interface FormulaResult {
 const VALID_TOKEN_PATTERN =
   /^[\d\s+\-*/%^().,\[\]a-zA-Z_]+$/;
 
+/** Reserved bare identifiers that are never line references. */
+const RESERVED_IDENTIFIERS = new Set(["pi", "e", "month"]);
+
 /**
  * Validate a formula expression before evaluation.
  * Returns an error string if invalid, undefined if valid.
+ *
+ * @param expression - The formula string.
+ * @param knownLineNames - Phase 4 §4.4: when provided, every flat identifier
+ *   that is not a whitelisted function (`min`/`max`/…), a reserved name
+ *   (`pi`/`e`/`month`), or a member of this set is rejected as an
+ *   `Unknown reference "X"`. When OMITTED, no reference-checking happens
+ *   (backward compat — existing 1-arg callers are unaffected).
  */
-export function validateFormula(expression: string): string | undefined {
+export function validateFormula(
+  expression: string,
+  knownLineNames?: Set<string>
+): string | undefined {
   if (!expression || expression.trim().length === 0) {
     return "Empty expression";
   }
@@ -113,6 +126,25 @@ export function validateFormula(expression: string): string | undefined {
     const stripped = expression.replace(/[<>!=]=/g, "").replace(/==/g, "");
     if (/=/.test(stripped)) {
       return "Assignment not allowed in formulas";
+    }
+  }
+
+  // Phase 4 §4.4: when a known-names set is supplied, every flat identifier
+  // (line reference) must resolve to a known name. Function calls (followed by
+  // `(`), dotted paths, reserved names, and known line names — incl. offset
+  // refs `Name[-1]` — are allowed. Anything else is an unknown reference.
+  if (knownLineNames) {
+    const flatPattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+    let match: RegExpExecArray | null;
+    while ((match = flatPattern.exec(expression)) !== null) {
+      const name = match[1]!;
+      const after = expression[flatPattern.lastIndex];
+      // A `(` immediately after → function call; a `.` → dotted-path segment.
+      if (after === "(" || after === ".") continue;
+      if (ALLOWED_FUNCTIONS.has(name.toLowerCase())) continue;
+      if (RESERVED_IDENTIFIERS.has(name.toLowerCase())) continue;
+      if (knownLineNames.has(name)) continue;
+      return `Unknown reference "${name}"`;
     }
   }
 

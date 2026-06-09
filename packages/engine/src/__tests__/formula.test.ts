@@ -407,6 +407,46 @@ describe("formula evaluator", () => {
     });
   });
 
+  // ── Reference validation against known line names (Phase 4 §4.4) ────────────
+
+  describe("validateFormula(expression, knownLineNames)", () => {
+    it("passes when every flat reference is a known line name", () => {
+      const known = new Set(["CloudCosts", "ServerCosts"]);
+      expect(validateFormula("CloudCosts + ServerCosts * 2", known)).toBeUndefined();
+    });
+
+    it("rejects an unknown reference with a named error", () => {
+      const known = new Set(["CloudCosts"]);
+      expect(validateFormula("CloudCosts + Bogus", known)).toBe(
+        'Unknown reference "Bogus"'
+      );
+    });
+
+    it("allows whitelisted functions and pi/e/month alongside known names", () => {
+      const known = new Set(["CloudCosts"]);
+      expect(
+        validateFormula("floor(CloudCosts / pi) * e + month", known)
+      ).toBeUndefined();
+    });
+
+    it("allows offset references to a known name", () => {
+      const known = new Set(["CloudCosts"]);
+      expect(validateFormula("CloudCosts[-1] * 1.1", known)).toBeUndefined();
+    });
+
+    it("rejects an offset reference to an unknown name", () => {
+      const known = new Set(["CloudCosts"]);
+      expect(validateFormula("Bogus[-1] * 1.1", known)).toBe(
+        'Unknown reference "Bogus"'
+      );
+    });
+
+    it("does no reference-checking when no names list is provided (backward compat)", () => {
+      // Existing 1-arg callers are unaffected: unknown identifiers pass.
+      expect(validateFormula("Anything + UnknownRef")).toBeUndefined();
+    });
+  });
+
   // ── Security ────────────────────────────────────────────────────────────────
 
   describe("security", () => {

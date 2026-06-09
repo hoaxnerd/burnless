@@ -42,10 +42,21 @@ export const POST = withErrorHandler(async (request: Request) => {
   const parsed = await parseBody(request, createForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
-  // VAL-02: validate a custom_formula expression at the boundary before persisting.
+  // VAL-02 + Phase 4 §4.4: validate a custom_formula expression at the boundary
+  // before persisting, including that every reference is a known line name.
   if (parsed.data.method === "custom_formula") {
     const expression = (parsed.data.parameters as Record<string, unknown>)?.expression;
-    const reason = validateFormula(typeof expression === "string" ? expression : "");
+    const nameRows = await db
+      .select({ name: forecastLines.name })
+      .from(forecastLines)
+      .where(eq(forecastLines.companyId, ctx.companyId));
+    const knownNames = new Set(
+      nameRows.map((r) => r.name).filter((n): n is string => !!n)
+    );
+    const reason = validateFormula(
+      typeof expression === "string" ? expression : "",
+      knownNames
+    );
     if (reason) return errorResponse(`Invalid formula: ${reason}`, 400);
   }
 

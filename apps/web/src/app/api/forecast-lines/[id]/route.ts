@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { forecastLines, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { db, forecastLines, scenarioUpdate, scenarioDelete } from "@burnless/db";
+import { eq } from "drizzle-orm";
 import { updateForecastLineSchema } from "@burnless/types";
 import { validateFormula } from "@burnless/engine";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -23,12 +24,23 @@ export const PATCH = withErrorHandler(async (
   const parsed = await parseBody(request, updateForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
-  // VAL-02: validate a custom_formula expression at the boundary, but only when
-  // one is actually present in this update payload.
+  // VAL-02 + Phase 4 §4.4: validate a custom_formula expression at the boundary,
+  // but only when one is actually present in this update payload. Every reference
+  // must resolve to a known company line name (excluding this line itself).
   if (parsed.data.method === "custom_formula") {
     const expression = (parsed.data.parameters as Record<string, unknown> | undefined)?.expression;
     if (typeof expression === "string") {
-      const reason = validateFormula(expression);
+      const nameRows = await db
+        .select({ id: forecastLines.id, name: forecastLines.name })
+        .from(forecastLines)
+        .where(eq(forecastLines.companyId, ctx.companyId));
+      const knownNames = new Set(
+        nameRows
+          .filter((r) => r.id !== id)
+          .map((r) => r.name)
+          .filter((n): n is string => !!n)
+      );
+      const reason = validateFormula(expression, knownNames);
       if (reason) return errorResponse(`Invalid formula: ${reason}`, 400);
     }
   }
