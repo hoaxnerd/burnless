@@ -385,6 +385,9 @@ export function computeSubscriptionDetailForStream(
   return raw.map((d) => {
     const month = parseMonthKey(d.month);
     if (!isActiveInMonth(month, stream.startDate, stream.endDate)) {
+      // Phase 6 6.3 §1 — preserve the full 5-component MRR-bridge shape even
+      // when zeroed: carry the optional contraction/downgrade/reactivation keys
+      // through (as undefined) so the inactive branch matches the prorated one.
       return {
         month: d.month,
         customers: 0,
@@ -394,10 +397,17 @@ export function computeSubscriptionDetailForStream(
         newMrr: 0,
         expansionMrr: 0,
         churnedMrr: 0,
+        contractionMrr: d.contractionMrr == null ? undefined : 0,
+        downgradeMrr: d.downgradeMrr == null ? undefined : 0,
+        reactivationMrr: d.reactivationMrr == null ? undefined : 0,
         netNewMrr: 0,
       };
     }
     const f = proratedFraction(month, stream.startDate, stream.endDate);
+    // Phase 6 6.3 §1 — prorate preserves undefined (does NOT coerce → 0) so the
+    // optional component fields survive proration without being fabricated.
+    const prorate = (v: number | undefined): number | undefined =>
+      v == null ? undefined : round2(v * f);
     return {
       month: d.month,
       customers: d.customers,
@@ -407,6 +417,9 @@ export function computeSubscriptionDetailForStream(
       newMrr: round2(d.newMrr * f),
       expansionMrr: round2(d.expansionMrr * f),
       churnedMrr: round2(d.churnedMrr * f),
+      contractionMrr: prorate(d.contractionMrr),
+      downgradeMrr: prorate(d.downgradeMrr),
+      reactivationMrr: prorate(d.reactivationMrr),
       netNewMrr: round2(d.netNewMrr * f),
     };
   });

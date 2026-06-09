@@ -3,6 +3,7 @@ import {
   computeRevenueStream,
   computeTotalRevenue,
   computeSubscriptionDetail,
+  computeSubscriptionDetailForStream,
   type RevenueStreamInput,
   type SubscriptionParams,
 } from "../revenue";
@@ -152,6 +153,65 @@ describe("revenue", () => {
       ];
       const total = computeTotalRevenue(streams, start, end);
       expect(total.get("2026-01")).toBe(11000); // 10000 + 1000
+    });
+  });
+
+  // Phase 6 6.3 §1 — proration must carry ALL 5 MRR component fields, not just
+  // the original 4 (new/expansion/churned/netNew). The optional contraction /
+  // downgrade / reactivation fields must survive the prorated map AND the
+  // inactive-month branch so downstream MRR-bridge consumers see a stable shape.
+  describe("computeSubscriptionDetailForStream — proration preserves all 5 MRR component fields", () => {
+    const PS = new Date(2026, 0, 1);
+    const PE = new Date(2026, 11, 1);
+
+    it("prorated active month carries contraction/downgrade/reactivation keys", () => {
+      // Mid-month start → proration fraction < 1 (exercises the prorated map).
+      const stream: RevenueStreamInput = {
+        id: "pro",
+        name: "Pro Plan",
+        type: "subscription",
+        startDate: new Date("2026-03-15"),
+        endDate: null,
+        parameters: {
+          monthlyPrice: 1000,
+          startingCustomers: 10,
+          newCustomersPerMonth: 2,
+          monthlyChurnRate: 0.05,
+          expansionRate: 0.02,
+        } as never,
+      };
+      const det = computeSubscriptionDetailForStream(stream, PS, PE);
+      const startMonth = det.find((d) => d.month === "2026-03")!;
+      expect(startMonth).toBeDefined();
+      // The 5-component MRR-bridge shape: every component key is present
+      // (value may be undefined for components the subscription model never
+      // produces, but the KEY must exist — proration must not drop it).
+      expect("contractionMrr" in startMonth).toBe(true);
+      expect("downgradeMrr" in startMonth).toBe(true);
+      expect("reactivationMrr" in startMonth).toBe(true);
+    });
+
+    it("inactive month carries contraction/downgrade/reactivation keys", () => {
+      // Future-dated stream → months before start hit the inactive branch.
+      const stream: RevenueStreamInput = {
+        id: "future",
+        name: "Future Plan",
+        type: "subscription",
+        startDate: new Date("2026-07-01"),
+        endDate: null,
+        parameters: {
+          monthlyPrice: 5000,
+          startingCustomers: 0,
+          newCustomersPerMonth: 1,
+        } as never,
+      };
+      const det = computeSubscriptionDetailForStream(stream, PS, PE);
+      const before = det.find((d) => d.month === "2026-01")!;
+      expect(before).toBeDefined();
+      expect(before.mrr).toBe(0);
+      expect("contractionMrr" in before).toBe(true);
+      expect("downgradeMrr" in before).toBe(true);
+      expect("reactivationMrr" in before).toBe(true);
     });
   });
 });
