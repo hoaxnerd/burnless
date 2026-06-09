@@ -281,6 +281,55 @@
       "when": 1780181333186,
       "tag": "0042_ai_pending_action_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780639015000,
+      "tag": "0043_covers_headcount",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1780779551000,
+      "tag": "0044_pending_action_plan_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780831623000,
+      "tag": "0045_ai_write_mode_default_confirm",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780832208000,
+      "tag": "0046_audit_pending_apply_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1780853421000,
+      "tag": "0047_pending_action_timeline",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1780951072000,
+      "tag": "0048_ai_write_scenario_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1781002656000,
+      "tag": "0049_forecast_line_subcategory",
+      "breakpoints": true
     }
   ]
 }
