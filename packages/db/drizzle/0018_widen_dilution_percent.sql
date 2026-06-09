@@ -1,1 +1,0 @@
-ALTER TABLE "funding_rounds" ALTER COLUMN "dilution_percent" SET DATA TYPE numeric(7, 4);

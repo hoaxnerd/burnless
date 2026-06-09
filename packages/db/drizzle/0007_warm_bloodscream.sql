@@ -1,1 +1,0 @@
-ALTER TABLE "ai_feature_flags" ADD COLUMN "monthly_budget_cents" integer DEFAULT 5000 NOT NULL;
