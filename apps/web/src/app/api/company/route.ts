@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db, companies, hasFinancialData } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
-import { CURRENCY_CODES } from "@burnless/types";
+import { CURRENCY_CODES, percentage } from "@burnless/types";
 import { ConfirmableError } from "@/lib/confirmable-error";
 
 // ── GET /api/company — Get company profile ──────────────────────────────────
@@ -49,6 +49,9 @@ const updateSchema = z.object({
   region: z.enum(["us-east", "eu-west", "ap-south"]).optional(),
   fiscalYearEnd: z.number().min(1).max(12).optional(),
   benefitsRates: benefitsRatesSchema.optional(),
+  // Cap-table founder common-stock ownership (0-100). numeric(7,4) column ->
+  // String()-coerced below (the bug class that 500'd a funding save).
+  foundersOwnershipPercent: percentage().optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
@@ -82,7 +85,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   }
 
   const updates: Record<string, unknown> = {};
-  const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd, benefitsRates } = parsed.data;
+  const { name, stage, businessModel, industry, currency, locale, timezone, region, fiscalYearEnd, benefitsRates, foundersOwnershipPercent } = parsed.data;
 
   if (name !== undefined) updates.name = name;
   if (stage !== undefined) updates.stage = stage;
@@ -94,6 +97,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (region !== undefined) updates.region = region;
   if (fiscalYearEnd !== undefined) updates.fiscalYearEnd = fiscalYearEnd;
   if (benefitsRates !== undefined) updates.benefitsRates = benefitsRates;
+  if (foundersOwnershipPercent !== undefined) updates.foundersOwnershipPercent = String(foundersOwnershipPercent);
 
   if (Object.keys(updates).length === 0) {
     return errorResponse("No fields to update", 400);
