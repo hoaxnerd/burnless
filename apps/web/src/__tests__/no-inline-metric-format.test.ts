@@ -63,7 +63,7 @@ function isAllowed(line: string): boolean {
 
 /** Strips grep matches that live in a __tests__ dir or *.test.* file anywhere in the tree. */
 function isTestFile(line: string): boolean {
-  const file = line.split(":")[0];
+  const file = line.split(":")[0]!;
   return file.includes("/__tests__/") || /\.test\.(ts|tsx)$/.test(file);
 }
 

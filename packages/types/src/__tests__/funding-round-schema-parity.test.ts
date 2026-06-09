@@ -38,7 +38,7 @@ function dbPgEnumValues(): string[] {
     /export const fundingRoundTypeEnum = pgEnum\(\s*"funding_round_type",\s*\[([\s\S]*?)\]\s*\)/,
   );
   if (!m) throw new Error("Could not locate fundingRoundTypeEnum pgEnum in packages/db/src/schema.ts");
-  return [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+  return [...m[1]!.matchAll(/"([a-z_]+)"/g)].map((x) => x[1]!);
 }
 
 /** Extract the engine FundingRoundType string-literal union members from source. */
@@ -49,7 +49,7 @@ function engineUnionValues(): string[] {
   );
   const m = src.match(/export type FundingRoundType =([\s\S]*?);/);
   if (!m) throw new Error("Could not locate FundingRoundType union in packages/engine/src/funding.ts");
-  return [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+  return [...m[1]!.matchAll(/"([a-z_]+)"/g)].map((x) => x[1]!);
 }
 
 describe("FUND-01/FUND-04: createFundingRoundSchema accepts the add-form payload", () => {

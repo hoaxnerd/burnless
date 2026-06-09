@@ -132,13 +132,13 @@ function buildEdges(): Map<string, Set<string>> {
     IMPORT_RE.lastIndex = 0;
     while ((m = IMPORT_RE.exec(code))) {
       const clause = m[1] || "";
-      const target = resolveImport(f, m[2]);
+      const target = resolveImport(f, m[2]!);
       if (!target || !FILE_SET.has(target)) continue;
 
       const symbols: string[] = [];
       const named = clause.match(/\{([^}]*)\}/);
       if (named) {
-        for (const s of named[1].split(",")) {
+        for (const s of named[1]!.split(",")) {
           const name = s.trim().split(/\s+as\s+/).pop()!.trim();
           if (name && /^[A-Za-z_]/.test(name)) symbols.push(name);
         }
@@ -165,14 +165,14 @@ function buildEdges(): Map<string, Set<string>> {
     //    if the barrel is reached, the re-exported module is reachable.
     REEXPORT_RE.lastIndex = 0;
     while ((m = REEXPORT_RE.exec(code))) {
-      const target = resolveImport(f, m[1]);
+      const target = resolveImport(f, m[1]!);
       if (target && FILE_SET.has(target)) set.add(target);
     }
 
     // 3. Dynamic / lazy import edges (`import("./x")`) — always an edge.
     DYNAMIC_IMPORT_RE.lastIndex = 0;
     while ((m = DYNAMIC_IMPORT_RE.exec(code))) {
-      const target = resolveImport(f, m[1]);
+      const target = resolveImport(f, m[1]!);
       if (target && FILE_SET.has(target)) set.add(target);
     }
 

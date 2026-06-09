@@ -82,8 +82,8 @@ function scan(file: string): string[] {
   let m: RegExpExecArray | null;
   BUTTON_RE.lastIndex = 0;
   while ((m = BUTTON_RE.exec(src)) !== null) {
-    const attrs = m[1];
-    const inner = m[2];
+    const attrs = m[1]!;
+    const inner = m[2]!;
     if (/aria-label|aria-labelledby|title=/.test(attrs)) continue;
     if (inner.includes("{children}") || inner.includes("{label")) continue;
     const hasIcon = ICON_TAG.test(inner) || SVG_BLOCK.test(inner);
