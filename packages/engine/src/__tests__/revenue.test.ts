@@ -46,6 +46,42 @@ describe("revenue", () => {
       const m1 = details[0]!;
       expect(m1.expansionMrr).toBe(200); // 10000 * 0.02
     });
+
+    // Phase 6 6.2 §1 — per-stream netNewMrr is the canonical explicit 5-term
+    // formula New + Expansion + Reactivation − Churned − Contraction. On real
+    // subscription data contraction/reactivation are never produced (they stay
+    // undefined as named zero Decimals), so making the formula explicitly
+    // 5-term is provably a no-op on every month of a realistic stream.
+    //
+    // This is a LOCK test: the canonical netNewMrr values below are computed
+    // from the full-precision Decimal pipeline (rounded once at the boundary),
+    // NOT reverse-engineered from already-rounded component fields. The 5-term
+    // refactor must leave every one of these byte-identical, and must NOT
+    // populate contractionMrr/reactivationMrr (they remain undefined → preserves
+    // indexSubscriptionDetails semantics).
+    it("computes netNewMrr as explicit 5-term — no behavior change on real data (lock)", () => {
+      const params: SubscriptionParams = {
+        startingCustomers: 100,
+        monthlyPrice: 50,
+        newCustomersPerMonth: 10,
+        monthlyChurnRate: 0.05,
+        expansionRate: 0.03,
+      };
+
+      const details = computeSubscriptionDetail(params, start, end);
+      expect(details).toHaveLength(6);
+
+      // Canonical full-precision netNewMrr per month (snapshot of the Decimal
+      // pipeline). 5-term == 3-term here because contraction = reactivation = 0.
+      const canon = [392.5, 397.63, 403.09, 408.86, 414.96, 421.38];
+      for (let i = 0; i < details.length; i++) {
+        const d = details[i]!;
+        expect(d.netNewMrr).toBe(canon[i]);
+        // Zero components are NOT emitted onto the detail object.
+        expect(d.contractionMrr).toBeUndefined();
+        expect(d.reactivationMrr).toBeUndefined();
+      }
+    });
   });
 
   describe("one-time revenue", () => {

@@ -319,7 +319,19 @@ export function computeSubscriptionDetail(
     const expansionMrr = existingMrr.mul(params.expansionRate ?? 0);
     const newMrr = newCustomers.mul(pricePerCustomer);
     const churnedMrr = churnedCustomers.mul(pricePerCustomer);
-    const netNewMrr = newMrr.plus(expansionMrr).minus(churnedMrr);
+    // Phase 6 6.2 §1 — canonical netNewMrr is the explicit 5-term formula
+    // New + Expansion + Reactivation − Churned − Contraction. The subscription
+    // model never produces contraction (downgrades) or reactivation, so these
+    // are named zero Decimals here (a no-op on real data). They are intentionally
+    // NOT written onto the pushed SubscriptionDetail (kept undefined) so
+    // indexSubscriptionDetails treats them as absent.
+    const contractionMrr = D(0);
+    const reactivationMrr = D(0);
+    const netNewMrr = newMrr
+      .plus(expansionMrr)
+      .plus(reactivationMrr)
+      .minus(churnedMrr)
+      .minus(contractionMrr);
     const totalMrr = existingMrr.plus(expansionMrr).plus(newMrr);
 
     details.push({
