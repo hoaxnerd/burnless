@@ -20,10 +20,11 @@ export function RevenueWaterfallChart({ waterfall }: RevenueWaterfallChartProps)
     net: w.netNewMrr,
   }));
 
+  // Phase 6 §6.5: 5-term netNewMrr copy (bars unchanged — no empty contraction/reactivation bars)
   return (
     <ChartCard
       title="MRR Waterfall"
-      subtitle="New + Expansion - Churn = Net New MRR"
+      subtitle="New + Expansion + Reactivation - Churned - Contraction = Net New MRR"
     >
       <BarChartWidget
         data={data}

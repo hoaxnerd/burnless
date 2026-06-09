@@ -26,7 +26,7 @@ const metricDefinitions: MetricDefinition[] = [
   { key: "newMrr", label: "New MRR", category: "revenue", format: "currency", description: "MRR from new customers" },
   { key: "expansionMrr", label: "Expansion MRR", category: "revenue", format: "currency", description: "MRR from upsells and plan upgrades" },
   { key: "churnedMrr", label: "Churned MRR", category: "revenue", format: "currency", description: "MRR lost from cancellations" },
-  { key: "netNewMrr", label: "Net New MRR", category: "revenue", format: "currency", description: "New + Expansion - Churned MRR" },
+  { key: "netNewMrr", label: "Net New MRR", category: "revenue", format: "currency", description: "New + Expansion + Reactivation - Churned - Contraction MRR" }, // Phase 6 §6.5: 5-term netNewMrr copy
 
   // SaaS
   { key: "totalCustomers", label: "Total Customers", category: "saas", format: "number", description: "Active paying customers" },
