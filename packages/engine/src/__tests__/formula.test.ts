@@ -267,6 +267,66 @@ describe("formula evaluator", () => {
     });
   });
 
+  // ── Flat identifier references from resolvedSeries (Phase 4 §4.2) ───────────
+
+  describe("flat identifier references from resolvedSeries", () => {
+    it("resolves a flat line name to its current-month value", () => {
+      const series: MonthlySeries = new Map([["2026-03", 100]]);
+      const ctx: FormulaContext = {
+        resolvedSeries: new Map([["CloudCosts", series]]),
+        currentMonthKey: "2026-03",
+        allMonthKeys: ["2026-03"],
+      };
+      const result = evaluateFormula("CloudCosts * 2", ctx);
+      expect(result.value).toBe(200);
+    });
+
+    it("explicit variable wins over a same-named series", () => {
+      const series: MonthlySeries = new Map([["2026-03", 100]]);
+      const ctx: FormulaContext = {
+        resolvedSeries: new Map([["x", series]]),
+        currentMonthKey: "2026-03",
+        allMonthKeys: ["2026-03"],
+        variables: { x: 7 },
+      };
+      const result = evaluateFormula("x * 2", ctx);
+      expect(result.value).toBe(14); // 7 (explicit), not 100 (series)
+    });
+
+    it("function names are not treated as flat references", () => {
+      const ctx: FormulaContext = {
+        resolvedSeries: new Map(),
+        currentMonthKey: "2026-03",
+        allMonthKeys: ["2026-03"],
+      };
+      const result = evaluateFormula("max(1, 2)", ctx);
+      expect(result.value).toBe(2); // max stays a function
+    });
+
+    it("injected month variable wins over a same-named series", () => {
+      const series: MonthlySeries = new Map([["2026-03", 100]]);
+      const ctx: FormulaContext = {
+        resolvedSeries: new Map([["month", series]]),
+        currentMonthKey: "2026-03",
+        allMonthKeys: ["2026-03"],
+        variables: { month: 3 },
+      };
+      const result = evaluateFormula("month + 1", ctx);
+      expect(result.value).toBe(4); // 3 (injected month), not 100 (series)
+    });
+
+    it("missing flat reference resolves to 0", () => {
+      const ctx: FormulaContext = {
+        resolvedSeries: new Map([["CloudCosts", new Map([["2026-03", 100]])]]),
+        currentMonthKey: "2026-03",
+        allMonthKeys: ["2026-03"],
+      };
+      // ServerCosts has no series → 0; CloudCosts present → 100; 100 + 0
+      const result = evaluateFormula("CloudCosts + ServerCosts", ctx);
+      expect(result.value).toBe(100);
+    });
+  });
+
   // ── Real-world formulas ─────────────────────────────────────────────────────
 
   describe("real-world formula patterns", () => {

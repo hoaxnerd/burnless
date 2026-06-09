@@ -194,6 +194,42 @@ function resolveDottedVars(
   return { expression, scope };
 }
 
+/**
+ * Resolve flat (single-segment) identifiers like `CloudCosts` from resolvedSeries
+ * at the current month. Skips function names, the `pi`/`e`/`month` reserved names,
+ * and any key already supplied via `context.variables` (explicit vars win). Names
+ * not present in resolvedSeries resolve to 0 (missing reference). (Phase 4 §4.2)
+ */
+function resolveFlatVars(
+  expression: string,
+  ctx: FormulaContext
+): { scope: Record<string, number> } {
+  const scope: Record<string, number> = {};
+
+  if (!ctx.resolvedSeries || !ctx.currentMonthKey) {
+    return { scope };
+  }
+
+  // Flat identifiers not immediately followed by `.`, `[`, or `(`
+  // (those are dotted refs, offset refs, or function calls respectively).
+  const flatPattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b(?![.\[(])/g;
+  const reserved = new Set(["pi", "e", "month"]);
+  const declaredVars = new Set(Object.keys(ctx.variables ?? {}));
+
+  let match: RegExpExecArray | null;
+  while ((match = flatPattern.exec(expression)) !== null) {
+    const name = match[1]!;
+    if (ALLOWED_FUNCTIONS.has(name.toLowerCase())) continue;
+    if (reserved.has(name.toLowerCase())) continue;
+    if (declaredVars.has(name)) continue;
+    if (name in scope) continue;
+
+    scope[name] = ctx.resolvedSeries.get(name)?.get(ctx.currentMonthKey) ?? 0;
+  }
+
+  return { scope };
+}
+
 // ── Custom `if` function ──────────────────────────────────────────────────────
 
 /**
@@ -231,11 +267,16 @@ export function evaluateFormula(
     const { expression: withDotted, scope: dottedScope } = resolveDottedVars(resolved, context);
     resolved = withDotted;
 
+    // Step 2b: Resolve flat single-segment identifiers from resolvedSeries
+    const { scope: flatScope } = resolveFlatVars(resolved, context);
+
     // Step 3: Alias 'ceiling' → 'ceil' for user convenience
     resolved = resolved.replace(/\bceiling\b/gi, "ceil");
 
-    // Step 4: Build scope with all variables
+    // Step 4: Build scope with all variables.
+    // Order matters: explicit/injected variables (incl. `month`) win over series.
     const scope: Record<string, number | ((...args: number[]) => number)> = {
+      ...flatScope,
       ...dottedScope,
       ...context.variables,
       // Custom functions
