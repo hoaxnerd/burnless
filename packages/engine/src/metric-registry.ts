@@ -1646,6 +1646,18 @@ const DATA_REQUIREMENT_HINTS: Record<string, string> = {
   ruleOf40: "Add revenue & expenses to calculate Rule of 40",
   freeCashFlow: "Add revenue & expenses to see free cash flow",
   fcfMargin: "Add revenue & expenses to see FCF margin",
+  // Phase 5.8 — NaN-gated dark metrics. Each ghosts (card shows this hint, not
+  // a wrong 0) when its distinguishing input is absent; the hint names that
+  // exact input so the founder knows what to add. See §5.2–§5.5 + review M2.
+  cac: "Add acquisition/marketing spend to compute CAC",
+  ltvCacRatio: "Add acquisition spend & LTV inputs to see the LTV:CAC ratio",
+  cacPaybackMonths: "Add acquisition spend to see CAC payback months",
+  magicNumber: "Add prior-period sales & marketing spend to compute the magic number",
+  customerRetentionCost: "Add retention/customer-success spend to compute retention cost",
+  arpu: "Add active users to compute ARPU",
+  ltv: "Add a non-zero revenue churn rate to estimate LTV",
+  workingCapital: "Add balance-sheet data (current assets & liabilities) to see working capital",
+  interestExpense: "Add a debt-bearing funding round to see interest expense",
 };
 
 /**
