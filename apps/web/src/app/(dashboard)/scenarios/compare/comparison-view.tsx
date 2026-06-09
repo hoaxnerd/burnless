@@ -117,12 +117,18 @@ export function ComparisonView({
             onChange={(e) => setBaseId(e.target.value)}
           >
             <option value="">Select scenario...</option>
-            <option value="base">Base (current plan)</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.source})
-              </option>
-            ))}
+            {/* Group the base-data option apart from the scenario overlays so it's
+                obvious which row is the live plan vs a what-if scenario. */}
+            <optgroup label="Base data">
+              <option value="base">Base (current plan)</option>
+            </optgroup>
+            <optgroup label="Scenarios">
+              {scenarios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.source})
+                </option>
+              ))}
+            </optgroup>
           </Select>
         </div>
 
@@ -138,13 +144,15 @@ export function ComparisonView({
             onChange={(e) => setCompareId(e.target.value)}
           >
             <option value="">Select scenario...</option>
-            {scenarios
-              .filter((s) => s.id !== baseId)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.source})
-                </option>
-              ))}
+            <optgroup label="Scenarios">
+              {scenarios
+                .filter((s) => s.id !== baseId)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.source})
+                  </option>
+                ))}
+            </optgroup>
           </Select>
         </div>
 
