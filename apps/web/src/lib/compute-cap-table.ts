@@ -87,6 +87,7 @@ export async function computeCapTableInner(
         safeOverhang: 0,
         optionPoolOverhang: 0,
       },
+      dilutionDataNeedsPricedRound: false,
       isEmpty: true,
     };
   }
@@ -105,6 +106,29 @@ export async function computeCapTableInner(
 
   const optionPoolsWithGranted = buildOptionPoolsWithGranted(pools, grants);
 
+  // FAIL-2a: implied conversion price for discount-only SAFEs/convertibles is the
+  // latest PRICED round's price/share. A discount with no cap and no implied price
+  // cannot be converted to shares — the engine surfaces that as a
+  // `dilutionDataNeedsPricedRound` state instead of fabricating 0 dilution (H2).
+  const PRICED_TYPES = new Set([
+    "pre_seed",
+    "seed",
+    "series_a",
+    "series_b",
+    "series_c_plus",
+  ]);
+  const impliedRoundPrice: number | undefined = resolvedRounds
+    .filter(
+      (r: any) =>
+        PRICED_TYPES.has(r.type) &&
+        Number((r.parameters as any)?.pricePerShare) > 0,
+    )
+    .map((r: any) => ({
+      date: r.date instanceof Date ? r.date : new Date(r.date),
+      price: Number((r.parameters as any).pricePerShare),
+    }))
+    .sort((a, b) => b.date.getTime() - a.date.getTime())[0]?.price;
+
   const pendingSafes = resolvedRounds
     .filter((r: any) => r.type === "safe")
     .map((r: any) => ({
@@ -112,6 +136,7 @@ export async function computeCapTableInner(
       amount: Number(r.amount),
       valuationCap: (r.parameters as any)?.valuationCap,
       discountRate: (r.parameters as any)?.discountRate,
+      roundPricePerShare: impliedRoundPrice,
     }));
 
   const pendingConvertibles = resolvedRounds
@@ -125,6 +150,7 @@ export async function computeCapTableInner(
       issueDate: (r.date instanceof Date ? r.date : new Date(r.date))
         .toISOString()
         .slice(0, 10),
+      roundPricePerShare: impliedRoundPrice,
     }));
 
   const commonClass = classes.find((s) => /common/i.test(s.name));

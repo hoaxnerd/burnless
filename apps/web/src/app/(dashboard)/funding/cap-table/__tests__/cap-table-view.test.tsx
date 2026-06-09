@@ -14,6 +14,7 @@ function emptyCapTable(): CapTable & { isEmpty: boolean } {
       safeOverhang: 0,
       optionPoolOverhang: 0,
     },
+    dilutionDataNeedsPricedRound: false,
     isEmpty: true,
   };
 }
@@ -31,6 +32,7 @@ function populatedCapTable(): CapTable & { isEmpty: boolean } {
       safeOverhang: 0,
       optionPoolOverhang: 0,
     },
+    dilutionDataNeedsPricedRound: false,
     isEmpty: false,
   };
 }

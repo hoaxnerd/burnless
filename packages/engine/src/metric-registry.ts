@@ -1290,7 +1290,8 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
   {
     slug: "safeOverhang",
     name: "SAFE Overhang",
-    description: "Dilution from unconverted SAFEs expressed as a percentage of fully-diluted cap table",
+    description:
+      "Dilution from unconverted SAFEs expressed as a percentage of fully-diluted cap table. Discount-only SAFEs with no valuation cap need a priced round to estimate conversion — until one exists the dilution is shown as unknown, not 0 (FAIL-2a / H2).",
     formula: "SAFE Converted Shares (at cap/discount) / Total Fully-Diluted Shares × 100",
     dependsOn: ["totalOwnership"],
     parentMetricId: "totalOwnership",

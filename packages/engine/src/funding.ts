@@ -111,6 +111,15 @@ export interface CapTable {
     safeOverhang: number;
     optionPoolOverhang: number;
   };
+  /**
+   * Data-availability state (review H2, FAIL-2a). True when at least one pending
+   * SAFE/convertible has a discount but NO valuation cap AND no implied round
+   * price to convert against (pre-seed common case). The overhang for those
+   * instruments is UNKNOWN — we deliberately do not fabricate 0 dilution as if
+   * there were none. UI surfaces a "dilution needs a priced round to estimate"
+   * ghost rather than a misleading 0%.
+   */
+  dilutionDataNeedsPricedRound: boolean;
 }
 
 // --- Output types ---
@@ -141,7 +150,14 @@ export interface CapTableInput {
   foundersTotalShares: number;
   shareClasses: ShareClassInput[];
   optionPools: OptionPoolInput[];
-  pendingSafes: Array<{ id: string; amount: number; valuationCap?: number; discountRate?: number }>;
+  pendingSafes: Array<{
+    id: string;
+    amount: number;
+    valuationCap?: number;
+    discountRate?: number;
+    /** Latest priced-round price/share, threaded by the adapter (FAIL-2a). */
+    roundPricePerShare?: number;
+  }>;
   pendingConvertibles: Array<{
     id: string;
     amount: number;
@@ -149,6 +165,8 @@ export interface CapTableInput {
     discountRate?: number;
     interestRate?: number;
     issueDate?: string;
+    /** Latest priced-round price/share, threaded by the adapter (FAIL-2a). */
+    roundPricePerShare?: number;
   }>;
 }
 
@@ -169,18 +187,63 @@ export function computeCapTable(input: CapTableInput): CapTable {
     0,
   );
   const preMoneyFD = commonStock + preferredStock + optionPoolOverhang;
-  const safeOverhang = input.pendingSafes.reduce((sum, s) => {
-    if (!s.valuationCap || preMoneyFD === 0) return sum;
-    const capPrice = D(s.valuationCap).div(preMoneyFD);
-    const shares = Math.floor(Number(D(s.amount).div(capPrice).toFixed(0)));
-    return sum + shares;
-  }, 0);
-  const convertibleOverhang = input.pendingConvertibles.reduce((sum, c) => {
-    if (!c.valuationCap || preMoneyFD === 0) return sum;
-    const capPrice = D(c.valuationCap).div(preMoneyFD);
-    const shares = Math.floor(Number(D(c.amount).div(capPrice).toFixed(0)));
-    return sum + shares;
-  }, 0);
+
+  // Track whether any instrument's dilution is UNKNOWN for lack of a priced
+  // reference (review H2): a discount-only SAFE/convertible with neither a
+  // valuation cap nor an implied round price cannot be converted to shares —
+  // we surface that as a data-availability state rather than fabricating 0.
+  let dilutionDataNeedsPricedRound = false;
+
+  /**
+   * Shares a pending SAFE/convertible would convert into, taking the
+   * holder-favourable (lowest) of the available conversion prices:
+   *   - cap path:      valuationCap / preMoneyFD
+   *   - discount path: roundPricePerShare × (1 − discountRate)
+   * Returns 0 when neither price can be derived. Mutates the
+   * `dilutionDataNeedsPricedRound` flag when a discount-only instrument has no
+   * implied round price (so the caller can surface "needs priced round").
+   */
+  const overhangShares = (inst: {
+    amount: number;
+    valuationCap?: number;
+    discountRate?: number;
+    roundPricePerShare?: number;
+  }): number => {
+    const candidates: Decimal[] = [];
+    if (inst.valuationCap && inst.valuationCap > 0 && preMoneyFD > 0) {
+      candidates.push(D(inst.valuationCap).div(preMoneyFD));
+    }
+    if (
+      inst.discountRate &&
+      inst.discountRate > 0 &&
+      inst.roundPricePerShare &&
+      inst.roundPricePerShare > 0
+    ) {
+      candidates.push(D(inst.roundPricePerShare).mul(D(1).minus(inst.discountRate)));
+    }
+    if (candidates.length === 0) {
+      // No cap and no implied price → dilution is UNKNOWN. Discount-only
+      // instruments without a priced round flag the data-availability state;
+      // we never fabricate a share count.
+      if (inst.discountRate && inst.discountRate > 0) {
+        dilutionDataNeedsPricedRound = true;
+      }
+      return 0;
+    }
+    // Lowest price = most shares for the holder (industry-standard SAFE clause).
+    const price = candidates.reduce((a, b) => (b.lte(a) ? b : a));
+    return price.lte(0) ? 0 : D(inst.amount).div(price).floor().toNumber();
+  };
+
+  const safeOverhang = input.pendingSafes.reduce(
+    (sum, s) => sum + overhangShares(s),
+    0,
+  );
+  const convertibleOverhang = input.pendingConvertibles.reduce(
+    // convertibleConvertedAmount stub — principal only until Task 2.4 adds accrued interest.
+    (sum, c) => sum + overhangShares({ ...c, amount: c.amount }),
+    0,
+  );
 
   const totalFullyDiluted =
     commonStock + preferredStock + optionPoolOverhang + safeOverhang + convertibleOverhang;
@@ -221,6 +284,7 @@ export function computeCapTable(input: CapTableInput): CapTable {
       safeOverhang: safeOverhang + convertibleOverhang,
       optionPoolOverhang,
     },
+    dilutionDataNeedsPricedRound,
   };
 }
 

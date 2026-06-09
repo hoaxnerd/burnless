@@ -213,6 +213,7 @@ vi.mock("../../compute-cap-table", () => ({
       safeOverhang: 0,
       optionPoolOverhang: 500_000,
     },
+    dilutionDataNeedsPricedRound: false,
   })),
 }));
 

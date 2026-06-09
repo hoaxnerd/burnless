@@ -48,4 +48,68 @@ describe("computeCapTable", () => {
     expect(ct.totals.safeOverhang).toBe(1_000_000);
     expect(ct.totalFullyDiluted).toBe(11_000_000);
   });
+
+  it("models a discount-only SAFE via the implied round price (FAIL-2a)", () => {
+    // $100k SAFE, 20% discount, no cap. With a priced round at $1.00/share the
+    // implied conversion price is 1.00 × (1 − 0.20) = $0.80 → 100k / 0.80 = 125k shares.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 10_000_000,
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [
+        { id: "s1", amount: 100_000, discountRate: 0.2, roundPricePerShare: 1.0 },
+      ],
+      pendingConvertibles: [],
+    });
+    expect(ct.totals.safeOverhang).toBe(125_000);
+    expect(ct.totalFullyDiluted).toBe(10_125_000);
+    expect(ct.dilutionDataNeedsPricedRound).toBe(false);
+    // NB: the SAFE holder row (which makes this fixture foot to 100%) is added
+    // in Task 2.4. Here we assert the overhang share count + FD only.
+  });
+
+  it("takes the holder-favourable (lowest) of cap and discount price", () => {
+    // Cap path: 5,000,000 / 10,000,000 preMoneyFD = $0.50/share.
+    // Discount path: 1.00 × (1 − 0.20) = $0.80/share.
+    // Holder favours the lower price → cap → 100k / 0.50 = 200k shares.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 10_000_000,
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [
+        { id: "s1", amount: 100_000, valuationCap: 5_000_000, discountRate: 0.2, roundPricePerShare: 1.0 },
+      ],
+      pendingConvertibles: [],
+    });
+    expect(ct.totals.safeOverhang).toBe(200_000);
+    expect(ct.dilutionDataNeedsPricedRound).toBe(false);
+  });
+
+  it("does NOT fabricate overhang for a discount-only SAFE with no implied round price (H2)", () => {
+    // Pre-seed common case: a discount SAFE with no cap and no priced round to
+    // reference. We must NOT silently estimate 0 dilution as if there were none —
+    // we surface a data-availability "needs priced round" state instead.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 10_000_000,
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [
+        { id: "s1", amount: 100_000, discountRate: 0.2 }, // no cap, no roundPricePerShare
+      ],
+      pendingConvertibles: [],
+    });
+    expect(ct.totals.safeOverhang).toBe(0); // no fabrication
+    expect(ct.totalFullyDiluted).toBe(10_000_000);
+    // Data-availability signal: dilution is UNKNOWN, not zero.
+    expect(ct.dilutionDataNeedsPricedRound).toBe(true);
+  });
 });
