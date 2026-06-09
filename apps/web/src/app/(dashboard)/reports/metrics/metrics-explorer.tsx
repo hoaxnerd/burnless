@@ -196,7 +196,13 @@ export function MetricsExplorer({
           const data = metrics[def.key] as MetricValue[];
           const currentIdx = data.findIndex((d) => d.month === currentMonth);
           const resolvedIdx = currentIdx >= 0 ? currentIdx : data.length - 1;
-          const current = data[resolvedIdx]?.value ?? 0;
+          // Phase 5 §5.7: NaN-gated dark metrics ghost as "—", not "$NaN"/"$0".
+          // The raw value can be NaN (engine gate) or null (post unstable_cache
+          // JSON round-trip — JSON.stringify(NaN) === "null"); `?? 0` catches
+          // neither correctly, so gate on Number.isFinite of the RAW value.
+          const rawCurrent = data[resolvedIdx]?.value;
+          const hasData = Number.isFinite(rawCurrent);
+          const current = hasData ? (rawCurrent as number) : 0;
           const previous = resolvedIdx > 0 ? data[resolvedIdx - 1]?.value ?? 0 : 0;
           const isExpanded = expandedMetric === def.key;
 
@@ -227,16 +233,16 @@ export function MetricsExplorer({
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-surface-900 tabular-nums">
-                      {makeMetricFormatter(def.format, fmtCurrency)(current)}
+                      {hasData ? makeMetricFormatter(def.format, fmtCurrency)(current) : "—"}
                     </p>
-                    {resolvedIdx > 0 && (
+                    {hasData && resolvedIdx > 0 && (
                       <TrendIndicator current={current} previous={previous} />
                     )}
                   </div>
                 </div>
               </button>
 
-              {isExpanded && data.length > 0 && (
+              {isExpanded && hasData && data.length > 0 && (
                 <div className="px-4 pb-4">
                   <AreaChartWidget
                     data={data}
