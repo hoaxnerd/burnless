@@ -307,7 +307,7 @@ export function ExpensesView({
         forecastLines={forecastLines}
       />
     ),
-  }), [slotById, lowerIsBetterSlugs, summaryMetrics, expenseDetails, accountMap, departments, forecastLines, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
+  }), [slotById, lowerIsBetterSlugs, summaryMetrics, anomalyCount, recurringCount, expenseDetails, accountMap, departments, forecastLines, scenarioId, view, budgetTimeline, budgetCompareData, varianceData]);
 
   return (
     <PageLayoutProvider pageId="expenses">

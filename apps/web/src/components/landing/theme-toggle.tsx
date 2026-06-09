@@ -1,30 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon } from "lucide-react";
 
 const THEME_KEY = "burnless-theme";
+const THEME_EVENT = "burnless-theme-change";
 
 /* Landing theme toggle. The landing page defaults to light (see the blocking
    script in page.tsx); this lets a visitor override to dark. Persists to the
-   shared `burnless-theme` key so the choice carries into the app. */
-export function ThemeToggle() {
-  const [dark, setDark] = useState(false);
+   shared `burnless-theme` key so the choice carries into the app.
 
-  // Sync initial icon to the class the blocking script already applied.
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+   The dark flag is read from the live `<html class="dark">` (already applied by
+   the blocking script) via useSyncExternalStore rather than a mount effect: the
+   server snapshot is always false (matching the landing's light SSR default) so
+   there is no hydration mismatch, and there is no setState-inside-an-effect
+   (which the previous mount-effect introduced — a react-compiler lint error). */
+function subscribeTheme(callback: () => void) {
+  window.addEventListener(THEME_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(THEME_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+function getDarkSnapshot() {
+  return document.documentElement.classList.contains("dark");
+}
+function getDarkServerSnapshot() {
+  return false;
+}
+
+export function ThemeToggle() {
+  const dark = useSyncExternalStore(
+    subscribeTheme,
+    getDarkSnapshot,
+    getDarkServerSnapshot
+  );
 
   const toggle = () => {
     const next = !dark;
-    setDark(next);
     document.documentElement.classList.toggle("dark", next);
     try {
       localStorage.setItem(THEME_KEY, next ? "dark" : "light");
     } catch {
       /* localStorage unavailable — ignore */
     }
+    window.dispatchEvent(new Event(THEME_EVENT));
   };
 
   return (

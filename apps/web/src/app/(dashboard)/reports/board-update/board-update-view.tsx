@@ -418,7 +418,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
         </div>
       );
     })(),
-  }), [d]);
+  }), [d, slotById, lowerIsBetterSlugs, fmtDate]);
 
   return (
     <PageLayoutProvider pageId="reports/board-update">

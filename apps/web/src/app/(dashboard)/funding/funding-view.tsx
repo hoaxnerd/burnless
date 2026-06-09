@@ -177,7 +177,7 @@ export function FundingView({
         }}
       />
     ),
-  }), [slotById, rounds, foundersOwnership, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney]);
+  }), [slotById, rounds, foundersOwnership, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney, currency]);
 
 
   // Suppress unused variable warnings for props that are part of the interface

@@ -50,11 +50,13 @@ function ProductPanel() {
   const [analyzed, setAnalyzed] = useState(false);
 
   useEffect(() => {
-    if (prefersReducedMotion()) {
-      setAnalyzed(true);
-      return;
-    }
-    const t = setTimeout(() => setAnalyzed(true), 1900);
+    // Reduced-motion users skip the 1.9s reveal delay and see the insight
+    // immediately; everyone else gets the timed "analysing → insight" reveal.
+    // Both branches schedule the setState via a timer (0ms vs 1900ms) so the
+    // update never runs synchronously in the effect body (react-compiler:
+    // "Calling setState synchronously within an effect").
+    const delay = prefersReducedMotion() ? 0 : 1900;
+    const t = setTimeout(() => setAnalyzed(true), delay);
     return () => clearTimeout(t);
   }, []);
 

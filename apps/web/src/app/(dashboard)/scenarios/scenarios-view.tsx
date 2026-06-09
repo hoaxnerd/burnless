@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { PageProvider } from "@/components/providers/page-context";
 import { PromoteDialog } from "@/components/scenarios/promote-dialog";
 import { ScenarioCards } from "./scenario-cards";
+
+// "Is this the client?" flag via useSyncExternalStore: the server snapshot is
+// false and the client snapshot is true, so SSR + first client paint agree
+// (both false) and the value flips to true after hydration — same two-phase
+// behavior as a mount effect, but without a setState-inside-an-effect
+// (react-compiler: "Calling setState synchronously within an effect").
+const noopSubscribe = () => () => {};
+function useIsClient() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false
+  );
+}
 
 export interface ScenarioItem {
   id: string;
@@ -37,8 +51,7 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   // the server but differently on the client's first paint → a hydration mismatch
   // that makes React discard the tree and the dialog never appears. Opening only
   // after mount keeps SSR + first client render in agreement (both closed).
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
   const promoteOpen = mounted && !!promoteScenario && !dismissedPromote;
 
   const handlePromoteClose = () => {
