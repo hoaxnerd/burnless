@@ -17,12 +17,28 @@ const OLLAMA_URL = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1";
 const MODEL = process.env.AI_MODEL ?? "qwen3.5:9b";
 const TIMEOUT = 120_000;
 
-async function isOllamaReachable(): Promise<boolean> {
+/**
+ * Integration-test gate: the provider AND the exact model under test must both
+ * be available, else this whole suite is a no-op (green) — it never asserts
+ * against a missing local LLM. Previously this only checked endpoint
+ * reachability, so a running Ollama that lacked `qwen3.5:9b` produced a hard
+ * "404 model ... not found" instead of skipping. We now confirm the model is
+ * actually pulled (present in /api/tags) before running real chat calls.
+ */
+async function isOllamaModelAvailable(model: string): Promise<boolean> {
   try {
     const resp = await fetch("http://localhost:11434/api/tags", {
       signal: AbortSignal.timeout(5000),
     });
-    return resp.ok;
+    if (!resp.ok) return false;
+    const body = (await resp.json()) as {
+      models?: { name?: string; model?: string }[];
+    };
+    const names = (body.models ?? []).flatMap((m) =>
+      [m.name, m.model].filter((n): n is string => typeof n === "string")
+    );
+    // Match exact tag or the base name before the `:tag` suffix.
+    return names.some((n) => n === model || n.split(":")[0] === model.split(":")[0]);
   } catch {
     return false;
   }
@@ -32,9 +48,11 @@ describe("Tool Calling Integration (BUR-200)", () => {
   let ollamaAvailable = false;
 
   beforeAll(async () => {
-    ollamaAvailable = await isOllamaReachable();
+    ollamaAvailable = await isOllamaModelAvailable(MODEL);
     if (!ollamaAvailable) {
-      console.warn("⚠ Ollama not reachable — skipping tool-calling tests");
+      console.warn(
+        `⚠ Ollama model '${MODEL}' not available — skipping tool-calling tests`
+      );
     }
     resetProvider();
   });
