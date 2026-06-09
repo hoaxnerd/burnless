@@ -112,6 +112,11 @@ export interface ExpensePayloadInput {
   isRecurring?: boolean | null;
   vendor?: string | null;
   notes?: string | null;
+  /**
+   * Phase 4 §4.6 — stable line name a `custom_formula` expression can reference.
+   * null = unnamed (not referenceable by name). Bound to `forecastLines.name`.
+   */
+  name?: string | null;
   /** Explicit per-line category override; null = derive automatically. */
   subcategory?: string | null;
   departmentId?: string | null;

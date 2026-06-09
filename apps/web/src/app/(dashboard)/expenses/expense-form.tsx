@@ -46,6 +46,11 @@ export interface ExpenseRow {
   endDate: string | Date | null;
   vendor?: string | null;
   notes?: string | null;
+  /**
+   * Phase 4 §4.6 — stable line name a `custom_formula` expression can
+   * reference (`CloudCosts * 2`). Bound to the `forecastLines.name` column.
+   */
+  name?: string | null;
   /** Explicit per-line category override; null/"" = derive from account. */
   subcategory?: string | null;
   frequency?: Frequency | null;
@@ -166,6 +171,8 @@ export function ExpenseForm({
   const [departmentId, setDepartmentId] = useState<string>(initialValue?.departmentId ?? "");
   const [vendor, setVendor] = useState<string>(initialValue?.vendor ?? "");
   const [notes, setNotes] = useState<string>(initialValue?.notes ?? "");
+  // Phase 4 §4.6: optional stable line name (referenced by custom_formula).
+  const [name, setName] = useState<string>(initialValue?.name ?? "");
   // "" = Auto (derive from account); a value = explicit per-line override.
   const [subcategory, setSubcategory] = useState<string>(initialValue?.subcategory ?? "");
 
@@ -243,6 +250,7 @@ export function ExpenseForm({
       isRecurring,
       vendor: vendor.trim() === "" ? null : vendor.trim(),
       notes: notes.trim() === "" ? null : notes.trim(),
+      name: name.trim() === "" ? null : name.trim(),
       subcategory: subcategory.trim() === "" ? null : subcategory,
       departmentId: departmentId === "" ? null : departmentId,
       accountId,
@@ -352,6 +360,22 @@ export function ExpenseForm({
       <div>
         <label className="block text-sm font-medium text-surface-700 mb-1">Frequency</label>
         <FrequencySelector value={frequency} onChange={setFrequency} />
+      </div>
+
+      <div>
+        <label htmlFor="ef-name" className="block text-sm font-medium text-surface-700 mb-1">
+          Line name <span className="text-surface-400 font-normal">(optional)</span>
+        </label>
+        <Input
+          id="ef-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. CloudCosts"
+        />
+        <p className="mt-1 text-xs text-surface-400">
+          A stable name lets a Custom Formula reference this line (e.g. <code>CloudCosts * 2</code>).
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -501,10 +525,15 @@ function MethodFields({ method, parameters, onChange, sourceLines }: MethodField
           params={
             parameters as {
               expression: string;
-              variables?: Record<string, number | string>;
+              variables?: Record<string, number>;
             }
           }
           onChange={widen}
+          // Phase 4 §4.6: other lines' names (self already filtered from
+          // sourceLines), so the expression can reference them by name.
+          availableLineNames={sourceLines
+            .map((l) => l.name)
+            .filter((n): n is string => typeof n === "string" && n.trim() !== "")}
         />
       );
   }
