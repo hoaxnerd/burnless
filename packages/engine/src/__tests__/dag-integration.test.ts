@@ -152,6 +152,7 @@ describe("DAG-based forecast line resolution", () => {
 
 describe("buildForecastDependencyGraph", () => {
   const start = new Date(2026, 0, 1);
+  const end = new Date(2026, 2, 1); // 3 months
 
   it("builds graph with correct dependencies", () => {
     const lines: ForecastLineInput[] = [
@@ -173,6 +174,71 @@ describe("buildForecastDependencyGraph", () => {
 
     const graph = buildForecastDependencyGraph(lines);
     expect(graph.getDependencies("a").size).toBe(0);
+  });
+
+  it("adds dep→src edge from a custom_formula expression referencing a line by name (Phase 4 §4.3)", () => {
+    const lines: ForecastLineInput[] = [
+      { id: "src-id", accountId: "x", name: "src", method: "fixed", parameters: { amount: 100 }, startDate: start, endDate: null },
+      { id: "dep-id", accountId: "x", name: "dep", method: "custom_formula", parameters: { expression: "src * 0.5" }, startDate: start, endDate: null },
+    ];
+
+    const graph = buildForecastDependencyGraph(lines);
+    // dep depends on src (by id), derived from the expression token "src"
+    expect(graph.getDependencies("dep-id").has("src-id")).toBe(true);
+    expect(graph.getDependencies("src-id").size).toBe(0);
+  });
+
+  it("does NOT add edges for non-line tokens in a custom_formula expression (Phase 4 §4.3)", () => {
+    const lines: ForecastLineInput[] = [
+      { id: "src-id", accountId: "x", name: "src", method: "fixed", parameters: { amount: 100 }, startDate: start, endDate: null },
+      {
+        id: "dep-id",
+        accountId: "x",
+        name: "dep",
+        method: "custom_formula",
+        // max() is a function, pi is a constant, revenue is not a line name
+        parameters: { expression: "max(src, pi) + revenue * 0" },
+        startDate: start,
+        endDate: null,
+      },
+    ];
+
+    const graph = buildForecastDependencyGraph(lines);
+    const deps = graph.getDependencies("dep-id");
+    expect(deps.has("src-id")).toBe(true); // only the real line "src"
+    expect(deps.size).toBe(1); // max, pi, revenue produce NO edge
+  });
+
+  it("throws CircularDependencyError on an A↔B custom_formula cycle by name (Phase 4 §4.3)", () => {
+    const lines: ForecastLineInput[] = [
+      { id: "a-id", accountId: "x", name: "A", method: "custom_formula", parameters: { expression: "B * 2" }, startDate: start, endDate: null },
+      { id: "b-id", accountId: "x", name: "B", method: "custom_formula", parameters: { expression: "A * 2" }, startDate: start, endDate: null },
+    ];
+
+    expect(() => computeAllForecastLines(lines, start, end)).toThrow(
+      CircularDependencyError
+    );
+  });
+
+  it("computes a custom_formula cross-line reference by name, order-independent (Phase 4 §4.3)", () => {
+    const make = (lines: ForecastLineInput[]) => computeAllForecastLines(lines, start, end);
+
+    const zzz: ForecastLineInput = {
+      id: "zzz-id", accountId: "x", name: "zzz", method: "fixed", parameters: { amount: 100 }, startDate: start, endDate: null,
+    };
+    const aaa: ForecastLineInput = {
+      id: "aaa-id", accountId: "x", name: "aaa", method: "custom_formula", parameters: { expression: "zzz * 2" }, startDate: start, endDate: null,
+    };
+
+    // source-before-dependent
+    const r1 = make([zzz, aaa]);
+    // dependent-before-source (reversed) → must yield the SAME result
+    const r2 = make([aaa, zzz]);
+
+    expect(r1.get("aaa-id")!.get("2026-01")).toBe(200); // 100 * 2
+    expect(r2.get("aaa-id")!.get("2026-01")).toBe(200);
+    expect(r1.get("zzz-id")!.get("2026-01")).toBe(100);
+    expect(r2.get("zzz-id")!.get("2026-01")).toBe(100);
   });
 });
 

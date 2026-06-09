@@ -15,7 +15,7 @@ import type { MonthlySeries } from "./utils";
 
 // ── Allowed function whitelist ────────────────────────────────────────────────
 
-const ALLOWED_FUNCTIONS = new Set([
+export const ALLOWED_FUNCTIONS = new Set([
   "min",
   "max",
   "floor",

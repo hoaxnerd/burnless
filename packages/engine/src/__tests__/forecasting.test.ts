@@ -121,6 +121,26 @@ describe("forecasting", () => {
     });
   });
 
+  describe("custom_formula cross-line references by name (Phase 4 §4.3)", () => {
+    it("resolves a reference to another line by name (zzz fixed 100 → aaa = zzz*2 = 200)", () => {
+      const lines: ForecastLineInput[] = [
+        { id: "zzz-id", accountId: "a1", name: "zzz", method: "fixed", parameters: { amount: 100 }, startDate: start, endDate: null },
+        { id: "aaa-id", accountId: "a2", name: "aaa", method: "custom_formula", parameters: { expression: "zzz * 2" }, startDate: start, endDate: null },
+      ];
+      const results = computeAllForecastLines(lines, start, end);
+      expect(results.get("aaa-id")!.get("2026-01")).toBe(200);
+    });
+
+    it("is order-independent (dependent listed before source)", () => {
+      const lines: ForecastLineInput[] = [
+        { id: "aaa-id", accountId: "a2", name: "aaa", method: "custom_formula", parameters: { expression: "zzz * 2" }, startDate: start, endDate: null },
+        { id: "zzz-id", accountId: "a1", name: "zzz", method: "fixed", parameters: { amount: 100 }, startDate: start, endDate: null },
+      ];
+      const results = computeAllForecastLines(lines, start, end);
+      expect(results.get("aaa-id")!.get("2026-01")).toBe(200);
+    });
+  });
+
   describe("overrides", () => {
     it("uses override value when present", () => {
       const overrides = new Map([["2026-03", 9999]]);
