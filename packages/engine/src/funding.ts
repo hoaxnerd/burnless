@@ -438,7 +438,7 @@ export function computeSafeConversion(
   const candidates: Array<{ method: SafeConversionResult["method"]; price: Decimal }> = [
     { method: "priced", price: priced },
   ];
-  if (safeParams.valuationCap && safeParams.valuationCap > 0) {
+  if (safeParams.valuationCap && safeParams.valuationCap > 0 && preRoundFullyDilutedShares > 0) {
     const capPrice = D(safeParams.valuationCap).div(preRoundFullyDilutedShares);
     candidates.push({ method: "cap", price: capPrice });
   }
@@ -450,7 +450,9 @@ export function computeSafeConversion(
   // over "priced" — cap / discount terms are more specific and holder-favourable by convention.
   const winner = candidates.reduce((a, b) => (b.price.lte(a.price) ? b : a));
   const effectivePricePerShare = Number(winner.price.toFixed(6));
-  const sharesIssued = Math.floor(Number(D(safeAmount).div(winner.price).toFixed(0)));
+  const sharesIssued = winner.price.lte(0)
+    ? 0
+    : D(safeAmount).div(winner.price).floor().toNumber();
   return { method: winner.method, effectivePricePerShare, sharesIssued };
 }
 

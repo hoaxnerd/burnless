@@ -18,6 +18,22 @@ describe("computeConvertibleNote", () => {
     expect(result.sharesIssued).toBe(1_040_000);
   });
 
+  it("mirrors the true floor — $1000 note @ $6.6 priced → 151 shares", () => {
+    // Convertible delegates to computeSafeConversion, so the floor fix must mirror.
+    // $1000 / $6.6 = 151.515... → floor 151, not rounded-up 152.
+    const result = computeConvertibleNote({
+      noteAmount: 1_000,
+      noteParams: { interestRate: 0 },
+      issueDate: "2026-01-01",
+      conversionDate: "2026-01-01",
+      qualifiedRoundPreMoney: 6_600_000,
+      qualifiedRoundPricePerShare: 6.6,
+      preRoundFullyDilutedShares: 1_000_000,
+    });
+    expect(result.method).toBe("priced");
+    expect(result.sharesIssued).toBe(151);
+  });
+
   it("handles zero interest rate", () => {
     const result = computeConvertibleNote({
       noteAmount: 500_000,
