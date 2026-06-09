@@ -16,7 +16,35 @@ import { DataEmptyState } from "@/components/ui";
  */
 type CapTableWithEmpty = CapTable & { isEmpty?: boolean };
 
-export function CapTableView({ capTable }: { capTable: CapTableWithEmpty }) {
+/**
+ * Raw share-class row as persisted (server-wired via U1). Share counts are
+ * `numeric(18,0)` columns — they arrive as STRINGS (cap-table contract). The
+ * UI is currency-agnostic: render share counts as-is, never recompute footing.
+ */
+export interface ShareClassRow {
+  id: string;
+  name: string;
+  classType: "common" | "preferred";
+  totalAuthorized: string;
+  totalIssued: string;
+}
+
+/** Raw option-pool row as persisted (server-wired via U1). */
+export interface OptionPoolRow {
+  id: string;
+  name: string;
+  totalReserved: string;
+}
+
+export function CapTableView({
+  capTable,
+  shareClasses = [],
+  optionPools = [],
+}: {
+  capTable: CapTableWithEmpty;
+  shareClasses?: ShareClassRow[];
+  optionPools?: OptionPoolRow[];
+}) {
   const { fmtPercent } = useLocale();
   const fd = capTable.totalFullyDiluted;
   const isEmpty =
@@ -94,6 +122,60 @@ export function CapTableView({ capTable }: { capTable: CapTableWithEmpty }) {
           ))}
         </tbody>
       </table>
+
+      {(shareClasses.length > 0 || optionPools.length > 0) && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Capital Structure</h2>
+
+          {shareClasses.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Share Class</th>
+                  <th className="text-left p-2">Type</th>
+                  <th className="text-right p-2">Issued</th>
+                  <th className="text-right p-2">Authorized</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shareClasses.map((sc) => (
+                  <tr key={sc.id} className="border-b">
+                    <td className="p-2">{sc.name}</td>
+                    <td className="p-2 capitalize">{sc.classType}</td>
+                    <td className="p-2 text-right">
+                      {Number(sc.totalIssued).toLocaleString()}
+                    </td>
+                    <td className="p-2 text-right">
+                      {Number(sc.totalAuthorized).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {optionPools.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Option Pool</th>
+                  <th className="text-right p-2">Reserved</th>
+                </tr>
+              </thead>
+              <tbody>
+                {optionPools.map((op) => (
+                  <tr key={op.id} className="border-b">
+                    <td className="p-2">{op.name}</td>
+                    <td className="p-2 text-right">
+                      {Number(op.totalReserved).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
     </div>
   );
 }

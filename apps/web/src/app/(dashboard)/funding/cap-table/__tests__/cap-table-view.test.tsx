@@ -2,7 +2,36 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { CapTable } from "@burnless/engine";
 import { LocaleProvider } from "@/components/locale/locale-context";
-import { CapTableView } from "../cap-table-view";
+import { CapTableView, type ShareClassRow, type OptionPoolRow } from "../cap-table-view";
+
+function shareClassRows(): ShareClassRow[] {
+  return [
+    {
+      id: "sc-common",
+      name: "Common Stock",
+      classType: "common",
+      totalAuthorized: "10000000",
+      totalIssued: "8000000",
+    },
+    {
+      id: "sc-pref",
+      name: "Series Seed Preferred",
+      classType: "preferred",
+      totalAuthorized: "3000000",
+      totalIssued: "2000000",
+    },
+  ];
+}
+
+function optionPoolRows(): OptionPoolRow[] {
+  return [
+    {
+      id: "op-1",
+      name: "2026 Equity Incentive Plan",
+      totalReserved: "1500000",
+    },
+  ];
+}
 
 function emptyCapTable(): CapTable & { isEmpty: boolean } {
   return {
@@ -86,5 +115,22 @@ describe("CapTableView", () => {
       .getAllByRole("link")
       .filter((a) => a.getAttribute("href") === "/funding");
     expect(fundingLinks.length).toBeGreaterThan(0);
+  });
+
+  it("renders the raw share-class + option-pool structure rows from props (U1)", () => {
+    render(
+      <LocaleProvider>
+        <CapTableView
+          capTable={populatedCapTable()}
+          shareClasses={shareClassRows()}
+          optionPools={optionPoolRows()}
+        />
+      </LocaleProvider>,
+    );
+
+    // The raw structure rows wired through from the server must be visible.
+    expect(screen.getByText("Common Stock")).toBeInTheDocument();
+    expect(screen.getByText("Series Seed Preferred")).toBeInTheDocument();
+    expect(screen.getByText("2026 Equity Incentive Plan")).toBeInTheDocument();
   });
 });
