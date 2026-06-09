@@ -31,7 +31,6 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 import type { NavItem, QuickAction, QuickActionMode, UserInfo } from "./nav-config";
 import { SortableNavItem } from "./sortable-nav-item";
-import { QuickActionModeButton } from "./quick-action-mode-button";
 
 export interface SidebarInnerProps {
   collapsed: boolean;

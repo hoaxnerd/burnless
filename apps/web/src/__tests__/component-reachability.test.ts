@@ -38,9 +38,23 @@ const SCAN_ROOTS = [join(SRC, "app"), join(SRC, "components")];
  * Paths are relative to src/ with forward slashes.
  */
 const ALLOWLIST = new Set<string>([
-  // (none yet — there are no storybook/fixture component files in the tree
-  //  today; add here with a justification if a genuine isolated-render-only
-  //  component is introduced, e.g. "components/__stories__/foo.stories.tsx")
+  // ── Deliberately-deferred features (Batch I triage) ──────────────────────
+  // Built but intentionally not mounted yet. Each is a conscious deferral, not a
+  // dead-code orphan — kept (not deleted) so the work isn't lost. Remove from
+  // this list when the feature is wired.
+  //
+  // Bank-sync (Plaid / Account-Aggregator) import UI — connectors are still
+  // provider stubs (@burnless/engine bank-connectors). Imported by import-flow
+  // behind an unmounted `showBankSync` flag; mount when bank sync ships.
+  "app/(dashboard)/import/bank-sync-panel.tsx",
+  // Landing social-proof / integrations bar — commented out in app/page.tsx
+  // ("restore when live"); waiting on real integration logos/metrics.
+  "components/landing/social-proof.tsx",
+  // Deterministic (non-AI) expense/revenue insight fallbacks — commented out in
+  // expenses-view / revenue-view ("disabled — redundant with AI-generated
+  // insights"). Kept as the offline/AI-disabled fallback path.
+  "app/(dashboard)/expenses/expense-insights.tsx",
+  "app/(dashboard)/revenue/revenue-insights.tsx",
 ]);
 
 function walk(dir: string): string[] {

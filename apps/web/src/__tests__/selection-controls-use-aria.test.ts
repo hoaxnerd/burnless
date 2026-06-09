@@ -33,8 +33,11 @@ const SRC = join(__dirname, "..");
 
 // The specific segmented/toggle/mode control files this guard pins.
 const TARGET_FILES = [
-  "app/(dashboard)/ai/_components/ai-permissions-panel.tsx", // AI-03 permission-level buttons
-  "app/(dashboard)/dashboard/mode-switcher.tsx", // dashboard intelligence/dynamic/custom mode toggle
+  "app/(dashboard)/ai/_components/ai-permissions-panel.tsx", // AI-03 permission-level buttons (via SegmentedControl)
+  // mode-switcher.tsx (deleted in Batch I — dead/unwired) carried inline aria;
+  // the live canonical toggle is now the shared SegmentedControl primitive, which
+  // ai-permissions-panel and other toggles render.
+  "components/ui/segmented-control.tsx", // role="radio" + aria-checked (A11Y-CTRL-02 single-source)
 ];
 
 // A button "reflects selection state" if its open tag (or the className
