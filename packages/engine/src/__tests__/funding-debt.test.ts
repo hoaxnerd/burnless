@@ -21,6 +21,35 @@ describe("computeDebt", () => {
     expect(result.draws.get("2026-02") ?? 0).toBe(0);
   });
 
+  it("straight-line residual: 100k/12 → months 1–11 = 8333.33, month 12 = 8333.37, Σ = 100000", () => {
+    const result = computeDebt({
+      principal: 100_000,
+      debtParams: { interestRate: 0.12, termMonths: 12, repaymentSchedule: "straight_line" },
+      issueDate: "2026-01-01",
+      months,
+    });
+    for (let i = 0; i < 11; i++) {
+      expect(result.principalPayments.get(months[i])).toBe(8333.33);
+    }
+    expect(result.principalPayments.get("2026-12")).toBe(8333.37);
+    const sum = months.reduce((acc, m) => acc + (result.principalPayments.get(m) ?? 0), 0);
+    expect(Math.round(sum * 100) / 100).toBe(100_000);
+  });
+
+  it("termMonths=0: only the draw, no principal/interest, no divide-by-zero", () => {
+    const result = computeDebt({
+      principal: 100_000,
+      debtParams: { interestRate: 0.12, termMonths: 0, repaymentSchedule: "straight_line" },
+      issueDate: "2026-01-01",
+      months,
+    });
+    expect(result.draws.get("2026-01")).toBe(100_000);
+    for (const m of months) {
+      expect(result.principalPayments.get(m) ?? 0).toBe(0);
+      expect(result.interestExpense.get(m) ?? 0).toBe(0);
+    }
+  });
+
   it("interest_only: zero principal until final month (balloon)", () => {
     const result = computeDebt({
       principal: 120_000,

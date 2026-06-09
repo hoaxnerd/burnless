@@ -507,24 +507,28 @@ export function computeDebt(input: DebtComputeInput): DebtComputeResult {
   }
   if (months.includes(issueKey)) draws.set(issueKey, principal);
 
+  // Phase 3.1 §3.1: termMonths===0 guard — only the draw, no principal/interest, no divide-by-zero.
+  const term = debtParams.termMonths;
+  if (term <= 0) return { draws, interestExpense, principalPayments };
+
   let balance = D(principal);
   let monthsPaid = 0;
   for (const m of months) {
     if (m < firstPay) continue;
-    if (monthsPaid >= debtParams.termMonths) break;
+    if (monthsPaid >= term) break;
 
     const interest = dRound2(balance.mul(monthlyRate));
     interestExpense.set(m, Number(interest));
 
-    let principalThisMonth = D(0);
+    // Phase 3.1 §3.1: final scheduled month pays the remaining balance (residual)
+    // so Σprincipal === principal exactly (no rounding drift).
+    const isFinalScheduled = monthsPaid === term - 1;
+    let roundedPrincipal = D(0);
     if (schedule === "straight_line") {
-      principalThisMonth = D(principal).div(debtParams.termMonths);
+      roundedPrincipal = isFinalScheduled ? dRound2(balance) : dRound2(D(principal).div(term));
     } else if (schedule === "interest_only") {
-      if (monthsPaid === debtParams.termMonths - 1) {
-        principalThisMonth = balance;
-      }
+      if (isFinalScheduled) roundedPrincipal = dRound2(balance);
     }
-    const roundedPrincipal = dRound2(principalThisMonth);
     principalPayments.set(m, Number(roundedPrincipal));
     balance = balance.minus(roundedPrincipal);
     monthsPaid += 1;
