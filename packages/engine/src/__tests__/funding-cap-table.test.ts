@@ -112,4 +112,58 @@ describe("computeCapTable", () => {
     // Data-availability signal: dilution is UNKNOWN, not zero.
     expect(ct.dilutionDataNeedsPricedRound).toBe(true);
   });
+
+  it("emits a SAFE holder row so the cap table foots to 100% (FAIL-2b)", () => {
+    // $500k SAFE @ $5M cap, preMoneyFD 10M → cap price $0.50 → 1,000,000 shares.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 10_000_000,
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [{ id: "s1", amount: 500_000, valuationCap: 5_000_000 }],
+      pendingConvertibles: [],
+    });
+    expect(ct.totals.safeOverhang).toBe(1_000_000);
+    expect(ct.totalFullyDiluted).toBe(11_000_000);
+    const safeRow = ct.rows.find((r) => r.shareClass === "SAFE");
+    expect(safeRow?.shares).toBe(1_000_000);
+    expect(safeRow?.ownershipPercent).toBeCloseTo(1_000_000 / 11_000_000, 6);
+    // Foots to 100%.
+    const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
+    expect(sumShares).toBe(ct.totalFullyDiluted);
+    const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);
+    expect(sumOwnership).toBeCloseTo(1.0, 6);
+  });
+
+  it("converts a convertible note at principal + ACT/365 accrued interest, emits a holder row (FAIL-2b, L1)", () => {
+    // $1M convertible @ 8%/yr, $10M cap. Issued 2026-01-01, valued asOf 2026-07-01 (181 days).
+    // ACT/365 accrual (consistent with Phase 3.3): 1,000,000 × 0.08 × 181/365 = 39,671.23.
+    // Principal + interest = 1,039,671.23. preMoneyFD 10M → cap price $1.00 →
+    // 1,039,671.23 / 1.00 floored = 1,039,671 shares.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 10_000_000,
+      asOfDate: "2026-07-01",
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [],
+      pendingConvertibles: [
+        { id: "c1", amount: 1_000_000, valuationCap: 10_000_000, interestRate: 0.08, issueDate: "2026-01-01" },
+      ],
+    });
+    expect(ct.totals.safeOverhang).toBe(1_039_671);
+    expect(ct.totalFullyDiluted).toBe(11_039_671);
+    const convRow = ct.rows.find((r) => r.shareClass === "Convertible");
+    expect(convRow?.shares).toBe(1_039_671);
+    expect(convRow?.ownershipPercent).toBeCloseTo(1_039_671 / 11_039_671, 6);
+    // Foots to 100% including the convertible row.
+    const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
+    expect(sumShares).toBe(ct.totalFullyDiluted);
+    const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);
+    expect(sumOwnership).toBeCloseTo(1.0, 6);
+  });
 });

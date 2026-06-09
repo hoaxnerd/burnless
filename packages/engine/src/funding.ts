@@ -148,6 +148,12 @@ export interface FundingImpact {
 export interface CapTableInput {
   foundersOwnershipPercent: number;
   foundersTotalShares: number;
+  /**
+   * Valuation date for convertible accrued-interest (FAIL-2b, review L1).
+   * Convertibles accrue principal + ACT/365 interest from their `issueDate`
+   * up to this date. Defaults to "today" when omitted.
+   */
+  asOfDate?: string;
   shareClasses: ShareClassInput[];
   optionPools: OptionPoolInput[];
   pendingSafes: Array<{
@@ -235,13 +241,40 @@ export function computeCapTable(input: CapTableInput): CapTable {
     return price.lte(0) ? 0 : D(inst.amount).div(price).floor().toNumber();
   };
 
-  const safeOverhang = input.pendingSafes.reduce(
-    (sum, s) => sum + overhangShares(s),
-    0,
-  );
-  const convertibleOverhang = input.pendingConvertibles.reduce(
-    // convertibleConvertedAmount stub — principal only until Task 2.4 adds accrued interest.
-    (sum, c) => sum + overhangShares({ ...c, amount: c.amount }),
+  // A convertible note converts principal + accrued interest (FAIL-2b). Accrual
+  // uses ACT/365 day-count from the note's issueDate to the cap-table asOfDate,
+  // consistent with the convertible schedule (Phase 3.3, review L1) so the
+  // schedule and the cap table report the same accrued interest. Conversion
+  // before issue (or no issueDate/rate) accrues 0 — never negative.
+  const asOf = new Date(input.asOfDate ?? new Date().toISOString().slice(0, 10));
+  const convertibleConvertedAmount = (c: {
+    amount: number;
+    interestRate?: number;
+    issueDate?: string;
+  }): number => {
+    if (!c.interestRate || c.interestRate <= 0 || !c.issueDate) return c.amount;
+    const issue = new Date(c.issueDate);
+    const daysElapsed = Math.max(
+      0,
+      Math.round((asOf.getTime() - issue.getTime()) / 86_400_000),
+    );
+    const accrued = D(c.amount).mul(c.interestRate).mul(D(daysElapsed).div(365));
+    return Number(D(c.amount).plus(accrued).toFixed(2));
+  };
+
+  // Per-instrument share counts (kept for holder-row emission so rows foot).
+  const safeShares = input.pendingSafes.map((s) => ({
+    inst: s,
+    shares: overhangShares(s),
+  }));
+  const convertibleShares = input.pendingConvertibles.map((c) => ({
+    inst: c,
+    shares: overhangShares({ ...c, amount: convertibleConvertedAmount(c) }),
+  }));
+
+  const safeOverhang = safeShares.reduce((sum, x) => sum + x.shares, 0);
+  const convertibleOverhang = convertibleShares.reduce(
+    (sum, x) => sum + x.shares,
     0,
   );
 
@@ -272,6 +305,26 @@ export function computeCapTable(input: CapTableInput): CapTable {
       shareClass: "Option Pool",
       shares: unissued,
       ownershipPercent: totalFullyDiluted > 0 ? unissued / totalFullyDiluted : 0,
+    });
+  }
+  // SAFE / convertible holder rows so the table foots to 100% (FAIL-2b).
+  // Zero-share instruments (e.g. discount-only with no priced round) are skipped.
+  for (const { inst, shares } of safeShares) {
+    if (shares <= 0) continue;
+    rows.push({
+      holder: inst.id,
+      shareClass: "SAFE",
+      shares,
+      ownershipPercent: totalFullyDiluted > 0 ? shares / totalFullyDiluted : 0,
+    });
+  }
+  for (const { inst, shares } of convertibleShares) {
+    if (shares <= 0) continue;
+    rows.push({
+      holder: inst.id,
+      shareClass: "Convertible",
+      shares,
+      ownershipPercent: totalFullyDiluted > 0 ? shares / totalFullyDiluted : 0,
     });
   }
 
