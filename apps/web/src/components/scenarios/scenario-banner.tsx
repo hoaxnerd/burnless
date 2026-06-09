@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { AlertTriangle, X, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
 import { useScenario } from "./scenario-context";
 import { useRouter } from "next/navigation";
@@ -10,11 +9,6 @@ import { useScenario as useScenarioSWR, useOverrideCount } from "@/lib/swr";
 export function ScenarioBanner() {
   const { isInScenarioMode, activeScenarioId, activeScenarioName, exitScenario } = useScenario();
   const router = useRouter();
-
-  // SCN-08: the /scenarios/compare RSC is force-dynamic + slow, so the button
-  // reads as dead. Wrap the navigation in a transition and drive the Button's
-  // pending state from isPending so the user sees a spinner immediately.
-  const [isComparePending, startCompareTransition] = useTransition();
 
   // If we have an ID but no name (e.g. direct URL navigation), read it from the
   // shared SWR cache rather than a private snapshot fetch — only when the context
@@ -40,8 +34,12 @@ export function ScenarioBanner() {
   // Page reads `ids` (comma-separated). First id = base side, second = compare side.
   // Use literal "base" for the current plan; comparison-view has a matching option.
   const compareUrl = `/scenarios/compare?ids=base,${activeScenarioId}`;
-  const goToCompare = () =>
-    startCompareTransition(() => router.push(compareUrl));
+  // Navigate plainly (NOT inside a transition): the compare RSC is force-dynamic
+  // and slow (N+1 override counts), and a transition would keep the user on THIS
+  // page with the button spinning until that RSC fully resolves — reading as
+  // "nothing happens". A plain push commits immediately and the compare page shows
+  // its own "Loading comparison…" Suspense fallback while the data streams in.
+  const goToCompare = () => router.push(compareUrl);
   const changeLabel =
     overrideCount !== null
       ? `${overrideCount} change${overrideCount !== 1 ? "s" : ""} from base`
@@ -68,7 +66,6 @@ export function ScenarioBanner() {
           variant="ghost"
           size="sm"
           icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
-          state={isComparePending ? "loading" : "idle"}
           onClick={goToCompare}
           className="!text-white bg-white/15 hover:!bg-white/25 active:!bg-white/30 border-0"
         >

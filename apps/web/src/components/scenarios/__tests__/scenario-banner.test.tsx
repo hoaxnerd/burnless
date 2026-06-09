@@ -1,10 +1,11 @@
 /**
- * SCN-08 — ScenarioBanner "Compare with Base" pending affordance.
+ * ScenarioBanner "Compare with Base" navigation.
  *
- * The /scenarios/compare RSC is force-dynamic and slow, so the button reads as
- * dead without feedback. The push is wrapped in useTransition() and the Button's
- * pending state is driven from isPending. We assert the Button shows its loading
- * state while the transition is pending.
+ * The /scenarios/compare RSC is force-dynamic and slow (N+1 override counts). The
+ * navigation is a PLAIN router.push (NOT wrapped in useTransition): a transition
+ * would hold the user on the current page with the button spinning until that slow
+ * RSC fully resolved ("nothing happens"), whereas a plain push commits immediately
+ * and the compare page shows its own "Loading comparison…" Suspense fallback.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -31,47 +32,33 @@ vi.mock("@/lib/swr", () => ({
   useOverrideCount: () => ({ data: { count: 3 } }),
 }));
 
-// Drive useTransition so isPending is true synchronously while the callback runs,
-// letting us assert the Button's loading state during the pending window.
-let pendingFlag = false;
-vi.mock("react", async () => {
-  const actual = await vi.importActual<typeof import("react")>("react");
-  return {
-    ...actual,
-    useTransition: () =>
-      [
-        pendingFlag,
-        (cb: () => void) => {
-          pendingFlag = true;
-          cb();
-        },
-      ] as const,
-  };
-});
-
 import { ScenarioBanner } from "../scenario-banner";
 
-describe("ScenarioBanner — SCN-08 compare pending affordance", () => {
+describe("ScenarioBanner — compare navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    pendingFlag = false;
   });
 
-  it("wraps the compare navigation in a transition (router.push called)", () => {
+  it("navigates to the compare page (base vs active scenario) on click", () => {
     render(<ScenarioBanner />);
-    const button = screen.getByRole("button", { name: /compare with base/i });
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: /compare with base/i }));
     expect(mockPush).toHaveBeenCalledWith("/scenarios/compare?ids=base,scn-1");
   });
 
-  it("shows the Button loading state while the transition is pending", () => {
-    // Render with the transition already pending → Button must show its spinner
-    // and be disabled (Button state='loading').
-    pendingFlag = true;
+  it("the change-count link also opens the compare page", () => {
+    render(<ScenarioBanner />);
+    fireEvent.click(screen.getByRole("button", { name: /3 changes from base/i }));
+    expect(mockPush).toHaveBeenCalledWith("/scenarios/compare?ids=base,scn-1");
+  });
+
+  it("does NOT disable/spin the compare button (plain push, no transition hold)", () => {
     render(<ScenarioBanner />);
     const button = screen.getByRole("button", {
       name: /compare with base/i,
     }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    // Plain navigation — the button never enters a stuck loading/disabled state;
+    // loading feedback comes from the destination page's Suspense fallback.
+    expect(button.disabled).toBe(false);
   });
 });
