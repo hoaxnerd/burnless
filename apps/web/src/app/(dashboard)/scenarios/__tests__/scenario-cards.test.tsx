@@ -8,7 +8,7 @@
  *         submitting empty/unchanged name skips the fetch.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "@/components/ui/toast";
 import type { ReactElement } from "react";
@@ -145,6 +145,12 @@ describe("ScenarioCards — SCN-01: delete active scenario exits scenario mode",
     const deleteBtn = screen.getByRole("button", { name: /^delete$/i });
     await userEvent.click(deleteBtn);
 
+    // SCN-02: a confirm dialog now gates the destructive delete — confirm it.
+    const confirmDialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: /^delete$/i })
+    );
+
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
         "/api/scenarios/scn-active",
@@ -172,6 +178,12 @@ describe("ScenarioCards — SCN-01: delete active scenario exits scenario mode",
     const deleteBtn = screen.getByRole("button", { name: /^delete$/i });
     await userEvent.click(deleteBtn);
 
+    // SCN-02: a confirm dialog now gates the destructive delete — confirm it.
+    const confirmDialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: /^delete$/i })
+    );
+
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
         "/api/scenarios/scn-other",
@@ -197,6 +209,12 @@ describe("ScenarioCards — SCN-01: delete active scenario exits scenario mode",
 
     const deleteBtn = screen.getByRole("button", { name: /^delete$/i });
     await userEvent.click(deleteBtn);
+
+    // SCN-02: a confirm dialog now gates the destructive delete — confirm it.
+    const confirmDialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: /^delete$/i })
+    );
 
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
     expect(mockExitScenario).not.toHaveBeenCalled();

@@ -7,8 +7,10 @@
  * so consumers get full type safety without importing key constants.
  */
 
+import { useEffect } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 import { KEYS } from "./keys";
+import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
 
 // ── Type imports ────────────────────────────────────────────────────────────
 
@@ -307,8 +309,21 @@ export function useOverrideCount(
   scenarioId: string | null,
   config?: SWRConfiguration<{ count: number }>,
 ) {
-  return useSWR<{ count: number }>(
+  const swr = useSWR<{ count: number }>(
     scenarioId ? KEYS.scenarioOverrideCount(scenarioId) : null,
     { ...config },
   );
+  // SCN-05: the scenario-head change counter must update the instant a
+  // scenario-aware edit lands — not only on focus/reload. Editing an expense /
+  // headcount / revenue / funding row in scenario mode writes an override, and
+  // apiFetch publishes a financial MutationEvent; revalidate the count on it
+  // (same-tab AND cross-tab). No-op when no scenario is active (key is null).
+  const { mutate } = swr;
+  useEffect(() => {
+    if (!scenarioId) return;
+    return subscribeMutation((e) => {
+      if (FINANCIAL_DOMAINS.has(e.domain)) void mutate();
+    });
+  }, [scenarioId, mutate]);
+  return swr;
 }

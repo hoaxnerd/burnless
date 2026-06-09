@@ -62,7 +62,7 @@ export function RevenueStreamBreakdown({
 }: RevenueStreamBreakdownProps) {
   const router = useRouter();
   const { fmtPercent } = useLocale();
-  const { error: toastError } = useToast();
+  const { success, error: toastError } = useToast();
   const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -93,7 +93,10 @@ export function RevenueStreamBreakdown({
         throw new Error(data.error ?? "Failed to update revenue stream");
       }
       setEditingStream(null);
+      success("Revenue stream updated");
       router.refresh();
+    } catch (err) {
+      toastError(toUserMessage(err));
     } finally {
       setEditSubmitting(false);
     }

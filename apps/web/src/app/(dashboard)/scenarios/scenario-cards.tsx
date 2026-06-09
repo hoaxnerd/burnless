@@ -21,7 +21,7 @@ import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { useToast } from "@/components/ui/toast";
 import { useLocale } from "@/components/locale/locale-context";
 import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
-import { Modal, FormField, Button } from "@/components/ui";
+import { Modal, FormField, Button, useConfirm } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   useScenarios,
@@ -144,6 +144,8 @@ export function ScenarioCards({
 }) {
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
   const { fmtDate } = useLocale();
+  // SCN-02: destructive delete needs an explicit confirm (card menu + backup button).
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -204,8 +206,16 @@ export function ScenarioCards({
   };
 
   const deleteScenario = async (id: string) => {
-    setDeletingId(id);
     setMenuOpenId(null);
+    // SCN-02: confirm before this destructive, irreversible action.
+    const ok = await confirm({
+      title: "Delete scenario?",
+      body: "This permanently removes the scenario and all its changes from base. This can't be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeletingId(id);
     try {
       const res = await apiFetch(`/api/scenarios/${id}`, {
         method: "DELETE",
@@ -283,6 +293,13 @@ export function ScenarioCards({
         throw new Error(body?.error ?? "Failed to rename scenario");
       }
       toast.success("Scenario renamed");
+      // SCN-03: if the renamed scenario is the ACTIVE one, refresh the banner's
+      // name immediately via the sanctioned context path (updates cookie/session
+      // + state) — otherwise the banner shows the stale pre-rename name until the
+      // next reconcile tick.
+      if (renameTarget.id === activeScenarioId) {
+        enterScenario(renameTarget.id, trimmed);
+      }
       setRenameTarget(null);
       router.refresh();
     } catch (err) {
@@ -687,6 +704,9 @@ export function ScenarioCards({
           </div>
         </div>
       </Modal>
+
+      {/* SCN-02: shared delete-confirmation dialog (card menu + backup button). */}
+      {confirmDialog}
     </div>
   );
 }
