@@ -15,8 +15,21 @@ import { join } from "node:path";
  * across all *.ts/*.tsx under apps/web/src (excluding test files), after
  * excluding React identifiers (onConfirm, confirmText, confirmLabel,
  * requiresConfirmation) and `.confirm(`-style method calls on objects.
- * Expected: 4 offenders. When they migrate to useConfirm()/<ConfirmDialog>,
- * this turns green.
+ *
+ * Accuracy carve-outs (NOT silencing — these remove false positives, the
+ * native dialogs they could mask are still caught):
+ *   1. Comments are stripped before matching. Prose like "the rename prompt
+ *      (skip path)" or "explicit confirm (card menu)" is documentation, not a
+ *      call. (line `//`, trailing `//`, and `/* … *\/` block comments).
+ *   2. The themed `useConfirm()` helper resolves to a bare `confirm(opts)`
+ *      call. In a file that imports/uses `useConfirm`, a bare `confirm(` is the
+ *      app's own confirm primitive — the replacement for the native dialog, not
+ *      a violation. `window.confirm(` / `window.alert(` / `window.prompt(` and
+ *      bare `alert(` / `prompt(` are ALWAYS still flagged, in every file.
+ *
+ * Expected after Phase 6 cleanup: 0 offenders (the last native dialog,
+ * invite-codes-tab.tsx, migrated to useConfirm()). When a new native dialog is
+ * introduced, this turns red again.
  */
 
 const SRC_ROOT = join(__dirname, "..");
@@ -61,6 +74,21 @@ function listSources(dir: string): string[] {
  */
 const NATIVE_DIALOG = /(?<![.\w])(?:window\.)?(confirm|alert|prompt)\s*\(/g;
 
+/** Always-native: `window.`-prefixed dialogs, or bare `alert(`/`prompt(`. */
+const ALWAYS_NATIVE = /(?<![.\w])(?:window\.(?:confirm|alert|prompt)|alert|prompt)\s*\(/;
+
+/**
+ * Strip comments so prose mentioning "confirm" / "prompt" inside a `//` or
+ * `/* … *\/` comment is not mis-read as a call. Crude (string-literal-unaware)
+ * but sufficient for this guard — it only ever risks UNDER-reporting inside a
+ * string, and there are no native-dialog calls hidden in string literals.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+}
+
 describe("no-native-dialogs (S2-NATIVE-DIALOG / MODAL-SYS-02)", () => {
   it("uses the app Modal/ConfirmDialog — never native window.confirm/alert/prompt", () => {
     const files = listSources(SRC_ROOT)
@@ -71,13 +99,22 @@ describe("no-native-dialogs (S2-NATIVE-DIALOG / MODAL-SYS-02)", () => {
 
     const offenders: string[] = [];
     for (const { abs, rel } of files) {
-      const src = readFileSync(abs, "utf8");
-      const lines = src.split("\n");
+      const raw = readFileSync(abs, "utf8");
+      // A file that uses the themed `useConfirm()` hook gets to call the bare
+      // `confirm(...)` helper it returns — that bare call is the SANCTIONED
+      // replacement, not a native dialog. `window.confirm(` etc. stay flagged.
+      const usesThemedConfirm = /\buseConfirm\b/.test(raw);
+      const lines = stripComments(raw).split("\n");
       lines.forEach((line, i) => {
         NATIVE_DIALOG.lastIndex = 0;
         let m: RegExpExecArray | null;
         while ((m = NATIVE_DIALOG.exec(line))) {
-          offenders.push(`${rel}:${i + 1} ${m[0].trim()}`);
+          const matched = m[0].trim();
+          // The themed-confirm carve-out only covers the bare `confirm(`
+          // identifier; anything always-native is still an offender.
+          const alwaysNative = ALWAYS_NATIVE.test(matched);
+          if (m[1] === "confirm" && !alwaysNative && usesThemedConfirm) continue;
+          offenders.push(`${rel}:${i + 1} ${matched}`);
         }
       });
     }

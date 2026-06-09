@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import type { InviteCode, CodeFormData } from "./invite-codes-types";
 import {
@@ -58,6 +59,9 @@ export function InviteCodesTab() {
 
   // Copy feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // SET-09 / MODAL-SYS-02 — themed confirm for the destructive hard-delete.
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const reloadCodes = () => revalidate(KEYS.adminInviteCodes);
 
@@ -145,12 +149,13 @@ export function InviteCodesTab() {
   // affordance (server returns 409); deactivate via the toggle instead.
   const deleteCode = async (code: InviteCode) => {
     if (code.currentRedemptions > 0) return;
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Permanently delete invite code ${code.code}? This can't be undone.`)
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete invite code?",
+      body: `Permanently delete invite code ${code.code}? This can't be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await apiFetch(`/api/admin/invite-codes/${code.id}`, {
       method: "DELETE",
     });
@@ -448,6 +453,9 @@ export function InviteCodesTab() {
         onClose={() => setRedemptionsCode(null)}
         code={redemptionsCode}
       />
+
+      {/* SET-09 / MODAL-SYS-02 — themed delete-confirmation dialog. */}
+      {confirmDialog}
     </div>
   );
 }
