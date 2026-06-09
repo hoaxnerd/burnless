@@ -649,6 +649,13 @@ export const equityGrantTypeEnum = pgEnum("equity_grant_type", [
   "rsu",
 ]);
 
+// FAIL-4b: classify share classes by an explicit enum, not a /common/i name
+// regex. "common" folds into the founders row; "preferred" emits its own row.
+export const shareClassTypeEnum = pgEnum("share_class_type", [
+  "common",
+  "preferred",
+]);
+
 export const equityGrants = pgTable(
   "equity_grants",
   {
@@ -838,6 +845,7 @@ export const shareClasses = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    classType: shareClassTypeEnum("class_type").notNull().default("preferred"),
     totalAuthorized: numeric("total_authorized", { precision: 18, scale: 0 }).notNull(),
     totalIssued: numeric("total_issued", { precision: 18, scale: 0 }).notNull().default("0"),
     parValue: numeric("par_value", { precision: 18, scale: 6 }).notNull().default("0.000001"),

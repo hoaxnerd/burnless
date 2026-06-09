@@ -7,8 +7,8 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
-        { id: "series-a", name: "Series A Preferred", totalAuthorized: 5_000_000, totalIssued: 3_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "series-a", name: "Series A Preferred", classType: "preferred", totalAuthorized: 5_000_000, totalIssued: 3_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [
         { id: "p1", name: "2026 Plan", totalReserved: 2_000_000, totalGranted: 500_000 },
@@ -39,7 +39,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [{ id: "s1", amount: 500_000, valuationCap: 5_000_000 }],
@@ -56,7 +56,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [
@@ -79,7 +79,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [
@@ -99,7 +99,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [
@@ -119,7 +119,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 10_000_000,
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [{ id: "s1", amount: 500_000, valuationCap: 5_000_000 }],
@@ -144,7 +144,7 @@ describe("computeCapTable", () => {
       foundersOwnershipPercent: 1.0,
       foundersTotalShares: 999_999, // intentionally wrong / stale — must be ignored
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 8_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 8_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [],
@@ -173,7 +173,7 @@ describe("computeCapTable", () => {
       foundersTotalShares: 10_000_000,
       asOfDate: "2026-07-01",
       shareClasses: [
-        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
+        { id: "common", name: "Common", classType: "common", totalAuthorized: 20_000_000, totalIssued: 10_000_000, liquidationPreference: 1.0 },
       ],
       optionPools: [],
       pendingSafes: [],
@@ -187,6 +187,56 @@ describe("computeCapTable", () => {
     expect(convRow?.shares).toBe(1_039_671);
     expect(convRow?.ownershipPercent).toBeCloseTo(1_039_671 / 11_039_671, 6);
     // Foots to 100% including the convertible row.
+    const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
+    expect(sumShares).toBe(ct.totalFullyDiluted);
+    const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);
+    expect(sumOwnership).toBeCloseTo(1.0, 6);
+  });
+
+  it("classifies by classType, not by name regex (FAIL-4b)", () => {
+    // A class named "Ordinary Shares" (no /common/i match) with classType:"common"
+    // MUST count as common. A class named "Founder Shares" (also no /common/i match)
+    // with classType:"preferred" MUST count as preferred. Name is decorative —
+    // classType is the source of truth.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 999_999, // stale; founders row derives from issued common
+      shareClasses: [
+        {
+          id: "ord",
+          name: "Ordinary Shares",
+          classType: "common",
+          totalAuthorized: 20_000_000,
+          totalIssued: 10_000_000,
+          liquidationPreference: 1.0,
+        },
+        {
+          id: "fs",
+          name: "Founder Shares", // name does NOT match /common/i, but it is preferred
+          classType: "preferred",
+          totalAuthorized: 5_000_000,
+          totalIssued: 2_000_000,
+          liquidationPreference: 1.0,
+        },
+      ],
+      optionPools: [],
+      pendingSafes: [],
+      pendingConvertibles: [],
+    });
+    // Common is the "Ordinary Shares" class (by classType), NOT matched by name.
+    expect(ct.totals.commonStock).toBe(10_000_000);
+    // Preferred is the "Founder Shares" class (by classType), NOT matched by name.
+    expect(ct.totals.preferredStock).toBe(2_000_000);
+    expect(ct.totalFullyDiluted).toBe(12_000_000);
+
+    // Founders row reflects issued common (the Ordinary Shares class).
+    const founders = ct.rows.find((r) => r.holder === "Founders");
+    expect(founders?.shares).toBe(10_000_000);
+    // The preferred class emits its own row (it is NOT folded into Founders).
+    const prefRow = ct.rows.find((r) => r.holder === "Founder Shares");
+    expect(prefRow?.shares).toBe(2_000_000);
+
+    // Foots to 100%.
     const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
     expect(sumShares).toBe(ct.totalFullyDiluted);
     const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);

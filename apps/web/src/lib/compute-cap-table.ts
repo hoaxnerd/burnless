@@ -153,7 +153,8 @@ export async function computeCapTableInner(
       roundPricePerShare: impliedRoundPrice,
     }));
 
-  const commonClass = classes.find((s) => /common/i.test(s.name));
+  // FAIL-4b: classify by the explicit class_type enum, not a name regex.
+  const commonClass = classes.find((s) => s.classType === "common");
 
   const capTable = computeCapTable({
     foundersOwnershipPercent:
@@ -164,6 +165,7 @@ export async function computeCapTableInner(
     shareClasses: classes.map((s) => ({
       id: s.id,
       name: s.name,
+      classType: s.classType,
       totalAuthorized: Number(s.totalAuthorized),
       totalIssued: Number(s.totalIssued),
       liquidationPreference: Number(s.liquidationPreference),

@@ -83,6 +83,13 @@ export interface FundingRoundInput {
 export interface ShareClassInput {
   id: string;
   name: string;
+  /**
+   * FAIL-4b: classification source of truth. "common" folds into the founders
+   * row; "preferred" emits its own row. Replaces the old /common/i name regex,
+   * which misclassified e.g. "Ordinary Shares" (common) or a preferred class
+   * whose name happened to contain "common".
+   */
+  classType: "common" | "preferred";
   totalAuthorized: number;
   totalIssued: number;
   liquidationPreference: number;
@@ -180,10 +187,10 @@ export function computeCapTable(input: CapTableInput): CapTable {
   const rows: CapTableRow[] = [];
 
   const commonStock = input.shareClasses
-    .filter((s) => /common/i.test(s.name))
+    .filter((s) => s.classType === "common")
     .reduce((sum, s) => sum + s.totalIssued, 0);
   const preferredStock = input.shareClasses
-    .filter((s) => !/common/i.test(s.name))
+    .filter((s) => s.classType !== "common")
     .reduce((sum, s) => sum + s.totalIssued, 0);
   // Option-pool overhang = unissued reserve only (reserved − granted).
   // Granted shares are already counted in commonStock, so adding the full
@@ -293,7 +300,7 @@ export function computeCapTable(input: CapTableInput): CapTable {
     });
   }
   for (const s of input.shareClasses) {
-    if (/common/i.test(s.name)) continue;
+    if (s.classType === "common") continue;
     rows.push({
       holder: s.name,
       shareClass: s.name,
