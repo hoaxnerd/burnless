@@ -15,7 +15,7 @@ import {
   db,
   resolveEntities,
   getCompanyForUser,
-  getOverrideCount,
+  getOverrideCounts,
   listResolvedSalaryChanges,
   listResolvedBonuses,
   listResolvedEquityGrants,
@@ -111,12 +111,10 @@ export const getCompany = cache(async function getCompany() {
 export const getScenarios = cachedQuery(
   async (companyId: string) => {
     const rows = await db.select().from(scenarios).where(and(eq(scenarios.companyId, companyId), isNull(scenarios.deletedAt))).orderBy(scenarios.createdAt);
-    return Promise.all(
-      rows.map(async (s) => ({
-        ...s,
-        overrideCount: await getOverrideCount(s.id),
-      }))
-    );
+    // Batched: one grouped count query for all scenarios (was an N+1 — one
+    // getOverrideCount per scenario, which made /scenarios/compare 2-4s).
+    const counts = await getOverrideCounts(rows.map((s) => s.id));
+    return rows.map((s) => ({ ...s, overrideCount: counts.get(s.id) ?? 0 }));
   },
   ["scenarios"],
   { revalidate: 30, tags: ["scenarios"] }
