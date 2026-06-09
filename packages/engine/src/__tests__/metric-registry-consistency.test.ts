@@ -102,6 +102,35 @@ describe("metric-registry consistency (Phase 3 F §1.4 sweep)", () => {
     }
   });
 
+  it("netNewMrr registry formula + dependsOn are the canonical 5-term shape (Phase 6)", () => {
+    // Canonical: New + Expansion + Reactivation − Churned − Contraction.
+    // contractionMrr (slug:423) and reactivationMrr (slug:438) are both real
+    // registry slugs, so dependsOn MUST include them (review L4 — no hedge).
+    const netNewMrr = METRIC_REGISTRY.find((m) => m.slug === "netNewMrr");
+    expect(netNewMrr, "netNewMrr must exist in registry").toBeDefined();
+    expect(netNewMrr!.formula).toBe(
+      "New MRR + Expansion MRR + Reactivation MRR - Churned MRR - Contraction MRR",
+    );
+    // dependsOn must reference all 5 components, each a real registry slug.
+    const knownSlugs = new Set(METRIC_REGISTRY.map((m) => m.slug));
+    for (const dep of [
+      "newMrr",
+      "expansionMrr",
+      "reactivationMrr",
+      "churnedMrr",
+      "contractionMrr",
+    ]) {
+      expect(
+        netNewMrr!.dependsOn,
+        `netNewMrr.dependsOn must include ${dep}`,
+      ).toContain(dep);
+      expect(
+        knownSlugs,
+        `netNewMrr dependsOn slug ${dep} must be a real registry slug`,
+      ).toContain(dep);
+    }
+  });
+
   it("every parent metric (i.e. has children) declares aiContext explicitly", () => {
     const parentSlugs = new Set(
       METRIC_REGISTRY

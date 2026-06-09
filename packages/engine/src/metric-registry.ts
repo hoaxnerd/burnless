@@ -407,9 +407,19 @@ export const METRIC_REGISTRY: MetricDefinition[] = [
   {
     slug: "netNewMrr",
     name: "Net New MRR",
-    description: "Net change in MRR after adds, expansions, and churn",
-    formula: "New MRR + Expansion MRR - Churned MRR",
-    dependsOn: ["newMrr", "expansionMrr", "churnedMrr"],
+    description:
+      "Net change in MRR after adds, expansions, reactivations, churn, and contractions",
+    // Phase 6: canonical 5-term formula. contractionMrr & reactivationMrr are
+    // real registry slugs (slug:423,438) → both belong in dependsOn (review L4).
+    formula:
+      "New MRR + Expansion MRR + Reactivation MRR - Churned MRR - Contraction MRR",
+    dependsOn: [
+      "newMrr",
+      "expansionMrr",
+      "reactivationMrr",
+      "churnedMrr",
+      "contractionMrr",
+    ],
     category: "saas",
     tier: "advanced",
     format: "currency",
