@@ -6,6 +6,8 @@ import { ratioToPct } from "@burnless/engine";
 import type { CapTable } from "@burnless/engine";
 import { useLocale } from "@/components/locale/locale-context";
 import { DataEmptyState } from "@/components/ui";
+import { CapTableManager } from "./cap-table-manager";
+import { ShareClassForm } from "./share-class-form";
 
 /**
  * Cap-table can carry an explicit emptiness signal [FUND-05 / ESL-1]. When
@@ -72,11 +74,10 @@ export function CapTableView({
           icon={PieChart}
           title="No share data yet"
           body="Add share classes and equity grants to build your cap table."
-          action={
-            <Link href="/funding" className="btn-outline-sm">
-              Go to Funding
-            </Link>
-          }
+          // U5: a brand-new company starts the cap table from the empty state —
+          // the action slot opens the share-class form (testid open-add-share-class)
+          // instead of bouncing the user back to /funding.
+          action={<ShareClassForm />}
         />
       </div>
     );
@@ -126,59 +127,11 @@ export function CapTableView({
         </tbody>
       </table>
 
-      {(shareClasses.length > 0 || optionPools.length > 0) && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Capital Structure</h2>
-
-          {shareClasses.length > 0 && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Share Class</th>
-                  <th className="text-left p-2">Type</th>
-                  <th className="text-right p-2">Issued</th>
-                  <th className="text-right p-2">Authorized</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shareClasses.map((sc) => (
-                  <tr key={sc.id} className="border-b">
-                    <td className="p-2">{sc.name}</td>
-                    <td className="p-2 capitalize">{sc.classType}</td>
-                    <td className="p-2 text-right">
-                      {Number(sc.totalIssued).toLocaleString()}
-                    </td>
-                    <td className="p-2 text-right">
-                      {Number(sc.totalAuthorized).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {optionPools.length > 0 && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Option Pool</th>
-                  <th className="text-right p-2">Reserved</th>
-                </tr>
-              </thead>
-              <tbody>
-                {optionPools.map((op) => (
-                  <tr key={op.id} className="border-b">
-                    <td className="p-2">{op.name}</td>
-                    <td className="p-2 text-right">
-                      {Number(op.totalReserved).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      )}
+      {/* U5: the editable Manage section lives BELOW the foots-to-100% holder
+          table (moved out of page.tsx). It owns the share-class + option-pool
+          structure tables (edit/delete) — base-data only; the API routes own
+          scenario safety + the single-pool guard. */}
+      <CapTableManager shareClasses={shareClasses} optionPools={optionPools} />
     </div>
   );
 }
