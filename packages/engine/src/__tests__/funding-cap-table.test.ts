@@ -137,6 +137,32 @@ describe("computeCapTable", () => {
     expect(sumOwnership).toBeCloseTo(1.0, 6);
   });
 
+  it("derives the founders row from issued commonStock, not the decoupled foundersTotalShares (FAIL-4a)", () => {
+    // Divergent fixture: foundersTotalShares (999,999) disagrees with issued common (8M).
+    // The founders row MUST reflect what was actually issued (8M), so the cap table foots.
+    const ct = computeCapTable({
+      foundersOwnershipPercent: 1.0,
+      foundersTotalShares: 999_999, // intentionally wrong / stale — must be ignored
+      shareClasses: [
+        { id: "common", name: "Common", totalAuthorized: 20_000_000, totalIssued: 8_000_000, liquidationPreference: 1.0 },
+      ],
+      optionPools: [],
+      pendingSafes: [],
+      pendingConvertibles: [],
+    });
+    expect(ct.totals.commonStock).toBe(8_000_000);
+    expect(ct.totalFullyDiluted).toBe(8_000_000);
+    const founders = ct.rows.find((r) => r.holder === "Founders");
+    // Row reflects ISSUED common, not the decoupled foundersTotalShares.
+    expect(founders?.shares).toBe(8_000_000);
+    expect(founders?.ownershipPercent).toBeCloseTo(8_000_000 / 8_000_000, 6);
+    // Foots to 100%: Σ row shares === FD, Σ ownership ≈ 1.0.
+    const sumShares = ct.rows.reduce((s, r) => s + r.shares, 0);
+    expect(sumShares).toBe(ct.totalFullyDiluted);
+    const sumOwnership = ct.rows.reduce((s, r) => s + r.ownershipPercent, 0);
+    expect(sumOwnership).toBeCloseTo(1.0, 6);
+  });
+
   it("converts a convertible note at principal + ACT/365 accrued interest, emits a holder row (FAIL-2b, L1)", () => {
     // $1M convertible @ 8%/yr, $10M cap. Issued 2026-01-01, valued asOf 2026-07-01 (181 days).
     // ACT/365 accrual (consistent with Phase 3.3): 1,000,000 × 0.08 × 181/365 = 39,671.23.

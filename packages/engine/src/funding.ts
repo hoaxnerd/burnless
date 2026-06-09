@@ -285,8 +285,11 @@ export function computeCapTable(input: CapTableInput): CapTable {
     rows.push({
       holder: "Founders",
       shareClass: "Common",
-      shares: input.foundersTotalShares,
-      ownershipPercent: totalFullyDiluted > 0 ? input.foundersTotalShares / totalFullyDiluted : 0,
+      // Founders row derives from ISSUED commonStock, not the decoupled
+      // foundersTotalShares input (which can drift stale) — keeps the cap
+      // table footing to 100% (FAIL-4a).
+      shares: commonStock,
+      ownershipPercent: totalFullyDiluted > 0 ? commonStock / totalFullyDiluted : 0,
     });
   }
   for (const s of input.shareClasses) {
