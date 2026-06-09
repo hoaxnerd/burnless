@@ -71,6 +71,64 @@ describe("computeFinancials — blended lines", () => {
   });
 });
 
+describe("computeFinancials — dark-metric wiring (Task 5.5)", () => {
+  // Phase 5 Task 5.5: the computeAllMetrics+attach block must run BELOW the
+  // balance-sheet/cash-flow build so metricsInput.operatingCashFlow,
+  // currentAssets and currentLiabilities are wired from the REAL statements.
+  // Pre-fix the metrics block ran first (statements undefined) → workingCapital
+  // collapses to 0−0 and freeCashFlow silently falls back to netIncome.
+
+  const arr = (li: { month: string; value: number }[], m: string) =>
+    li.find((r) => r.month === m)?.value ?? 0;
+
+  it("workingCapital ≈ currentAssets − currentLiabilities and is NON-zero", () => {
+    const r = computeFinancials(baseInput());
+    const month = "2026-06";
+    const ca = arr(r.balanceSheet.currentAssets.values, month);
+    const cl = arr(r.balanceSheet.currentLiabilities.values, month);
+    const wc = arr(r.metrics.workingCapital, month);
+    // canonical: workingCapital is the real current-assets minus current-liabilities
+    expect(wc).toBeCloseTo(ca - cl, 2);
+    // and it must NOT be the pre-fix 0−0 = 0 (this company has cash + A/P)
+    expect(Math.abs(wc)).toBeGreaterThan(0);
+    expect(Math.abs(ca)).toBeGreaterThan(0);
+    expect(Math.abs(cl)).toBeGreaterThan(0);
+  });
+
+  it("freeCashFlow tracks the operating-cash-flow statement line (not a bare fallback)", () => {
+    const r = computeFinancials(baseInput());
+    for (const m of ["2026-01", "2026-06", "2026-11"]) {
+      const ocf = arr(r.cashFlow.operatingCashFlow.values, m);
+      const fcf = arr(r.metrics.freeCashFlow, m);
+      // capex is unset → FCF == OCF exactly; the point is FCF is sourced from the
+      // wired OCF series, not silently approximated.
+      expect(fcf).toBeCloseTo(ocf, 2);
+    }
+  });
+
+  it("interestExpense is a finite series for a debt company", () => {
+    const input = baseInput();
+    input.fundingRounds = [
+      {
+        id: "fr-debt",
+        name: "Bridge",
+        type: "debt",
+        amount: 120000,
+        date: new Date(2026, 0, 1),
+        isProjected: false,
+        parameters: { interestRate: 0.12, termMonths: 12, repaymentSchedule: "straight_line" },
+      },
+    ];
+    const r = computeFinancials(input);
+    const series = r.metrics.interestExpense;
+    expect(series.length).toBeGreaterThan(0);
+    for (const { value } of series) expect(Number.isFinite(value)).toBe(true);
+    // interest actually accrues (declining-balance, non-zero in early months)
+    const total = series.reduce((s, v) => s + v.value, 0);
+    expect(total).toBeGreaterThan(0);
+  });
+});
+
 describe("computeFinancials — balance sheet balances (RPT-01 web)", () => {
   // RPT-01: compute-financials injects A/P (≈ 1 month of expenses) and routes it
   // through generateBalanceSheet's workingCapitalAdjustments so the engine adds

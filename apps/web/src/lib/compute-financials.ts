@@ -389,34 +389,10 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     cashPosition.set(m, dRound2(runningCash));
   }
 
-  // Metrics
-  const metricsInput: MetricsInput = {
-    revenue: totalRevenue,
-    subscriptionDetails: subDetails,
-    totalExpenses,
-    cogs: totalCogs,
-    operatingExpenses: totalOpex,
-    cashPosition,
-    netIncome,
-    headcount: headcountCosts.headcount,
-    interestExpense: fundingImpact.interestExpense,
-    principalPayments: fundingImpact.principalPayments,
-  };
-  const metrics = computeAllMetrics(metricsInput);
-
-  // Surface non-ComputedMetrics series via slug so build-slot-metrics /
-  // extractMetricValue can resolve them.
-  const attach = (slug: string, series: MonthlySeries) => {
-    (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug] =
-      Array.from(series.entries())
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([month, value]) => ({ month, value }));
-  };
-  attach("totalOpex", totalOpex);
-  attach("fixedExpenses", fixedExpensesSeries);
-  attach("variableExpenses", variableExpensesSeries);
-  attach("percentageDrivenExpenses", percentageDrivenExpensesSeries);
-  attach("oneTimeExpenses", oneTimeExpensesSeries);
+  // NOTE (Phase 5 Task 5.5): metrics are computed BELOW the balance-sheet/cash-flow
+  // build so workingCapital / freeCashFlow / interest read from the REAL statements.
+  // cashPosition (built above, Phase 1) stays where it is and is consumed by the
+  // bs-cash row; nothing that reads `metrics` may execute before that moved block.
 
   // Financial statements — forecasts for accounts with forecast lines, actuals for the rest
   const accountDataList: AccountData[] = [];
@@ -562,6 +538,47 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     capitalExpenditures: new Map(),
   };
   const balanceSheet = generateBalanceSheet(accountDataList, workingCapitalAdjustments);
+
+  // ── Metrics (Phase 5 Task 5.5) ────────────────────────────────────────────
+  // Computed AFTER the statements so freeCashFlow / workingCapital read the REAL
+  // operating-cash-flow + current-asset/liability lines instead of falling back
+  // (FCF→netIncome, WC→0). `lineToSeries` reverses a StatementLineItem's
+  // `{month,value}[]` back into the MonthlySeries the metrics input expects.
+  const lineToSeries = (li: { values: { month: string; value: number }[] }): MonthlySeries => {
+    const s: MonthlySeries = new Map();
+    for (const { month, value } of li.values) s.set(month, value);
+    return s;
+  };
+  const metricsInput: MetricsInput = {
+    revenue: totalRevenue,
+    subscriptionDetails: subDetails,
+    totalExpenses,
+    cogs: totalCogs,
+    operatingExpenses: totalOpex,
+    cashPosition,
+    netIncome,
+    headcount: headcountCosts.headcount,
+    interestExpense: fundingImpact.interestExpense,
+    principalPayments: fundingImpact.principalPayments,
+    operatingCashFlow: lineToSeries(cashFlow.operatingCashFlow),
+    currentAssets: lineToSeries(balanceSheet.currentAssets),
+    currentLiabilities: lineToSeries(balanceSheet.currentLiabilities),
+  };
+  const metrics = computeAllMetrics(metricsInput);
+
+  // Surface non-ComputedMetrics series via slug so build-slot-metrics /
+  // extractMetricValue can resolve them.
+  const attach = (slug: string, series: MonthlySeries) => {
+    (metrics as unknown as Record<string, Array<{ month: string; value: number }>>)[slug] =
+      Array.from(series.entries())
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([month, value]) => ({ month, value }));
+  };
+  attach("totalOpex", totalOpex);
+  attach("fixedExpenses", fixedExpensesSeries);
+  attach("variableExpenses", variableExpensesSeries);
+  attach("percentageDrivenExpenses", percentageDrivenExpensesSeries);
+  attach("oneTimeExpenses", oneTimeExpensesSeries);
 
   const hasData = fLines.length > 0 || revStreams.length > 0 || hcPlans.length > 0;
 
