@@ -92,7 +92,9 @@ describe("Magic Number — hand-calculated", () => {
     expect(m.magicNumber[1]?.value).toBe(2.4);
   });
 
-  it("returns 0 when no S&M spend", () => {
+  // Re-baselined Phase 5.3: no acquisitionSpend is the DARK case (input absent) —
+  // magicNumber is NaN, not a misleading 0, so isMetricDataAvailable ghosts the card.
+  it("returns NaN when no S&M spend (dark — acquisitionSpend absent)", () => {
     const details: SubscriptionDetail[] = [
       sub({ month: "2026-01", mrr: 10000 }),
       sub({ month: "2026-02", mrr: 12000 }),
@@ -109,7 +111,7 @@ describe("Magic Number — hand-calculated", () => {
       // no acquisitionSpend
     };
     const m = computeAllMetrics(input);
-    expect(m.magicNumber[1]?.value).toBe(0);
+    expect(Number.isNaN(m.magicNumber[1]?.value)).toBe(true);
   });
 });
 

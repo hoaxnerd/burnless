@@ -280,14 +280,16 @@ describe("Tier-2 Metrics", () => {
       expect(m.arpu[0]?.value).toBe(20);
     });
 
-    it("returns 0 when no user data available", () => {
+    // Re-baselined Phase 5.3: no active-user input (subDetail + series both absent)
+    // is the DARK case → NaN, so the card ghosts instead of showing $0.
+    it("returns NaN when no user data available", () => {
       const input = make3MonthInput({}, [
         { activeUsers: undefined },
         { activeUsers: undefined },
         { activeUsers: undefined },
       ]);
       const m = computeAllMetrics(input);
-      expect(m.arpu[0]?.value).toBe(0);
+      expect(Number.isNaN(m.arpu[0]?.value)).toBe(true);
     });
   });
 
@@ -407,18 +409,22 @@ describe("Tier-2 Metrics", () => {
       expect(m.customerRetentionCost[1]?.value).toBeCloseTo(57.14, 1);
     });
 
-    it("returns 0 when no retention spend", () => {
+    // Re-baselined Phase 5.3: no retentionSpend is the DARK case (input absent) →
+    // NaN, so isMetricDataAvailable ghosts the card instead of showing $0.
+    it("returns NaN when no retention spend", () => {
       const input = make3MonthInput();
       const m = computeAllMetrics(input);
-      expect(m.customerRetentionCost[0]?.value).toBe(0);
+      expect(Number.isNaN(m.customerRetentionCost[0]?.value)).toBe(true);
     });
 
-    it("returns 0 when no customers", () => {
+    // Re-baselined Phase 5.3 (review M2): retentionSpend present but customers===0
+    // is its own documented-undefined case → NaN, distinct from the dark case above.
+    it("returns NaN when no customers", () => {
       const input = make3MonthInput({
         retentionSpend: makeSeries({ "2026-01": 5000 }),
       }, [{ customers: 0 }]);
       const m = computeAllMetrics(input);
-      expect(m.customerRetentionCost[0]?.value).toBe(0);
+      expect(Number.isNaN(m.customerRetentionCost[0]?.value)).toBe(true);
     });
   });
 });
@@ -496,10 +502,11 @@ describe("Edge Cases — All New Metrics", () => {
     expect(m.freeCashFlow[0]?.value).toBe(0);
     expect(m.fcfMargin[0]?.value).toBe(0);
     expect(m.ttmRevenue[0]?.value).toBe(0);
-    expect(m.arpu[0]?.value).toBe(0);
+    // Re-baselined Phase 5.3: no activeUsers / retentionSpend inputs → dark → NaN.
+    expect(Number.isNaN(m.arpu[0]?.value)).toBe(true);
     expect(m.netChurnRate[1]?.value).toBe(0);
     expect(m.workingCapital[0]?.value).toBe(0);
-    expect(m.customerRetentionCost[0]?.value).toBe(0);
+    expect(Number.isNaN(m.customerRetentionCost[0]?.value)).toBe(true);
     expect(m.burnProductivity[0]?.value).toBe(0);
   });
 });

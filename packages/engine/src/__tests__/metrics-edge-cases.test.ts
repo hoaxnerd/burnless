@@ -602,4 +602,114 @@ describe("metrics — edge cases", () => {
     // Rule of 40 = 20 + 28.33 = 48.33
     expect(metrics.ruleOf40[1]?.value).toBeCloseTo(48.33, 1);
   });
+
+  // ── Phase 5.3: NaN-gate magicNumber / customerRetentionCost / arpu ──────────
+  // Each metric divides by (or is driven by) a specific INPUT that is optional on
+  // MetricsInput. When that input is ABSENT, the dark value must be NaN — not 0 —
+  // so isMetricDataAvailable ghosts the card with a hint instead of showing a
+  // misleading $0 / 0.0x. Per review M2, "input present but the count is 0" is its
+  // OWN documented-undefined case (also NaN) and is asserted separately.
+  describe("Phase 5.3 — dark-metric NaN gating", () => {
+    // magicNumber ← acquisitionSpend (prior month's S&M spend)
+    it("returns NaN magicNumber when no acquisitionSpend input at all", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0 },
+        { month: "2026-02", customers: 110, newCustomers: 10, churnedCustomers: 0, mrr: 11000, newMrr: 1000, expansionMrr: 0, churnedMrr: 0, netNewMrr: 1000 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000], ["2026-02", 11000]]),
+        subscriptionDetails: subDetails,
+        // no acquisitionSpend provided → magicNumber is dark
+      });
+      const metrics = computeAllMetrics(input);
+      // month index 1 (the monthly-approximation branch) divides by the prior
+      // month's acquisitionSpend, which is absent → NaN.
+      expect(Number.isNaN(metrics.magicNumber[1]?.value)).toBe(true);
+    });
+
+    it("computes a finite magicNumber when acquisitionSpend is present", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0 },
+        { month: "2026-02", customers: 110, newCustomers: 10, churnedCustomers: 0, mrr: 11000, newMrr: 1000, expansionMrr: 0, churnedMrr: 0, netNewMrr: 1000 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000], ["2026-02", 11000]]),
+        subscriptionDetails: subDetails,
+        // prior-month (2026-01) S&M spend present
+        acquisitionSpend: new Map([["2026-01", 5000], ["2026-02", 6000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      // netNewArr = (11000-10000)*12 = 12000; / priorSpend 5000 = 2.4
+      expect(metrics.magicNumber[1]?.value).toBe(2.4);
+    });
+
+    // customerRetentionCost ← retentionSpend
+    it("returns NaN customerRetentionCost when no retentionSpend input at all", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        subscriptionDetails: subDetails,
+        // no retentionSpend provided → CRC is dark
+      });
+      const metrics = computeAllMetrics(input);
+      expect(Number.isNaN(metrics.customerRetentionCost[0]?.value)).toBe(true);
+    });
+
+    // Review M2: retentionSpend PRESENT but customers === 0 is its own
+    // documented-undefined case (you spent retention $ on zero customers) → NaN,
+    // distinct from the "no retentionSpend at all" dark case above.
+    it("returns NaN customerRetentionCost when spend is present but customers is 0", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 0, newCustomers: 0, churnedCustomers: 0, mrr: 0, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 0]]),
+        subscriptionDetails: subDetails,
+        retentionSpend: new Map([["2026-01", 5000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      expect(Number.isNaN(metrics.customerRetentionCost[0]?.value)).toBe(true);
+    });
+
+    it("computes a finite customerRetentionCost when both inputs are present", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        subscriptionDetails: subDetails,
+        retentionSpend: new Map([["2026-01", 5000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      expect(metrics.customerRetentionCost[0]?.value).toBe(50); // 5000 / 100
+    });
+
+    // arpu ← activeUsers (subDetail.activeUsers ?? input.activeUsers)
+    it("returns NaN arpu when no active-user input at all", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0, activeUsers: undefined },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        subscriptionDetails: subDetails,
+        // no activeUsers series, subDetail.activeUsers undefined → ARPU is dark
+      });
+      const metrics = computeAllMetrics(input);
+      expect(Number.isNaN(metrics.arpu[0]?.value)).toBe(true);
+    });
+
+    it("computes a finite arpu when active-user input is present", () => {
+      const subDetails: SubscriptionDetail[] = [
+        { month: "2026-01", customers: 100, newCustomers: 0, churnedCustomers: 0, mrr: 10000, newMrr: 0, expansionMrr: 0, churnedMrr: 0, netNewMrr: 0, activeUsers: 250 },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 10000]]),
+        subscriptionDetails: subDetails,
+      });
+      const metrics = computeAllMetrics(input);
+      expect(metrics.arpu[0]?.value).toBe(40); // 10000 / 250
+    });
+  });
 });

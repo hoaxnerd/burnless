@@ -324,23 +324,36 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   const magicNumber = months.map((m, i) => {
     if (i < 3) {
       // Not enough for quarterly — fall back to monthly approximation
-      if (i === 0) return { month: m, value: 0 };
+      if (i === 0) return { month: m, value: 0 }; // first month: no prior — structural N/A
       const currMrr = D(mrr[i]?.value ?? 0);
       const prevMrr = D(mrr[i - 1]?.value ?? 0);
       const netNewArr = currMrr.minus(prevMrr).mul(12);
-      const prevSpend = D(input.acquisitionSpend?.get(months[i - 1]!) ?? 0);
-      if (prevSpend.isZero()) return { month: m, value: 0 };
+      // Phase 5.3: dark-gate on INPUT PRESENCE. No prior-month acquisitionSpend
+      // entry → NaN (ghost the card), not a misleading 0. A present-but-zero spend
+      // is its own undefined (can't divide by zero S&M) → also NaN.
+      const rawPrevSpend = input.acquisitionSpend?.get(months[i - 1]!);
+      if (rawPrevSpend === undefined) return { month: m, value: NaN };
+      const prevSpend = D(rawPrevSpend);
+      if (prevSpend.isZero()) return { month: m, value: NaN };
       return { month: m, value: dRound2(netNewArr.div(prevSpend)) };
     }
     // Quarterly: net new ARR over 3 months / prior quarter S&M spend
     const currMrr = D(mrr[i]?.value ?? 0);
     const qtrAgoMrr = D(mrr[i - 3]?.value ?? 0);
     const netNewArr = currMrr.minus(qtrAgoMrr).mul(12); // annualize quarterly MRR change to ARR
+    // Phase 5.3: if NO prior-quarter month carries an acquisitionSpend entry, the
+    // input is absent → NaN. If entries exist but sum to zero → undefined → NaN.
     let priorQtrSpend = D(0);
+    let sawSpendInput = false;
     for (let j = Math.max(0, i - 3); j < i; j++) {
-      priorQtrSpend = priorQtrSpend.plus(input.acquisitionSpend?.get(months[j]!) ?? 0);
+      const raw = input.acquisitionSpend?.get(months[j]!);
+      if (raw !== undefined) {
+        sawSpendInput = true;
+        priorQtrSpend = priorQtrSpend.plus(raw);
+      }
     }
-    if (priorQtrSpend.isZero()) return { month: m, value: 0 };
+    if (!sawSpendInput) return { month: m, value: NaN };
+    if (priorQtrSpend.isZero()) return { month: m, value: NaN };
     return { month: m, value: dRound2(netNewArr.div(priorQtrSpend)) };
   });
 
@@ -494,9 +507,15 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   // ── Tier-2: ARPU (Average Revenue Per User) ───────────────────────────────
   const arpu = months.map((m) => {
     const d = subDetails.get(m);
-    const users = D(d?.activeUsers ?? input.activeUsers?.get(m) ?? 0);
+    // Phase 5.3: dark-gate on INPUT PRESENCE. Active-user count comes from the
+    // subscription detail or the activeUsers series; if NEITHER provides a value
+    // the metric is dark → NaN (ghost the card), not a misleading $0. A present-
+    // but-zero user count is its own undefined (÷0) → also NaN.
+    const rawUsers = d?.activeUsers ?? input.activeUsers?.get(m);
+    if (rawUsers === undefined) return { month: m, value: NaN };
+    const users = D(rawUsers);
     const mrrVal = D(d?.mrr ?? input.revenue.get(m) ?? 0);
-    if (users.isZero()) return { month: m, value: 0 };
+    if (users.isZero()) return { month: m, value: NaN };
     return { month: m, value: dRound2(mrrVal.div(users)) };
   });
 
@@ -540,10 +559,15 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
 
   // ── Tier-2: Customer Retention Cost ────────────────────────────────────────
   const customerRetentionCost = months.map((m) => {
-    const spend = D(input.retentionSpend?.get(m) ?? 0);
+    // Phase 5.3: dark-gate on INPUT PRESENCE. No retentionSpend entry for the
+    // month → NaN (ghost the card), not a misleading $0. Spend present but
+    // customers===0 is its own documented undefined (÷0) → also NaN.
+    const rawSpend = input.retentionSpend?.get(m);
+    if (rawSpend === undefined) return { month: m, value: NaN };
+    const spend = D(rawSpend);
     const d = subDetails.get(m);
     const customers = D(d?.customers ?? 0);
-    if (customers.isZero()) return { month: m, value: 0 };
+    if (customers.isZero()) return { month: m, value: NaN };
     return { month: m, value: dRound2(spend.div(customers)) };
   });
 
