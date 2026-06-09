@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Input, Select } from "@/components/ui";
+import { Input, Select, Button } from "@/components/ui";
 import { DateRangePicker } from "@/components/forms/primitives";
 import {
   defaultParamsForType,
@@ -122,21 +122,13 @@ export function RevenueStreamForm({
 
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm border border-surface-300"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md px-3 py-1.5 text-sm bg-primary-600 text-white disabled:opacity-50"
-        >
-          {submitting ? "Saving…" : mode === "add" ? "Add stream" : "Save changes"}
-        </button>
+        <Button type="submit" size="sm" state={submitting ? "loading" : "idle"}>
+          {mode === "add" ? "Add stream" : "Save changes"}
+        </Button>
       </div>
     </form>
   );

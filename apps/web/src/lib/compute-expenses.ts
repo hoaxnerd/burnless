@@ -329,13 +329,39 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     });
   }
 
+  // Per-account explicit category override (from the expense form's Category
+  // field). The blended breakdown is account-aggregated, so each account adopts
+  // the dominant explicit subcategory among its forecast lines (if any). This
+  // makes the category chart + AI insight honor the user's per-entry category —
+  // mirroring the per-line override already applied to lineItems above. Accounts
+  // with no forecast line (transaction-only) carry no override and derive as before.
+  const subcatByAccount = (() => {
+    const counts = new Map<string, Map<string, number>>(); // accountId → (subcat → count)
+    for (const fl of fLines) {
+      const sc = (fl as { subcategory?: string | null }).subcategory;
+      if (typeof sc !== "string" || sc.trim() === "") continue;
+      const key = sc.trim();
+      const inner = counts.get(fl.accountId) ?? new Map<string, number>();
+      inner.set(key, (inner.get(key) ?? 0) + 1);
+      counts.set(fl.accountId, inner);
+    }
+    const out = new Map<string, string>();
+    for (const [accountId, inner] of counts) {
+      let best = "";
+      let bestN = -1;
+      for (const [sc, n] of inner) if (n > bestN) { best = sc; bestN = n; }
+      if (best) out.set(accountId, best);
+    }
+    return out;
+  })();
+
   // Single-source: breakdown/totals reconcile to blended totalExpenses;
   // lineItems/expenseMix remain forecast-line "plan detail".
   const blendedTotal = dash.totalExpenses.get(currentMonth) ?? 0;
-  const blended = buildExpenseBreakdown(dash.expenseLines, currentMonth, blendedTotal);
+  const blended = buildExpenseBreakdown(dash.expenseLines, currentMonth, blendedTotal, subcatByAccount);
   const prevTotal = dash.totalExpenses.get(prevMonth) ?? 0;
   const prevBySubcat = new Map(
-    buildExpenseBreakdown(dash.expenseLines, prevMonth, prevTotal).map((b) => [b.subcategory, b.amount]),
+    buildExpenseBreakdown(dash.expenseLines, prevMonth, prevTotal, subcatByAccount).map((b) => [b.subcategory, b.amount]),
   );
   const subcategoryBreakdown: SubcategoryBreakdown[] = blended.map((b) => {
     const items = lineItems.filter((i) => i.subcategory === b.subcategory);
@@ -354,7 +380,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const totalPrevMonthlyCost = dash.totalExpenses.get(prevMonth) ?? 0;
 
   // Stacked-chart series — blended per-month, same subcategory grouping.
-  const monthlyBySubcategory = buildExpenseMonthlyBySubcategory(dash.expenseLines);
+  const monthlyBySubcategory = buildExpenseMonthlyBySubcategory(dash.expenseLines, subcatByAccount);
   // `subcategories` (chart's top-6/Other selection) is ordered by current-month
   // spend, matching the split panel below.
   const subcategories = subcategoryBreakdown.map((s) => s.subcategory);
