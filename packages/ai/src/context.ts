@@ -120,7 +120,12 @@ function metricValueAtMonth(
 ): number | null {
   if (!values || values.length === 0) return null;
   const atMonth = values.find((v) => v.month === currentMonth);
-  return (atMonth ?? values[values.length - 1]!).value;
+  const v = (atMonth ?? values[values.length - 1]!).value;
+  // Phase 5 §5.6: production-dark metrics arrive as non-finite (NaN/Infinity)
+  // from the engine's NaN-gates (cac with no acquisitionSpend, ltvCacRatio
+  // inheriting it, ltv with non-positive churn). Coerce to null so the prompt's
+  // existing N/A guards drop the line — the AI must never assert "0.0x LTV:CAC".
+  return Number.isFinite(v) ? v : null;
 }
 
 /** Sum all values in a StatementLineItem's values array. */
