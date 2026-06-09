@@ -39,6 +39,8 @@ export const PATCH = withErrorHandler(async (
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
+  revalidateTag("expense-details"); // refetch the server-rendered expense table
+  revalidateTag("dashboard"); // KPIs blend forecast lines
   return NextResponse.json(row);
 });
 
@@ -60,5 +62,7 @@ export const DELETE = withErrorHandler(async (
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
+  revalidateTag("expense-details"); // refetch the server-rendered expense table
+  revalidateTag("dashboard"); // KPIs blend forecast lines
   return NextResponse.json({ deleted: true });
 });

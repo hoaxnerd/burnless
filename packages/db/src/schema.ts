@@ -534,6 +534,12 @@ export const forecastLines = pgTable(
     // ── Phase 1 additions (§2.C) ─────────────────────────────────────────
     notes: text("notes"),
     vendor: text("vendor"),
+    /**
+     * Explicit per-line expense category override (set in the expense form).
+     * NULL = derive automatically (merchant rules → account → "Uncategorized").
+     * A non-null value WINS over derivation in compute-expenses deriveSubcategory.
+     */
+    subcategory: text("subcategory"),
     departmentId: text("department_id").references(() => departments.id, {
       onDelete: "set null",
     }),

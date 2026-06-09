@@ -45,6 +45,7 @@ const baseItem: ExpenseLineItem = {
   subcategory: "Software",
   subcategoryConfidence: 0.9,
   categorySource: "rule",
+  subcategoryOverride: null,
   method: "fixed",
   parameters: {},
   startDate: "2026-01-01",

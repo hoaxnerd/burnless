@@ -285,6 +285,9 @@ export const createForecastLineSchema = withDateRange(
     // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
     notes: z.string().nullable().optional(),
     vendor: z.string().nullable().optional(),
+    // Explicit per-line category override (set in the expense form). string = set,
+    // null = clear (derive automatically), undefined = leave as-is.
+    subcategory: z.string().trim().min(1).max(100).nullable().optional(),
     departmentId: z.string().nullable().optional(),
     frequency: expenseFrequencyEnum.default("monthly"),
     isOneTime: z.boolean().default(false),
@@ -301,6 +304,9 @@ export const updateForecastLineSchema = z.object({
   // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
   notes: z.string().nullable().optional(),
   vendor: z.string().nullable().optional(),
+  // Explicit per-line category override (set in the expense form). string = set,
+  // null = clear (derive automatically), undefined = leave as-is.
+  subcategory: z.string().trim().min(1).max(100).nullable().optional(),
   departmentId: z.string().nullable().optional(),
   frequency: expenseFrequencyEnum.optional(),
   isOneTime: z.boolean().optional(),

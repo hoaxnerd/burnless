@@ -34,13 +34,12 @@ interface ExpenseTableProps {
   /** Other forecast lines — used by the edit form's `percentage_of` source dropdown. */
   forecastLines?: Array<{ id: string; name: string }>;
   onDelete?: (ids: string[]) => void;
-  onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
 
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete, onCategoryOverride }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete }: ExpenseTableProps) {
   const router = useRouter();
   const { fmtPercent } = useLocale();
   const [search, setSearch] = useState("");
@@ -49,8 +48,6 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
   const [sortKey, setSortKey] = useState<SortKey>("currentAmount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const {
     isInScenarioMode,
     overrideMap: scenarioOverrideMap,
@@ -92,22 +89,6 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
   }, [accountMap]);
 
   const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
-
-  // EXP-06: Full distinct category list derived from ALL lineItems (not just
-  // top-N spend-ordered subcategories). Used for the inline per-row re-
-  // categorize select so low/zero-spend categories (e.g. COGS) are reachable.
-  // The spend-ordered `subcategories` prop is kept for the top filter + chart.
-  const allCategories = useMemo(() => {
-    const seen = new Set<string>();
-    for (const item of lineItems) {
-      seen.add(item.subcategory);
-    }
-    // Merge with the prop list (which may include categories not in lineItems)
-    for (const c of subcategories) {
-      seen.add(c);
-    }
-    return Array.from(seen).sort();
-  }, [lineItems, subcategories]);
 
   // Filter and sort
   const filtered = useMemo(() => {
@@ -512,52 +493,22 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="relative flex items-center gap-1.5">
-                        {editingCategoryId === item.id ? (
-                          <Select
-                            autoFocus
-                            aria-label={`Change category for ${displayName}`}
-                            defaultValue={overrides[item.id] ?? item.subcategory}
-                            onChange={(e) => {
-                              const newCat = e.target.value;
-                              setOverrides((prev) => ({ ...prev, [item.id]: newCat }));
-                              setEditingCategoryId(null);
-                              onCategoryOverride?.(item.id, newCat);
-                              // Learn: save merchant->category mapping
-                              apiFetch("/api/merchant-mappings", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  description: displayName,
-                                  accountId: item.accountId,
-                                  category: item.accountCategory,
-                                  subcategory: newCat,
-                                }),
-                              }).catch(() => {});
-                            }}
-                            onBlur={() => setEditingCategoryId(null)}
-                            className="px-2 py-0.5 text-[10px] font-medium"
+                      {/* Category is read-only here — set it per entry in the
+                          expense form (Edit). A non-null override wins over
+                          derivation; otherwise the displayed value is derived. */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600">
+                          {item.subcategory}
+                        </span>
+                        {item.subcategoryOverride !== null && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
+                            title="Category set manually on this entry"
                           >
-                            {/* EXP-06: use allCategories (full distinct list
-                                from lineItems) so low/zero-spend categories
-                                (e.g. COGS) are reachable. Pre-selects the
-                                row's current category via defaultValue above,
-                                even when it's outside the top-N subcategories
-                                prop used by the chart filter. */}
-                            {allCategories.map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </Select>
-                        ) : (
-                          <button
-                            onClick={() => setEditingCategoryId(item.id)}
-                            className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600 hover:bg-surface-200 hover:text-surface-800 transition-colors cursor-pointer"
-                            title="Click to change category"
-                          >
-                            {overrides[item.id] ?? item.subcategory}
-                          </button>
+                            <Sparkles className="h-2.5 w-2.5" /> Manual
+                          </span>
                         )}
-                        {item.categorySource === "rule" && !overrides[item.id] && (
+                        {item.subcategoryOverride === null && item.categorySource === "rule" && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600"
                             title={`AI categorized (${Math.round(ratioToPct(item.subcategoryConfidence))}% confidence)`}
@@ -565,15 +516,15 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                             <Sparkles className="h-2.5 w-2.5" /> AI
                           </span>
                         )}
-                        {(item.categorySource === "merchant_memory" || overrides[item.id]) && (
+                        {item.subcategoryOverride === null && item.categorySource === "merchant_memory" && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
-                            title={overrides[item.id] ? "You overrode this category" : "Learned from your override"}
+                            title="Learned from your override"
                           >
-                            <Sparkles className="h-2.5 w-2.5" /> {overrides[item.id] ? "Override" : "Learned"}
+                            <Sparkles className="h-2.5 w-2.5" /> Learned
                           </span>
                         )}
-                        {item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && !overrides[item.id] && (
+                        {item.subcategoryOverride === null && item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && (
                           <span className="text-[9px] text-surface-400" title="Low confidence categorization">
                             ?
                           </span>
@@ -787,6 +738,9 @@ function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
     isRecurring: item.recurringSource === "user" ? item.isRecurring : null,
     vendor: item.vendor,
     notes: item.notes,
+    // Raw override only — null preselects "Auto" so an edit that doesn't touch
+    // the category doesn't bake the derived value in as an explicit override.
+    subcategory: item.subcategoryOverride,
     departmentId: item.departmentId,
   };
 }

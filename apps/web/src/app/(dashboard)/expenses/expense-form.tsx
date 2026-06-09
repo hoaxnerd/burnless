@@ -24,6 +24,7 @@ import {
   normalizeExpensePayload,
   type ExpensePayloadNormalized,
 } from "@/lib/expense-params";
+import { getCategorySubcategories } from "@burnless/engine";
 import { FrequencySelector, type Frequency } from "./components/FrequencySelector";
 import { DateRangePicker } from "@/components/forms/primitives";
 import { Input, Select, Textarea } from "@/components/ui";
@@ -45,6 +46,8 @@ export interface ExpenseRow {
   endDate: string | Date | null;
   vendor?: string | null;
   notes?: string | null;
+  /** Explicit per-line category override; null/"" = derive from account. */
+  subcategory?: string | null;
   frequency?: Frequency | null;
   isOneTime?: boolean | null;
   isRecurring?: boolean | null;
@@ -163,6 +166,19 @@ export function ExpenseForm({
   const [departmentId, setDepartmentId] = useState<string>(initialValue?.departmentId ?? "");
   const [vendor, setVendor] = useState<string>(initialValue?.vendor ?? "");
   const [notes, setNotes] = useState<string>(initialValue?.notes ?? "");
+  // "" = Auto (derive from account); a value = explicit per-line override.
+  const [subcategory, setSubcategory] = useState<string>(initialValue?.subcategory ?? "");
+
+  // Full canonical subcategory list (~100 rules). If the edit row carries a
+  // custom value not in that list, include it so it stays selectable.
+  const categoryOptions = useMemo(() => {
+    const canonical = getCategorySubcategories();
+    const current = (initialValue?.subcategory ?? "").trim();
+    if (current !== "" && !canonical.includes(current)) {
+      return [current, ...canonical];
+    }
+    return canonical;
+  }, [initialValue?.subcategory]);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [paramsError, setParamsError] = useState<string | null>(null);
@@ -227,6 +243,7 @@ export function ExpenseForm({
       isRecurring,
       vendor: vendor.trim() === "" ? null : vendor.trim(),
       notes: notes.trim() === "" ? null : notes.trim(),
+      subcategory: subcategory.trim() === "" ? null : subcategory,
       departmentId: departmentId === "" ? null : departmentId,
       accountId,
       ...(mode === "edit" && initialValue?.id ? { id: initialValue.id } : {}),
@@ -267,6 +284,27 @@ export function ExpenseForm({
             </option>
           ))}
         </Select>
+      </div>
+
+      <div>
+        <label htmlFor="ef-category" className="block text-sm font-medium text-surface-700 mb-1">
+          Category
+        </label>
+        <Select
+          id="ef-category"
+          value={subcategory}
+          onChange={(e) => setSubcategory(e.target.value)}
+        >
+          <option value="">Auto (derive from account)</option>
+          {categoryOptions.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </Select>
+        <p className="mt-1 text-xs text-surface-400">
+          Leave on Auto to categorize from the account, or pick a category for this entry.
+        </p>
       </div>
 
       <div>

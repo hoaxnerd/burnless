@@ -40,6 +40,13 @@ export interface ExpenseLineItem {
   subcategory: string;
   subcategoryConfidence: number;
   categorySource: "rule" | "merchant_memory" | "manual";
+  /**
+   * Raw per-line category override from the DB (`forecast_lines.subcategory`).
+   * NULL when the category is auto-derived. Threaded so the edit form can
+   * preselect "Auto" vs the explicit value (the displayed `subcategory` above
+   * is always populated — it carries the derived value when this is null).
+   */
+  subcategoryOverride: string | null;
   method: string;
   parameters: Record<string, unknown>;
   startDate: string;
@@ -104,10 +111,16 @@ export interface ExpenseDetails {
 
 // ── Subcategory derivation ───────────────────────────────────────────────────
 
-function deriveSubcategory(
+export function deriveSubcategory(
   accountName: string,
   accountCategory: string,
+  explicit?: string | null,
 ): { subcategory: string; confidence: number; source: "rule" | "merchant_memory" | "manual" } {
+  // Explicit per-line override (set in the expense form) WINS over derivation.
+  if (typeof explicit === "string" && explicit.trim() !== "") {
+    return { subcategory: explicit.trim(), confidence: 1, source: "manual" };
+  }
+
   // Try categorization engine first
   const result = categorizeTransaction(accountName);
   if (result && result.confidence >= 0.5) {
@@ -215,8 +228,12 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     const prevAmount = getAnomalyBaseline(ctx, currentMonth, values);
     const changePercent = ratioChange(currentAmount, prevAmount) ?? 0;
 
-    // Derive subcategory from account name
-    const { subcategory, confidence, source } = deriveSubcategory(account.name, account.category);
+    // Derive subcategory from account name — explicit per-line override wins.
+    const { subcategory, confidence, source } = deriveSubcategory(
+      account.name,
+      account.category,
+      (fLine as { subcategory?: string | null }).subcategory ?? null,
+    );
 
     // Recurring: explicit user choice wins; otherwise fall back to the
     // variance-based suggestion (suggestion-only when DB column is null).
@@ -248,6 +265,11 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategory,
       subcategoryConfidence: confidence,
       categorySource: source,
+      subcategoryOverride:
+        typeof (fLine as { subcategory?: string | null }).subcategory === "string" &&
+        (fLine as { subcategory?: string | null }).subcategory!.trim() !== ""
+          ? (fLine as { subcategory?: string | null }).subcategory!.trim()
+          : null,
       method: fLine.method,
       parameters: (fLine.parameters ?? {}) as Record<string, unknown>,
       startDate,
@@ -286,6 +308,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategory: "People",
       subcategoryConfidence: 1.0,
       categorySource: "manual",
+      subcategoryOverride: null,
       method: "fixed",
       parameters: {},
       startDate: periodStart.toISOString().slice(0, 10),

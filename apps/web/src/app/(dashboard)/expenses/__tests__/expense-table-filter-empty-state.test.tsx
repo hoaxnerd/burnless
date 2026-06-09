@@ -51,6 +51,7 @@ const mkItem = (
   subcategory,
   subcategoryConfidence: 0.9,
   categorySource: "rule",
+  subcategoryOverride: null,
   method: "fixed",
   parameters: {},
   startDate: "2026-01-01",
@@ -154,19 +155,20 @@ describe("<ExpenseTable> EXP-05 — filter-aware empty state", () => {
   });
 });
 
-// ── EXP-06: inline category select includes full list ─────────────────────────
+// ── Category is read-only in the table (set in the expense form) ──────────────
+// The former EXP-06 inline per-row re-categorize select has been removed.
+// Reaching low/zero-spend categories is now handled by the form's wide canonical
+// list (see expense-form-category.test.tsx). Here we guard that the table renders
+// the category read-only with NO inline edit affordance.
 
-describe("<ExpenseTable> EXP-06 — inline category select includes low-spend categories", () => {
-  // The item is categorized as "COGS" — a zero-spend category absent from the
-  // spend-ordered `subcategories` prop (which only carries top-N by spend).
+describe("<ExpenseTable> category is read-only", () => {
   const cogsItem = mkItem("cogs-1", "AWS COGS", "COGS");
   const accountMap = new Map([
     ["acc-cogs-1", { id: "acc-cogs-1", name: "AWS COGS" }],
   ]);
-  // subcategories prop has only the chart's top-N: does NOT include "COGS".
   const topNSubcategories = ["Software", "Marketing", "Infrastructure"];
 
-  it("includes a zero-spend category (COGS) in the inline select options", () => {
+  it("renders the category text but offers no inline edit control", () => {
     render(
       <ExpenseTable
         lineItems={[cogsItem]}
@@ -175,38 +177,10 @@ describe("<ExpenseTable> EXP-06 — inline category select includes low-spend ca
       />,
     );
 
-    // Click the category badge button to open the inline select.
-    // The button's accessible name is the subcategory text ("COGS").
-    const categoryBadge = screen.getByRole("button", { name: "COGS" });
-    fireEvent.click(categoryBadge);
-
-    // The inline select should now be rendered.
-    const inlineSelect = screen.getByLabelText(/change category for AWS COGS/i) as HTMLSelectElement;
-    const optionValues = Array.from(inlineSelect.options).map((o) => o.value);
-
-    // "COGS" must be present even though it's not in topNSubcategories.
-    expect(optionValues).toContain("COGS");
-    // Top-N categories are also present.
-    expect(optionValues).toContain("Software");
-    expect(optionValues).toContain("Marketing");
-    expect(optionValues).toContain("Infrastructure");
-  });
-
-  it("pre-selects the row's current category even when outside top-N subcategories", () => {
-    render(
-      <ExpenseTable
-        lineItems={[cogsItem]}
-        subcategories={topNSubcategories}
-        accountMap={accountMap}
-      />,
-    );
-
-    // Click the category badge button to open the inline select.
-    const categoryBadge = screen.getByRole("button", { name: "COGS" });
-    fireEvent.click(categoryBadge);
-
-    const inlineSelect = screen.getByLabelText(/change category for AWS COGS/i) as HTMLSelectElement;
-    // defaultValue should be "COGS" (the row's current subcategory).
-    expect(inlineSelect.value).toBe("COGS");
+    // Category is shown.
+    expect(screen.getAllByText("COGS").length).toBeGreaterThan(0);
+    // No clickable category badge / inline select.
+    expect(screen.queryByRole("button", { name: "COGS" })).toBeNull();
+    expect(screen.queryByLabelText(/change category for/i)).toBeNull();
   });
 });

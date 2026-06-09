@@ -112,15 +112,18 @@ export interface ExpensePayloadInput {
   isRecurring?: boolean | null;
   vendor?: string | null;
   notes?: string | null;
+  /** Explicit per-line category override; null = derive automatically. */
+  subcategory?: string | null;
   departmentId?: string | null;
   accountId?: string;
   id?: string;
 }
 
 export interface ExpensePayloadNormalized
-  extends Omit<ExpensePayloadInput, "startDate" | "endDate"> {
+  extends Omit<ExpensePayloadInput, "startDate" | "endDate" | "subcategory"> {
   startDate: Date;
   endDate: Date | null;
+  subcategory: string | null;
 }
 
 export function normalizeExpensePayload(
@@ -134,5 +137,10 @@ export function normalizeExpensePayload(
       : input.endDate instanceof Date
         ? input.endDate
         : new Date(input.endDate);
-  return { ...input, startDate, endDate };
+  // Default null when absent/empty so an unset category clears the override.
+  const subcategory =
+    typeof input.subcategory === "string" && input.subcategory.trim() !== ""
+      ? input.subcategory.trim()
+      : null;
+  return { ...input, startDate, endDate, subcategory };
 }
