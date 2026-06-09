@@ -84,6 +84,13 @@ export {
   listInvestorsForRound,
   listShareClasses,
   listOptionPools,
+  createShareClass,
+  updateShareClass,
+  softDeleteShareClass,
+  createOptionPool,
+  updateOptionPool,
+  softDeleteOptionPool,
+  countOptionPools,
 } from "./funding";
 
 export {
