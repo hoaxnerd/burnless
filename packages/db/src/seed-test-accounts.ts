@@ -184,7 +184,7 @@ function defaultAccounts(ids: typeof FREE | typeof PRO | typeof TEAM, companyId:
   return [
     { id: ids.acctRevenue, companyId, name: "Revenue", type: "income" as const, category: "revenue" as const, isSystem: true, sortOrder: 1 },
     { id: ids.acctCogs, companyId, name: "Cost of Goods Sold", type: "expense" as const, category: "cogs" as const, isSystem: true, sortOrder: 10 },
-    { id: ids.acctSalaries, companyId, name: "Salaries & Wages", type: "expense" as const, category: "operating_expense" as const, isSystem: true, sortOrder: 20 },
+    { id: ids.acctSalaries, companyId, name: "Salaries & Wages", type: "expense" as const, category: "operating_expense" as const, isSystem: true, sortOrder: 20, coversHeadcount: true },
     { id: ids.acctCloud, companyId, name: "Cloud & Infrastructure", type: "expense" as const, category: "operating_expense" as const, isSystem: false, sortOrder: 21 },
     { id: ids.acctMarketing, companyId, name: "Marketing & Advertising", type: "expense" as const, category: "operating_expense" as const, isSystem: false, sortOrder: 22 },
     { id: ids.acctOffice, companyId, name: "Office & Facilities", type: "expense" as const, category: "operating_expense" as const, isSystem: false, sortOrder: 23 },

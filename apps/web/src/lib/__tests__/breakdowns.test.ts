@@ -50,9 +50,10 @@ describe("buildExpenseBreakdown", () => {
     const override = new Map<string, string>([["acc-1", "Software"]]);
     const withOverride = buildExpenseBreakdown(lines, "2026-06", 1000, override);
     expect(withOverride[0]?.subcategory).toBe("Software");
-    // Without the override it falls back to "Uncategorized" (proving the override is load-bearing).
+    // Without the override it falls back to the ACCOUNT NAME (not "Uncategorized")
+    // — proving the override wins over the name-based fallback.
     const without = buildExpenseBreakdown(lines, "2026-06", 1000);
-    expect(without[0]?.subcategory).toBe("Uncategorized");
+    expect(without[0]?.subcategory).toBe("Misc Account 9931");
   });
 
   it("override does not apply to the headcount-cost synthetic line", () => {

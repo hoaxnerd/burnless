@@ -34,7 +34,11 @@ function deriveSubcategory(line: BlendedExpenseLine, subcatByAccount?: Map<strin
   if (override && override.trim() !== "") return override.trim();
   const result = categorizeTransaction(line.accountName);
   if (result && result.confidence >= 0.5) return result.subcategory;
-  return line.category === "cogs" ? "Cost of Goods Sold" : "Uncategorized";
+  if (line.category === "cogs") return "Cost of Goods Sold";
+  // Final fallback: an expense account is always named, and its name is a more
+  // useful category than a generic "Uncategorized" bucket (which read as a 49%
+  // mystery in board reports — RPT-06). Only truly nameless spend stays Uncategorized.
+  return line.accountName?.trim() || "Uncategorized";
 }
 
 /**

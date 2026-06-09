@@ -132,7 +132,13 @@ export function deriveSubcategory(
     return { subcategory: "Cost of Goods Sold", confidence: 0.6, source: "manual" };
   }
 
-  // Generic operating expense fallback
+  // An expense account is always named; its name is a more useful category than a
+  // generic "Uncategorized" bucket (mirrors breakdowns.ts:deriveSubcategory so the
+  // table, chart, and AI insight agree). Only truly nameless spend stays Uncategorized.
+  const named = accountName?.trim();
+  if (named) {
+    return { subcategory: named, confidence: 0.4, source: "manual" };
+  }
   return { subcategory: "Uncategorized", confidence: 0.3, source: "manual" };
 }
 
