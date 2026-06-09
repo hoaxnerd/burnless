@@ -154,6 +154,9 @@ export interface ComputedMetrics {
 
   // Retention Cost (Tier-2)
   customerRetentionCost: MetricValue[];
+
+  // Debt (Phase 5 Task 5.1 §1.4 D6) — monthly interest expense echoed from input
+  interestExpense: MetricValue[];
 }
 
 // ── Core metrics computation ─────────────────────────────────────────────────
@@ -533,6 +536,14 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     return { month: m, value: dRound2(spend.div(customers)) };
   });
 
+  // ── Debt: Interest Expense (Phase 5 Task 5.1 §1.4 D6) ──────────────────────
+  // Echo the per-month input series so the dashboard/explorer/AI can surface it
+  // as a first-class metric. 0 when no interest input is provided.
+  const interestExpenseValues = months.map((m) => ({
+    month: m,
+    value: dRound2(D(input.interestExpense?.get(m) ?? 0)),
+  }));
+
   return {
     mrr,
     arr,
@@ -584,6 +595,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     burnProductivity,
     workingCapital,
     customerRetentionCost,
+    interestExpense: interestExpenseValues,
   };
 }
 

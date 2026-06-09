@@ -503,3 +503,26 @@ describe("Edge Cases — All New Metrics", () => {
     expect(m.burnProductivity[0]?.value).toBe(0);
   });
 });
+
+// Phase 5 Task 5.1 §1.4 D6 — interestExpense surfaced as a ComputedMetrics slug.
+describe("interestExpense metric (Phase 5 Task 5.1)", () => {
+  it("echoes the per-month input.interestExpense series", () => {
+    const input = make3MonthInput({
+      interestExpense: makeSeries({ "2026-01": 1250.5, "2026-02": 1300, "2026-03": 1349.25 }),
+    });
+    const m = computeAllMetrics(input);
+
+    expect(m.interestExpense[0]?.value).toBe(1250.5);
+    expect(m.interestExpense[1]?.value).toBe(1300);
+    expect(m.interestExpense[2]?.value).toBe(1349.25);
+  });
+
+  it("is 0 each month when no interestExpense input is provided", () => {
+    const input = make3MonthInput();
+    const m = computeAllMetrics(input);
+
+    expect(m.interestExpense[0]?.value).toBe(0);
+    expect(m.interestExpense[1]?.value).toBe(0);
+    expect(m.interestExpense[2]?.value).toBe(0);
+  });
+});

@@ -76,6 +76,8 @@ const VALID_ENGINE_KEYS: Set<string> = new Set<string>([
   "freeCashFlow", "fcfMargin", "ttmRevenue",
   "arpu", "netChurnRate", "hasNegativeChurn",
   "burnProductivity", "workingCapital", "customerRetentionCost",
+  // Phase 5 Task 5.1 — interest expense emitted as a ComputedMetrics slug
+  "interestExpense",
 ]);
 
 describe("Metrics Explorer → Engine alignment", () => {
