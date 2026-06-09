@@ -27,6 +27,9 @@ export interface ShareClassRow {
   classType: "common" | "preferred";
   totalAuthorized: string;
   totalIssued: string;
+  /** Liquidation preference multiple (numeric → string). Optional: present on
+   * raw DB rows; the footing view does not need it. */
+  liquidationPreference?: string;
 }
 
 /** Raw option-pool row as persisted (server-wired via U1). */

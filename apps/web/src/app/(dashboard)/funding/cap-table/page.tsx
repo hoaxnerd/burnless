@@ -8,6 +8,7 @@ import { computeCapTableForCompany } from "@/lib/compute-cap-table";
 import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
 import { CapTableView } from "./cap-table-view";
+import { CapTableManager } from "./cap-table-manager";
 
 export default async function CapTablePage() {
   const company = await getCompany();
@@ -37,10 +38,17 @@ async function CapTableContent({
     listOptionPools(companyId),
   ]);
   return (
-    <CapTableView
-      capTable={capTable}
-      shareClasses={shareClasses}
-      optionPools={optionPools}
-    />
+    <>
+      <CapTableView
+        capTable={capTable}
+        shareClasses={shareClasses}
+        optionPools={optionPools}
+      />
+      {/* U4: editable Manage section (base-data structure; routes own scenario
+          safety + single-pool guard). */}
+      <div className="px-6 pb-6">
+        <CapTableManager shareClasses={shareClasses} optionPools={optionPools} />
+      </div>
+    </>
   );
 }
