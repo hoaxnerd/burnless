@@ -231,7 +231,10 @@ describe("LTV:CAC Ratio — hand-calculated", () => {
     expect(m.ltvCacRatio[1]?.value).toBeCloseTo(3.6, 0);
   });
 
-  it("returns 0 when CAC is 0 (no acquisition spend)", () => {
+  // Re-baselined Phase 5.2: with no acquisitionSpend input, CAC is a DARK metric
+  // (gated on input presence) → NaN, and ltvCacRatio inherits NaN. Previously this
+  // emitted a misleading 0; NaN lets isMetricDataAvailable ghost the card.
+  it("returns NaN when there is no acquisition spend (CAC is dark)", () => {
     const details: SubscriptionDetail[] = [
       sub({
         month: "2026-01",
@@ -256,8 +259,8 @@ describe("LTV:CAC Ratio — hand-calculated", () => {
       headcount: s({ "2026-01": 10 }),
     };
     const m = computeAllMetrics(input);
-    expect(m.cac[0]?.value).toBe(0);
-    expect(m.ltvCacRatio[0]?.value).toBe(0);
+    expect(Number.isNaN(m.cac[0]?.value)).toBe(true);
+    expect(Number.isNaN(m.ltvCacRatio[0]?.value)).toBe(true);
   });
 });
 

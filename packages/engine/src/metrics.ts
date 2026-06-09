@@ -275,26 +275,37 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   });
 
   // CAC = acquisition spend / new customers
+  // Phase 5.2 (review M2): gate the DARK case strictly on input PRESENCE —
+  // acquisitionSpend absent for the month → NaN (card ghosts with a hint).
+  // "Spend present but newCustomers === 0" is its OWN documented-undefined case
+  // (acquisition money was spent but acquired nobody → CAC undefined, not 0).
+  // Both emit NaN so isMetricDataAvailable ghosts the card instead of a wrong 0.
   const cac = months.map((m) => {
-    const spend = D(input.acquisitionSpend?.get(m) ?? 0);
+    const rawSpend = input.acquisitionSpend?.get(m);
+    if (rawSpend === undefined) return { month: m, value: NaN };
+    const spend = D(rawSpend);
     const newCust = D(subDetails.get(m)?.newCustomers ?? input.newCustomers?.get(m) ?? 0);
-    if (newCust.isZero()) return { month: m, value: 0 };
+    if (newCust.isZero()) return { month: m, value: NaN };
     return { month: m, value: dRound2(spend.div(newCust)) };
   });
 
   const ltvCacRatio = months.map((m, i) => {
-    const cacVal = D(cac[i]?.value ?? 0);
-    if (cacVal.isZero()) return { month: m, value: 0 };
-    return { month: m, value: dRound2(D(ltv[i]?.value ?? 0).div(cacVal)) };
+    const cacVal = cac[i]?.value ?? NaN;
+    // Propagate NaN from a dark/undefined CAC; only divide when CAC is a finite, nonzero number.
+    if (!Number.isFinite(cacVal) || cacVal === 0) return { month: m, value: NaN };
+    return { month: m, value: dRound2(D(ltv[i]?.value ?? 0).div(D(cacVal))) };
   });
 
   // CAC Payback = CAC / (ARPA × Gross Margin%)
   const cacPaybackMonths = months.map((m, i) => {
+    const cacVal = cac[i]?.value ?? NaN;
+    // Propagate NaN from a dark/undefined CAC before the gross-margin gate.
+    if (!Number.isFinite(cacVal)) return { month: m, value: NaN };
     const arpaVal = D(arpa[i]?.value ?? 0);
     const gmFraction = D(grossMarginPercent[i]?.value ?? 0).div(100);
     const monthlyGrossPerCustomer = arpaVal.mul(gmFraction);
     if (monthlyGrossPerCustomer.isZero()) return { month: m, value: 0 };
-    return { month: m, value: dRound2(D(cac[i]?.value ?? 0).div(monthlyGrossPerCustomer)) };
+    return { month: m, value: dRound2(D(cacVal).div(monthlyGrossPerCustomer)) };
   });
 
   // SaaS Quick Ratio = (New MRR + Expansion MRR) / (Churned MRR + Contraction MRR)

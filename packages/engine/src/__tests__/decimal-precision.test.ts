@@ -239,9 +239,14 @@ describe("Decimal precision — metrics calculations", () => {
 
     const metrics = computeAllMetrics(input);
 
-    // No metric should be NaN or Infinity
+    // Re-baselined Phase 5.2: cac/ltvCacRatio/cacPaybackMonths are now DARK metrics
+    // gated on input presence — with no acquisitionSpend (as here) they intentionally
+    // emit NaN so isMetricDataAvailable ghosts the card. NaN is the canonical value
+    // for these slugs under missing input; all OTHER metrics must still be finite.
+    const DARK_WHEN_NO_INPUT = new Set(["cac", "ltvCacRatio", "cacPaybackMonths"]);
     for (const [key, values] of Object.entries(metrics)) {
       if (Array.isArray(values)) {
+        if (DARK_WHEN_NO_INPUT.has(key)) continue;
         for (const v of values as { value: number }[]) {
           expect(Number.isNaN(v.value)).toBe(false);
           expect(Number.isFinite(v.value)).toBe(true);

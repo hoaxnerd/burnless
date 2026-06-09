@@ -295,7 +295,11 @@ describe("metrics — edge cases", () => {
       expect(metrics.cac[0]?.value).toBe(500);
     });
 
-    it("returns 0 CAC when no new customers", () => {
+    // Re-baselined Phase 5.2: spend present but newCustomers===0 is its OWN
+    // documented-undefined case (you spent acquisition $ but acquired nobody →
+    // CAC is undefined, not a misleading 0). Distinct from the "no spend at all"
+    // dark case below; both surface NaN so isMetricDataAvailable ghosts the card.
+    it("returns NaN CAC when spend is present but no new customers", () => {
       const subDetails: SubscriptionDetail[] = [
         {
           month: "2026-01",
@@ -315,7 +319,83 @@ describe("metrics — edge cases", () => {
         acquisitionSpend: new Map([["2026-01", 5000]]),
       });
       const metrics = computeAllMetrics(input);
-      expect(metrics.cac[0]?.value).toBe(0);
+      expect(Number.isNaN(metrics.cac[0]?.value)).toBe(true);
+    });
+
+    // Phase 5.2 M2: the DARK case — acquisitionSpend is absent for the month
+    // (input not present at all). Gate strictly on input presence → NaN, so the
+    // card ghosts with a "needs acquisition spend" hint instead of showing $0.
+    it("returns NaN CAC when no acquisitionSpend input at all", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 110,
+          newCustomers: 10,
+          churnedCustomers: 0,
+          mrr: 11000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 1000,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 11000]]),
+        subscriptionDetails: subDetails,
+        // no acquisitionSpend provided
+      });
+      const metrics = computeAllMetrics(input);
+      expect(Number.isNaN(metrics.cac[0]?.value)).toBe(true);
+    });
+
+    it("computes CAC = 600 on the positive path (6000 spend / 10 new)", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 110,
+          newCustomers: 10,
+          churnedCustomers: 0,
+          mrr: 11000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 0,
+          netNewMrr: 1000,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 11000]]),
+        subscriptionDetails: subDetails,
+        acquisitionSpend: new Map([["2026-01", 6000]]),
+      });
+      const metrics = computeAllMetrics(input);
+      expect(metrics.cac[0]?.value).toBe(600);
+    });
+
+    // Phase 5.2: NaN propagates through the dependents that divide by CAC.
+    it("ltvCacRatio and cacPaybackMonths inherit NaN when CAC is dark", () => {
+      const subDetails: SubscriptionDetail[] = [
+        {
+          month: "2026-01",
+          customers: 110,
+          newCustomers: 10,
+          churnedCustomers: 2,
+          mrr: 11000,
+          newMrr: 1000,
+          expansionMrr: 0,
+          churnedMrr: 200,
+          netNewMrr: 800,
+        },
+      ];
+      const input = makeBasicInput({
+        revenue: new Map([["2026-01", 11000]]),
+        cogs: new Map([["2026-01", 2200]]), // 80% gross margin → nonzero gross/customer
+        subscriptionDetails: subDetails,
+        // no acquisitionSpend → CAC NaN
+      });
+      const metrics = computeAllMetrics(input);
+      expect(Number.isNaN(metrics.cac[0]?.value)).toBe(true);
+      expect(Number.isNaN(metrics.ltvCacRatio[0]?.value)).toBe(true);
+      expect(Number.isNaN(metrics.cacPaybackMonths[0]?.value)).toBe(true);
     });
   });
 
