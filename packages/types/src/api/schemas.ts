@@ -270,6 +270,77 @@ export const updateFundingRoundSchema = z.object({
 export type CreateFundingRoundInput = z.infer<typeof createFundingRoundSchema>;
 export type UpdateFundingRoundInput = z.infer<typeof updateFundingRoundSchema>;
 
+// ── Cap Table: Share Classes + Option Pools ──────────────────────────────────
+// Mirrors db `share_classes`/`option_pools` (schema.ts:850-886). Share counts
+// are numeric(18,0) integers (DB stores STRINGS — routes String()-coerce before
+// insert). classType drives the engine cap-table classification (funding.ts:190,
+// compute-cap-table.ts:157), NEVER a name regex. Founder common stock = a class
+// with classType:'common'. Phase 3 F §F5 single-pool MVP — these are base-data
+// (not scenario) schemas; the route layer owns the scenario safety throw.
+
+/** Mirrors db `share_class_type` pgEnum (schema.ts:664). */
+export const shareClassTypeEnumZ = z.enum(["common", "preferred"]);
+
+// numeric(18,0) max = 10^18 - 1.
+const MAX_SHARES = 999_999_999_999_999_999;
+/** Integer share count: numeric(18,0), non-negative. */
+const shareCount = () => z.number().int().nonnegative().max(MAX_SHARES);
+
+export const createShareClassSchema = z
+  .object({
+    name: z.string().min(1),
+    // Defaults to 'preferred' (matches the DB column default); founder common
+    // stock is created by explicitly passing classType:'common'.
+    classType: shareClassTypeEnumZ.default("preferred"),
+    totalAuthorized: shareCount(),
+    totalIssued: shareCount().default(0),
+    // numeric(7,4) liquidation multiple, e.g. 1× non-participating. Not a share
+    // count — plain (possibly fractional) number.
+    liquidationPreference: z.number().finite().min(0).max(999.9999).default(1),
+    // numeric(18,6) par value (money). Optional — defaults at the DB level.
+    parValue: z.number().finite().min(0).optional(),
+  })
+  .refine((d) => d.totalIssued <= d.totalAuthorized, {
+    path: ["totalIssued"],
+    message: "totalIssued cannot exceed totalAuthorized",
+  });
+
+export const updateShareClassSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    classType: shareClassTypeEnumZ.optional(),
+    totalAuthorized: shareCount().optional(),
+    totalIssued: shareCount().optional(),
+    liquidationPreference: z.number().finite().min(0).max(999.9999).optional(),
+    parValue: z.number().finite().min(0).optional(),
+  })
+  // Cross-field footing guard only fires when BOTH bounds are present in the
+  // patch (a single-field update can't be validated against the absent column).
+  .refine(
+    (d) =>
+      d.totalAuthorized == null ||
+      d.totalIssued == null ||
+      d.totalIssued <= d.totalAuthorized,
+    { path: ["totalIssued"], message: "totalIssued cannot exceed totalAuthorized" },
+  );
+
+export const createOptionPoolSchema = z.object({
+  name: z.string().min(1),
+  totalReserved: shareCount(),
+  refreshDate: nullableDateString().optional(),
+});
+
+export const updateOptionPoolSchema = z.object({
+  name: z.string().min(1).optional(),
+  totalReserved: shareCount().optional(),
+  refreshDate: nullableDateString().optional(),
+});
+
+export type CreateShareClassInput = z.infer<typeof createShareClassSchema>;
+export type UpdateShareClassInput = z.infer<typeof updateShareClassSchema>;
+export type CreateOptionPoolInput = z.infer<typeof createOptionPoolSchema>;
+export type UpdateOptionPoolInput = z.infer<typeof updateOptionPoolSchema>;
+
 // ── Forecast Lines ──────────────────────────────────────────────────────────
 
 /** Phase 1 §1.5 expense frequency enum (mirrors `expenseFrequencyEnum` in db schema). */
