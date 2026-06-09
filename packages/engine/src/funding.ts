@@ -620,11 +620,13 @@ export function computeConvertibleNote(
 ): ConvertibleNoteConversionResult {
   const issue = new Date(input.issueDate);
   const convert = new Date(input.conversionDate);
-  // Month-based accrual: avoids leap-year / day-count drift; matches standard simple-interest convention.
-  const monthsElapsed =
-    (convert.getFullYear() - issue.getFullYear()) * 12 +
-    (convert.getMonth() - issue.getMonth());
-  const yearsElapsed = monthsElapsed / 12;
+  // ACT/365 day-count, matching the cap-table convertible accrual (review L1; funding.ts accrueConvertible).
+  // Negative guard: a conversion date before issuance floors elapsed days at 0 (no negative accrual).
+  const daysElapsed = Math.max(
+    0,
+    Math.round((convert.getTime() - issue.getTime()) / 86_400_000),
+  );
+  const yearsElapsed = D(daysElapsed).div(365);
   const accrued = D(input.noteAmount).mul(input.noteParams.interestRate ?? 0).mul(yearsElapsed);
   const total = D(input.noteAmount).plus(accrued);
   const safeResult = computeSafeConversion({

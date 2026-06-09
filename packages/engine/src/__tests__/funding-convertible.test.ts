@@ -12,10 +12,42 @@ describe("computeConvertibleNote", () => {
       qualifiedRoundPricePerShare: 1.0,
       preRoundFullyDilutedShares: 10_000_000,
     });
-    expect(result.accruedInterest).toBeCloseTo(40_000, 0);
-    expect(result.principalPlusInterest).toBeCloseTo(1_040_000, 0);
+    // ACT/365: 2026-01-01 → 2026-07-01 = 181 days.
+    // 1,000,000 × 0.08 × 181/365 = 39,671.2328... → 39,671.23.
+    expect(result.accruedInterest).toBeCloseTo(39_671.23, 2);
+    expect(result.principalPlusInterest).toBeCloseTo(1_039_671.23, 2);
     expect(result.method).toBe("cap");
-    expect(result.sharesIssued).toBe(1_040_000);
+    expect(result.sharesIssued).toBe(1_039_671);
+  });
+
+  it("accrues interest on a partial month — ACT/365 day-count (195 days)", () => {
+    const result = computeConvertibleNote({
+      noteAmount: 1_000_000,
+      noteParams: { interestRate: 0.08, valuationCap: 10_000_000 },
+      issueDate: "2026-01-01",
+      conversionDate: "2026-07-15",
+      qualifiedRoundPreMoney: 20_000_000,
+      qualifiedRoundPricePerShare: 1.0,
+      preRoundFullyDilutedShares: 10_000_000,
+    });
+    // 2026-01-01 → 2026-07-15 = 195 days.
+    // 1,000,000 × 0.08 × 195/365 = 42,739.726... → 42,739.73.
+    expect(result.accruedInterest).toBeCloseTo(42_739.73, 2);
+    expect(result.principalPlusInterest).toBeCloseTo(1_042_739.73, 2);
+  });
+
+  it("guards against a conversion date before issuance — accrued floors at 0", () => {
+    const result = computeConvertibleNote({
+      noteAmount: 1_000_000,
+      noteParams: { interestRate: 0.08, valuationCap: 10_000_000 },
+      issueDate: "2026-07-01",
+      conversionDate: "2026-01-01",
+      qualifiedRoundPreMoney: 20_000_000,
+      qualifiedRoundPricePerShare: 1.0,
+      preRoundFullyDilutedShares: 10_000_000,
+    });
+    expect(result.accruedInterest).toBe(0);
+    expect(result.principalPlusInterest).toBe(1_000_000);
   });
 
   it("mirrors the true floor — $1000 note @ $6.6 priced → 151 shares", () => {
