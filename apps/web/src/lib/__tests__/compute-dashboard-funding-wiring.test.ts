@@ -91,5 +91,23 @@ describe("computeDashboardData funding wiring", () => {
     // (netBurnRate = max(0, opex + interest - revenue) = max(0, 10000 + 1200 - 1) = 11199)
     const janBurn = data.metrics.netBurnRate.find((m) => m.month === "2026-01")?.value;
     expect(janBurn).toBe(11_199);
+
+    // Assertion 3 (Task 1.1 — FAIL-1): cumulative cashPosition must drain by debt
+    // interest + principal. Derived by running computeFundingImpact for THIS fixture
+    // ($120k debt, 1%/mo on declining balance, straight-line $10k/mo principal):
+    //   netIncome[m] = rev($1) − opex($10,000) − interest[m]   (interest now inside NI)
+    //   cash[m] = startingCash(0) + Σdraws + Σnetincome − Σprincipal
+    // Jan: 0 + 120000 + (1−10000−1200) − 10000          = 98,801
+    // Feb: 98801 + (1−10000−1100) − 10000               = 77,702
+    // Interest is counted ONCE (via netIncome); principal once; the $120k draw raises
+    // cash once. Old code added the unsigned draw and never subtracted interest/principal.
+    expect(data.cashPosition.get("2026-01")).toBe(98_801);
+    expect(data.cashPosition.get("2026-02")).toBe(77_702);
+    expect(data.cashPosition.get("2026-12")).toBe(-127_788);
+
+    // grossBurnRate (burn contract, Phase 2D §D6) = opex + interest, UNCHANGED by this
+    // fix — interest must NOT be double-counted in burn. Jan = 10000 + 1200 = 11,200.
+    const janGross = data.metrics.burnRate.find((m) => m.month === "2026-01")?.value;
+    expect(janGross).toBe(11_200);
   });
 });

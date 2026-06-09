@@ -126,21 +126,6 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     headcountPlans: hcPlans, fundingRounds: funding, transactions: txns, periodStart, periodEnd,
   } = input;
 
-  // Phase 2 D §1.3 + Phase 3 F §F6: raw funding-inflow series used only for the
-  // cumFunding chart accumulator below. NOT passed to generateCashFlow — that
-  // path consumes fundingImpact (this Map's structured successor).
-  const dashboardFundingInflowSeries: MonthlySeries = new Map();
-  for (const round of funding) {
-    const roundDate = new Date(round.date);
-    if (round.isProjected || roundDate >= periodStart) {
-      const key = monthKey(roundDate);
-      dashboardFundingInflowSeries.set(
-        key,
-        (dashboardFundingInflowSeries.get(key) ?? 0) + Number(round.amount),
-      );
-    }
-  }
-
   // Phase 2 D §1.3: structured funding impact for burn/runway semantics + cash-flow children.
   const horizonMonths = monthRange(periodStart, periodEnd).map((d) => monthKey(d));
   const fundingImpact = computeFundingImpact({
@@ -337,8 +322,18 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
       category: "operating_expense", values: reconciledHeadcountCost,
     });
   }
+  // Phase 1 FAIL-1 (B1) §1.1: keep `totalExpenses` interest-free so the engine
+  // burn contract (grossBurnRate = totalExpenses + interest, Phase 2D §D6) is
+  // unchanged and interest is NOT double-counted in burn.
   const totalExpenses = addSeries(addSeries(totalCogs, totalOpex), totalOtherExpense);
-  const netIncome = subtractSeries(addSeries(totalRevenue, totalOtherIncome), totalExpenses);
+  // Phase 1 FAIL-1 (B1) §1.1 + M1: interest enters netIncome (so retained earnings
+  // absorbs it once, fixing both footing and the "Net Income is pre-interest"
+  // concern); grant disbursements are other income (NOT paid-in capital, M1).
+  const otherIncomeWithGrants = addSeries(totalOtherIncome, fundingImpact.grantDisbursements);
+  const netIncome = subtractSeries(
+    subtractSeries(addSeries(totalRevenue, otherIncomeWithGrants), totalExpenses),
+    fundingImpact.interestExpense,
+  );
 
   // Expense-mix component series (Phase 1 §1.5 MANDATE) — per-month sums of
   // forecast-line values bucketed by method / isOneTime. These feed the
@@ -366,25 +361,28 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     }
   }
 
-  // Cash position — only include funding received on or before period start;
-  // future/projected rounds are added when their month arrives
+  // Cash position — Phase 1 FAIL-1 (B1) §1.1.
+  // startingCash = pre-period equity/grant cash only. EXCLUDE pre-period debt
+  // (§3c): debt is a financing inflow modeled month-by-month via fundingImpact
+  // (draw raises cash AND the debt liability together), so counting a pre-period
+  // debt round in startingCash would double-count the cash and dangle the BS.
   const startingCash = dSum(
     funding
-      .filter((r) => !r.isProjected && new Date(r.date) < periodStart)
+      .filter((r) => !r.isProjected && new Date(r.date) < periodStart && r.type !== "debt")
       .map((r) => Number(r.amount)),
   );
-  const futureFunding: MonthlySeries = new Map();
-  for (const r of funding) {
-    const rDate = new Date(r.date);
-    if (r.isProjected || rDate >= periodStart) {
-      const key = monthKey(rDate);
-      futureFunding.set(key, (futureFunding.get(key) ?? 0) + Number(r.amount));
-    }
-  }
+  // Funding cash flow = (equity + debt + grant draws) − principal ONLY. Interest
+  // is already inside netIncome (counted once) — subtracting it again here is the
+  // double-count trap B1 fixes.
+  const fundingInflows = addSeries(
+    addSeries(fundingImpact.equityInflows, fundingImpact.debtInflows),
+    fundingImpact.grantDisbursements,
+  );
+  const fundingCashFlow = subtractSeries(fundingInflows, fundingImpact.principalPayments);
   const cashPosition: MonthlySeries = new Map();
   let runningCash = D(startingCash);
   for (const m of Array.from(netIncome.keys()).sort()) {
-    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(futureFunding.get(m) ?? 0);
+    runningCash = runningCash.plus(netIncome.get(m) ?? 0).plus(fundingCashFlow.get(m) ?? 0);
     cashPosition.set(m, dRound2(runningCash));
   }
 
@@ -460,6 +458,32 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     });
   }
 
+  // Phase 1 FAIL-1 (B1) §1.1 statement consistency: push the debt interest as an
+  // `other_expense` AccountData row so generateProfitAndLoss's Net Income line and
+  // generateCashFlow's operating cash flow include interest and AGREE with the
+  // interest-inclusive `netIncome` series above. This row is added AFTER
+  // metricsInput.totalExpenses was computed, so it does NOT leak into burn (which
+  // keeps interest separate via metricsInput.interestExpense).
+  if (Array.from(fundingImpact.interestExpense.values()).some((v) => Math.abs(v) >= 0.005)) {
+    accountDataList.push({
+      id: "fi-interest-expense",
+      name: "Interest Expense",
+      category: "other_expense",
+      values: fundingImpact.interestExpense,
+    });
+  }
+  // M1: grant disbursements are other income (NOT paid-in capital). Mirror the
+  // `otherIncomeWithGrants` blend into accountDataList so the displayed P&L /
+  // cash-flow net income agrees with the `netIncome` series.
+  if (Array.from(fundingImpact.grantDisbursements.values()).some((v) => Math.abs(v) >= 0.005)) {
+    accountDataList.push({
+      id: "fi-grant-income",
+      name: "Grant Income",
+      category: "other_income",
+      values: fundingImpact.grantDisbursements,
+    });
+  }
+
   const profitAndLoss = generateProfitAndLoss(accountDataList, {
     personnelBreakdown: { benefitsByComponent: headcountCosts.benefitsByComponent },
   });
@@ -485,13 +509,35 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
     }
     accountDataList.push({ id: "bs-retained-earnings", name: "Retained Earnings", category: "equity", values: retainedEarnings });
 
+    // Phase 1 FAIL-1 (B1) §3d: Paid-in Capital = startingCash + Σ(equity inflows)
+    // ONLY. Debt is a liability (bs-debt-outstanding below), grants are other
+    // income (→ retained via netIncome, M1). The old code added the full funding
+    // amount (debt included) as equity, mislabeling debt and dangling the BS.
     const paidInCapital: MonthlySeries = new Map();
-    let cumFunding = startingCash;
+    let cumEquity = startingCash;
     for (const m of months) {
-      cumFunding += dashboardFundingInflowSeries.get(m) ?? 0;
-      paidInCapital.set(m, dRound2(D(cumFunding)));
+      cumEquity = D(cumEquity).plus(fundingImpact.equityInflows.get(m) ?? 0).toNumber();
+      paidInCapital.set(m, dRound2(D(cumEquity)));
     }
     accountDataList.push({ id: "bs-paid-in-capital", name: "Paid-in Capital", category: "equity", values: paidInCapital });
+
+    // Phase 1 FAIL-1 (B1) §3d: Debt Outstanding (liability) = Σdraws − Σprincipal.
+    // The draw raised cash (asset) and the liability together; principal repaid
+    // drains cash and the liability together → A = L + E holds every month.
+    const debtDrawCum: MonthlySeries = new Map();
+    const principalCum: MonthlySeries = new Map();
+    let cumDraw = 0;
+    let cumPrincipal = 0;
+    for (const m of months) {
+      cumDraw = D(cumDraw).plus(fundingImpact.debtInflows.get(m) ?? 0).toNumber();
+      cumPrincipal = D(cumPrincipal).plus(fundingImpact.principalPayments.get(m) ?? 0).toNumber();
+      debtDrawCum.set(m, dRound2(D(cumDraw)));
+      principalCum.set(m, dRound2(D(cumPrincipal)));
+    }
+    const debtOutstanding = subtractSeries(debtDrawCum, principalCum);
+    if (Array.from(debtOutstanding.values()).some((v) => Math.abs(v) >= 0.005)) {
+      accountDataList.push({ id: "bs-debt-outstanding", name: "Debt Outstanding", category: "liability", values: debtOutstanding });
+    }
 
     // Liability: Accounts Payable — approximate as 1 month of total expenses (Net-30 terms).
     for (const m of months) {
