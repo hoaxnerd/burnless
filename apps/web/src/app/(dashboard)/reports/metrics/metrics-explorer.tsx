@@ -196,7 +196,7 @@ export function MetricsExplorer({
           const data = metrics[def.key] as MetricValue[];
           const currentIdx = data.findIndex((d) => d.month === currentMonth);
           const resolvedIdx = currentIdx >= 0 ? currentIdx : data.length - 1;
-          // Phase 5 §5.7: NaN-gated dark metrics ghost as "—", not "$NaN"/"$0".
+          // Phase 5 §5.7: NaN-gated dark metrics ghost as "—", not a NaN/zero $ figure.
           // The raw value can be NaN (engine gate) or null (post unstable_cache
           // JSON round-trip — JSON.stringify(NaN) === "null"); `?? 0` catches
           // neither correctly, so gate on Number.isFinite of the RAW value.

@@ -130,6 +130,10 @@ const ALLOWED = [
   "apps/web/src/app/(dashboard)/ai/_components/__tests__/",
   "apps/web/src/app/(dashboard)/dashboard/__tests__/",
   "apps/web/src/app/(dashboard)/data-room/__tests__/",
+  // metrics-explorer-ghost.test.tsx (Phase 5 §5.7): mocks fmtCurrency as
+  // `$${...}` and asserts dark metrics render "—" not "$NaN"/"$0"/"$600" —
+  // fixture stubs + assertions on display output, not display code.
+  "apps/web/src/app/(dashboard)/reports/metrics/__tests__/",
   "apps/web/src/app/api/chat/__tests__/",
   "apps/web/src/app/api/import/__tests__/",
   "apps/web/src/app/api/onboarding/__tests__/",

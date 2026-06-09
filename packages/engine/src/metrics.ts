@@ -261,7 +261,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
 
   // LTV = (ARPA × Gross Margin%) / Revenue Churn Rate
   // Phase 5.4: when churn ≤ 0 (zero churn = 100% retention, negative = net
-  // expansion), LTV is mathematically infinite. Emit NaN instead of a $1M
+  // expansion), LTV is mathematically infinite. Emit NaN instead of a 1M-dollar
   // sentinel so isMetricDataAvailable ghosts the card with a hint rather than
   // showing a misleading concrete dollar figure. The no-revenue case
   // (ARPA = 0, so churn is also 0) is a distinct "no LTV data" state → 0.
@@ -512,8 +512,8 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
     const d = subDetails.get(m);
     // Phase 5.3: dark-gate on INPUT PRESENCE. Active-user count comes from the
     // subscription detail or the activeUsers series; if NEITHER provides a value
-    // the metric is dark → NaN (ghost the card), not a misleading $0. A present-
-    // but-zero user count is its own undefined (÷0) → also NaN.
+    // the metric is dark → NaN (ghost the card), not a misleading zero. A
+    // present-but-zero user count is its own undefined (÷0) → also NaN.
     const rawUsers = d?.activeUsers ?? input.activeUsers?.get(m);
     if (rawUsers === undefined) return { month: m, value: NaN };
     const users = D(rawUsers);
@@ -563,7 +563,7 @@ export function computeAllMetrics(input: MetricsInput): ComputedMetrics {
   // ── Tier-2: Customer Retention Cost ────────────────────────────────────────
   const customerRetentionCost = months.map((m) => {
     // Phase 5.3: dark-gate on INPUT PRESENCE. No retentionSpend entry for the
-    // month → NaN (ghost the card), not a misleading $0. Spend present but
+    // month → NaN (ghost the card), not a misleading zero. Spend present but
     // customers===0 is its own documented undefined (÷0) → also NaN.
     const rawSpend = input.retentionSpend?.get(m);
     if (rawSpend === undefined) return { month: m, value: NaN };
