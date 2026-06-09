@@ -62,19 +62,29 @@ vi.mock("@/lib/date-validation", () => ({
 }));
 vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
 
-vi.mock("@burnless/engine", () => ({
-  computeAllForecastLines: mockComputeAllForecastLines,
-  aggregateByAccount: mockAggregateByAccount,
-  computeTotalRevenue: mockComputeTotalRevenue,
-  computeAllHeadcountCosts: mockComputeAllHeadcountCosts,
-  generateProfitAndLoss: mockGenerateProfitAndLoss,
-  generateCashFlow: mockGenerateCashFlow,
-  generateBalanceSheet: mockGenerateBalanceSheet,
-  monthKey: mockMonthKey,
-  addSeries: mockAddSeries,
-  computeFundingImpact: mockComputeFundingImpact,
-  monthRange: mockMonthRange,
-}));
+vi.mock("@burnless/engine", async (importOriginal) => {
+  // Pure Decimal/series helpers the route now uses at runtime (Phase 1 cash
+  // model) get their REAL implementations — they have no DB/side effects, so
+  // mocking them would only risk arithmetic drift. The compute fns stay mocked.
+  const actual = await importOriginal<typeof import("@burnless/engine")>();
+  return {
+    computeAllForecastLines: mockComputeAllForecastLines,
+    aggregateByAccount: mockAggregateByAccount,
+    computeTotalRevenue: mockComputeTotalRevenue,
+    computeAllHeadcountCosts: mockComputeAllHeadcountCosts,
+    generateProfitAndLoss: mockGenerateProfitAndLoss,
+    generateCashFlow: mockGenerateCashFlow,
+    generateBalanceSheet: mockGenerateBalanceSheet,
+    monthKey: mockMonthKey,
+    addSeries: mockAddSeries,
+    computeFundingImpact: mockComputeFundingImpact,
+    monthRange: mockMonthRange,
+    subtractSeries: actual.subtractSeries,
+    dSum: actual.dSum,
+    D: actual.D,
+    dRound2: actual.dRound2,
+  };
+});
 
 import { GET } from "../route";
 
@@ -89,7 +99,11 @@ function setupEmptyEngine() {
   mockAggregateByAccount.mockReturnValue(new Map());
   mockComputeTotalRevenue.mockReturnValue(new Map());
   mockComputeAllHeadcountCosts.mockReturnValue({ totalCost: new Map(), headcount: new Map() });
-  mockGenerateProfitAndLoss.mockReturnValue({ revenue: { name: "Revenue", values: [], children: [] } });
+  mockGenerateProfitAndLoss.mockReturnValue({
+    revenue: { name: "Revenue", values: [], children: [] },
+    // Phase 1: the route derives its netIncome series from pnl.netIncome.values.
+    netIncome: { name: "Net Income", values: [], children: [] },
+  });
   mockGenerateCashFlow.mockReturnValue({ operatingCashFlow: { name: "Operating", values: [], children: [] } });
   mockGenerateBalanceSheet.mockReturnValue({ assets: { name: "Assets", values: [], children: [] } });
   mockAddSeries.mockReturnValue(new Map());
@@ -182,7 +196,7 @@ describe("GET /api/statements", () => {
     const costMap = new Map([["2026-01", 30000], ["2026-02", 30000]]);
     const headcountMap = new Map([["2026-01", 3], ["2026-02", 3]]);
     mockComputeAllHeadcountCosts.mockReturnValue({ totalCost: costMap, headcount: headcountMap });
-    mockGenerateProfitAndLoss.mockReturnValue({});
+    mockGenerateProfitAndLoss.mockReturnValue({ netIncome: { name: "Net Income", values: [], children: [] } });
     mockGenerateCashFlow.mockReturnValue({});
     mockGenerateBalanceSheet.mockReturnValue({});
 

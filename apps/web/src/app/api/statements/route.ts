@@ -239,10 +239,9 @@ export const GET = withErrorHandler(async (request: Request) => {
   // + Σ(equity+debt+grant draws ≤ m) − Σ(principal ≤ m). Interest is already
   // inside netIncome (counted once) — funding cash flow nets inflows − principal
   // ONLY (subtracting interest again is the double-count trap).
-  const fundingInflows = addSeries(
-    addSeries(fundingImpact.equityInflows, fundingImpact.debtInflows),
-    fundingImpact.grantDisbursements,
-  );
+  // Grants are other income (in netIncome), reaching cash once — NOT also a
+  // financing inflow (else cash double-counts the grant). Equity + debt draws only.
+  const fundingInflows = addSeries(fundingImpact.equityInflows, fundingImpact.debtInflows);
   const fundingCashFlow = subtractSeries(fundingInflows, fundingImpact.principalPayments);
   const cashPosition: MonthlySeries = new Map();
   let runningCash = D(startingCash);

@@ -72,7 +72,7 @@ const PERIOD_START = new Date(2026, 0, 1);
 const PERIOD_END = new Date(2026, 11, 1);
 
 /** Seed a company with $10k/mo opex + $1/mo revenue + one funding round. */
-async function seedCompany(roundType: "debt" | "seed") {
+async function seedCompany(roundType: "debt" | "seed" | "grant") {
   const user = await createUser();
   const company = await createCompany(user.id);
 
@@ -100,7 +100,7 @@ async function seedCompany(roundType: "debt" | "seed") {
   });
 
   await createFundingRound(company.id, {
-    name: roundType === "debt" ? "Bridge" : "Seed",
+    name: roundType === "debt" ? "Bridge" : roundType === "grant" ? "SBIR Grant" : "Seed",
     type: roundType,
     amount: "120000.00",
     date: new Date("2026-01-01"),
@@ -108,7 +108,9 @@ async function seedCompany(roundType: "debt" | "seed") {
     parameters:
       roundType === "debt"
         ? { interestRate: 0.12, termMonths: 12, repaymentSchedule: "straight_line" }
-        : {},
+        : roundType === "grant"
+          ? { milestones: [{ id: "m1", label: "Award", amount: 120000, hitDate: "2026-01-15" }] }
+          : {},
   });
 
   return company;
@@ -188,6 +190,29 @@ describe("Phase 1 Task 1.2 — real-pipeline debt balance sheet", () => {
       const cfNI = arrAt(debt.cashFlow.operatingCashFlow.values, m);
       expect(pnlNI).toBeCloseTo(seriesNI, 2);
       expect(cfNI).toBeCloseTo(seriesNI, 2);
+    }
+  });
+
+  // Review catch (Phase 1): a grant must be counted ONCE. The first cut put
+  // grantDisbursements into BOTH netIncome (other income → retained earnings)
+  // AND fundingCashFlow inflows, so cash double-counted the grant and the
+  // balance sheet was over by Σgrant. A grant is income only — not also a
+  // financing inflow. This fixture (a $120k grant disbursing in Jan) foots only
+  // when the grant hits cash exactly once.
+  it("grant company foots every month (grant counted once, not double)", async () => {
+    const grantCompany = await seedCompany("grant");
+    const grant = await computeForCompany(grantCompany.id);
+
+    // Sanity: the grant actually disbursed (else the test is vacuous).
+    const totalGrantInNI =
+      (grant.netIncome.get("2026-01") ?? 0) - (grant.netIncome.get("2026-02") ?? 0);
+    expect(Math.abs(totalGrantInNI)).toBeGreaterThan(100000); // ~120k income lift in Jan
+
+    for (const m of MONTHS) {
+      const a = arrAt(grant.balanceSheet.assets.values, m);
+      const l = arrAt(grant.balanceSheet.liabilities.values, m);
+      const e = arrAt(grant.balanceSheet.equity.values, m);
+      expect(Math.abs(a - (l + e))).toBeLessThan(0.01);
     }
   });
 });

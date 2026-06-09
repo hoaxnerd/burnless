@@ -374,10 +374,12 @@ export function computeFinancials(input: FinancialsInput): FinancialsResult {
   // Funding cash flow = (equity + debt + grant draws) − principal ONLY. Interest
   // is already inside netIncome (counted once) — subtracting it again here is the
   // double-count trap B1 fixes.
-  const fundingInflows = addSeries(
-    addSeries(fundingImpact.equityInflows, fundingImpact.debtInflows),
-    fundingImpact.grantDisbursements,
-  );
+  // Grants are recognized as OTHER INCOME (otherIncomeWithGrants → netIncome →
+  // retained earnings), so they reach cash via netIncome exactly once. They must
+  // NOT also appear as a financing inflow here, or cash double-counts the grant
+  // and the balance sheet is over by Σgrant (Phase 1 review catch). Equity + debt
+  // draws only; principal repaid.
+  const fundingInflows = addSeries(fundingImpact.equityInflows, fundingImpact.debtInflows);
   const fundingCashFlow = subtractSeries(fundingInflows, fundingImpact.principalPayments);
   const cashPosition: MonthlySeries = new Map();
   let runningCash = D(startingCash);
