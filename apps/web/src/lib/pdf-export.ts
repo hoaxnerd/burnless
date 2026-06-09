@@ -5,7 +5,7 @@
  */
 
 import type jsPDFType from "jspdf";
-import { formatCurrency, formatCompactAmount, formatMonthKey, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatCompactAmount, formatMonthKey, formatDate, type CurrencyCode } from "@burnless/types";
 
 // Lazy-load jsPDF + autoTable only when PDF generation is triggered
 async function loadJsPDF() {
@@ -73,7 +73,7 @@ function addPDFHeader(doc: jsPDFType, opts: PDFReportOptions) {
   doc.setTextColor(100, 116, 139);
   const subtitle = opts.subtitle ?? `${opts.scenarioName} scenario`;
   doc.text(subtitle, 20, 50);
-  doc.text(`Generated ${date.toLocaleDateString(opts.locale ?? "en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 50, { align: "right" });
+  doc.text(`Generated ${formatDate(date, opts.locale, { year: "numeric", month: "long", day: "numeric" })}`, pageWidth - 20, 50, { align: "right" });
 
   // Divider
   doc.setDrawColor(226, 232, 240); // surface-200
@@ -554,6 +554,39 @@ export async function generateInvestorDataRoomPDF(
     clOpts,
     bsHdrOpts
   );
+
+  addPDFFooter(doc);
+  return doc;
+}
+
+/**
+ * RPT-10: generic table PDF for report views that don't have a bespoke
+ * statement generator (Budget vs Actuals, Metrics Explorer). Rows are already
+ * formatted strings — the caller owns currency/locale formatting (engine never
+ * formats), keeping this helper format-agnostic and reusable.
+ */
+export async function generateTablePDF(
+  headers: string[],
+  rows: string[][],
+  opts: PDFReportOptions
+): Promise<jsPDFType> {
+  const { jsPDF, autoTable } = await loadJsPDF();
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+  addPDFHeader(doc, opts);
+
+  autoTable(doc, {
+    startY: 66,
+    head: [headers],
+    body: rows,
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 4, textColor: [71, 85, 105] },
+    headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
+    columnStyles: Object.fromEntries(
+      headers.map((_, i) => [i, i === 0 ? { halign: "left" as const } : { halign: "right" as const }])
+    ),
+    margin: { left: 20, right: 20 },
+  });
 
   addPDFFooter(doc);
   return doc;

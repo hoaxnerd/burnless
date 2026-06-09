@@ -22,13 +22,15 @@ export interface TimelineViewProps {
   nodes: TimelineNodeClient[];
   disabled: boolean;
   onPlanSubmit: (pending: PendingPlan, plan: PendingPlan["spec"]) => void;
+  /** Locally dismiss an advisory plan node without a server resume (AI-02). */
+  onPlanDismiss?: (pending: PendingPlan) => void;
   onDecide: (pending: PendingPermission, decisions: { requestId: string; decision: "once" | "session" | "deny" }[]) => void;
   onInputSubmit: (pending: PendingInput, data: Record<string, unknown>) => void;
   onAction?: (prompt: string) => void;
 }
 
 /** The agentic worklog (spec §4.5): an ordered node list on a left connector rail. */
-export function TimelineView({ nodes, disabled, onPlanSubmit, onDecide, onInputSubmit, onAction }: TimelineViewProps) {
+export function TimelineView({ nodes, disabled, onPlanSubmit, onPlanDismiss, onDecide, onInputSubmit, onAction }: TimelineViewProps) {
   return (
     <ol className="relative flex flex-col gap-3 pl-6">
       {/* connector rail */}
@@ -39,7 +41,7 @@ export function TimelineView({ nodes, disabled, onPlanSubmit, onDecide, onInputS
             {RAIL_ICON[node.kind]}
           </span>
           {node.kind === "plan" && node.plan ? (
-            <PlanNode pending={node.plan} disabled={disabled} onSubmit={(spec) => onPlanSubmit(node.plan!, spec)} />
+            <PlanNode pending={node.plan} disabled={disabled} onSubmit={(spec) => onPlanSubmit(node.plan!, spec)} onDismiss={onPlanDismiss ? () => onPlanDismiss(node.plan!) : undefined} />
           ) : node.kind === "tool" ? (
             <ToolNode node={node} />
           ) : node.kind === "diff_gate" && node.pending ? (

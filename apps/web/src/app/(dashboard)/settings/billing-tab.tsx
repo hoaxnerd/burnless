@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Check, ExternalLink, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { useLocale } from "@/components/locale/locale-context";
 import { useBilling, billingAction } from "@/lib/swr";
 import { getEnabledPlans, type PlanDefinition } from "@burnless/ai";
 
@@ -10,6 +11,7 @@ export function BillingTab() {
   const { data: billing, isLoading: loading } = useBilling();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
+  const { fmtDate } = useLocale();
 
   const handleUpgrade = async (plan: "pro" | "team") => {
     setActionLoading(plan);
@@ -112,7 +114,7 @@ export function BillingTab() {
               {billing?.cancelAtPeriodEnd
                 ? `Your ${currentPlan === "pro" ? "Pro" : "Team"} plan is active until ${
                     billing.currentPeriodEnd
-                      ? new Date(billing.currentPeriodEnd).toLocaleDateString("en-US", {
+                      ? fmtDate(new Date(billing.currentPeriodEnd), {
                           month: "long",
                           day: "numeric",
                           year: "numeric",
@@ -121,7 +123,7 @@ export function BillingTab() {
                   }. After that, you'll be downgraded to Free.`
                 : `Your ${currentPlan === "pro" ? "Pro" : "Team"} plan is active.${
                     billing?.currentPeriodEnd
-                      ? ` Next billing date: ${new Date(billing.currentPeriodEnd).toLocaleDateString("en-US", {
+                      ? ` Next billing date: ${fmtDate(new Date(billing.currentPeriodEnd), {
                           month: "long",
                           day: "numeric",
                           year: "numeric",

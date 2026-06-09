@@ -4,7 +4,9 @@ export interface Message {
   thinking?: string;
   isStreaming?: boolean;
   toolCalls?: string[];
-  createdAt: number;
+  /** ms-epoch send time. Absent for restored history turns with no persisted
+   *  timestamp — the message list then renders an absolute date, not "just now". */
+  createdAt?: number | null;
   /** Live status of a tool currently executing (Plan 3 tool_status event). */
   toolStatus?: { tool: string; phase: "running" | "done" | "error" } | null;
   /** A paused tool batch awaiting the user's decision. */

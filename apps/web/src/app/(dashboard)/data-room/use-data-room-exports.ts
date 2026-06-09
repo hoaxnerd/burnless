@@ -25,7 +25,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
     keyMetrics, fundingRounds, startingCash, netBurnRate, runwayMonths,
   } = props;
 
-  const { currency, locale } = useLocale();
+  const { currency, locale, fmtDate } = useLocale();
   const fmtAmount = useCallback(
     (value: number) => formatCompactAmount(value, currency, locale),
     [currency, locale],
@@ -105,7 +105,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           const { generateStatementCSV, downloadCSV: dlCSV } = await import("@/lib/excel-export");
           const pnlMonths = profitAndLoss.revenue.values.map((v) => v.month);
           const csv = generateStatementCSV(
-            { title: "Profit & Loss Statement", companyName, scenarioName, months: pnlMonths },
+            { title: "Profit & Loss Statement", companyName, scenarioName, months: pnlMonths, locale },
             [
               { name: "Revenue", items: [profitAndLoss.revenue] },
               { name: "Cost of Goods Sold", items: [profitAndLoss.cogs] },
@@ -124,7 +124,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           const { generateStatementCSV: genCSV, downloadCSV: dlCSV2 } = await import("@/lib/excel-export");
           const cfMonths = cashFlow.operatingCashFlow.values.map((v) => v.month);
           const csv = genCSV(
-            { title: "Cash Flow Statement", companyName, scenarioName, months: cfMonths },
+            { title: "Cash Flow Statement", companyName, scenarioName, months: cfMonths, locale },
             [
               { name: "Operating Cash Flow", items: [cashFlow.operatingCashFlow] },
               { name: "Investing Cash Flow", items: [cashFlow.investingCashFlow] },
@@ -140,7 +140,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           const { generateStatementCSV: genBSCSV, downloadCSV: dlCSV3 } = await import("@/lib/excel-export");
           const bsMonths = balanceSheet.assets.values.map((v) => v.month);
           const csv = genBSCSV(
-            { title: "Balance Sheet", companyName, scenarioName, months: bsMonths },
+            { title: "Balance Sheet", companyName, scenarioName, months: bsMonths, locale },
             [
               { name: "Assets", items: [balanceSheet.assets] },
               { name: "Liabilities", items: [balanceSheet.liabilities] },
@@ -155,7 +155,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           lines.push(`Key Financial Metrics`);
           lines.push(`Company: ${companyName}`);
           lines.push(`Scenario: ${scenarioName}`);
-          lines.push(`Generated: ${new Date().toLocaleDateString()}`);
+          lines.push(`Generated: ${fmtDate(new Date())}`);
           lines.push(``);
           lines.push("Category,Metric,Value");
           for (const m of keyMetrics) {
@@ -175,7 +175,7 @@ export function useDataRoomExports(props: DataRoomViewProps) {
           const lines: string[] = [];
           lines.push(`Funding History`);
           lines.push(`Company: ${companyName}`);
-          lines.push(`Generated: ${new Date().toLocaleDateString()}`);
+          lines.push(`Generated: ${fmtDate(new Date())}`);
           lines.push(``);
           lines.push("Round,Amount,Formatted Amount,Date,Pre-Money Valuation");
           for (const r of fundingRounds) {
@@ -191,7 +191,6 @@ export function useDataRoomExports(props: DataRoomViewProps) {
       setExported((prev) => new Set(prev).add(id));
       toastSuccess("Export complete", { description: `${id === "full-deck" ? "Full Financial Package" : id} downloaded.` });
     } catch (err) {
-      console.error("Export failed:", err);
       toastError("Export failed", { description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again." });
     } finally {
       setExporting(null);

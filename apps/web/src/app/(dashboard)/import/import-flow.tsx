@@ -5,16 +5,19 @@ import { apiFetch } from "@/lib/api-fetch";
 import { Upload, FileSpreadsheet, Check, AlertCircle, X, Sparkles, History, Link2 } from "lucide-react";
 import { useLocale } from "@/components/locale/locale-context";
 import Papa from "papaparse";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
+import { useImports, useAccounts, revalidate, KEYS } from "@/lib/swr";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
-import { autoMapColumns, resolveAmount } from "./import-utils";
+import { autoMapColumns, resolveAmount, applyPreviewRowEdit } from "./import-utils";
 import type {
   Step, ParsedRow, ColumnMapping, AnyColumnMapping, MappingConfidence,
   AccountOption, PreviewTransaction, ImportResult, ImportBatch,
   FundingRoundColumnMapping, ImportTarget,
 } from "./import-utils";
 import { UploadStep } from "./upload-step";
-import { MapStep } from "./map-step";
+import { MapStep, FundingMapStep } from "./map-step";
 import { PreviewStep } from "./preview-step";
 import { ResultStep } from "./result-step";
 import { ImportHistoryPanel } from "./import-history-panel";
@@ -35,7 +38,6 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const [mappingConfidence, setMappingConfidence] = useState<MappingConfidence>({ date: 0, amount: 0, description: 0, category: 0, vendor: 0, notes: 0, externalId: 0 });
   const [fundingPreview, setFundingPreview] = useState<Array<Record<string, unknown>>>([]);
   const [targetAccountId, setTargetAccountId] = useState("");
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [preview, setPreview] = useState<PreviewTransaction[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,36 +45,34 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const [dragActive, setDragActive] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<ImportBatch[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [showBankSync, setShowBankSync] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
-  const loadAccounts = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/accounts");
-      if (res.ok) {
-        const data = await res.json();
-        setAccounts(data);
-        if (data.length > 0 && !targetAccountId) setTargetAccountId(data[0].id);
-      }
-    } catch { /* silent */ }
-  }, [targetAccountId]);
+  // Accounts dropdown (target-account picker) — shared SWR cache, so an account
+  // created elsewhere shows up here without a reload.
+  const { data: accountsData, error: accountsError } = useAccounts();
+  const accounts = (accountsData ?? []) as unknown as AccountOption[];
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    try {
-      const res = await apiFetch("/api/imports");
-      if (res.ok) {
-        const json = await res.json();
-        setHistory(json.data ?? json);
-      }
-    } catch { /* silent */ }
-    finally { setHistoryLoading(false); }
-  }, []);
+  // Default the target account to the first one once accounts load.
+  useEffect(() => {
+    if (accounts.length > 0 && !targetAccountId) setTargetAccountId(accounts[0]!.id);
+  }, [accounts, targetAccountId]);
 
-  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => {
+    if (accountsError) toast.error(toUserMessage(accountsError));
+  }, [accountsError, toast]);
+
+  // DATA-02: import history from the shared SWR cache. Revalidated after every
+  // completed import / rollback so the History panel never shows a stale list.
+  const {
+    data: importsData,
+    error: historyError,
+    isLoading: historyLoading,
+    mutate: mutateImports,
+  } = useImports();
+  const history = (importsData?.data ?? []) as unknown as ImportBatch[];
 
   const handleFile = useCallback(
     (file: File) => {
@@ -88,7 +88,9 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         transformHeader: (h: string) => h.trim(),
         complete: (results) => {
           if (results.errors.length > 0 && results.data.length === 0) {
-            setError(`Parse error: ${results.errors[0]?.message ?? "Unknown error"}`);
+            setError(
+              "We couldn't read that file. Please check it's a valid CSV/TSV and try again.",
+            );
             return;
           }
           const parsedHeaders = results.meta.fields || [];
@@ -97,12 +99,13 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           const { mapping: autoMap, confidence } = autoMapColumns(parsedHeaders, { target });
           setMapping(autoMap as ColumnMapping);
           setMappingConfidence(confidence);
-          loadAccounts();
+          // Refresh the accounts dropdown before showing the Map step.
+          void revalidate(KEYS.accounts);
           setStep("map");
         },
       });
     },
-    [loadAccounts]
+    [target]
   );
 
   const handleDrop = useCallback(
@@ -142,8 +145,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         }),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Failed to preview funding import");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -176,13 +178,14 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       clearInterval(progressInterval);
       setImportProgress(100);
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Import failed");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
       const data = await res.json();
       setResult({ imported: data.imported, skipped: data.skipped, errors: data.errors ?? [] });
+      // DATA-02: refresh import history so the new batch appears immediately.
+      await mutateImports();
       setStep("result");
     } catch { setError("Import failed"); }
     finally { setLoading(false); }
@@ -242,8 +245,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         body: JSON.stringify({ transactions: mapped, dryRun: true, fileName, columnMapping: mapping }),
       });
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Failed to preview import");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
@@ -274,6 +276,9 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         vendor: t.vendor ?? null,
         notes: t.notes ?? null,
         externalId: t.externalId || undefined,
+        // DATA-08: resolved category — manual override wins, else the AI
+        // suggestion. Threaded to the server so the override actually persists.
+        category: t.categoryOverride ?? t.suggestedCategory ?? undefined,
       }));
       const res = await apiFetch("/api/import", {
         method: "POST",
@@ -283,13 +288,14 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       clearInterval(progressInterval);
       setImportProgress(100);
       if (!res.ok) {
-        const errData = await res.json();
-        setError(errData.error || "Import failed");
+        setError(await extractApiError(res));
         setLoading(false);
         return;
       }
       const data = await res.json();
       setResult(data);
+      // DATA-02: refresh import history so the new batch appears immediately.
+      await mutateImports();
       setStep("result");
     } catch { setError("Import failed"); }
     finally { setLoading(false); }
@@ -298,10 +304,9 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   const rollbackBatch = async (batchId: string) => {
     try {
       const res = await apiFetch(`/api/imports/${batchId}`, { method: "DELETE" });
-      if (res.ok) { loadHistory(); }
+      if (res.ok) { await mutateImports(); }
       else {
-        const data = await res.json();
-        setError(data.error || "Rollback failed");
+        setError(await extractApiError(res));
       }
     } catch { setError("Rollback failed"); }
   };
@@ -311,16 +316,10 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
   };
 
   const updatePreviewRow = (index: number, field: string, value: string) => {
+    // DATA-03 + DATA-08: per-row transform is a pure, tested helper that only
+    // sets _edited on a real change and carries category overrides.
     setPreview((prev) =>
-      prev.map((t, i) => {
-        if (i !== index) return t;
-        if (field === "amount") {
-          const num = parseFloat(value);
-          if (!isNaN(num)) return { ...t, amount: num, _edited: true };
-          return t;
-        }
-        return { ...t, [field]: value, _edited: true };
-      })
+      prev.map((t, i) => (i === index ? applyPreviewRowEdit(t, field, value) : t)),
     );
   };
 
@@ -359,7 +358,7 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="ghost" size="sm" icon={<History className="h-4 w-4" />}
-              onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
+              onClick={() => { setShowHistory(!showHistory); if (!showHistory) void mutateImports(); }}>
               History
             </Button>
             {/* TODO: Bank Sync — future release */}
@@ -371,17 +370,24 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
       {embedded && (
         <div className="flex items-center gap-2 mb-4">
           <Button variant="ghost" size="sm" icon={<History className="h-4 w-4" />}
-            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
+            onClick={() => { setShowHistory(!showHistory); if (!showHistory) void mutateImports(); }}>
             History
           </Button>
           {/* TODO: Bank Sync — future release */}
         </div>
       )}
 
-      {showHistory && (
+      {showHistory && historyError ? (
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950 dark:text-danger-300">
+          <span>{toUserMessage(historyError)}</span>
+          <Button variant="ghost" size="sm" onClick={() => void mutateImports()}>
+            Retry
+          </Button>
+        </div>
+      ) : showHistory ? (
         <ImportHistoryPanel history={history} historyLoading={historyLoading}
           setShowHistory={setShowHistory} rollbackBatch={rollbackBatch} />
-      )}
+      ) : null}
       {/* TODO: Bank Sync — future release */}
 
       {/* Target selector — only visible on upload step (changing mid-flow would reset state) */}
@@ -390,20 +396,27 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
           <label htmlFor="import-target" className="text-sm font-medium text-surface-700 dark:text-surface-300 shrink-0">
             Import type
           </label>
-          <select
+          <Select
             id="import-target"
             value={target}
             onChange={(e) => {
-              setTarget(e.target.value as ImportTarget);
-              // Reset mapping so it re-auto-maps on next file pick
-              setMapping({ date: "", amount: "", description: "", category: "" });
+              const next = e.target.value as ImportTarget;
+              setTarget(next);
+              // Reset mapping so it re-auto-maps on next file pick. Seed the
+              // shape that matches the new target (DATA-01) — a transaction-shaped
+              // seed for funding would leave name/roundType undefined and the
+              // funding preview validation would always fail.
+              setMapping(
+                next === "funding-rounds"
+                  ? ({ target: "funding-rounds", name: "", roundType: "", amount: "", date: "" } as unknown as ColumnMapping)
+                  : { date: "", amount: "", description: "", category: "" },
+              );
               setFundingPreview([]);
             }}
-            className="rounded-md border border-surface-300 bg-white px-3 py-1.5 text-sm text-surface-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-50"
           >
             <option value="transactions">Transactions</option>
             <option value="funding-rounds">Funding Rounds</option>
-          </select>
+          </Select>
         </div>
       )}
 
@@ -449,7 +462,13 @@ export function ImportFlow({ embedded = false, currency = "USD" }: ImportFlowPro
         <UploadStep dragActive={dragActive} handleDrop={handleDrop} handleDragOver={handleDragOver}
           handleDragLeave={handleDragLeave} fileInputRef={fileInputRef} handleFile={handleFile} />
       )}
-      {step === "map" && (
+      {step === "map" && target === "funding-rounds" && (
+        <FundingMapStep fileName={fileName} rows={rows} headers={headers}
+          mapping={mapping as unknown as FundingRoundColumnMapping}
+          setMapping={setMapping} mappingConfidence={mappingConfidence}
+          loading={loading} reset={reset} generatePreview={generatePreview} />
+      )}
+      {step === "map" && target === "transactions" && (
         <MapStep fileName={fileName} rows={rows} headers={headers} mapping={mapping}
           setMapping={setMapping} mappingConfidence={mappingConfidence}
           setMappingConfidence={setMappingConfidence} targetAccountId={targetAccountId}

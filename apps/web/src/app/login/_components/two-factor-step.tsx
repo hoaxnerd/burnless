@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { Input } from "@/components/ui";
 
 interface TwoFactorStepProps {
   totpCode: string;
@@ -32,12 +33,11 @@ export function TwoFactorStep({
           Enter the 6-digit code from your authenticator app for{" "}
           <span className="font-medium text-surface-800">{email}</span>.
         </p>
-        <label htmlFor="totp-code" className="block text-sm font-medium text-surface-700 mb-1.5">
-          Verification code
-        </label>
-        <input
+        <Input
           ref={inputRef}
           id="totp-code"
+          label="Verification code"
+          hint="You can also use a backup code."
           type="text"
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -48,11 +48,8 @@ export function TwoFactorStep({
             onTotpCodeChange(v);
           }}
           placeholder="000000"
-          className="w-full rounded-xl border border-surface-200 bg-surface-0 px-4 py-3 text-center text-lg font-mono tracking-[0.3em] text-surface-900 placeholder:text-surface-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all"
+          className="text-center text-lg font-mono tracking-[0.3em]"
         />
-        <p className="mt-2 text-xs text-surface-400">
-          You can also use a backup code.
-        </p>
       </div>
 
       <button

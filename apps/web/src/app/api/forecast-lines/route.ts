@@ -3,7 +3,8 @@ import { revalidateTag } from "next/cache";
 import { db, forecastLines, resolveEntities, scenarioInsert } from "@burnless/db";
 import { eq, and, lt } from "drizzle-orm";
 import { createForecastLineSchema } from "@burnless/types";
-import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { validateFormula } from "@burnless/engine";
+import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
@@ -41,6 +42,13 @@ export const POST = withErrorHandler(async (request: Request) => {
   const parsed = await parseBody(request, createForecastLineSchema);
   if ("error" in parsed) return parsed.error;
 
+  // VAL-02: validate a custom_formula expression at the boundary before persisting.
+  if (parsed.data.method === "custom_formula") {
+    const expression = (parsed.data.parameters as Record<string, unknown>)?.expression;
+    const reason = validateFormula(typeof expression === "string" ? expression : "");
+    if (reason) return errorResponse(`Invalid formula: ${reason}`, 400);
+  }
+
   const data = { ...parsed.data, companyId: ctx.companyId };
   const row = await scenarioInsert("forecast_line", forecastLines, data, scenarioId, ctx.companyId);
 
@@ -48,5 +56,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   await trackDataMutation(ctx.companyId, "forecast-lines");
   revalidateTag("forecast-lines");
   revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
+  revalidateTag("expense-details"); // refetch the server-rendered expense table
+  revalidateTag("dashboard"); // KPIs blend forecast lines
   return NextResponse.json(row, { status: 201 });
 });

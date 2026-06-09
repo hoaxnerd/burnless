@@ -15,6 +15,7 @@ import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { getDefaultScenario } from "@/lib/data";
+import { resolveWriteScenarioId } from "@/lib/ai-write-target";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse } from "@/lib/chat-stream";
 import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
@@ -125,10 +126,12 @@ export const POST = withErrorHandler(async (request: Request) => {
       content: m.content,
     }));
 
-  // Resolve scenario
+  // Resolve scenario for READ context (financial snapshot). Falls back to the
+  // default scenario so the AI always has a base picture.
   let scenario;
+  let found: typeof scenariosTable.$inferSelect | undefined;
   if (body.scenarioId) {
-    const [found] = await db.select().from(scenariosTable).where(
+    [found] = await db.select().from(scenariosTable).where(
       and(eq(scenariosTable.id, body.scenarioId), eq(scenariosTable.companyId, ctx.companyId))
     );
     scenario = found ?? await getDefaultScenario(ctx.companyId);
@@ -139,6 +142,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!scenario) {
     return errorResponse("No scenario found. Create a scenario first.", 404);
   }
+
+  // AI-01: the WRITE target. Only an explicitly-selected, company-validated
+  // scenario is a write target; base view (no body.scenarioId, or an unknown id)
+  // writes to BASE tables (null) — never the Base-Case overlay that read-context
+  // falls back to.
+  const writeScenarioId = resolveWriteScenarioId(body.scenarioId, found ?? null);
 
   // Build financial context
   const { contextText: baseContextText } = await buildAiContext(ctx.companyId, {
@@ -166,6 +175,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     companyId: ctx.companyId,
     userId: ctx.userId,
     scenarioId: scenario.id,
+    writeScenarioId,
     conversationId,
     messages,
     financialContext: contextText,

@@ -11,6 +11,7 @@ import {
   Copy,
   MoreHorizontal,
   Trash2,
+  Pencil,
   Clock,
   Shield,
   History,
@@ -19,8 +20,51 @@ import { useScenario } from "@/components/scenarios/scenario-context";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 import { useToast } from "@/components/ui/toast";
 import { useLocale } from "@/components/locale/locale-context";
+import { DataLoadError, classifyError } from "@/components/ui/data-load-error";
+import { Modal, FormField, Button, useConfirm } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import {
+  useScenarios,
+  revalidate,
+  revalidateOnFinancialMutation,
+  KEYS,
+  type Scenario,
+} from "@/lib/swr";
 import type { ScenarioItem } from "./scenarios-view";
+
+/**
+ * Raw row shape from `GET /api/scenarios` — a superset of the SWR `Scenario`
+ * type (adds the override count + backup/auto-delete fields the cards need).
+ * Dates arrive as ISO strings over JSON.
+ */
+interface ScenarioRow {
+  id: string;
+  name: string;
+  description: string | null;
+  source: string;
+  status: string;
+  color: string | null;
+  overrideCount?: number;
+  autoDeleteAt?: string | null;
+  sourceScenarioId?: string | null;
+  createdAt: string;
+}
+
+/** Normalize a raw `/api/scenarios` row into the card view-model. */
+function toScenarioItem(s: ScenarioRow): ScenarioItem {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    source: s.source,
+    status: s.status,
+    color: s.color,
+    overrideCount: s.overrideCount ?? 0,
+    autoDeleteAt: s.autoDeleteAt ?? null,
+    sourceScenarioId: s.sourceScenarioId ?? null,
+    createdAt: s.createdAt,
+  };
+}
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
 
@@ -93,16 +137,49 @@ function DropdownItem({
 
 /* ── Main component ───────────────────────────────────────────────────── */
 
-export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
+export function ScenarioCards({
+  scenarios: initialScenarios,
+}: {
+  scenarios: ScenarioItem[];
+}) {
   const { activeScenarioId, enterScenario, exitScenario } = useScenario();
   const { fmtDate } = useLocale();
+  // SCN-02: destructive delete needs an explicit confirm (card menu + backup button).
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [keepingId, setKeepingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  // SCN-03: rename modal state
+  const [renameTarget, setRenameTarget] = useState<{ id: string; currentName: string } | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const router = useRouter();
   const toast = useToast();
+
+  // SCN-04: read the live scenario list from the shared SWR cache so a scenario
+  // created elsewhere (the New Scenario modal) appears without a hard reload.
+  // The server-rendered prop seeds `fallbackData`, so first paint matches SSR.
+  const {
+    data: rows,
+    error,
+    isLoading,
+    mutate: mutateScenarios,
+  } = useScenarios({
+    fallbackData: initialScenarios as unknown as Scenario[],
+  });
+
+  // Revalidate when ANY scenario-domain mutation fires on the bus — covers the
+  // create from the New Scenario modal (a different component) as well as the
+  // delete/duplicate below (PMR-1, preserving the "other" domain exclusion).
+  useEffect(() => {
+    return revalidateOnFinancialMutation([KEYS.scenarios]);
+  }, []);
+
+  const scenarios: ScenarioItem[] = (rows ?? []).map((s) =>
+    toScenarioItem(s as ScenarioRow),
+  );
 
   /* ── Actions ─────────────────────────────────────────────────────── */
 
@@ -117,6 +194,7 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
         throw new Error(body?.error ?? "Failed to duplicate scenario");
       }
       toast.success("Scenario duplicated");
+      await revalidate(KEYS.scenarios);
       router.refresh();
     } catch (err) {
       toast.error(
@@ -128,8 +206,16 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   };
 
   const deleteScenario = async (id: string) => {
-    setDeletingId(id);
     setMenuOpenId(null);
+    // SCN-02: confirm before this destructive, irreversible action.
+    const ok = await confirm({
+      title: "Delete scenario?",
+      body: "This permanently removes the scenario and all its changes from base. This can't be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeletingId(id);
     try {
       const res = await apiFetch(`/api/scenarios/${id}`, {
         method: "DELETE",
@@ -139,7 +225,15 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
         throw new Error(body?.error ?? "Failed to delete scenario");
       }
       toast.success("Scenario deleted");
-      router.refresh();
+      // SCN-01: if the deleted scenario was active, exitScenario() clears the
+      // cookie + sessionStorage, resets React state, broadcasts cross-tab sync,
+      // and calls router.refresh() — so it replaces the bare refresh here.
+      // For any other scenario, only a bare refresh is needed.
+      if (id === activeScenarioId) {
+        exitScenario();
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to delete scenario"
@@ -172,6 +266,51 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
     }
   };
 
+  // SCN-03: open rename modal pre-filled with the scenario's current name
+  const openRename = (id: string, currentName: string) => {
+    setMenuOpenId(null);
+    setRenameTarget({ id, currentName });
+    setRenameName(currentName);
+  };
+
+  const submitRename = async () => {
+    if (!renameTarget) return;
+    const trimmed = renameName.trim();
+    // No-op: empty name or unchanged name — just close
+    if (!trimmed || trimmed === renameTarget.currentName) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenamingId(renameTarget.id);
+    try {
+      const res = await apiFetch(`/api/scenarios/${renameTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? "Failed to rename scenario");
+      }
+      toast.success("Scenario renamed");
+      // SCN-03: if the renamed scenario is the ACTIVE one, refresh the banner's
+      // name immediately via the sanctioned context path (updates cookie/session
+      // + state) — otherwise the banner shows the stale pre-rename name until the
+      // next reconcile tick.
+      if (renameTarget.id === activeScenarioId) {
+        enterScenario(renameTarget.id, trimmed);
+      }
+      setRenameTarget(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to rename scenario"
+      );
+    } finally {
+      setRenamingId(null);
+    }
+  };
+
   const toggleCompare = (id: string) => {
     setCompareIds((prev) =>
       prev.includes(id)
@@ -190,6 +329,19 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
   const activeScenarios = nonBackup.filter((s) => s.status === "active");
   const promotedScenarios = nonBackup.filter((s) => s.status === "promoted");
   const archivedScenarios = nonBackup.filter((s) => s.status === "archived");
+
+  /* ── Error state (ESL-3) ────────────────────────────────────────── */
+
+  if (error && scenarios.length === 0) {
+    return (
+      <DataLoadError
+        message={"We couldn't load your scenarios."}
+        variant={classifyError(error)}
+        onRetry={() => void mutateScenarios()}
+        retrying={isLoading}
+      />
+    );
+  }
 
   /* ── Empty state ────────────────────────────────────────────────── */
 
@@ -290,6 +442,16 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
                   open={menuOpenId === scenario.id}
                   onClose={() => setMenuOpenId(null)}
                 >
+                  {/* SCN-03: Rename item — only for active, non-backup scenarios */}
+                  <DropdownItem
+                    onClick={() => openRename(scenario.id, scenario.name)}
+                    disabled={renamingId === scenario.id}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Pencil className="h-3 w-3" />
+                      Rename
+                    </span>
+                  </DropdownItem>
                   <DropdownItem
                     onClick={() => {
                       setMenuOpenId(null);
@@ -507,6 +669,44 @@ export function ScenarioCards({ scenarios }: { scenarios: ScenarioItem[] }) {
           </div>
         </div>
       )}
+
+      {/* SCN-03: Rename modal */}
+      <Modal
+        open={renameTarget !== null}
+        onClose={() => setRenameTarget(null)}
+        title="Rename Scenario"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <FormField
+            label="Scenario name"
+            value={renameName}
+            onChange={setRenameName}
+            placeholder="e.g. Best Case Q3"
+            autoFocus
+          />
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <Button
+              variant="ghost"
+              onClick={() => setRenameTarget(null)}
+              disabled={renamingId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void submitRename()}
+              disabled={renamingId !== null}
+              state={renamingId !== null ? "loading" : "idle"}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SCN-02: shared delete-confirmation dialog (card menu + backup button). */}
+      {confirmDialog}
     </div>
   );
 }

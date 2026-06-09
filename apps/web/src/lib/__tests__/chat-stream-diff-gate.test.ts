@@ -60,7 +60,9 @@ async function collect(res: Response): Promise<Record<string, unknown>[]> {
 }
 
 const baseParams = {
-  companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1",
+  // AI-01: writeScenarioId is the WRITE target the diff-gate computes the override
+  // against; this test models an overlay write in scenario "s1".
+  companyId: "c1", userId: "u1", scenarioId: "s1", writeScenarioId: "s1", conversationId: "conv1",
   messages: [{ role: "user" as const, content: "add a pro plan stream" }],
   financialContext: "ctx", companionName: "Aria", providerConfig: undefined,
   defaults: { read: "always", write: "ask", delete: "ask", web_search: "always", browser_use: "ask" } as const,

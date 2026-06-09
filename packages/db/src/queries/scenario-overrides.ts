@@ -87,6 +87,29 @@ export async function getOverrideCount(scenarioId: string) {
 }
 
 /**
+ * Batched override counts for many scenarios in ONE grouped query (avoids the
+ * N+1 of calling getOverrideCount per scenario — e.g. getScenarios for the list
+ * + the slow /scenarios/compare RSC). Returns a Map keyed by scenarioId; scenarios
+ * with zero overrides are simply absent from the map (callers default to 0).
+ */
+export async function getOverrideCounts(
+  scenarioIds: string[],
+): Promise<Map<string, number>> {
+  if (scenarioIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      scenarioId: scenarioOverrides.scenarioId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(scenarioOverrides)
+    .where(inArray(scenarioOverrides.scenarioId, scenarioIds))
+    .groupBy(scenarioOverrides.scenarioId);
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.scenarioId, r.count);
+  return map;
+}
+
+/**
  * Grouped override breakdown for a set of scenarios — one row per
  * (scenarioId, entityType, action) with a count. Powers the list_scenarios diff
  * headline (Plan 5) without computing full dashboards.

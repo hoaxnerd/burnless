@@ -5,14 +5,15 @@
  * and what metrics depend on it, in a visual card/tree layout.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo } from "react";
+import { Overlay, IconButton } from "@/components/ui";
 import { X, ArrowDown, ArrowUp, Info } from "lucide-react";
 import {
   getMetricDef,
   getMetricDependencyTree,
   getMetricDependents,
   CATEGORY_META,
+  FORMAT_LABELS,
   type MetricDefinition,
   type MetricTier,
 } from "@burnless/engine";
@@ -51,37 +52,38 @@ export function FormulaViewer() {
       .filter((d): d is MetricDefinition => !!d);
   }, [metric]);
 
-  const [mounted, setMounted] = useState(false);
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => { setMounted(true); }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  const open = Boolean(metric && formulaViewerSlug);
 
-  if (!metric || !formulaViewerSlug || !mounted) return null;
-
-  return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60] transition-opacity"
-        onClick={closeFormulaViewer}
-      />
-
-      {/* Modal */}
-      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-[60] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
+  return (
+    <Overlay
+      open={open}
+      onClose={closeFormulaViewer}
+      headless
+      className="!p-0"
+      scrimClassName="bg-black/30 fixed inset-0 backdrop-blur-sm z-[60] transition-opacity"
+    >
+      {(panelProps) =>
+        metric ? (
+        <div
+          {...panelProps}
+          role="dialog"
+          aria-modal="true"
+          aria-label={metric.name}
+          className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-[60] flex flex-col overflow-hidden outline-none"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
             <h2 className="text-lg font-bold text-surface-900">{metric.name}</h2>
             <p className="text-xs text-surface-400 mt-0.5">
               {CATEGORY_META[metric.category]?.label} metric
             </p>
           </div>
-          <button
+          <IconButton
+            aria-label="Close"
             onClick={closeFormulaViewer}
-            className="p-2 rounded-lg hover:bg-surface-100 transition-colors"
-          >
-            <X className="h-4 w-4 text-surface-500" />
-          </button>
+            icon={<X className="text-surface-500" />}
+          />
         </div>
 
         {/* Content */}
@@ -203,8 +205,9 @@ export function FormulaViewer() {
           )}
         </div>
       </div>
-    </>,
-    document.body,
+        ) : null
+      }
+    </Overlay>
   );
 }
 
@@ -228,8 +231,8 @@ function MetricNode({
         <span className={`text-sm font-medium ${isCenter ? "text-brand-700" : "text-surface-900"}`}>
           {metric.name}
         </span>
-        <span className="text-[10px] text-surface-400 uppercase">
-          {metric.format}
+        <span className="text-[10px] text-surface-400">
+          {FORMAT_LABELS[metric.format]}
         </span>
       </div>
       <p className="text-[10px] text-surface-500 mt-0.5 line-clamp-1">

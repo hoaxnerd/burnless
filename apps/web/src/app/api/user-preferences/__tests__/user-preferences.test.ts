@@ -12,8 +12,8 @@ vi.mock("@/lib/api-helpers", () => ({
 
 const {
   mockSelect, mockFrom, mockWhere, mockLimit,
-  mockInsert, mockValues, mockReturning,
-  mockUpdate, mockSet, mockUpdateWhere, mockUpdateReturning,
+  mockInsert, mockValues, mockOnConflict, mockReturning,
+  mockUpdate,
 } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
@@ -21,11 +21,9 @@ const {
   mockLimit: vi.fn(),
   mockInsert: vi.fn(),
   mockValues: vi.fn(),
+  mockOnConflict: vi.fn(),
   mockReturning: vi.fn(),
   mockUpdate: vi.fn(),
-  mockSet: vi.fn(),
-  mockUpdateWhere: vi.fn(),
-  mockUpdateReturning: vi.fn(),
 }));
 
 vi.mock("@burnless/db", () => ({
@@ -57,19 +55,15 @@ describe("/api/user-preferences", () => {
       role: "owner",
     });
 
-    // Select chain
+    // Select chain (GET path)
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ limit: mockLimit });
 
-    // Insert chain
+    // Insert → onConflictDoUpdate → returning chain (PATCH atomic upsert)
     mockInsert.mockReturnValue({ values: mockValues });
-    mockValues.mockReturnValue({ returning: mockReturning });
-
-    // Update chain
-    mockUpdate.mockReturnValue({ set: mockSet });
-    mockSet.mockReturnValue({ where: mockUpdateWhere });
-    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockValues.mockReturnValue({ onConflictDoUpdate: mockOnConflict });
+    mockOnConflict.mockReturnValue({ returning: mockReturning });
   });
 
   describe("GET", () => {
@@ -116,11 +110,12 @@ describe("/api/user-preferences", () => {
   });
 
   describe("PATCH", () => {
-    it("updates existing preferences", async () => {
-      // Select for existence check
-      mockLimit.mockResolvedValue([{ id: "pref-1" }]);
-      const updated = { id: "pref-1", quickActionMode: "custom", sidebarCollapsed: true };
-      mockUpdateReturning.mockResolvedValue([updated]);
+    // SHELL-01: PATCH is now a single atomic onConflictDoUpdate upsert. It must NOT
+    // do a prior SELECT (that race 500s when concurrent first-writes collide on the
+    // unique index), and it returns a uniform 200 for both create and update.
+    it("upserts atomically via onConflictDoUpdate (no prior SELECT) and returns 200", async () => {
+      const upserted = { id: "pref-1", quickActionMode: "custom", sidebarCollapsed: true };
+      mockReturning.mockResolvedValue([upserted]);
 
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",
@@ -134,10 +129,32 @@ describe("/api/user-preferences", () => {
       expect(res.status).toBe(200);
       expect(body.quickActionMode).toBe("custom");
       expect(body.sidebarCollapsed).toBe(true);
+
+      // No existence SELECT — the upsert is the only DB call.
+      expect(mockSelect).not.toHaveBeenCalled();
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(mockOnConflict).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
-    it("creates preferences when none exist", async () => {
-      mockLimit.mockResolvedValue([]);
+    it("targets the (userId, companyId) unique index and sets only provided keys", async () => {
+      mockReturning.mockResolvedValue([{ id: "pref-1", sidebarCollapsed: true }]);
+
+      const req = new Request("http://localhost:3000/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ sidebarCollapsed: true }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      await PATCH(req);
+
+      const conflictArg = mockOnConflict.mock.calls[0]![0];
+      expect(conflictArg.target).toEqual(["userId", "companyId"]);
+      // Partial-PATCH semantics: set only the provided key, nothing else.
+      expect(conflictArg.set).toEqual({ sidebarCollapsed: true });
+    });
+
+    it("returns 200 (not 201) even when the row is newly created", async () => {
       const created = { id: "new-1", quickActionMode: "intelligence", sidebarOrder: ["dashboard"] };
       mockReturning.mockResolvedValue([created]);
 
@@ -148,13 +165,12 @@ describe("/api/user-preferences", () => {
       });
 
       const res = await PATCH(req);
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
     });
 
     it("accepts sidebar order as array of strings", async () => {
-      mockLimit.mockResolvedValue([{ id: "pref-1" }]);
-      const updated = { id: "pref-1", sidebarOrder: ["expenses", "revenue", "team"] };
-      mockUpdateReturning.mockResolvedValue([updated]);
+      const upserted = { id: "pref-1", sidebarOrder: ["expenses", "revenue", "team"] };
+      mockReturning.mockResolvedValue([upserted]);
 
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",
@@ -169,9 +185,8 @@ describe("/api/user-preferences", () => {
     });
 
     it("accepts null sidebar order to reset", async () => {
-      mockLimit.mockResolvedValue([{ id: "pref-1" }]);
-      const updated = { id: "pref-1", sidebarOrder: null };
-      mockUpdateReturning.mockResolvedValue([updated]);
+      const upserted = { id: "pref-1", sidebarOrder: null };
+      mockReturning.mockResolvedValue([upserted]);
 
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",
@@ -186,10 +201,9 @@ describe("/api/user-preferences", () => {
     });
 
     it("accepts quickActionModeOverrides as record", async () => {
-      mockLimit.mockResolvedValue([{ id: "pref-1" }]);
       const overrides = { dashboard: "intelligence", expenses: "custom" };
-      const updated = { id: "pref-1", quickActionModeOverrides: overrides };
-      mockUpdateReturning.mockResolvedValue([updated]);
+      const upserted = { id: "pref-1", quickActionModeOverrides: overrides };
+      mockReturning.mockResolvedValue([upserted]);
 
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",

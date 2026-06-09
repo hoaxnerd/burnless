@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import { Input } from "@/components/ui/input";
 
 export interface SingleDateInputProps {
   label: string;
@@ -38,7 +39,7 @@ export function SingleDateInput({
         {label}
         {required && <span className="text-danger-500"> *</span>}
       </span>
-      <input
+      <Input
         type="date"
         aria-label={label}
         value={value}
@@ -47,7 +48,7 @@ export function SingleDateInput({
         disabled={disabled}
         min={min}
         max={max}
-        className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800 px-2 py-1"
+        className="mt-1"
       />
       {hint && <p className="mt-1 text-xs text-surface-500">{hint}</p>}
     </label>

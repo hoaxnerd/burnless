@@ -22,7 +22,8 @@ import { useMetrics } from "@/components/providers/metrics-context";
 import { useDashboardLayout } from "./dashboard-layout-context";
 import { DataTable } from "@/components/ui/data-table";
 import { Sparkline } from "@/components/ui/hero-kpi-card";
-import { sparkline } from "./dashboard-helpers";
+import { sparkline, ppDelta } from "./dashboard-helpers";
+import { formatPercent } from "@burnless/types";
 import { useLocale } from "@/components/locale/locale-context";
 
 // ── Row data type for the DataTable ─────────────────────────────────────────
@@ -128,7 +129,7 @@ export function CustomizableMetrics({
         if (def.format === "percent") {
           const diff = currentVal - prevVal;
           if (prevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
-            change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+            change = ppDelta(diff);
           }
         } else if (def.format === "number") {
           const diff = currentVal - prevVal;
@@ -138,7 +139,7 @@ export function CustomizableMetrics({
         } else if (prevVal !== 0) {
           const pct = pctChange(currentVal, prevVal) ?? 0;
           if (pct !== 0 && Number.isFinite(pct)) {
-            change = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+            change = `${pct >= 0 ? "+" : ""}${formatPercent(pct)}`;
           }
         }
 

@@ -3,8 +3,9 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Sparkles, LayoutTemplate } from "lucide-react";
-import { Modal, Button, FormField } from "@/components/ui";
+import { Modal, Button, FormField, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -129,8 +130,7 @@ export function CreateScenarioModal({ open, onClose, onCreated }: CreateScenario
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `Failed to create scenario (${res.status})`);
+        throw new Error(await extractApiError(res));
       }
 
       const scenario = await res.json();
@@ -163,7 +163,7 @@ export function CreateScenarioModal({ open, onClose, onCreated }: CreateScenario
       router.refresh();
       onCreated?.({ id: scenario.id, name: scenario.name });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(toUserMessage(err));
       setCreating(false);
     }
   }, [canCreate, name, selectedPath, aiPrompt, selectedTemplate, handleClose, router, onCreated]);
@@ -224,13 +224,13 @@ export function CreateScenarioModal({ open, onClose, onCreated }: CreateScenario
           >
             What do you want to explore?
           </label>
-          <textarea
+          <Textarea
             id="ai-prompt"
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}
             placeholder="e.g. What happens if we delay hiring by 3 months and cut marketing by 30%?"
             rows={3}
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all resize-none"
+            className="resize-none"
           />
         </div>
       )}

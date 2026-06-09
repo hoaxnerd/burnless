@@ -4,11 +4,13 @@ import { Sparkles, X, Pin } from "lucide-react";
 import { usePinnedInsights } from "@/components/ai/use-pinned-insights";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { AiGate } from "@/components/ai/ai-gate";
+import { useLocale } from "@/components/locale/locale-context";
 
 export function PinnedInsights() {
   const { pins, unpin } = usePinnedInsights();
   const aiFlags = useOptionalAiFlags();
   const companionName = aiFlags?.companionName ?? "Companion";
+  const { fmtDate } = useLocale();
 
   if (pins.length === 0) return null;
 
@@ -36,7 +38,7 @@ export function PinnedInsights() {
                 </p>
                 <p className="mt-1.5 text-[10px] text-surface-400">
                   {insight.page} &middot;{" "}
-                  {new Date(insight.pinnedAt).toLocaleDateString("en-US", {
+                  {fmtDate(new Date(insight.pinnedAt), {
                     month: "short",
                     day: "numeric",
                   })}

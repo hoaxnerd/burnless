@@ -70,3 +70,34 @@ describe("computeFinancials — blended lines", () => {
     expect(resSum).toBeCloseTo(totSum, 2);
   });
 });
+
+describe("computeFinancials — balance sheet balances (RPT-01 web)", () => {
+  // RPT-01: compute-financials injects A/P (≈ 1 month of expenses) and routes it
+  // through generateBalanceSheet's workingCapitalAdjustments so the engine adds
+  // the offsetting cash asset. Assets === Liabilities + Equity must hold for
+  // EVERY month on the real web render (previously the A/P-only liability row
+  // dangled the sheet).
+  it("Assets === Liabilities + Equity for every month", () => {
+    const r = computeFinancials(baseInput());
+
+    const byMonth = (li: { month: string; value: number }[]) =>
+      new Map(li.map((v) => [v.month, v.value]));
+    const assets = byMonth(r.balanceSheet.assets.values);
+    const liabilities = byMonth(r.balanceSheet.liabilities.values);
+    const equity = byMonth(r.balanceSheet.equity.values);
+
+    const offenders: string[] = [];
+    for (const m of assets.keys()) {
+      const a = assets.get(m) ?? 0;
+      const l = liabilities.get(m) ?? 0;
+      const e = equity.get(m) ?? 0;
+      if (Math.abs(a - (l + e)) >= 0.01) {
+        offenders.push(`${m}: A=${a} L=${l} E=${e} diff=${(a - (l + e)).toFixed(2)}`);
+      }
+    }
+
+    expect(offenders, `Balance sheet dangles:\n${offenders.join("\n")}`).toEqual([]);
+    // A/P should be non-zero (expenses exist), so this is a real balancing test.
+    expect((liabilities.get("2026-06") ?? 0)).toBeGreaterThan(0);
+  });
+});

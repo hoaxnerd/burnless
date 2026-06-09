@@ -24,6 +24,9 @@ export interface ChatStreamParams {
   companyId: string;
   userId: string;
   scenarioId: string;
+  /** AI-01: nullable WRITE target. null = base view → tool writes hit base tables.
+   *  Distinct from `scenarioId` (read context, persisted for resume's buildAiContext). */
+  writeScenarioId: string | null;
   conversationId: string;
   messages: ChatMessage[];
   financialContext: string;
@@ -44,6 +47,14 @@ export interface ChatStreamParams {
 }
 
 const THINK_TAG = /<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi;
+
+/** Order-independent JSON for dedup signatures (AI-05). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
 
 /** Cheap shape probe for a display-tool `{ render: { component }, modelResult }` envelope. */
 function looksLikeRenderEnvelope(raw: string): boolean {
@@ -88,6 +99,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // Display-tool render payloads accumulate here; persisted to
       // aiMessages.metadata.uiBlocks on `done` so reload can re-render (spec §6/§8).
       const uiBlocks: UiBlock[] = [];
+
+      // AI-05: dedup identical DISPLAY-only genui blocks within one turn (the model
+      // sometimes emits the same show_* twice). Mutations are never deduped.
+      const seenDisplaySignatures = new Set<string>();
 
       // Diff-gate (spec §4.2): override deltas computed at pause-time, keyed by the
       // tool_use requestId, so the permission_request SSE case can attach them.
@@ -139,7 +154,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           onToolCall: async (toolName, input) => {
             const raw = await executeToolCall(toolName, input, {
               companyId: params.companyId,
-              scenarioId: params.scenarioId,
+              scenarioId: params.writeScenarioId,
               userId: params.userId,
               conversationId: params.conversationId,
               permissionDecision: "auto",
@@ -174,6 +189,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                   const rationale = typeof parsed.rationale === "string" ? parsed.rationale : inRat;
                   if (confidence === "high" || confidence === "low") block.confidence = confidence;
                   if (typeof rationale === "string") block.rationale = rationale;
+                  const sig = `${parsed.render.component}:${stableStringify(parsed.render.props ?? {})}`;
+                  if (seenDisplaySignatures.has(sig)) {
+                    // Identical display block already emitted this turn — skip the
+                    // duplicate render but still return the terse modelResult so the
+                    // model loop is unaffected.
+                    return typeof parsed.modelResult === "string" ? parsed.modelResult : `[${parsed.render.component} shown]`;
+                  }
+                  seenDisplaySignatures.add(sig);
                   uiBlocks.push(block);
                   timeline.push({ id, kind: "result", block, confidence: block.confidence, rationale: block.rationale });
                   send(controller, {
@@ -208,7 +231,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 try {
                   const raw = await executeToolCall(action.toolName, action.toolInput, {
                     companyId: params.companyId,
-                    scenarioId: params.scenarioId,
+                    scenarioId: params.writeScenarioId,
                     userId: params.userId,
                     conversationId: params.conversationId,
                     mode: "plan",
@@ -229,6 +252,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               conversationId: params.conversationId,
               pauseId,
               scenarioId: params.scenarioId, // persist active scenario for correct resume targeting
+              writeScenarioId: params.writeScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: enrichedPending,
@@ -242,6 +266,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               pauseId,
               kind: "input",
               scenarioId: params.scenarioId,
+              writeScenarioId: params.writeScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: { inputToolUseId: state.inputToolUseId, spec: state.spec },
@@ -255,6 +280,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               pauseId,
               kind: "plan",
               scenarioId: params.scenarioId,
+              writeScenarioId: params.writeScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: { planToolUseId: state.planToolUseId, spec: state.spec },

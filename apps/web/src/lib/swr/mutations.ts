@@ -10,8 +10,49 @@
 
 import { mutate } from "swr";
 import { apiFetch } from "@/lib/api-fetch";
+import {
+  subscribeMutation,
+  type MutationEvent,
+  FINANCIAL_DOMAINS,
+} from "@/lib/mutation-bus";
 import { KEYS } from "./keys";
 import { FetchError } from "./fetcher";
+
+// ── Post-mutation revalidation (PMR-1) ───────────────────────────────────────
+
+/**
+ * Single trigger any consumer can call after a successful mutation to revalidate
+ * one or more SWR keys. Thin wrapper over `mutate` so Phase-2 consumers import
+ * from one place (`@/lib/swr`) instead of reaching into `swr` directly.
+ *
+ *   import { revalidate, KEYS } from "@/lib/swr";
+ *   await save(); revalidate(KEYS.imports);
+ */
+export async function revalidate(...keys: string[]): Promise<void> {
+  await Promise.all(keys.map((k) => mutate(k)));
+}
+
+/**
+ * Subscribe to the financial mutation bus and revalidate the given SWR keys
+ * whenever a *financial-domain* mutation fires (same-tab or cross-tab).
+ *
+ * Preserves the bus's "other" domain exclusion: `domainFromUrl` already maps
+ * non-financial endpoints (preferences, the insights-regen POST itself, chat,
+ * ai-config) to "other", which `apiFetch` never publishes — and we additionally
+ * guard on `FINANCIAL_DOMAINS` here so a future non-financial emitter can't
+ * retrigger a revalidation loop. Returns an unsubscribe fn for cleanup in an
+ * effect.
+ */
+export function revalidateOnFinancialMutation(
+  keys: string[],
+  onEvent?: (e: MutationEvent) => void,
+): () => void {
+  return subscribeMutation((e) => {
+    if (!FINANCIAL_DOMAINS.has(e.domain)) return; // exclude "other"
+    void Promise.all(keys.map((k) => mutate(k)));
+    onEvent?.(e);
+  });
+}
 
 // ── Generic helpers ─────────────────────────────────────────────────────────
 

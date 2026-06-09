@@ -1,3 +1,12 @@
+/**
+ * expense-form.test.tsx
+ *
+ * EXP-04 guard: the form must have a SINGLE recurrence control (a radio group).
+ * The old standalone "One-time expense" checkbox has been removed. Choosing
+ * 'one-time' must yield isOneTime=true/isRecurring=false in the submit payload.
+ * Choosing 'recurring' must yield isOneTime=false/isRecurring=true.
+ * Choosing 'auto' must yield isOneTime=false/isRecurring=null.
+ */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ExpenseForm, type ExpenseRow } from "../expense-form";
@@ -158,6 +167,166 @@ describe("<ExpenseForm> add mode", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+// ── EXP-04: single recurrence control ────────────────────────────────────────
+
+describe("<ExpenseForm> EXP-04 — single recurring control", () => {
+  it("has NO standalone 'One-time expense' checkbox (removed in EXP-04)", () => {
+    render(
+      <ExpenseForm
+        mode="add"
+        accounts={accounts}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    // The old checkbox label was "One-time expense (does not recur)".
+    // It must no longer exist as a standalone checkbox — it's now a radio option.
+    const checkboxes = screen
+      .queryAllByRole("checkbox")
+      .filter((el) => el.closest("label")?.textContent?.includes("One-time expense"));
+    expect(checkboxes).toHaveLength(0);
+  });
+
+  it("has a radio option for one-time within the Recurrence fieldset", () => {
+    render(
+      <ExpenseForm
+        mode="add"
+        accounts={accounts}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    // The "One-time expense" option is now a radio, not a checkbox.
+    const radio = screen.getByLabelText(/one-time expense/i) as HTMLInputElement;
+    expect(radio.type).toBe("radio");
+  });
+
+  it("choosing 'one-time' yields isOneTime=true and isRecurring=false in payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ExpenseForm
+        mode="add"
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "500" } });
+    fireEvent.click(screen.getByLabelText(/one-time expense/i));
+
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("form", { name: "Add expense" }));
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const payload = onSubmit.mock.calls[0]![0];
+    expect(payload.isOneTime).toBe(true);
+    expect(payload.isRecurring).toBe(false);
+  });
+
+  it("choosing 'recurring' yields isOneTime=false and isRecurring=true in payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ExpenseForm
+        mode="add"
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "500" } });
+    fireEvent.click(screen.getByLabelText("Yes, recurring"));
+
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("form", { name: "Add expense" }));
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const payload = onSubmit.mock.calls[0]![0];
+    expect(payload.isOneTime).toBe(false);
+    expect(payload.isRecurring).toBe(true);
+  });
+
+  it("choosing 'auto' yields isOneTime=false and isRecurring=null in payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ExpenseForm
+        mode="add"
+        accounts={accounts}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "500" } });
+    // "Auto-detect" is the default, but click it explicitly.
+    fireEvent.click(screen.getByLabelText(/auto-detect/i));
+
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("form", { name: "Add expense" }));
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const payload = onSubmit.mock.calls[0]![0];
+    expect(payload.isOneTime).toBe(false);
+    expect(payload.isRecurring).toBeNull();
+  });
+
+  it("initializes to 'one-time' when isOneTime=true is passed via initialValue", () => {
+    const initialValue: ExpenseRow = {
+      id: "line-ot",
+      accountId: "acct-1",
+      method: "fixed",
+      parameters: { amount: 200 },
+      startDate: "2026-01-01",
+      endDate: null,
+      isOneTime: true,
+      isRecurring: false,
+    };
+
+    render(
+      <ExpenseForm
+        mode="edit"
+        initialValue={initialValue}
+        accounts={accounts}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const radio = screen.getByLabelText(/one-time expense/i) as HTMLInputElement;
+    expect(radio.checked).toBe(true);
+  });
+
+  it("initializes to 'recurring' when isRecurring=true and isOneTime=false", () => {
+    const initialValue: ExpenseRow = {
+      id: "line-rc",
+      accountId: "acct-1",
+      method: "fixed",
+      parameters: { amount: 200 },
+      startDate: "2026-01-01",
+      endDate: null,
+      isOneTime: false,
+      isRecurring: true,
+    };
+
+    render(
+      <ExpenseForm
+        mode="edit"
+        initialValue={initialValue}
+        accounts={accounts}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const radio = screen.getByLabelText("Yes, recurring") as HTMLInputElement;
+    expect(radio.checked).toBe(true);
   });
 });
 

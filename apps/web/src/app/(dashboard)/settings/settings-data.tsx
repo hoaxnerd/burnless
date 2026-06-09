@@ -160,9 +160,13 @@ export const REGION_OPTIONS = (Object.entries(DATA_REGIONS) as [DataRegion, { na
 export const tabs = [
   { key: "general" as const, label: "General" },
   { key: "security" as const, label: "Security" },
-  // TODO: Re-enable AI Features and AI Dashboard tabs in a later release
-  // { key: "ai" as const, label: "AI Features" },
-  // { key: "ai-dashboard" as const, label: "AI Dashboard" },
+  // SET-07 (Path B): AI Features + AI Dashboard tabs are SHIPPED for launch.
+  // Conscious decision — the surface (provider selector, data mode, per-feature
+  // toggles, credits, observability) is complete and renders against the live
+  // useAiFlags context. writeMode is governed by per-user AI tool permissions
+  // (two-gates contract); the company-level writeMode default is `confirm`.
+  { key: "ai" as const, label: "AI Features" },
+  { key: "ai-dashboard" as const, label: "AI Dashboard" },
   { key: "integrations" as const, label: "Integrations" },
   { key: "invite-codes" as const, label: "Invite Codes" },
   { key: "billing" as const, label: "Billing" },

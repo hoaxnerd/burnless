@@ -1,4 +1,5 @@
 import { RefObject } from "react";
+import { Input } from "@/components/ui";
 import { PasswordStrength } from "./password-strength";
 import type { PasswordStrength as PasswordStrengthType } from "./types";
 
@@ -32,60 +33,41 @@ export function SignUpStep({
   return (
     <div style={{ animation: "fadeSlideIn 300ms ease-out" }}>
       <form onSubmit={onSubmit} className="space-y-5">
+        <Input
+          id="name"
+          label="Your name"
+          showOptional
+          type="text"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="Jane Doe"
+        />
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-surface-700 mb-2"
-          >
-            Your name
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Jane Doe"
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="signup-password"
-            className="block text-sm font-medium text-surface-700 mb-2"
-          >
-            Create a password
-          </label>
-          <input
+          <Input
             ref={passwordRef}
             id="signup-password"
+            label="Create a password"
             type="password"
             value={password}
             onChange={(e) => onPasswordChange(e.target.value)}
             placeholder="Min. 8 characters"
             required
             minLength={8}
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
           />
           {passwordStrength && (
             <PasswordStrength strength={passwordStrength} />
           )}
         </div>
-        <div>
-          <label
-            htmlFor="invite-code"
-            className="block text-sm font-medium text-surface-700 mb-2"
-          >
-            Invite code <span className="text-surface-400 font-normal">(optional)</span>
-          </label>
-          <input
-            id="invite-code"
-            type="text"
-            value={inviteCode}
-            onChange={(e) => onInviteCodeChange(e.target.value.toUpperCase())}
-            placeholder="e.g. BURNLESS2026"
-            className="w-full rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all font-mono tracking-wider"
-          />
-        </div>
+        <Input
+          id="invite-code"
+          label="Invite code"
+          showOptional
+          type="text"
+          value={inviteCode}
+          onChange={(e) => onInviteCodeChange(e.target.value.toUpperCase())}
+          placeholder="e.g. BURNLESS2026"
+          className="font-mono tracking-wider"
+        />
         <button
           type="submit"
           disabled={isLoading}

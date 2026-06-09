@@ -9,6 +9,7 @@ import {
   DateRangePicker,
 } from "@/components/forms/primitives";
 import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui";
 import type { PendingInput, PendingInputField } from "../types";
 
 export interface InputFormCardProps {
@@ -163,48 +164,36 @@ function FieldInput({
     }
     case "select":
       return (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-surface-700">
-            {f.label}
-            {f.required ? " *" : ""}
-          </span>
-          <select
-            className="rounded-lg border border-surface-200 px-2 py-1.5"
-            value={String(value ?? "")}
-            disabled={disabled}
-            aria-label={f.label}
-            onChange={(e) => onChange(e.target.value)}
-          >
-            <option value="" disabled>
-              Select…
+        <Select
+          label={f.label}
+          hint={f.hint}
+          required={f.required}
+          value={String(value ?? "")}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="" disabled>
+            Select…
+          </option>
+          {(f.options ?? []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
-            {(f.options ?? []).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          {f.hint ? <span className="text-xs text-surface-500">{f.hint}</span> : null}
-        </label>
+          ))}
+        </Select>
       );
     default:
       return (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-surface-700">
-            {f.label}
-            {f.required ? " *" : ""}
-          </span>
-          <input
-            className="rounded-lg border border-surface-200 px-2 py-1.5"
-            type="text"
-            value={String(value ?? "")}
-            placeholder={f.placeholder}
-            disabled={disabled}
-            aria-label={f.label}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          {f.hint ? <span className="text-xs text-surface-500">{f.hint}</span> : null}
-        </label>
+        <Input
+          label={f.label}
+          hint={f.hint}
+          required={f.required}
+          type="text"
+          value={String(value ?? "")}
+          placeholder={f.placeholder}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
       );
   }
 }

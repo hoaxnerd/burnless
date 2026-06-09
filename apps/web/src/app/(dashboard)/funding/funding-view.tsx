@@ -31,6 +31,14 @@ interface FundingViewProps {
     preMoneyValuation: number | null;
     dilutionPercent: number | null;
     isProjected: boolean;
+    milestones?: Array<{
+      id: string;
+      label: string;
+      amount: number;
+      dueDate: string;
+      hitDate?: string;
+      matchWarning?: { requiredAmount: number; actualAmount: number; asOf: string };
+    }>;
   }>;
   resolvedSlotData: ResolvedSlotData[];
   currency: CurrencyCode;

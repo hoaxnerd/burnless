@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { positiveAmount, percentage, ratio, dateString, nullableDateString } from "./validators";
+import { positiveAmount, percentage, ratio, dateString, nullableDateString, withDateRange } from "./validators";
 
 // ── Shared Enums (Zod + inferred TS types) ─────────────────────────────────
 
@@ -20,7 +20,8 @@ export const revenueStreamTypeEnum = z.enum([
   "ecommerce",
   "hardware",
 ]);
-export const fundingRoundTypeEnum = z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]);
+// FUND-03: set-equal to the DB pgEnum (`funding_round_type`) and engine `FundingRoundType` union — both already include safe + convertible. Guarded by funding-round-schema-parity.test.ts.
+export const fundingRoundTypeEnum = z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant", "safe", "convertible"]);
 export const integrationTypeEnum = z.enum(["quickbooks", "xero", "freshbooks", "plaid", "mercury", "gusto", "stripe"]);
 export const aiProviderEnum = z.enum(["anthropic", "openai", "openrouter", "ollama"]);
 export const aiDataModeEnum = z.enum(["full", "show_cached", "hide_all"]);
@@ -93,20 +94,22 @@ export type UpdateScenarioInput = z.infer<typeof updateScenarioSchema>;
 
 export const headcountEmployeeTypeEnum = z.enum(["full_time", "part_time", "contractor"]);
 
-export const createHeadcountSchema = z.object({
-  departmentId: z.string(),
-  title: z.string().min(1),
-  name: z.string().nullable().optional(),
-  employeeType: headcountEmployeeTypeEnum.default("full_time"),
-  count: z.number().min(0).max(99.99).default(1),
-  salary: positiveAmount(),
-  hourlyRate: z.number().nonnegative().nullable().optional(),
-  hoursPerWeek: z.number().min(0).max(168).nullable().optional(),
-  startDate: dateString(),
-  endDate: nullableDateString(),
-  benefitsRate: ratio().default(0.20),
-  parameters: z.record(z.unknown()).optional(),
-});
+export const createHeadcountSchema = withDateRange(
+  z.object({
+    departmentId: z.string(),
+    title: z.string().min(1),
+    name: z.string().nullable().optional(),
+    employeeType: headcountEmployeeTypeEnum.default("full_time"),
+    count: z.number().min(0).max(99.99).default(1),
+    salary: positiveAmount(),
+    hourlyRate: z.number().nonnegative().nullable().optional(),
+    hoursPerWeek: z.number().min(0).max(168).nullable().optional(),
+    startDate: dateString(),
+    endDate: nullableDateString(),
+    benefitsRate: ratio().default(0.20),
+    parameters: z.record(z.unknown()).optional(),
+  }),
+);
 
 export const updateHeadcountSchema = z.object({
   departmentId: z.string().optional(),
@@ -205,21 +208,25 @@ export type UpdateEquityGrantInput = z.infer<typeof updateEquityGrantSchema>;
 
 // ── Revenue Streams ─────────────────────────────────────────────────────────
 
-export const createRevenueStreamSchema = z.object({
-  name: z.string().min(1),
-  type: revenueStreamTypeEnum.default("subscription"),
-  startDate: z.string().date(),                       // ISO YYYY-MM-DD, required
-  endDate: z.string().date().nullable().optional(),    // ISO YYYY-MM-DD or null
-  parameters: z.record(z.unknown()).default({}),
-});
+export const createRevenueStreamSchema = withDateRange(
+  z.object({
+    name: z.string().min(1),
+    type: revenueStreamTypeEnum.default("subscription"),
+    startDate: z.string().date(),                       // ISO YYYY-MM-DD, required
+    endDate: z.string().date().nullable().optional(),    // ISO YYYY-MM-DD or null
+    parameters: z.record(z.unknown()).default({}),
+  }),
+);
 
-export const updateRevenueStreamSchema = z.object({
-  name: z.string().min(1).optional(),
-  type: revenueStreamTypeEnum.optional(),
-  startDate: z.string().date().optional(),
-  endDate: z.string().date().nullable().optional(),
-  parameters: z.record(z.unknown()).optional(),
-});
+export const updateRevenueStreamSchema = withDateRange(
+  z.object({
+    name: z.string().min(1).optional(),
+    type: revenueStreamTypeEnum.optional(),
+    startDate: z.string().date().optional(),
+    endDate: z.string().date().nullable().optional(),
+    parameters: z.record(z.unknown()).optional(),
+  }),
+);
 
 export type CreateRevenueStreamInput = z.infer<typeof createRevenueStreamSchema>;
 export type UpdateRevenueStreamInput = z.infer<typeof updateRevenueStreamSchema>;
@@ -228,12 +235,20 @@ export type UpdateRevenueStreamInput = z.infer<typeof updateRevenueStreamSchema>
 
 export const createFundingRoundSchema = z.object({
   name: z.string().min(1),
-  type: fundingRoundTypeEnum,
+  // FUND-01: the Add form sends `roundType` (matches the AI tool + DB intent); the
+  // POST route maps roundType -> the DB `type` column. Renamed from `type` (which
+  // 400'd every create). roundType is immutable post-creation (omitted from update).
+  roundType: fundingRoundTypeEnum,
   amount: positiveAmount(),
   date: dateString(),
   preMoneyValuation: positiveAmount().nullable().default(null),
   dilutionPercent: percentage().nullable().default(null),
   isProjected: z.boolean().default(false),
+  // FUND-04: type-specific data + close/notes were silently stripped on create
+  // (present on update only). Mirror updateFundingRoundSchema so they persist.
+  closeDate: nullableDateString(),
+  notes: z.string().nullable().optional(),
+  parameters: z.record(z.unknown()).optional(),
 });
 
 export const updateFundingRoundSchema = z.object({
@@ -260,21 +275,26 @@ export type UpdateFundingRoundInput = z.infer<typeof updateFundingRoundSchema>;
 /** Phase 1 §1.5 expense frequency enum (mirrors `expenseFrequencyEnum` in db schema). */
 export const expenseFrequencyEnum = z.enum(["monthly", "quarterly", "annual"]);
 
-export const createForecastLineSchema = z.object({
-  accountId: z.string(),
-  method: forecastMethodEnum.default("fixed"),
-  parameters: z.record(z.unknown()).default({}),
-  startDate: dateString(),
-  endDate: nullableDateString(),
-  // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
-  notes: z.string().nullable().optional(),
-  vendor: z.string().nullable().optional(),
-  departmentId: z.string().nullable().optional(),
-  frequency: expenseFrequencyEnum.default("monthly"),
-  isOneTime: z.boolean().default(false),
-  // Tri-state: true | false | null (cleared) | undefined (untouched).
-  isRecurring: z.boolean().nullable().optional(),
-});
+export const createForecastLineSchema = withDateRange(
+  z.object({
+    accountId: z.string(),
+    method: forecastMethodEnum.default("fixed"),
+    parameters: z.record(z.unknown()).default({}),
+    startDate: dateString(),
+    endDate: nullableDateString(),
+    // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
+    notes: z.string().nullable().optional(),
+    vendor: z.string().nullable().optional(),
+    // Explicit per-line category override (set in the expense form). string = set,
+    // null = clear (derive automatically), undefined = leave as-is.
+    subcategory: z.string().trim().min(1).max(100).nullable().optional(),
+    departmentId: z.string().nullable().optional(),
+    frequency: expenseFrequencyEnum.default("monthly"),
+    isOneTime: z.boolean().default(false),
+    // Tri-state: true | false | null (cleared) | undefined (untouched).
+    isRecurring: z.boolean().nullable().optional(),
+  }),
+);
 
 export const updateForecastLineSchema = z.object({
   method: forecastMethodEnum.optional(),
@@ -284,6 +304,9 @@ export const updateForecastLineSchema = z.object({
   // ── Phase 1 §1.5 / §2.C additions ───────────────────────────────────────
   notes: z.string().nullable().optional(),
   vendor: z.string().nullable().optional(),
+  // Explicit per-line category override (set in the expense form). string = set,
+  // null = clear (derive automatically), undefined = leave as-is.
+  subcategory: z.string().trim().min(1).max(100).nullable().optional(),
   departmentId: z.string().nullable().optional(),
   frequency: expenseFrequencyEnum.optional(),
   isOneTime: z.boolean().optional(),

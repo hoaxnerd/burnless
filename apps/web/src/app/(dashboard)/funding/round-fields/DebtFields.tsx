@@ -1,6 +1,7 @@
 "use client";
 
 import { NumberInput, PercentageInput, SingleDateInput } from "@/components/forms/primitives";
+import { Select } from "@/components/ui";
 
 interface DebtFieldsProps {
   params: {
@@ -28,23 +29,20 @@ export function DebtFields({ params, setParameters }: DebtFieldsProps) {
         label="Term (months)"
         required
       />
-      <div>
-        <label className="text-sm font-medium">Repayment Schedule</label>
-        <select
-          className="input"
-          value={params.repaymentSchedule ?? "straight_line"}
-          onChange={(e) =>
-            setParameters((p) => ({
-              ...p,
-              repaymentSchedule: e.target.value as DebtFieldsProps["params"]["repaymentSchedule"],
-            }))
-          }
-        >
-          <option value="straight_line">Straight-line (equal principal each month)</option>
-          <option value="interest_only">Interest-only with balloon</option>
-          <option value="amortized">Amortized (equal P+I each month) — coming soon</option>
-        </select>
-      </div>
+      <Select
+        label="Repayment Schedule"
+        value={params.repaymentSchedule ?? "straight_line"}
+        onChange={(e) =>
+          setParameters((p) => ({
+            ...p,
+            repaymentSchedule: e.target.value as DebtFieldsProps["params"]["repaymentSchedule"],
+          }))
+        }
+      >
+        <option value="straight_line">Straight-line (equal principal each month)</option>
+        <option value="interest_only">Interest-only with balloon</option>
+        <option value="amortized">Amortized (equal P+I each month) — coming soon</option>
+      </Select>
       <SingleDateInput
         label="First Payment Date"
         value={params.firstPaymentDate ?? ""}

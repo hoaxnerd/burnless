@@ -1,5 +1,5 @@
 /* ── Invite Codes – types, helpers & constants ────────────────── */
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatDate as formatDateLocale, type CurrencyCode } from "@burnless/types";
 
 export interface Redemption {
   id: string;
@@ -52,8 +52,8 @@ export const statusColors: Record<CodeStatus, string> = {
   inactive: "bg-danger-100 text-danger-700",
 };
 
-export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+export function formatDate(iso: string, locale?: string) {
+  return formatDateLocale(new Date(iso), locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -66,8 +66,10 @@ export function formatCredits(cents: number, currency: CurrencyCode = "USD", loc
 
 export const defaultForm: CodeFormData = {
   code: "",
-  type: "multi_use",
-  maxRedemptions: 50,
+  // SET-10: default to Single Use (the leftmost toggle) — a user who doesn't
+  // touch Type creates a 1-redemption code, not a silent 50-redemption one.
+  type: "single_use",
+  maxRedemptions: 1,
   expiresAt: "",
   freePlatformDays: 30,
   aiCreditsCents: 5000,

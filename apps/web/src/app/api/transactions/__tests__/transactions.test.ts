@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireWrite, mockRequireRole } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
+  mockRequireWrite: vi.fn(),
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
@@ -28,6 +29,7 @@ const {
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
+  requireCompanyWrite: mockRequireWrite,
   requireRole: mockRequireRole,
   parseBody: async (
     req: Request,
@@ -61,6 +63,10 @@ vi.mock("@burnless/db", () => ({
     date: "date",
     id: "id",
   },
+  financialAccounts: {
+    id: "id",
+    companyId: "companyId",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -87,10 +93,19 @@ vi.mock("@/lib/pagination", () => ({
     })),
 }));
 
-// Chain: db.select().from(transactions).where(and(...)).orderBy(transactions.id).limit(limit + 1)
+// GET chain: db.select().from(transactions).where(and(...)).orderBy(transactions.id).limit(limit + 1)
+// POST chain (AUTHZ-02 ownership): db.select({...}).from(financialAccounts).where(...) — awaited.
+// So mockWhere returns a thenable that ALSO exposes .orderBy (GET) and resolves to
+// the financialAccounts ownership rows (POST). By default: one row found (owned).
+function makeWhereResult() {
+  const result: Record<string, unknown> = { orderBy: mockOrderBy };
+  // Thenable: awaiting `where(...)` resolves to the ownership lookup rows.
+  result.then = (resolve: (v: unknown) => unknown) => resolve([{ id: "acc-1" }]);
+  return result;
+}
 mockSelect.mockReturnValue({ from: mockFrom });
 mockFrom.mockReturnValue({ where: mockWhere });
-mockWhere.mockReturnValue({ orderBy: mockOrderBy });
+mockWhere.mockImplementation(() => makeWhereResult());
 mockOrderBy.mockReturnValue({ limit: mockLimit });
 
 // Chain: db.insert(transactions).values({...}).returning()
@@ -110,7 +125,11 @@ describe("GET /api/transactions", () => {
     // Re-establish chains after clearAllMocks
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
-    mockWhere.mockReturnValue({ orderBy: mockOrderBy });
+    mockWhere.mockImplementation(() => {
+      const result: Record<string, unknown> = { orderBy: mockOrderBy };
+      result.then = (resolve: (v: unknown) => unknown) => resolve([{ id: "acc-1" }]);
+      return result;
+    });
     mockOrderBy.mockReturnValue({ limit: mockLimit });
     mockInsert.mockReturnValue({ values: mockValues });
     mockValues.mockReturnValue({ returning: mockReturning });
@@ -206,14 +225,25 @@ describe("POST /api/transactions", () => {
 
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
-    mockWhere.mockReturnValue({ orderBy: mockOrderBy });
+    mockWhere.mockImplementation(() => {
+      const result: Record<string, unknown> = { orderBy: mockOrderBy };
+      result.then = (resolve: (v: unknown) => unknown) => resolve([{ id: "acc-1" }]);
+      return result;
+    });
     mockOrderBy.mockReturnValue({ limit: mockLimit });
     mockInsert.mockReturnValue({ values: mockValues });
     mockValues.mockReturnValue({ returning: mockReturning });
+
+    // POST now gates on requireCompanyWrite — default to a passing write ctx.
+    mockRequireWrite.mockResolvedValue({
+      userId: "user-1",
+      companyId: "company-1",
+      role: "editor",
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {
-    mockRequireCompanyAccess.mockResolvedValue({
+    mockRequireWrite.mockResolvedValue({
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     });
 
@@ -231,6 +261,32 @@ describe("POST /api/transactions", () => {
 
     expect(res.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 when accountId belongs to another company", async () => {
+    // Ownership lookup returns no rows → foreign account.
+    mockWhere.mockImplementation(() => {
+      const result: Record<string, unknown> = { orderBy: mockOrderBy };
+      result.then = (resolve: (v: unknown) => unknown) => resolve([]);
+      return result;
+    });
+
+    const req = makeRequest("http://localhost/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountId: "foreign-acc",
+        date: "2026-03-15",
+        amount: 250,
+        description: "Cross-company attempt",
+      }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toContain("does not belong");
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("creates transaction and returns 201", async () => {

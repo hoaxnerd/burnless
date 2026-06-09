@@ -4,7 +4,7 @@
  */
 
 import { pctChange } from "@burnless/engine";
-import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
+import { formatCompactAmount, formatPercent, type CurrencyCode } from "@burnless/types";
 
 export type AlertSeverity = "critical" | "warning" | "info" | "celebration";
 
@@ -87,7 +87,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
         id: "burn-accelerating",
         severity: "warning",
         title: "Burn rate accelerating",
-        message: `Burn rate increased ${burnChange.toFixed(0)}% month-over-month (${fmt(prevBurn)} → ${fmt(burn)}). Review recent expenses for unexpected increases.`,
+        message: `Burn rate increased ${formatPercent(burnChange, undefined, 0)} month-over-month (${fmt(prevBurn)} → ${fmt(burn)}). Review recent expenses for unexpected increases.`,
         metric: "burn_rate",
         value: burnChange,
       });
@@ -102,7 +102,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
         id: "mrr-declining",
         severity: "warning",
         title: "Revenue declining",
-        message: `MRR dropped ${mrrDecline.toFixed(0)}% (${fmt(prevMrr)} → ${fmt(mrr)}). Investigate churn and review your retention strategy.`,
+        message: `MRR dropped ${formatPercent(mrrDecline, undefined, 0)} (${fmt(prevMrr)} → ${fmt(mrr)}). Investigate churn and review your retention strategy.`,
         metric: "mrr",
         value: -mrrDecline,
       });
@@ -146,7 +146,7 @@ export function generateAlerts(data: AlertInput): FinancialAlert[] {
         id: "burn-improving",
         severity: "celebration",
         title: "Burn rate improving",
-        message: `Burn rate decreased ${burnImprovement.toFixed(0)}% month-over-month. Keep up the efficient spending!`,
+        message: `Burn rate decreased ${formatPercent(burnImprovement, undefined, 0)} month-over-month. Keep up the efficient spending!`,
         metric: "burn_rate",
         value: -burnImprovement,
       });

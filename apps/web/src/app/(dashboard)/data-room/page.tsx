@@ -8,7 +8,7 @@ import { getCompany, getServerScenarioId, getFundingRounds } from "@/lib/data";
 import { getCompanyPlan } from "@/lib/api-helpers";
 import { canPerformAction } from "@/lib/feature-gate";
 import { computeDashboardData } from "@/lib/compute-dashboard";
-import { formatCompactAmount, type CurrencyCode } from "@burnless/types";
+import { formatCompactAmount, formatPercent, type CurrencyCode } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { DataRoomView } from "./data-room-view";
 import { SetupPrompt } from "@/components/ui/empty-state";
@@ -58,14 +58,21 @@ async function DataRoomContent({ companyId, scenarioId, companyName, currency }:
     getFundingRounds(companyId, null), // Data room is base-only by design (artifact warehouse)
   ]);
 
-  const latestRevenue = data.metrics.totalRevenue[data.metrics.totalRevenue.length - 1];
-  const latestArr = data.metrics.arr[data.metrics.arr.length - 1];
-  const latestBurn = data.metrics.netBurnRate[data.metrics.netBurnRate.length - 1];
-  const latestRunway = data.metrics.cashRunwayMonths[data.metrics.cashRunwayMonths.length - 1];
-  const latestGrossMargin = data.metrics.grossMarginPercent[data.metrics.grossMarginPercent.length - 1];
-  const latestCash = data.metrics.cashPosition[data.metrics.cashPosition.length - 1];
-  const latestMrr = data.metrics.mrr[data.metrics.mrr.length - 1];
-  const latestCustomers = data.metrics.totalCustomers[data.metrics.totalCustomers.length - 1];
+  // FMT-2 (Phase B horizon): read headline KPIs at the REAL current calendar
+  // month (data.currentMonth), NOT the end of the now-full-horizon series — the
+  // last element is an end-of-horizon projection, not "today".
+  const { currentMonth } = data;
+  const atCurrentMonth = (series: { month: string; value: number }[]) =>
+    series.find((m) => m.month === currentMonth) ?? series[series.length - 1];
+
+  const latestRevenue = atCurrentMonth(data.metrics.totalRevenue);
+  const latestArr = atCurrentMonth(data.metrics.arr);
+  const latestBurn = atCurrentMonth(data.metrics.netBurnRate);
+  const latestRunway = atCurrentMonth(data.metrics.cashRunwayMonths);
+  const latestGrossMargin = atCurrentMonth(data.metrics.grossMarginPercent);
+  const latestCash = atCurrentMonth(data.metrics.cashPosition);
+  const latestMrr = atCurrentMonth(data.metrics.mrr);
+  const latestCustomers = atCurrentMonth(data.metrics.totalCustomers);
 
   const fmtCurrency = (v: number) => formatCompactAmount(v, currency);
 
@@ -74,7 +81,7 @@ async function DataRoomContent({ companyId, scenarioId, companyName, currency }:
     { label: "MRR", value: fmtCurrency(latestMrr?.value ?? 0), category: "Revenue" },
     { label: "ARR", value: fmtCurrency(latestArr?.value ?? 0), category: "Revenue" },
     { label: "Total Customers", value: String(Math.round(latestCustomers?.value ?? 0)), category: "Revenue" },
-    { label: "Gross Margin", value: `${(latestGrossMargin?.value ?? 0).toFixed(1)}%`, category: "Profitability" },
+    { label: "Gross Margin", value: formatPercent(latestGrossMargin?.value ?? 0, undefined, 1), category: "Profitability" },
     { label: "Cash Position", value: fmtCurrency(latestCash?.value ?? 0), category: "Cash" },
     { label: "Net Burn Rate", value: fmtCurrency(latestBurn?.value ?? 0), category: "Cash" },
     { label: "Runway", value: latestRunway && latestRunway.value < 999 ? `${Math.round(latestRunway.value)} months` : "36+", category: "Cash" },

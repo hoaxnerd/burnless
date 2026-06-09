@@ -40,6 +40,13 @@ export interface ExpenseLineItem {
   subcategory: string;
   subcategoryConfidence: number;
   categorySource: "rule" | "merchant_memory" | "manual";
+  /**
+   * Raw per-line category override from the DB (`forecast_lines.subcategory`).
+   * NULL when the category is auto-derived. Threaded so the edit form can
+   * preselect "Auto" vs the explicit value (the displayed `subcategory` above
+   * is always populated — it carries the derived value when this is null).
+   */
+  subcategoryOverride: string | null;
   method: string;
   parameters: Record<string, unknown>;
   startDate: string;
@@ -104,10 +111,16 @@ export interface ExpenseDetails {
 
 // ── Subcategory derivation ───────────────────────────────────────────────────
 
-function deriveSubcategory(
+export function deriveSubcategory(
   accountName: string,
   accountCategory: string,
+  explicit?: string | null,
 ): { subcategory: string; confidence: number; source: "rule" | "merchant_memory" | "manual" } {
+  // Explicit per-line override (set in the expense form) WINS over derivation.
+  if (typeof explicit === "string" && explicit.trim() !== "") {
+    return { subcategory: explicit.trim(), confidence: 1, source: "manual" };
+  }
+
   // Try categorization engine first
   const result = categorizeTransaction(accountName);
   if (result && result.confidence >= 0.5) {
@@ -119,7 +132,13 @@ function deriveSubcategory(
     return { subcategory: "Cost of Goods Sold", confidence: 0.6, source: "manual" };
   }
 
-  // Generic operating expense fallback
+  // An expense account is always named; its name is a more useful category than a
+  // generic "Uncategorized" bucket (mirrors breakdowns.ts:deriveSubcategory so the
+  // table, chart, and AI insight agree). Only truly nameless spend stays Uncategorized.
+  const named = accountName?.trim();
+  if (named) {
+    return { subcategory: named, confidence: 0.4, source: "manual" };
+  }
   return { subcategory: "Uncategorized", confidence: 0.3, source: "manual" };
 }
 
@@ -215,8 +234,12 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     const prevAmount = getAnomalyBaseline(ctx, currentMonth, values);
     const changePercent = ratioChange(currentAmount, prevAmount) ?? 0;
 
-    // Derive subcategory from account name
-    const { subcategory, confidence, source } = deriveSubcategory(account.name, account.category);
+    // Derive subcategory from account name — explicit per-line override wins.
+    const { subcategory, confidence, source } = deriveSubcategory(
+      account.name,
+      account.category,
+      (fLine as { subcategory?: string | null }).subcategory ?? null,
+    );
 
     // Recurring: explicit user choice wins; otherwise fall back to the
     // variance-based suggestion (suggestion-only when DB column is null).
@@ -248,6 +271,11 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategory,
       subcategoryConfidence: confidence,
       categorySource: source,
+      subcategoryOverride:
+        typeof (fLine as { subcategory?: string | null }).subcategory === "string" &&
+        (fLine as { subcategory?: string | null }).subcategory!.trim() !== ""
+          ? (fLine as { subcategory?: string | null }).subcategory!.trim()
+          : null,
       method: fLine.method,
       parameters: (fLine.parameters ?? {}) as Record<string, unknown>,
       startDate,
@@ -286,6 +314,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
       subcategory: "People",
       subcategoryConfidence: 1.0,
       categorySource: "manual",
+      subcategoryOverride: null,
       method: "fixed",
       parameters: {},
       startDate: periodStart.toISOString().slice(0, 10),
@@ -306,13 +335,39 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
     });
   }
 
+  // Per-account explicit category override (from the expense form's Category
+  // field). The blended breakdown is account-aggregated, so each account adopts
+  // the dominant explicit subcategory among its forecast lines (if any). This
+  // makes the category chart + AI insight honor the user's per-entry category —
+  // mirroring the per-line override already applied to lineItems above. Accounts
+  // with no forecast line (transaction-only) carry no override and derive as before.
+  const subcatByAccount = (() => {
+    const counts = new Map<string, Map<string, number>>(); // accountId → (subcat → count)
+    for (const fl of fLines) {
+      const sc = (fl as { subcategory?: string | null }).subcategory;
+      if (typeof sc !== "string" || sc.trim() === "") continue;
+      const key = sc.trim();
+      const inner = counts.get(fl.accountId) ?? new Map<string, number>();
+      inner.set(key, (inner.get(key) ?? 0) + 1);
+      counts.set(fl.accountId, inner);
+    }
+    const out = new Map<string, string>();
+    for (const [accountId, inner] of counts) {
+      let best = "";
+      let bestN = -1;
+      for (const [sc, n] of inner) if (n > bestN) { best = sc; bestN = n; }
+      if (best) out.set(accountId, best);
+    }
+    return out;
+  })();
+
   // Single-source: breakdown/totals reconcile to blended totalExpenses;
   // lineItems/expenseMix remain forecast-line "plan detail".
   const blendedTotal = dash.totalExpenses.get(currentMonth) ?? 0;
-  const blended = buildExpenseBreakdown(dash.expenseLines, currentMonth, blendedTotal);
+  const blended = buildExpenseBreakdown(dash.expenseLines, currentMonth, blendedTotal, subcatByAccount);
   const prevTotal = dash.totalExpenses.get(prevMonth) ?? 0;
   const prevBySubcat = new Map(
-    buildExpenseBreakdown(dash.expenseLines, prevMonth, prevTotal).map((b) => [b.subcategory, b.amount]),
+    buildExpenseBreakdown(dash.expenseLines, prevMonth, prevTotal, subcatByAccount).map((b) => [b.subcategory, b.amount]),
   );
   const subcategoryBreakdown: SubcategoryBreakdown[] = blended.map((b) => {
     const items = lineItems.filter((i) => i.subcategory === b.subcategory);
@@ -331,7 +386,7 @@ export const computeExpenseDetails = cache(async function computeExpenseDetails(
   const totalPrevMonthlyCost = dash.totalExpenses.get(prevMonth) ?? 0;
 
   // Stacked-chart series — blended per-month, same subcategory grouping.
-  const monthlyBySubcategory = buildExpenseMonthlyBySubcategory(dash.expenseLines);
+  const monthlyBySubcategory = buildExpenseMonthlyBySubcategory(dash.expenseLines, subcatByAccount);
   // `subcategories` (chart's top-6/Other selection) is ordered by current-month
   // spend, matching the split panel below.
   const subcategories = subcategoryBreakdown.map((s) => s.subcategory);

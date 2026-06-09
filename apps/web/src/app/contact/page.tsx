@@ -74,7 +74,7 @@ export default function ContactPage() {
               Sales &amp; Partnerships
             </h2>
             <p className="text-sm text-surface-500 mb-4">
-              Enterprise plans, custom integrations, or partnerships.
+              Team and volume plans, custom integrations, or partnerships.
             </p>
             <a
               href="mailto:sales@burnless.com"

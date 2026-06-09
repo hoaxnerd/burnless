@@ -48,7 +48,7 @@ const faqs = [
   {
     question: "Can my whole team use burnless?",
     answer:
-      "Yes. Team plans allow multiple users with role-based access. Founders, finance leads, and team members can each see what they need.",
+      "Team plans with role-based access are coming soon, so founders, finance leads, and team members will each see what they need. Today, burnless supports a single workspace per account.",
   },
   {
     question: "How do I cancel my subscription?",

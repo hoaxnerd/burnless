@@ -52,6 +52,7 @@ const overriddenItem: ExpenseLineItem = {
   subcategory: "Infrastructure",
   subcategoryConfidence: 0.9,
   categorySource: "rule",
+  subcategoryOverride: null,
   method: "fixed",
   parameters: { amount: 5000 },
   startDate: "2026-01-01",

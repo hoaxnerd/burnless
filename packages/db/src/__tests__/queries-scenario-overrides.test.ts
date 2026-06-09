@@ -13,6 +13,7 @@ import {
   deleteOverride,
   deleteOverrideByEntity,
   getOverrideCount,
+  getOverrideCounts,
 } from "../queries/scenario-overrides";
 import {
   createCompanyContext,
@@ -258,6 +259,35 @@ describe("scenario override queries", () => {
       );
 
       expect(await getOverrideCount(ctx.scenario.id)).toBe(2);
+    });
+  });
+
+  describe("getOverrideCounts (batched)", () => {
+    it("returns a Map of counts for many scenarios in one query; absent = zero", async () => {
+      const ctx = await createCompanyContext({
+        user: { email: "batch-counts@test.burnless.app" },
+        company: { name: "Batch Counts Co" },
+        scenario: { name: "S1" },
+      });
+      const s1 = ctx.scenario.id;
+      const s2 = (await createScenario(ctx.company.id, { name: "S2" })).id;
+      const s3 = (await createScenario(ctx.company.id, { name: "S3 (empty)" })).id;
+
+      await createScenarioOverride(s1, "forecast_line", "b1", "modify");
+      await createScenarioOverride(s1, "revenue_stream", "b2", "create");
+      await createScenarioOverride(s2, "headcount_plan", "b3", "delete");
+
+      const counts = await getOverrideCounts([s1, s2, s3]);
+      expect(counts.get(s1)).toBe(2);
+      expect(counts.get(s2)).toBe(1);
+      // s3 has no overrides → absent from the map (caller defaults to 0)
+      expect(counts.get(s3)).toBeUndefined();
+      // matches the per-scenario getOverrideCount (no N+1 drift)
+      expect(counts.get(s1) ?? 0).toBe(await getOverrideCount(s1));
+    });
+
+    it("returns an empty Map for no scenario ids (no query)", async () => {
+      expect((await getOverrideCounts([])).size).toBe(0);
     });
   });
 

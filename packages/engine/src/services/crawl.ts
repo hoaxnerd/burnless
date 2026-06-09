@@ -171,7 +171,6 @@ export function createCrawlService(): CrawlService {
     // Future: case "firecrawl": _crawlService = new FirecrawlProvider(); break;
     // Future: case "scrapingbee": _crawlService = new ScrapingBeeProvider(); break;
     default:
-      console.warn(`[crawl] Unknown provider "${provider}", using no-op.`);
       _crawlService = new NoopCrawlProvider();
   }
 

@@ -104,7 +104,7 @@ Tests use **PGLite** in-mem PG. Setup at `src/__tests__/setup.ts`, factories at 
 
 ### Web app (`apps/web/src`)
 Route groups:
-- `app/(dashboard)/*` — authed: dashboard, overview, revenue, expenses, team, funding, scenarios, scenarios/compare, reports/{pl,cf,bs,runway,bvA,metrics,board-update}, data-room, import, ai, settings, dashboard-shell.
+- `app/(dashboard)/*` — authed: dashboard, overview, revenue, expenses, team, funding, scenarios, scenarios/compare, reports/{profit-loss,cash-flow,balance-sheet,runway,budget-vs-actuals,metrics,board-update}, data-room, import, ai, settings, dashboard-shell.
 - `app/api/*` — feature folders match dashboard; cron in `api/cron/{weekly-digest,data-retention}`; webhooks in `api/webhooks/[provider]`; auth in `api/auth/...`.
 - Public: `/`, `/login`, `/onboarding`, `/pricing`, `/about`, `/contact`, `/security`, `/terms`, `/privacy`, `/help`.
 

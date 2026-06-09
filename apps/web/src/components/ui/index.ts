@@ -15,3 +15,22 @@ export { KeyboardShortcutsProvider } from "./keyboard-shortcuts";
 export { PageGrid, type PageGridProps, type PageWidgetLayout, type DefaultLayoutItem } from "./page-grid";
 export { HeroKpiCard, type HeroKpiCardProps } from "./hero-kpi-card";
 export { ConnectedPageGrid } from "./connected-page-grid";
+
+// ── Batch C primitive substrates (S1-1, MODAL-SYS-01/02, A11Y-CTRL-01/02/04, ESL-1/3) ──
+export { Input } from "./input";
+export type { InputProps } from "./input";
+export { Select } from "./select";
+export type { SelectProps } from "./select";
+export { Textarea } from "./textarea";
+export type { TextareaProps } from "./textarea";
+export { Field } from "./field";
+export type { FieldProps, FieldA11yProps } from "./field";
+export { Overlay, useDialogA11y, type OverlayPanelProps } from "./overlay";
+export { IconButton } from "./icon-button";
+export { SegmentedControl, type SegmentedOption } from "./segmented-control";
+export { ConfirmDialog, useConfirm, type ConfirmOptions } from "./confirm-dialog";
+export { ConfirmButton } from "./confirm-button";
+export { DataEmptyState, isEmpty } from "./data-empty-state";
+export type { DataEmptyStateProps } from "./data-empty-state";
+export { AsyncData, useQueryState } from "./async-data";
+export type { AsyncDataProps, QueryState } from "./async-data";

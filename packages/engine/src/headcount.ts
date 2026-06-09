@@ -182,6 +182,26 @@ function monthlySalaryFor(plan: HeadcountPlanInput, resolvedAnnualSalary: number
   }
 }
 
+/**
+ * WILD-02: full-loaded monthly cost for a single headcount plan entry, at the
+ * plan's base salary (no proration, no salary changes, no bonuses).
+ *
+ * = monthlySalaryFor(plan, salary) × count × (1 + effective benefits rate)
+ *
+ * Honors employeeType:
+ *   - full_time:  annualSalary / 12
+ *   - part_time:  (annualSalary / 12) × hoursPerWeek / 40   (default 40 hpw)
+ *   - contractor: hoursPerWeek × 4.33 weeks/mo × hourlyRate
+ *
+ * Effective benefits = sum(benefitsBreakdown) when present, else flat benefitsRate.
+ * Returns a 2-decimal number.
+ */
+export function computeMemberMonthlyCost(plan: HeadcountPlanInput): number {
+  const perMember = monthlySalaryFor(plan, plan.salary);
+  const benefitsMultiplier = D(1).plus(effectiveBenefitsRate(plan));
+  return dRound2(perMember.mul(plan.count).mul(benefitsMultiplier));
+}
+
 /** Calculate monthly cost for a single headcount plan entry. */
 export function computeHeadcountPlanCost(
   plan: HeadcountPlanInput,

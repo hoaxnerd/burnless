@@ -1,64 +1,45 @@
 "use client";
 
 import { AlertTriangle, X, ArrowLeftRight, ArrowUpCircle } from "lucide-react";
-import { apiFetch } from "@/lib/api-fetch";
 import { useScenario } from "./scenario-context";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
+import { useScenario as useScenarioSWR, useOverrideCount } from "@/lib/swr";
 
 export function ScenarioBanner() {
   const { isInScenarioMode, activeScenarioId, activeScenarioName, exitScenario } = useScenario();
-  const [fetchedName, setFetchedName] = useState<string | undefined>(undefined);
-  const [fetchedCount, setFetchedCount] = useState<number | null>(null);
   const router = useRouter();
 
+  // If we have an ID but no name (e.g. direct URL navigation), read it from the
+  // shared SWR cache rather than a private snapshot fetch — only when the context
+  // didn't already supply a name.
+  const { data: fetchedScenario } = useScenarioSWR(
+    activeScenarioId && !activeScenarioName ? activeScenarioId : null,
+  );
+
+  // Live override count via the shared SWR cache (SCN-05). Keyed on the scenario
+  // id, so a delete/add of an override on any surface revalidates this badge
+  // (KEYS.scenarioOverrideCount) without a reload.
+  const { data: countData } = useOverrideCount(activeScenarioId ?? null);
+
   // Derive display name: prefer context name, fall back to fetched name
-  const resolvedName = activeScenarioName ?? fetchedName;
+  const resolvedName = activeScenarioName ?? fetchedScenario?.name;
 
   // Derive override count: only valid when there is an active scenario
-  const overrideCount = activeScenarioId ? fetchedCount : null;
-
-  // If we have an ID but no name (e.g., direct URL navigation), fetch it
-  useEffect(() => {
-    if (!activeScenarioId || activeScenarioName) return;
-    let cancelled = false;
-    apiFetch(`/api/scenarios/${activeScenarioId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.name) setFetchedName(data.name);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [activeScenarioId, activeScenarioName]);
-
-  // Fetch live override count
-  useEffect(() => {
-    if (!activeScenarioId) return;
-
-    let cancelled = false;
-
-    apiFetch(`/api/scenarios/overrides?scenarioId=${activeScenarioId}&count=true`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data && typeof data.count === "number") {
-          setFetchedCount(data.count);
-        }
-      })
-      .catch(() => {
-        // Endpoint may not exist yet — leave count as null
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeScenarioId]);
+  const overrideCount =
+    activeScenarioId && typeof countData?.count === "number" ? countData.count : null;
 
   if (!isInScenarioMode) return null;
 
   // Page reads `ids` (comma-separated). First id = base side, second = compare side.
   // Use literal "base" for the current plan; comparison-view has a matching option.
   const compareUrl = `/scenarios/compare?ids=base,${activeScenarioId}`;
+  // Navigate plainly (NOT inside a transition): the compare RSC is force-dynamic
+  // and slow (N+1 override counts), and a transition would keep the user on THIS
+  // page with the button spinning until that RSC fully resolves — reading as
+  // "nothing happens". A plain push commits immediately and the compare page shows
+  // its own "Loading comparison…" Suspense fallback while the data streams in.
+  const goToCompare = () => router.push(compareUrl);
   const changeLabel =
     overrideCount !== null
       ? `${overrideCount} change${overrideCount !== 1 ? "s" : ""} from base`
@@ -73,7 +54,7 @@ export function ScenarioBanner() {
         </span>
         <span className="text-white/60 text-sm hidden sm:inline">|</span>
         <button
-          onClick={() => router.push(compareUrl)}
+          onClick={goToCompare}
           className="text-sm text-white/80 hover:text-white underline underline-offset-2 decoration-white/40 hover:decoration-white transition-colors hidden sm:inline"
         >
           {changeLabel}
@@ -85,7 +66,7 @@ export function ScenarioBanner() {
           variant="ghost"
           size="sm"
           icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
-          onClick={() => router.push(compareUrl)}
+          onClick={goToCompare}
           className="!text-white bg-white/15 hover:!bg-white/25 active:!bg-white/30 border-0"
         >
           Compare with Base

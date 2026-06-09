@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { apiFetch } from "@/lib/api-fetch";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
+import {
+  useScenarioComparison,
+  revalidateOnFinancialMutation,
+  KEYS,
+} from "@/lib/swr";
+import { toUserMessage } from "@/lib/api-error";
 import { MultiLineChart, VarianceBarChart, chartColors } from "@/components/charts";
 import { ScenarioBadge } from "@/components/scenarios/scenario-badge";
 
 import { ratioToPct } from "@burnless/engine";
-import type { CurrencyCode } from "@burnless/types";
+import { formatPercent, type CurrencyCode } from "@burnless/types";
 import type { ScenarioOption, ComparisonData, DataDiffGroup, DataDiffItem } from "./comparison-types";
 import { formatCurrency, formatMonth } from "./comparison-types";
 import { ComparisonRow } from "./comparison-row";
@@ -26,41 +32,49 @@ export function ComparisonView({
   initialIds: string[];
   currency: CurrencyCode;
 }) {
+  const router = useRouter();
   const [baseId, setBaseId] = useState(initialIds[0] ?? "");
   const [compareId, setCompareId] = useState(initialIds[1] ?? "");
-  const [data, setData] = useState<ComparisonData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("metrics");
 
-  const fetchComparison = useCallback(async () => {
-    if (!baseId || !compareId || baseId === compareId) {
-      setData(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(
-        `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to compare scenarios");
-      }
-      const json = await res.json();
-      setData(json);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [baseId, compareId]);
-
+  // SCN-07: mirror the selected pair into the URL so refresh/share reproduces it.
+  // URL query only — this is unrelated to the active-scenario cookie / X-Scenario-Id
+  // single-source contract (apiFetch remains the sole header injector). router.replace
+  // (not push) avoids polluting history on every dropdown change.
   useEffect(() => {
-    fetchComparison();
-  }, [fetchComparison]);
+    if (baseId && compareId) {
+      router.replace(`/scenarios/compare?ids=${baseId},${compareId}`, {
+        scroll: false,
+      });
+    }
+  }, [baseId, compareId, router]);
+
+  // SCN-05 / DFL-01: read the comparison (incl. the data-diff change counter)
+  // from the shared SWR cache instead of a hand-rolled fetch-in-effect snapshot,
+  // so an override edit elsewhere restales the diff without a manual reload.
+  // The hook nulls the key (and skips fetching) unless both ids are present and
+  // distinct — preserving the original "same scenario → no fetch" guard.
+  const canCompare = !!baseId && !!compareId && baseId !== compareId;
+  const {
+    data,
+    error: swrError,
+    isLoading,
+    mutate: mutateComparison,
+  } = useScenarioComparison<ComparisonData>(
+    canCompare ? baseId : null,
+    canCompare ? compareId : null,
+  );
+
+  // Restale the comparison when any scenario-domain mutation fires (an override
+  // change on either scenario flips the diff). Preserves the "other" exclusion.
+  useEffect(() => {
+    return revalidateOnFinancialMutation([
+      ...(canCompare ? [KEYS.scenarioComparison(baseId, compareId)] : []),
+    ]);
+  }, [canCompare, baseId, compareId]);
+
+  const loading = isLoading && canCompare;
+  const error = swrError ? toUserMessage(swrError) : null;
 
   if (scenarios.length < 1) {
     return (
@@ -97,19 +111,25 @@ export function ComparisonView({
           <label className="block text-xs font-medium text-surface-500 mb-1">
             Base scenario
           </label>
-          <select
+          <Select
             value={baseId}
+            aria-label="Base scenario"
             onChange={(e) => setBaseId(e.target.value)}
-            className="w-full rounded-lg border border-surface-200 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Select scenario...</option>
-            <option value="base">Base (current plan)</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.source})
-              </option>
-            ))}
-          </select>
+            {/* Group the base-data option apart from the scenario overlays so it's
+                obvious which row is the live plan vs a what-if scenario. */}
+            <optgroup label="Base data">
+              <option value="base">Base (current plan)</option>
+            </optgroup>
+            <optgroup label="Scenarios">
+              {scenarios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.source})
+                </option>
+              ))}
+            </optgroup>
+          </Select>
         </div>
 
         <span className="text-sm font-medium text-surface-400 mb-2">vs</span>
@@ -118,20 +138,22 @@ export function ComparisonView({
           <label className="block text-xs font-medium text-surface-500 mb-1">
             Compare with
           </label>
-          <select
+          <Select
             value={compareId}
+            aria-label="Compare with"
             onChange={(e) => setCompareId(e.target.value)}
-            className="w-full rounded-lg border border-surface-200 bg-surface-0 px-3 py-2 text-sm text-surface-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Select scenario...</option>
-            {scenarios
-              .filter((s) => s.id !== baseId)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.source})
-                </option>
-              ))}
-          </select>
+            <optgroup label="Scenarios">
+              {scenarios
+                .filter((s) => s.id !== baseId)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.source})
+                  </option>
+                ))}
+            </optgroup>
+          </Select>
         </div>
 
         <button
@@ -154,8 +176,11 @@ export function ComparisonView({
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-6 flex items-center justify-between gap-4">
           <p className="text-sm text-red-700">{error}</p>
+          <Button variant="secondary" size="sm" onClick={() => void mutateComparison()}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -395,7 +420,7 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "\u2014";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") {
-    if (Math.abs(value) < 1 && value !== 0) return `${ratioToPct(value).toFixed(1)}%`;
+    if (Math.abs(value) < 1 && value !== 0) return formatPercent(ratioToPct(value));
     return value.toLocaleString();
   }
   if (typeof value === "object") return JSON.stringify(value);

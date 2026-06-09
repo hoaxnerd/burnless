@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
 import { RevenueStreamForm, type RevenueStreamFormValues } from "./revenue-stream-form";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -13,6 +15,7 @@ interface AddRevenueStreamButtonProps {
 
 export function AddRevenueStreamButton({ scenarioId }: AddRevenueStreamButtonProps) {
   const router = useRouter();
+  const { success, error: toastError } = useToast();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +32,11 @@ export function AddRevenueStreamButton({ scenarioId }: AddRevenueStreamButtonPro
         throw new Error(data.error ?? "Failed to create revenue stream");
       }
       setOpen(false);
+      success("Revenue stream added");
       router.refresh();
+    } catch (err) {
+      // Was silently swallowed (no feedback) — surface it.
+      toastError(toUserMessage(err));
     } finally {
       setSubmitting(false);
     }

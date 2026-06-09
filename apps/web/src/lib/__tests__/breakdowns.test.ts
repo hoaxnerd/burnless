@@ -41,6 +41,29 @@ describe("buildExpenseBreakdown", () => {
     expect(rows.some((r) => r.amount < 0)).toBe(true);
   });
 
+  it("honors an explicit per-account subcategory override (expense-form Category)", () => {
+    // An account whose name does NOT match any rule would derive "Uncategorized";
+    // the user set an explicit category on its forecast line → the breakdown adopts it.
+    const lines: BlendedExpenseLine[] = [
+      { accountId: "acc-1", accountName: "Misc Account 9931", category: "operating_expense", values: m("2026-06", 1000) },
+    ];
+    const override = new Map<string, string>([["acc-1", "Software"]]);
+    const withOverride = buildExpenseBreakdown(lines, "2026-06", 1000, override);
+    expect(withOverride[0]?.subcategory).toBe("Software");
+    // Without the override it falls back to the ACCOUNT NAME (not "Uncategorized")
+    // — proving the override wins over the name-based fallback.
+    const without = buildExpenseBreakdown(lines, "2026-06", 1000);
+    expect(without[0]?.subcategory).toBe("Misc Account 9931");
+  });
+
+  it("override does not apply to the headcount-cost synthetic line", () => {
+    const lines: BlendedExpenseLine[] = [
+      { accountId: "headcount-cost", accountName: "Personnel Costs", category: "operating_expense", values: m("2026-06", 500) },
+    ];
+    const rows = buildExpenseBreakdown(lines, "2026-06", 500, new Map([["headcount-cost", "Software"]]));
+    expect(rows[0]?.subcategory).toBe("People");
+  });
+
   it("merges two accounts that share a subcategory", () => {
     const lines: BlendedExpenseLine[] = [
       { accountId: "1", accountName: "AWS Hosting", category: "cogs", values: m("2026-06", 300) },

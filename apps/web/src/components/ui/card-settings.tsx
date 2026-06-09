@@ -22,6 +22,7 @@ import {
   Check,
 } from "lucide-react";
 import { Modal } from "./modal";
+import { Input } from "./input";
 import { type CardMode } from "@/components/providers/metrics-context";
 export type { CardMode };
 
@@ -101,6 +102,12 @@ export interface CardSettingsProps {
   catalogProps?: CatalogProps;
   /** Called when user saves a metric selection for this specific card. */
   onSaveForCard?: (selectedSlug: string) => void;
+  /**
+   * DASH-01: called when user resets this specific card to its default metric
+   * (dashboard hero path). When provided, 'Reset to default' restores the slug
+   * in addition to clearing the per-card display-mode override.
+   */
+  onResetForCard?: () => void;
 }
 
 export function CardSettings({
@@ -110,6 +117,7 @@ export function CardSettings({
   aiEnabled = false,
   catalogProps,
   onSaveForCard,
+  onResetForCard,
 }: CardSettingsProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -158,6 +166,7 @@ export function CardSettings({
         aiEnabled={aiEnabled}
         catalogProps={catalogProps}
         onSaveForCard={onSaveForCard}
+        onResetForCard={onResetForCard}
       />
     </div>
   );
@@ -174,6 +183,7 @@ function SettingsModal({
   aiEnabled,
   catalogProps,
   onSaveForCard,
+  onResetForCard,
 }: {
   open: boolean;
   onClose: () => void;
@@ -183,6 +193,7 @@ function SettingsModal({
   aiEnabled: boolean;
   catalogProps?: CatalogProps;
   onSaveForCard?: (selectedSlug: string) => void;
+  onResetForCard?: () => void;
 }) {
   const [stagedSlug, setStagedSlug] = useState<string | null>(null);
 
@@ -194,9 +205,18 @@ function SettingsModal({
   );
 
   const handleReset = useCallback(() => {
+    // DASH-01: clear the per-card display-MODE override AND restore the card's
+    // default metric slug together, so 'Reset to default' leaves no contradiction
+    // between the shown metric and the 'Using global default' state.
     onModeChange(null);
+    onResetForCard?.();
     onClose();
-  }, [onModeChange, onClose]);
+  }, [onModeChange, onResetForCard, onClose]);
+
+  // DASH-01: a hero card can always be reset to its default metric even when no
+  // per-card display-mode override exists (a slug-only swap leaves isOverride
+  // false), so surface the reset affordance whenever a slug-reset is available.
+  const canReset = isOverride || !!onResetForCard;
 
   return (
     <Modal
@@ -229,7 +249,7 @@ function SettingsModal({
 
         {/* Footer actions */}
         <div className="flex items-center justify-between pt-2 border-t border-surface-100">
-          {isOverride ? (
+          {canReset ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -452,13 +472,14 @@ function InlineCatalog({
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-        <input
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 z-10" />
+        <Input
           type="text"
           placeholder="Search metrics..."
+          aria-label="Search metrics"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-lg bg-surface-50 border border-surface-200 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          className="pl-9"
         />
       </div>
 

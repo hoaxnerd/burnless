@@ -10,6 +10,12 @@ import { D, dRound2, dSum } from "./decimal";
  *  Handles the common case where Drizzle/PostgreSQL returns ISO strings instead of Date objects. */
 export function toDate(value: Date | string | number): Date {
   if (value instanceof Date) return value;
+  // A bare 'YYYY-MM-DD' string parses as UTC midnight; west-of-UTC that shifts
+  // back a day (and a month for first-of-month dates). Append a local-time
+  // component so it constructs LOCAL midnight instead. (mirrors the types lane)
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(value + "T00:00:00");
+  }
   return new Date(value);
 }
 
@@ -138,6 +144,14 @@ export function sum(values: number[]): number {
 
 /** A monthly time series: month key -> value. */
 export type MonthlySeries = Map<string, number>;
+
+/**
+ * FMT-2: safe read of a single month from a series. Returns 0 when the month is
+ * absent (or the value is nullish), so callers never propagate `undefined`.
+ */
+export function valueAtMonth(series: MonthlySeries, month: string): number {
+  return series.get(month) ?? 0;
+}
 
 /** Create an empty monthly series for a date range. */
 export function emptySeries(start: Date | string, end: Date | string): MonthlySeries {

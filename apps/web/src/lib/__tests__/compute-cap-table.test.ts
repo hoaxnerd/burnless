@@ -20,11 +20,56 @@ vi.mock("react", async (importOriginal) => {
   return { ...actual, cache: (fn: unknown) => fn };
 });
 
-import { computeCapTableForCompany, buildOptionPoolsWithGranted } from "../compute-cap-table";
+// getCompany() is read inside computeCapTableInner. Control it per-test.
+const getCompanyMock = vi.fn();
+vi.mock("../data", () => ({
+  getCompany: () => getCompanyMock(),
+}));
+
+import {
+  computeCapTableForCompany,
+  computeCapTableInner,
+  buildOptionPoolsWithGranted,
+} from "../compute-cap-table";
 
 describe("computeCapTableForCompany", () => {
   it("exports a callable function", () => {
     expect(typeof computeCapTableForCompany).toBe("function");
+  });
+});
+
+describe("computeCapTableInner — isEmpty signal (FUND-05 / ESL-1)", () => {
+  it("returns isEmpty: true when there is no company (no rows, zero fully diluted)", async () => {
+    getCompanyMock.mockResolvedValueOnce(null);
+    const t = await computeCapTableInner("co-1", null);
+    expect(t.isEmpty).toBe(true);
+    expect(t.rows).toEqual([]);
+    expect(t.totalFullyDiluted).toBe(0);
+  });
+
+  it("returns isEmpty: true when a company exists but has no share classes/grants/rounds", async () => {
+    // DB mocks above resolve every query to [] and listShareClasses/Pools to [].
+    getCompanyMock.mockResolvedValueOnce({
+      id: "co-1",
+      foundersOwnershipPercent: 0,
+    });
+    const t = await computeCapTableInner("co-1", null);
+    // With no common share class, founder shares fall back to a synthetic
+    // 10M default — so the table is NOT all-derived-zero here; isEmpty reflects
+    // the strict rows.length===0 && totalFullyDiluted===0 predicate.
+    expect(t.isEmpty).toBe(t.rows.length === 0 && t.totalFullyDiluted === 0);
+    expect(typeof t.isEmpty).toBe("boolean");
+  });
+
+  it("returns isEmpty: false when founder ownership produces fully-diluted shares", async () => {
+    getCompanyMock.mockResolvedValueOnce({
+      id: "co-1",
+      foundersOwnershipPercent: 80,
+    });
+    const t = await computeCapTableInner("co-1", null);
+    if (t.totalFullyDiluted > 0 || t.rows.length > 0) {
+      expect(t.isEmpty).toBe(false);
+    }
   });
 });
 

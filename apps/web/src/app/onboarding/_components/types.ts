@@ -1,4 +1,10 @@
-export type OnboardingStep = "website" | "enriching" | "review" | "creating" | "done";
+export type OnboardingStep =
+  | "website"
+  | "enriching"
+  | "review"
+  | "name-fallback"
+  | "creating"
+  | "done";
 
 export interface FieldData {
   value: string;

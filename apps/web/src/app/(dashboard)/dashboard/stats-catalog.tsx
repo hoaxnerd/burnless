@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo } from "react";
+import { Overlay, IconButton, Input } from "@/components/ui";
 import {
   X,
   Search,
@@ -102,19 +103,23 @@ export function StatsCatalog() {
     return groups;
   }, [filtered]);
 
-  if (!catalogOpen) return null;
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity"
-        onClick={() => setCatalogOpen(false)}
-      />
-
-      {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-surface-0 border-l border-surface-200 shadow-2xl z-50 flex flex-col animate-slide-in-right">
-        {/* Header */}
+    <Overlay
+      open={catalogOpen}
+      onClose={() => setCatalogOpen(false)}
+      headless
+      className="!items-stretch !justify-end !p-0"
+      scrimClassName="bg-black/20 fixed inset-0 backdrop-blur-sm z-40 transition-opacity"
+    >
+      {(panelProps) => (
+        <div
+          {...panelProps}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Metrics catalog"
+          className="w-full max-w-lg h-full bg-surface-0 border-l border-surface-200 shadow-2xl flex flex-col animate-slide-in-right"
+        >
+          {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
             <h2 className="text-lg font-bold text-surface-900">
@@ -126,24 +131,24 @@ export function StatsCatalog() {
                 : `${registry.length} metrics available`}
             </p>
           </div>
-          <button
+          <IconButton
+            aria-label="Close catalog"
             onClick={() => setCatalogOpen(false)}
-            className="p-2 rounded-lg hover:bg-surface-100 transition-colors"
-          >
-            <X className="h-4 w-4 text-surface-500" />
-          </button>
+            icon={<X className="text-surface-500" />}
+          />
         </div>
 
         {/* Search */}
         <div className="px-6 py-3 border-b border-surface-100">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 z-10" />
+            <Input
               type="text"
               placeholder="Search metrics..."
+              aria-label="Search metrics"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-lg bg-surface-50 border border-surface-200 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+              className="pl-9"
             />
           </div>
         </div>
@@ -258,8 +263,9 @@ export function StatsCatalog() {
             Done
           </button>
         </div>
-      </div>
-    </>
+        </div>
+      )}
+    </Overlay>
   );
 }
 

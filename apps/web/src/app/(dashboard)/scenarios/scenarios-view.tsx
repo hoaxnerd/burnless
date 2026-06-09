@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
@@ -30,9 +30,16 @@ export function ScenariosView({ scenarios }: { scenarios: ScenarioItem[] }) {
   const promoteScenario = promoteId
     ? scenarios.find((s) => s.id === promoteId) ?? null
     : null;
-  // Dialog is open when a promote scenario is present via URL, or explicitly opened
+  // Dialog is open when a promote scenario is present via URL, or explicitly opened.
   const [dismissedPromote, setDismissedPromote] = useState(false);
-  const promoteOpen = !!promoteScenario && !dismissedPromote;
+  // Gate the dialog open on a client mount flag. The ?promote= param is present at
+  // SSR, so without this the PromoteDialog (a portal/overlay) renders open=true on
+  // the server but differently on the client's first paint → a hydration mismatch
+  // that makes React discard the tree and the dialog never appears. Opening only
+  // after mount keeps SSR + first client render in agreement (both closed).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const promoteOpen = mounted && !!promoteScenario && !dismissedPromote;
 
   const handlePromoteClose = () => {
     setDismissedPromote(true);

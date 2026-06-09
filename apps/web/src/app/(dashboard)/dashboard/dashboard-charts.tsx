@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { ChevronDown, Maximize2, X } from "lucide-react";
 import {
   AreaChartWidget,
@@ -10,6 +10,7 @@ import {
   formatCompactCurrency,
 } from "@/components/charts";
 import { WidgetCard } from "@/components/ui/widget-card";
+import { Overlay, IconButton } from "@/components/ui";
 
 interface MetricPoint {
   month: string;
@@ -38,38 +39,30 @@ function ChartExpandModal({
   children: React.ReactNode;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleEsc);
-    return () => document.removeEventListener("keydown", handleEsc);
-  }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 sm:p-8"
-      onClick={onClose}
+    <Overlay
+      open
+      onClose={onClose}
+      ariaLabel={title}
+      className="p-4 sm:p-8"
+      scrimClassName="bg-black/40 fixed inset-0 z-50 backdrop-blur-sm"
     >
-      <div
-        className="bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-auto p-6 sm:p-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-surface-900">{title}</h3>
-            <p className="mt-0.5 text-sm text-surface-400">{subtitle}</p>
+      {(panelProps) => (
+        <div
+          {...panelProps}
+          className="bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-auto p-6 sm:p-8 outline-none"
+        >
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-surface-900">{title}</h3>
+              <p className="mt-0.5 text-sm text-surface-400">{subtitle}</p>
+            </div>
+            <IconButton aria-label="Close" onClick={onClose} size="lg" icon={<X />} />
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 hover:text-surface-600 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {children}
         </div>
-        {children}
-      </div>
-    </div>
+      )}
+    </Overlay>
   );
 }
 

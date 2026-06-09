@@ -8,7 +8,7 @@ import { computeRevenueDetails } from "@/lib/compute-revenue";
 import { seriesToArray, METRIC_REGISTRY, annualize } from "@burnless/engine";
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard, getMetricSubLabel } from "@/lib/build-slot-metrics";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, formatPercent } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { RevenueView } from "./revenue-view";
 import { AddRevenueStreamButton } from "./add-revenue-stream-button";
@@ -62,6 +62,8 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
   const { currentMonth, prevMonth } = data;
   const g = revenueDetails.growthMetrics;
   const fc = (v: number) => formatCurrency(v, companyCurrency(company), undefined, { compact: true });
+  // Signed percent for MoM-style deltas (formatPercent has no explicit "+" for positives).
+  const signedPct = (v: number) => `${v > 0 ? "+" : ""}${formatPercent(v)}`;
 
   const spark = (series: { month: string; value: number }[]) => {
     const vals = series.slice(-8).map(t => t.value);
@@ -81,7 +83,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           content: { type: "metric", slug: "monthlyRevenue" },
           label: "Monthly Revenue",
           value: fc(g.currentRevenue),
-          change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
+          change: g.revenueGrowthPercent !== 0 ? signedPct(g.revenueGrowthPercent) : undefined,
           changeLabel: "MoM growth",
           hasData: g.currentRevenue > 0,
           sparkData: spark(revenueTimeline),
@@ -92,7 +94,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           content: { type: "metric", slug: "mrr" },
           label: "MRR",
           value: fc(g.currentMrr),
-          change: g.mrrGrowthPercent !== 0 ? `${g.mrrGrowthPercent > 0 ? "+" : ""}${g.mrrGrowthPercent.toFixed(1)}%` : undefined,
+          change: g.mrrGrowthPercent !== 0 ? signedPct(g.mrrGrowthPercent) : undefined,
           changeLabel: g.mrrGrowthPercent !== 0 ? "MoM growth" : undefined,
           // Metric-level sub-label (same source wherever MRR renders).
           description: getMetricSubLabel("mrr", data.metrics, currentMonth, companyCurrency(company)),
@@ -113,7 +115,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           slotId: "metric-3",
           content: { type: "metric", slug: "churnRate" },
           label: "Churn Rate",
-          value: `${g.churnRate.toFixed(1)}%`,
+          value: formatPercent(g.churnRate),
           description: `LTV: ${fc(g.ltv)}`,
           hasData: true,
           metricStyle: { icon: "Flame", color: "orange", href: "/revenue" },
@@ -125,7 +127,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           content: { type: "metric", slug: "monthlyRevenue" },
           label: "Monthly Revenue",
           value: fc(g.currentRevenue),
-          change: g.revenueGrowthPercent !== 0 ? `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%` : undefined,
+          change: g.revenueGrowthPercent !== 0 ? signedPct(g.revenueGrowthPercent) : undefined,
           changeLabel: "MoM growth",
           hasData: g.currentRevenue > 0,
           sparkData: spark(revenueTimeline),
@@ -153,7 +155,7 @@ async function RevenueContent({ companyId, scenarioId, company }: { companyId: s
           slotId: "metric-3",
           content: { type: "metric", slug: "growth" },
           label: "Growth",
-          value: `${g.revenueGrowthPercent > 0 ? "+" : ""}${g.revenueGrowthPercent.toFixed(1)}%`,
+          value: signedPct(g.revenueGrowthPercent),
           description: g.doublingTimeMonths ? `Doubles in ${Math.ceil(g.doublingTimeMonths)}mo` : "vs last month",
           hasData: true,
           metricStyle: { icon: "TrendingUp", color: "teal", href: "/revenue" },

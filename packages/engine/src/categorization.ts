@@ -187,6 +187,27 @@ export const DEFAULT_CATEGORIZATION_RULES: CategorizationRule[] = [
   { pattern: r("\\bfunding\\s*(?:received|round)\\b|\\binvestment\\s*received\\b"), category: "equity", subcategory: "Fundraising", confidence: 0.80 },
 ];
 
+/**
+ * The distinct, user-facing subcategory labels produced by the default rule set,
+ * in a stable (first-seen) order. Used to populate the category-override select
+ * in the import preview (DATA-08) so the manual override list stays consistent
+ * with what the auto-categorizer can emit. Derived from
+ * {@link DEFAULT_CATEGORIZATION_RULES} (or a custom rule set) so it never drifts.
+ */
+export function getCategorySubcategories(
+  rules: CategorizationRule[] = DEFAULT_CATEGORIZATION_RULES,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const rule of rules) {
+    if (!seen.has(rule.subcategory)) {
+      seen.add(rule.subcategory);
+      out.push(rule.subcategory);
+    }
+  }
+  return out.sort((a, b) => a.localeCompare(b));
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 /**

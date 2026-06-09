@@ -160,4 +160,47 @@ describe("ChatMessageList", () => {
     expect(screen.getByText("Second")).toBeInTheDocument();
     expect(screen.getByText("Third")).toBeInTheDocument();
   });
+
+  // ── AI-08: timestamp rendering ───────────────────────────────────────────
+  describe("timestamp (AI-08)", () => {
+    it("renders 'just now' for a fresh assistant message", () => {
+      render(
+        <ChatMessageList
+          {...defaultProps}
+          messages={[makeMessage("assistant", "Fresh", { createdAt: Date.now() })]}
+        />
+      );
+      expect(screen.getByText("just now")).toBeInTheDocument();
+    });
+
+    it("renders an absolute date (not 'just now') for a days-old restored turn", () => {
+      const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
+      render(
+        <ChatMessageList
+          {...defaultProps}
+          messages={[makeMessage("assistant", "Old turn", { createdAt: tenDaysAgo })]}
+        />
+      );
+      expect(screen.queryByText("just now")).not.toBeInTheDocument();
+      expect(screen.queryByText(/d ago/)).not.toBeInTheDocument();
+      // Absolute date via the centralized formatter default (short month/day/year).
+      const expected = new Date(tenDaysAgo).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    });
+
+    it("renders 'earlier' (no 'just now') when createdAt is missing", () => {
+      render(
+        <ChatMessageList
+          {...defaultProps}
+          messages={[makeMessage("assistant", "No timestamp", { createdAt: null })]}
+        />
+      );
+      expect(screen.queryByText("just now")).not.toBeInTheDocument();
+      expect(screen.getByText("earlier")).toBeInTheDocument();
+    });
+  });
 });

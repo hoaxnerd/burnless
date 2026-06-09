@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
+import useSWR from "swr";
+import { KEYS, revalidate } from "@/lib/swr";
 import {
   Loader2,
   Plus,
@@ -10,6 +13,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Pencil,
+  Trash2,
   Users,
   Calendar,
   Gift,
@@ -32,9 +36,13 @@ import { RedemptionsModal } from "./redemptions-modal";
 /* ── Main Tab Component ────────────────────────────────────────── */
 
 export function InviteCodesTab() {
-  const [codes, setCodes] = useState<InviteCode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Read snapshot now lives on the shared SWR cache (DFL-01). Mutations call
+  // revalidate(KEYS.adminInviteCodes) so the table refreshes without a reload.
+  const {
+    data: codes,
+    error: loadError,
+    isLoading,
+  } = useSWR<InviteCode[]>(KEYS.adminInviteCodes);
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -51,30 +59,7 @@ export function InviteCodesTab() {
   // Copy feedback
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadCodes = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/admin/invite-codes");
-      if (!res.ok) {
-        if (res.status === 403) {
-          setError("Admin access required");
-        } else {
-          setError("Failed to load invite codes");
-        }
-        return;
-      }
-      const data = await res.json();
-      setCodes(data);
-      setError(null);
-    } catch {
-      setError("Failed to load invite codes");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCodes();
-  }, [loadCodes]);
+  const reloadCodes = () => revalidate(KEYS.adminInviteCodes);
 
   /* ── CRUD handlers ─────────────────────────────────────────── */
 
@@ -99,11 +84,11 @@ export function InviteCodesTab() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setCreateError(data.error || "Failed to create");
+        setCreateError(toUserMessage(data) || "Failed to create");
         return;
       }
       setCreateOpen(false);
-      loadCodes();
+      reloadCodes();
     } catch {
       setCreateError("Failed to create invite code");
     } finally {
@@ -135,11 +120,11 @@ export function InviteCodesTab() {
       });
       if (!res.ok) {
         const data = await res.json();
-        setEditError(data.error || "Failed to update");
+        setEditError(toUserMessage(data) || "Failed to update");
         return;
       }
       setEditCode(null);
-      loadCodes();
+      reloadCodes();
     } catch {
       setEditError("Failed to update invite code");
     } finally {
@@ -153,7 +138,23 @@ export function InviteCodesTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !code.isActive }),
     });
-    loadCodes();
+    reloadCodes();
+  };
+
+  // SET-09 — hard-delete a never-redeemed code. Redeemed codes have no delete
+  // affordance (server returns 409); deactivate via the toggle instead.
+  const deleteCode = async (code: InviteCode) => {
+    if (code.currentRedemptions > 0) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Permanently delete invite code ${code.code}? This can't be undone.`)
+    ) {
+      return;
+    }
+    const res = await apiFetch(`/api/admin/invite-codes/${code.id}`, {
+      method: "DELETE",
+    });
+    if (res.ok) reloadCodes();
   };
 
   const copyLink = (code: InviteCode) => {
@@ -165,18 +166,26 @@ export function InviteCodesTab() {
 
   /* ── Render ────────────────────────────────────────────────── */
 
-  if (loading) {
+  if (loadError) {
+    // ESL-3 — never render a silent blank on read error.
+    const is403 =
+      typeof loadError === "object" &&
+      loadError !== null &&
+      "status" in loadError &&
+      (loadError as { status?: number }).status === 403;
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-5 w-5 animate-spin text-surface-400" />
+      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-6 text-center">
+        <p className="text-sm text-danger-700">
+          {is403 ? "Admin access required" : "Failed to load invite codes"}
+        </p>
       </div>
     );
   }
 
-  if (error) {
+  if (isLoading || !codes) {
     return (
-      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-6 text-center">
-        <p className="text-sm text-danger-700">{error}</p>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-5 w-5 animate-spin text-surface-400" />
       </div>
     );
   }
@@ -306,6 +315,18 @@ export function InviteCodesTab() {
               <ToggleLeft className="h-4 w-4 text-surface-400" />
             )}
           </button>
+          {row.currentRedemptions === 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteCode(row);
+              }}
+              className="p-1.5 rounded-lg hover:bg-danger-50 text-surface-400 hover:text-danger-600 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ),
     },

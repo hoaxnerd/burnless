@@ -120,6 +120,10 @@ async function seedPermissionPause(opts: {
     conversationId,
     pauseId,
     scenarioId: baseScenario.id,
+    // AI-01: this pause models an OVERLAY write (the turn was operating inside
+    // baseScenario as a write target), so the write target is non-null. Decision-4
+    // gates only when there is a real overlay write target.
+    writeScenarioId: baseScenario.id,
     assistantBlocks: [
       { type: "tool_use", id: requestId, name: toolName, input: {} },
     ],
@@ -250,6 +254,8 @@ describe("resume scenario safety (Plan 5)", () => {
       conversationId,
       pauseId,
       scenarioId: baseScenario.id,
+      // AI-01: overlay write target — non-null so decision-4 can evaluate the gate.
+      writeScenarioId: baseScenario.id,
       assistantBlocks: [
         { type: "tool_use", id: requestId, name: "create_revenue_stream", input: {} },
       ],

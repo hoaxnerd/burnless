@@ -6,6 +6,8 @@
  * Cash Flow, and Balance Sheet reports.
  */
 
+import { formatDate } from "@burnless/types";
+
 interface StatementLineItem {
   name: string;
   values: { month: string; value: number }[];
@@ -17,6 +19,7 @@ interface ExcelExportOptions {
   companyName: string;
   scenarioName: string;
   months: string[];
+  locale?: string;
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ export function generateStatementCSV(
   allRows.push([options.title]);
   allRows.push([`Company: ${options.companyName}`]);
   allRows.push([`Scenario: ${options.scenarioName}`]);
-  allRows.push([`Generated: ${new Date().toLocaleDateString()}`]);
+  allRows.push([`Generated: ${formatDate(new Date(), options.locale)}`]);
   allRows.push([]);
 
   for (const section of sections) {
@@ -103,11 +106,12 @@ export function generateTransactionsCSV(
     description: string | null;
     accountName: string;
     source: string;
-  }[]
+  }[],
+  locale?: string
 ): string {
   const headers = ["Date", "Amount", "Description", "Account", "Source"];
   const rows = transactions.map((t) => [
-    new Date(t.date).toLocaleDateString(),
+    formatDate(new Date(t.date), locale),
     String(t.amount),
     t.description || "",
     t.accountName,

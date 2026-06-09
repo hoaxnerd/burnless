@@ -1,5 +1,6 @@
 import React from "react";
 import { Send, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui";
 
 interface ChatInputProps {
   input: string;
@@ -18,17 +19,19 @@ export function ChatInput({
 }: ChatInputProps) {
   return (
     <form onSubmit={onSubmit} className="flex gap-3">
-      <input
+      <Input
         ref={inputRef}
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
         placeholder="Ask about your financials, build a scenario, get advice..."
         disabled={isLoading}
-        className="flex-1 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50"
+        aria-label="Message"
+        className="flex-1"
       />
       <button
         type="submit"
         disabled={isLoading || !input.trim()}
+        aria-label="Send message"
         className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {isLoading ? (

@@ -11,11 +11,23 @@ const {
   mockSet,
   mockWhere,
   mockReturning,
+  mockSelect,
+  mockSelectFrom,
+  mockSelectWhere,
+  mockSelectLimit,
+  mockDelete,
+  mockDeleteWhere,
 } = vi.hoisted(() => ({
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
   mockWhere: vi.fn(),
   mockReturning: vi.fn(),
+  mockSelect: vi.fn(),
+  mockSelectFrom: vi.fn(),
+  mockSelectWhere: vi.fn(),
+  mockSelectLimit: vi.fn(),
+  mockDelete: vi.fn(),
+  mockDeleteWhere: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -49,12 +61,19 @@ vi.mock("@/lib/api-rate-limit", () => ({
 vi.mock("@burnless/db", () => ({
   db: {
     update: mockUpdate,
+    select: mockSelect,
+    delete: mockDelete,
   },
   inviteCodes: { id: "id" },
+  inviteCodeRedemptions: { inviteCodeId: "inviteCodeId" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
+    { raw: (s: string) => s }
+  ),
 }));
 
 import { PATCH, DELETE } from "../[id]/route";
@@ -86,6 +105,22 @@ describe("Admin Invite Codes [id] API", () => {
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ returning: mockReturning });
+
+    // SELECT chain — used by DELETE for the existence check + redemption count.
+    // `.where()` is both awaitable (count query) AND chainable to `.limit()`
+    // (existence query). Default: code exists, zero redemptions.
+    mockSelect.mockReturnValue({ from: mockSelectFrom });
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
+    const whereThenable = {
+      limit: mockSelectLimit,
+      then: (resolve: (v: unknown) => unknown) => resolve([{ count: 0 }]),
+    };
+    mockSelectWhere.mockReturnValue(whereThenable);
+    mockSelectLimit.mockResolvedValue([{ id: "code-1" }]);
+
+    // DELETE chain
+    mockDelete.mockReturnValue({ where: mockDeleteWhere });
+    mockDeleteWhere.mockResolvedValue(undefined);
   });
 
   // ── PATCH ────────────────────────────────────────────────────────────────
@@ -200,8 +235,12 @@ describe("Admin Invite Codes [id] API", () => {
   // ── DELETE ───────────────────────────────────────────────────────────────
 
   describe("DELETE /api/admin/invite-codes/:id", () => {
-    it("soft-deletes (deactivates) invite code", async () => {
-      mockReturning.mockResolvedValue([{ id: "code-1", isActive: false }]);
+    it("hard-deletes a never-redeemed code (zero redemptions)", async () => {
+      mockSelectLimit.mockResolvedValue([{ id: "code-1" }]);
+      mockSelectWhere.mockReturnValue({
+        limit: mockSelectLimit,
+        then: (resolve: (v: unknown) => unknown) => resolve([{ count: 0 }]),
+      });
 
       const res = await DELETE(
         jsonRequest("/api/admin/invite-codes/code-1", "DELETE"),
@@ -210,10 +249,30 @@ describe("Admin Invite Codes [id] API", () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
+      // Real hard-delete, not a soft-deactivate update.
+      expect(mockDelete).toHaveBeenCalled();
+      expect(mockDeleteWhere).toHaveBeenCalled();
+    });
+
+    it("returns 409 for a redeemed code and does NOT delete", async () => {
+      mockSelectLimit.mockResolvedValue([{ id: "code-1" }]);
+      mockSelectWhere.mockReturnValue({
+        limit: mockSelectLimit,
+        then: (resolve: (v: unknown) => unknown) => resolve([{ count: 3 }]),
+      });
+
+      const res = await DELETE(
+        jsonRequest("/api/admin/invite-codes/code-1", "DELETE"),
+        makeParams("code-1")
+      );
+      expect(res.status).toBe(409);
+      const data = await res.json();
+      expect(data.code).toBe("INVITE_CODE_HAS_REDEMPTIONS");
+      expect(mockDelete).not.toHaveBeenCalled();
     });
 
     it("returns 404 for non-existent code", async () => {
-      mockReturning.mockResolvedValue([]);
+      mockSelectLimit.mockResolvedValue([]);
 
       const res = await DELETE(
         jsonRequest("/api/admin/invite-codes/nope", "DELETE"),
@@ -222,6 +281,7 @@ describe("Admin Invite Codes [id] API", () => {
       expect(res.status).toBe(404);
       const data = await res.json();
       expect(data.error).toContain("not found");
+      expect(mockDelete).not.toHaveBeenCalled();
     });
 
     it("rejects non-admin users", async () => {

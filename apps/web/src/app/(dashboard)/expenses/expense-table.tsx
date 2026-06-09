@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, AlertTriangle, RotateCw, ChevronUp, ChevronDown, ChevronsUpDown, Check, Trash2, Tag, Sparkles, Pencil } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import { formatCompactCurrency } from "@/components/charts";
-import { Modal } from "@/components/ui";
+import { useLocale } from "@/components/locale/locale-context";
+import { Modal, Input, Select } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import { ExpenseFormModal } from "./expense-form-modal";
 import type { ExpenseRow } from "./expense-form";
 import type { ForecastMethod } from "@/lib/expense-params";
@@ -32,22 +34,20 @@ interface ExpenseTableProps {
   /** Other forecast lines — used by the edit form's `percentage_of` source dropdown. */
   forecastLines?: Array<{ id: string; name: string }>;
   onDelete?: (ids: string[]) => void;
-  onCategoryOverride?: (itemId: string, newSubcategory: string) => void;
 }
 
 type SortKey = "accountName" | "subcategory" | "currentAmount" | "changePercent";
 type SortDir = "asc" | "desc";
 
-export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete, onCategoryOverride }: ExpenseTableProps) {
+export function ExpenseTable({ lineItems, subcategories, accountMap, departments, forecastLines, onDelete }: ExpenseTableProps) {
   const router = useRouter();
+  const { fmtPercent } = useLocale();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "recurring" | "anomaly">("all");
   const [sortKey, setSortKey] = useState<SortKey>("currentAmount");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const {
     isInScenarioMode,
     overrideMap: scenarioOverrideMap,
@@ -88,6 +88,8 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     return Array.from(accountMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [accountMap]);
 
+  const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
+
   // Filter and sort
   const filtered = useMemo(() => {
     let items = lineItems;
@@ -122,6 +124,14 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     return items;
   }, [lineItems, search, categoryFilter, typeFilter, sortKey, sortDir, accountMap]);
 
+  // EXP-02: Synthetic rows (headcount-synthetic) must NOT be bulk-selectable.
+  // Build a memoized list of selectable (non-synthetic) filtered items so that
+  // toggleAll, header state, and the count exclude the synthetic row.
+  const selectableItems = useMemo(
+    () => filtered.filter((i) => !isSynthetic(i)),
+    [filtered],
+  );
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -139,17 +149,17 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
     });
   };
 
+  // EXP-02: toggleAll operates only on selectable (non-synthetic) items.
   const toggleAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((i) => i.id)));
+    if (selected.size === selectableItems.length && selectableItems.length > 0)
+      setSelected(new Set());
+    else setSelected(new Set(selectableItems.map((i) => i.id)));
   };
 
   const sortIcon = (col: SortKey) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
-
-  const isSynthetic = (item: ExpenseLineItem) => item.id === "headcount-synthetic";
 
   async function handleDeleteConfirm() {
     if (!deletingItem) return;
@@ -169,7 +179,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setDeletingItem(null);
       router.refresh();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Something went wrong");
+      setDeleteError(toUserMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -197,9 +207,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setBulkDeleteOpen(false);
       router.refresh();
     } catch (err) {
-      setBulkDeleteError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setBulkDeleteError(toUserMessage(err));
     } finally {
       setBulkDeleting(false);
     }
@@ -229,9 +237,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
       setBulkAccountId("");
       router.refresh();
     } catch (err) {
-      setBulkCategorizeError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setBulkCategorizeError(toUserMessage(err));
     } finally {
       setBulkCategorizing(false);
     }
@@ -253,28 +259,30 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
             {/* Search */}
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-surface-400" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search expenses..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-surface-200 bg-surface-50 pl-9 pr-3 py-1.5 text-xs text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-colors"
+                aria-label="Search expenses"
+                className="pl-9 pr-3 py-1.5 text-xs"
               />
             </div>
 
             {/* Category filter */}
             <div className="relative">
               <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-surface-400 pointer-events-none" />
-              <select
+              <Select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="appearance-none rounded-lg border border-surface-200 bg-surface-50 pl-7 pr-6 py-1.5 text-xs text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 cursor-pointer"
+                aria-label="Filter by category"
+                className="pl-7 py-1.5 text-xs"
               >
                 <option value="all">All categories</option>
                 {subcategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Type filter pills */}
@@ -313,7 +321,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
             <label className="inline-flex items-center gap-1.5">
               <Tag className="h-3 w-3 text-brand-700" aria-hidden />
               <span className="sr-only">Reassign to account</span>
-              <select
+              <Select
                 aria-label="Reassign selected expenses to account"
                 value={bulkAccountId}
                 disabled={bulkCategorizing}
@@ -322,13 +330,13 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                   setBulkAccountId(next);
                   if (next) void handleBulkCategorize(next);
                 }}
-                className="appearance-none rounded-md border border-brand-200 bg-white px-2 py-1 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30 cursor-pointer disabled:opacity-50"
+                className="px-2 py-1 text-[10px] font-medium"
               >
                 <option value="">Reassign to...</option>
                 {accountOptions.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
 
@@ -364,14 +372,20 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
           <thead>
             <tr className="border-b border-surface-200 bg-surface-50">
               <th scope="col" className="w-10 px-4 py-3">
+                {/* EXP-02: header state is driven by selectableItems (excludes synthetic). */}
                 <button onClick={toggleAll} aria-label="Select all expenses" className="flex items-center justify-center">
                   <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-                    selected.size === filtered.length && filtered.length > 0
+                    selectableItems.length > 0 && selected.size === selectableItems.length
                       ? "bg-brand-600 border-brand-600"
-                      : "border-surface-300"
+                      : selected.size > 0 && selected.size < selectableItems.length
+                        ? "bg-brand-300 border-brand-600"
+                        : "border-surface-300"
                   }`}>
-                    {selected.size === filtered.length && filtered.length > 0 && (
+                    {selectableItems.length > 0 && selected.size === selectableItems.length && (
                       <Check className="h-3 w-3 text-white" />
+                    )}
+                    {selected.size > 0 && selected.size < selectableItems.length && (
+                      <span className="h-0.5 w-2 bg-white rounded-full" aria-hidden />
                     )}
                   </div>
                 </button>
@@ -429,8 +443,12 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                       ? "No expenses match your filters."
                       : "No expenses recorded yet."}
                   </p>
+                  {/* EXP-05: mirror the primary condition — show broaden/clear
+                      guidance whenever ANY filter is active, not just search. */}
                   <p className="text-xs text-surface-400 mt-1">
-                    {search ? "Try broadening your search." : "Add expenses to start tracking spend."}
+                    {search || categoryFilter !== "all" || typeFilter !== "all"
+                      ? "Try broadening your search or clearing filters."
+                      : "Add expenses to start tracking spend."}
                   </p>
                 </td>
               </tr>
@@ -452,13 +470,20 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     className={`hover:bg-surface-50 transition-colors ${isSelected ? "bg-brand-50/50" : ""} ${rowBorderClass}`}
                   >
                     <td className="w-10 px-4 py-3">
-                      <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-                          isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
-                        }`}>
-                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                      {/* EXP-02: disable checkbox for synthetic rows */}
+                      {synthetic ? (
+                        <div className="flex items-center justify-center">
+                          <div className="h-4 w-4 rounded border border-surface-200 bg-surface-100 cursor-not-allowed" aria-hidden />
                         </div>
-                      </button>
+                      ) : (
+                        <button onClick={() => toggleSelect(item.id)} aria-label={`Select ${displayName}`} className="flex items-center justify-center">
+                          <div className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
+                            isSelected ? "bg-brand-600 border-brand-600" : "border-surface-300 hover:border-surface-400"
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
@@ -468,45 +493,22 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="relative flex items-center gap-1.5">
-                        {editingCategoryId === item.id ? (
-                          <select
-                            autoFocus
-                            defaultValue={overrides[item.id] ?? item.subcategory}
-                            onChange={(e) => {
-                              const newCat = e.target.value;
-                              setOverrides((prev) => ({ ...prev, [item.id]: newCat }));
-                              setEditingCategoryId(null);
-                              onCategoryOverride?.(item.id, newCat);
-                              // Learn: save merchant->category mapping
-                              apiFetch("/api/merchant-mappings", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  description: displayName,
-                                  accountId: item.accountId,
-                                  category: item.accountCategory,
-                                  subcategory: newCat,
-                                }),
-                              }).catch(() => {});
-                            }}
-                            onBlur={() => setEditingCategoryId(null)}
-                            className="rounded-md border border-brand-300 bg-white px-2 py-0.5 text-[10px] font-medium text-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                      {/* Category is read-only here — set it per entry in the
+                          expense form (Edit). A non-null override wins over
+                          derivation; otherwise the displayed value is derived. */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600">
+                          {item.subcategory}
+                        </span>
+                        {item.subcategoryOverride !== null && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
+                            title="Category set manually on this entry"
                           >
-                            {subcategories.map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <button
-                            onClick={() => setEditingCategoryId(item.id)}
-                            className="inline-flex items-center rounded-md bg-surface-100 px-2 py-0.5 text-[10px] font-medium text-surface-600 hover:bg-surface-200 hover:text-surface-800 transition-colors cursor-pointer"
-                            title="Click to change category"
-                          >
-                            {overrides[item.id] ?? item.subcategory}
-                          </button>
+                            <Sparkles className="h-2.5 w-2.5" /> Manual
+                          </span>
                         )}
-                        {item.categorySource === "rule" && !overrides[item.id] && (
+                        {item.subcategoryOverride === null && item.categorySource === "rule" && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-600"
                             title={`AI categorized (${Math.round(ratioToPct(item.subcategoryConfidence))}% confidence)`}
@@ -514,15 +516,15 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                             <Sparkles className="h-2.5 w-2.5" /> AI
                           </span>
                         )}
-                        {(item.categorySource === "merchant_memory" || overrides[item.id]) && (
+                        {item.subcategoryOverride === null && item.categorySource === "merchant_memory" && (
                           <span
                             className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-600"
-                            title={overrides[item.id] ? "You overrode this category" : "Learned from your override"}
+                            title="Learned from your override"
                           >
-                            <Sparkles className="h-2.5 w-2.5" /> {overrides[item.id] ? "Override" : "Learned"}
+                            <Sparkles className="h-2.5 w-2.5" /> Learned
                           </span>
                         )}
-                        {item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && !overrides[item.id] && (
+                        {item.subcategoryOverride === null && item.subcategoryConfidence < 0.7 && item.categorySource !== "merchant_memory" && (
                           <span className="text-[9px] text-surface-400" title="Low confidence categorization">
                             ?
                           </span>
@@ -537,7 +539,7 @@ export function ExpenseTable({ lineItems, subcategories, accountMap, departments
                     <td className="px-4 py-3 text-right">
                       <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
                         <span className="sr-only">{changeLabel}</span>
-                        {changeIcon} {Math.abs(ratioToPct(item.changePercent)).toFixed(0)}%
+                        {changeIcon} {fmtPercent(Math.abs(ratioToPct(item.changePercent)), 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -736,6 +738,9 @@ function lineItemToExpenseRow(item: ExpenseLineItem): ExpenseRow {
     isRecurring: item.recurringSource === "user" ? item.isRecurring : null,
     vendor: item.vendor,
     notes: item.notes,
+    // Raw override only — null preselects "Auto" so an edit that doesn't touch
+    // the category doesn't bake the derived value in as an explicit override.
+    subcategory: item.subcategoryOverride,
     departmentId: item.departmentId,
   };
 }

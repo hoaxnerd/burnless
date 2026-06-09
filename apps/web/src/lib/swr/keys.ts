@@ -15,10 +15,26 @@ export const KEYS = {
   team: "/api/team",
   inviteCodes: "/api/invite-codes",
 
+  // Phase-2 consumer GET endpoints
+  adminInviteCodes: "/api/admin/invite-codes",
+  imports: "/api/imports",
+  twoFactorStatus: "/api/auth/two-factor/status",
+  digest: "/api/digest",
+  aiPermissions: "/api/ai/permissions",
+  alerts: "/api/alerts",
+  integrations: "/api/integrations",
+  company: "/api/company",
+
   // Parameterized keys — call as functions
   aiDashboard: (days: number) => `/api/ai-dashboard?days=${days}`,
   scenario: (id: string) => `/api/scenarios/${id}`,
   fundingRounds: () => "/api/funding-rounds",
   departments: () => "/api/departments",
   transactions: () => "/api/transactions",
+  scenarioComparison: (baseId: string, compareId: string) =>
+    `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`,
+  scenarioOverrides: (scenarioId: string) =>
+    `/api/scenarios/overrides?scenarioId=${scenarioId}`,
+  scenarioOverrideCount: (scenarioId: string) =>
+    `/api/scenarios/overrides?scenarioId=${scenarioId}&count=true`,
 } as const;

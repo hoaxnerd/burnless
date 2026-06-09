@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
-const { mockRequireCompanyAccess, mockGetCompanyPlan } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockRequireWrite, mockGetCompanyPlan } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
+  mockRequireWrite: vi.fn(),
   mockGetCompanyPlan: vi.fn(),
 }));
 
@@ -27,6 +28,7 @@ const {
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
+  requireCompanyWrite: mockRequireWrite,
   getCompanyPlan: mockGetCompanyPlan,
   errorResponse: (msg: string, status: number) =>
     NextResponse.json({ error: msg }, { status }),
@@ -77,6 +79,7 @@ describe("Exports API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(authCtx);
+    mockRequireWrite.mockResolvedValue(authCtx);
     mockGetCompanyPlan.mockResolvedValue("growth");
     mockGetPlanLimits.mockReturnValue({ maxExports: 50 });
     mockCanPerformAction.mockReturnValue({ allowed: true });
@@ -194,7 +197,7 @@ describe("Exports API", () => {
     });
 
     it("rejects unauthenticated requests", async () => {
-      mockRequireCompanyAccess.mockResolvedValue({
+      mockRequireWrite.mockResolvedValue({
         error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       });
 

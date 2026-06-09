@@ -43,6 +43,23 @@ export type MetricFormat =
   | "multiple"
   | "boolean";
 
+/**
+ * DASH-10: Friendly human labels for each MetricFormat token. Single source of
+ * truth for UI surfaces (e.g. the formula viewer) that would otherwise leak the
+ * internal enum ("CURRENCY"/"PERCENT"). Plain words only — NO currency symbols
+ * (guarded by no-currency-in-engine.test.ts). Must cover every MetricFormat
+ * union member.
+ */
+export const FORMAT_LABELS: Record<MetricFormat, string> = {
+  currency: "Money",
+  percent: "Percentage",
+  months: "Months",
+  number: "Number",
+  ratio: "Ratio",
+  multiple: "Multiple",
+  boolean: "Yes/No",
+};
+
 export type SignalDirection = "higher_better" | "lower_better" | "neutral";
 
 export interface MetricBenchmark {

@@ -1,8 +1,12 @@
 import React, { useState } from "react";
 import { Copy, Check, ChevronRight, Brain } from "lucide-react";
 import { MarkdownRenderer } from "@/components/ai/markdown-renderer";
+import { useLocale } from "@/components/locale/locale-context";
 import { TimelineView } from "./timeline/timeline-view";
 import type { Message, PendingPermission, PendingInput, PendingPlan } from "./types";
+
+/** Beyond this age a relative label ("Nd ago") is noise — show an absolute date. */
+const ABSOLUTE_AFTER_MS = 24 * 60 * 60 * 1000; // 1 day
 
 /** Strip model thinking tags (e.g. <think>...</think>) from response text — fallback defense. */
 function stripThinkingTags(text: string): string {
@@ -39,16 +43,23 @@ function ThinkingBlock({ thinking, isStreaming }: { thinking: string; isStreamin
   );
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+/**
+ * Relative label for a recent timestamp, or `null` when the caller should fall
+ * back to an absolute date. Returns null when the timestamp is missing (restored
+ * history with no real createdAt) or older than {@link ABSOLUTE_AFTER_MS} — so a
+ * day-old restored turn never reads "just now" / "Nd ago". (AI-08)
+ */
+function formatRelativeTime(timestamp: number | null | undefined): string | null {
+  if (timestamp == null) return null;
+  const ms = Date.now() - timestamp;
+  if (ms >= ABSOLUTE_AFTER_MS) return null;
+  const seconds = Math.floor(ms / 1000);
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${hours}h ago`;
 }
 
 interface ChatMessageListProps {
@@ -61,6 +72,8 @@ interface ChatMessageListProps {
   onActionPrompt?: (prompt: string) => void;
   onInputSubmit?: (pending: PendingInput, data: Record<string, unknown>) => void;
   onPlanSubmit?: (pending: PendingPlan, plan: PendingPlan["spec"]) => void;
+  /** Locally dismiss an advisory plan node without a server resume (AI-02). */
+  onPlanDismiss?: (pending: PendingPlan) => void;
   /** Permission/diff gate decision, now rendered in-stream as a diff_gate node. */
   onDecide?: (pending: PendingPermission, decisions: { requestId: string; decision: "once" | "session" | "deny" }[]) => void;
 }
@@ -74,8 +87,10 @@ export function ChatMessageList({
   onActionPrompt,
   onInputSubmit,
   onPlanSubmit,
+  onPlanDismiss,
   onDecide,
 }: ChatMessageListProps) {
+  const { fmtDate } = useLocale();
   return (
     <div className="flex-1 overflow-auto space-y-4 mb-4 pr-2 scroll-smooth">
       {messages.map((msg, i) => {
@@ -98,6 +113,7 @@ export function ChatMessageList({
                 nodes={msg.timeline!}
                 disabled={!!isLoading}
                 onPlanSubmit={(pending, plan) => onPlanSubmit?.(pending, plan)}
+                onPlanDismiss={(pending) => onPlanDismiss?.(pending)}
                 onDecide={(pending, decisions) => onDecide?.(pending, decisions)}
                 onInputSubmit={(pending, data) => onInputSubmit?.(pending, data)}
                 onAction={onActionPrompt}
@@ -120,7 +136,15 @@ export function ChatMessageList({
               </div>
             )}
             <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-[10px] text-surface-400">{formatRelativeTime(msg.createdAt)}</span>
+              {(() => {
+                // AI-08: a recent message reads relative ("just now"); a missing
+                // or day-old timestamp (restored history) reads an absolute date
+                // via the centralized formatter — never a misleading "just now".
+                const relative = formatRelativeTime(msg.createdAt);
+                const label =
+                  relative ?? (msg.createdAt != null ? fmtDate(new Date(msg.createdAt)) : "earlier");
+                return <span className="text-[10px] text-surface-400">{label}</span>;
+              })()}
               {!msg.isStreaming && msg.content ? (
                 <button onClick={() => onCopy(msg.content, i)} className="opacity-0 group-hover/msg:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-surface-400 hover:text-surface-600" aria-label="Copy message">
                   {copiedIndex === i ? (<><Check className="h-3 w-3 text-success-500" /><span className="text-success-500">Copied</span></>) : (<><Copy className="h-3 w-3" /><span>Copy</span></>)}

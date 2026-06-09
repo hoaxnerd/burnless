@@ -1,7 +1,9 @@
 "use client";
 
+import { ratioToPct } from "@burnless/engine";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard } from "@/components/ui";
+import { useLocale } from "@/components/locale/locale-context";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
 
 interface ExpenseCategoryChartProps {
@@ -38,6 +40,7 @@ export function ExpenseCategoryChart({
   subcategories,
   totalMonthly,
 }: ExpenseCategoryChartProps) {
+  const { fmtPercent } = useLocale();
   if (breakdown.length === 0) return null;
 
   // Top subcategories for chart (max 6, rest grouped as "Other")
@@ -106,7 +109,7 @@ export function ExpenseCategoryChart({
                       {formatCompactCurrency(item.amount)}
                     </span>
                     <span className={`text-[10px] font-medium ${changeColor}`}>
-                      {changeIcon}{Math.abs(item.changePercent * 100).toFixed(0)}%
+                      {changeIcon}{fmtPercent(Math.abs(ratioToPct(item.changePercent)), 0)}
                     </span>
                   </div>
                 </div>

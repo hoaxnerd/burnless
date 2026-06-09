@@ -534,6 +534,12 @@ export const forecastLines = pgTable(
     // ── Phase 1 additions (§2.C) ─────────────────────────────────────────
     notes: text("notes"),
     vendor: text("vendor"),
+    /**
+     * Explicit per-line expense category override (set in the expense form).
+     * NULL = derive automatically (merchant rules → account → "Uncategorized").
+     * A non-null value WINS over derivation in compute-expenses deriveSubcategory.
+     */
+    subcategory: text("subcategory"),
     departmentId: text("department_id").references(() => departments.id, {
       onDelete: "set null",
     }),
@@ -1116,6 +1122,13 @@ export const aiPendingActions = pgTable(
      * overrides to the wrong overlay (scenario-safety; spec §5).
      */
     scenarioId: text("scenario_id").notNull(),
+    /**
+     * AI-01: the WRITE target for the paused turn. NULL = base view (the tool
+     * handler writes to base tables). Distinct from `scenarioId`, which stays
+     * non-null for READ context (buildAiContext/getOverrideCount on resume). Only
+     * an explicitly-selected, company-validated scenario is a write target.
+     */
+    writeScenarioId: text("write_scenario_id"),
     /** Raw assistant tool-use content blocks for the paused turn. */
     assistantBlocks: jsonb("assistant_blocks").notNull(),
     /** tool_result blocks for tools already executed (auto-allowed/denied). */

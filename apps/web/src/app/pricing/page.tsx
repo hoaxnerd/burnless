@@ -47,8 +47,8 @@ const faqs = [
     a: "Our AI analyzes your financial data to surface insights, forecast runway, detect anomalies, and answer questions about your finances — like having a CFO on call 24/7.",
   },
   {
-    q: "How does the Team plan work? Are there seat limits?",
-    a: "The Team plan lets you invite unlimited team members at no extra per-seat cost. Everyone shares the same financial workspace with role-based access. Perfect for co-founders, finance leads, and advisors who need real-time visibility.",
+    q: "Can I add my team?",
+    a: "Team collaboration is coming soon — Pro supports a single workspace today. We're building shared workspaces with role-based access for co-founders, finance leads, and advisors who need real-time visibility.",
   },
   {
     q: "How does billing work? When am I charged?",

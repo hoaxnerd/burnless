@@ -71,6 +71,7 @@ function broadcastScenarioSync() {
     localStorage.setItem(SCENARIO_SYNC_KEY, String(Date.now()));
   } catch {
     // Storage disabled/full — other tabs still self-heal on focus/visibility.
+    return;
   }
 }
 
@@ -185,6 +186,7 @@ export function ScenarioProvider({ children }: { children: ReactNode }) {
       setActiveScenarioName(null);
     } catch {
       // Network blip — leave state alone; a later focus/visibility tick retries.
+      return;
     }
   }, []);
 

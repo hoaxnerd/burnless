@@ -49,9 +49,13 @@ async function RunwayContent({ companyId, scenarioId, companyName, currency }: {
     return vals.length >= 2 ? vals : undefined;
   };
 
-  const latest = data.metrics.cashPosition[data.metrics.cashPosition.length - 1];
-  const latestBurn = data.metrics.netBurnRate[data.metrics.netBurnRate.length - 1];
-  const latestRunway = data.metrics.cashRunwayMonths[data.metrics.cashRunwayMonths.length - 1];
+  // FMT-2: headline KPIs read at the REAL current calendar month (data.currentMonth),
+  // not the end of the now-full-horizon series (Phase B horizon contract).
+  const atMonth = (series: { month: string; value: number }[]) =>
+    series.find((m) => m.month === currentMonth) ?? series[series.length - 1];
+  const latest = atMonth(data.metrics.cashPosition);
+  const latestBurn = atMonth(data.metrics.netBurnRate);
+  const latestRunway = atMonth(data.metrics.cashRunwayMonths);
   const zeroCashMonth = data.metrics.cashPosition.find((c) => c.value <= 0);
 
   // Build resolved slot data for ALL engine metrics (swap targets)
@@ -110,6 +114,7 @@ async function RunwayContent({ companyId, scenarioId, companyName, currency }: {
       grossBurnRate={data.metrics.burnRate}
       startingCash={data.startingCash}
       companyName={companyName}
+      currentMonth={currentMonth}
       resolvedSlotData={resolvedSlotData}
     />
   );

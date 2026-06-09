@@ -171,6 +171,28 @@ const ALLOWED = [
   "apps/web/src/lib/onboarding-imports.ts",
   "apps/web/src/lib/onboarding-agent/heal.ts",
   "apps/web/src/lib/onboarding-agent/__tests__/",
+
+  // ── Onboarding wizard tests (Batch H ONB-02 / signup-name) ────────────────
+  // name-fallback.test.tsx / summary-sections.test.tsx use `$${n}` inside a
+  // vi.mock() fmtCurrency/fmtCompact stub — fixture values in a test, same
+  // rationale as the revenue/team/forms test-dir entries above.
+  "apps/web/src/app/onboarding/__tests__/",
+  "apps/web/src/app/onboarding/_components/__tests__/",
+  "apps/web/src/app/onboarding/_components/review/__tests__/",
+  // ai-tabs-render.test.tsx (Batch H SET-07) uses `$${n}` in a vi.mock() stub.
+  "apps/web/src/app/(dashboard)/settings/__tests__/",
+
+  // ── Regex backreferences ($1/$2), NOT currency ────────────────────────────
+  // These lines contain String.replace() backreference templates ("$1 $2" /
+  // "$1") which the $<digit> matcher flags as false positives. Not display code:
+  // data-diff-view/permission-card/diff-gate run the same camelCase splitter
+  // `.replace(/([a-z0-9])([A-Z])/g, "$1 $2")`; the two guard walkers strip
+  // comments with `.replace(/(^|[^:])\/\/.../g, "$1")`.
+  "apps/web/src/components/scenarios/data-diff-view.tsx",
+  "apps/web/src/app/(dashboard)/ai/_components/permission-card.tsx",
+  "apps/web/src/app/(dashboard)/ai/_components/generative/diff-gate.tsx",
+  "apps/web/src/__tests__/component-reachability.test.ts",
+  "apps/web/src/__tests__/no-console-in-production.test.ts",
 ];
 
 /**

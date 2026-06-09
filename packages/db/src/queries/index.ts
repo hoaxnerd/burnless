@@ -24,6 +24,7 @@ export {
   deleteOverride,
   deleteOverrideByEntity,
   getOverrideCount,
+  getOverrideCounts,
   getOverrideBreakdown,
 } from "./scenario-overrides";
 

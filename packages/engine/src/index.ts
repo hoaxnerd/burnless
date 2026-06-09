@@ -23,6 +23,7 @@ export {
   parseMonthKey,
   previousMonthKey,
   projectActualsForward,
+  valueAtMonth,
   round2,
   isActiveInMonth,
   proratedFraction,
@@ -88,6 +89,7 @@ export {
 export {
   computeHeadcountPlanCost,
   computeAllHeadcountCosts,
+  computeMemberMonthlyCost,
   reconcileHeadcountWithActuals,
   type HeadcountPlanInput,
   type HeadcountCostBreakdown,
@@ -126,6 +128,7 @@ export {
 // Metric registry — catalog, definitions, dependency graph, formatting
 export {
   METRIC_REGISTRY,
+  FORMAT_LABELS,
   CATEGORY_META,
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
@@ -219,6 +222,7 @@ export {
   categorizeWithMemory,
   categorizeTransactionsWithMemory,
   extractMerchantKey,
+  getCategorySubcategories,
   DEFAULT_CATEGORIZATION_RULES,
   type CategorizationRule,
   type CategorizationResult,

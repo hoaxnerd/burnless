@@ -56,7 +56,8 @@ function jsonRequest(url: string, method: string, body?: unknown): Request {
 
 const VALID_FUNDING_ROUND = {
   name: "Seed Round",
-  type: "seed" as const,
+  // FUND-01: schema field renamed type -> roundType (route maps it to the DB `type` column).
+  roundType: "seed" as const,
   amount: 1_000_000,
   date: "2026-06-01",
   preMoneyValuation: 5_000_000,
@@ -122,7 +123,7 @@ describe("POST /api/funding-rounds", () => {
   });
 
   it("returns 400 for invalid type", async () => {
-    const invalid = { ...VALID_FUNDING_ROUND, type: "angel" };
+    const invalid = { ...VALID_FUNDING_ROUND, roundType: "not_a_real_round" };
     const res = await POST(jsonRequest("http://localhost/api/funding-rounds", "POST", invalid));
     expect(res.status).toBe(400);
   });

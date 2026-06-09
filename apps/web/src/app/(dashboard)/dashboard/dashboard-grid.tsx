@@ -94,6 +94,7 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
     addSecondaryMetric,
     removeSecondaryMetric,
     swapHeroCard,
+    resetHeroCard,
   } = useDashboardLayout();
 
   const allUsedSlugs = useMemo(
@@ -120,7 +121,15 @@ export function DashboardGrid({ widgets, hiddenWidgets = [] }: DashboardGridProp
         swapHeroCard(heroIndex, selectedSlug).then(() => router.refresh());
       }
     },
-  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, swapHeroCard, router]);
+    // DASH-01: reset a hero card's slug back to its engine default so 'Reset
+    // to default' restores the metric, not just the per-card display mode.
+    onResetForCard: (cardSlug: string) => {
+      const heroIndex = heroCards.indexOf(cardSlug);
+      if (heroIndex >= 0) {
+        resetHeroCard(heroIndex).then(() => router.refresh());
+      }
+    },
+  }), [registry, allUsedSlugs, heroCards, addSecondaryMetric, removeSecondaryMetric, openFormulaViewer, swapHeroCard, resetHeroCard, router]);
 
   const heroCount = heroCards.length || 4;
 

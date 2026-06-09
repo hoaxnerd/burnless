@@ -9,7 +9,7 @@ import { seriesToArray, METRIC_REGISTRY, pctChange, pctOfTotal } from "@burnless
 import type { ResolvedSlotData } from "@burnless/engine";
 import { buildSlotMetricCard } from "@/lib/build-slot-metrics";
 import { aggregateBudgetTimeline } from "@/lib/budget-timeline";
-import { formatCurrency } from "@burnless/types";
+import { formatCurrency, formatPercent } from "@burnless/types";
 import { companyCurrency } from "@/lib/server-currency";
 import { ExpensesView } from "./expenses-view";
 import { ExpenseFormModal } from "./expense-form-modal";
@@ -133,7 +133,7 @@ async function ExpensesContent({ companyId, scenarioId, company }: { companyId: 
       content: { type: "metric", slug: "totalMonthly" },
       label: "Total Monthly",
       value: formatCurrency(totalExpenseAmount, companyCurrency(company), undefined, { compact: true }),
-      change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%` : undefined,
+      change: changePercent !== null ? `${changePercent > 0 ? "+" : ""}${formatPercent(changePercent, undefined, 1)}` : undefined,
       changeLabel: changePercent !== null ? "vs last month" : undefined,
       hasData: totalExpenseAmount > 0,
       sparkData: spark(expenseTimeline),
@@ -144,7 +144,7 @@ async function ExpensesContent({ companyId, scenarioId, company }: { companyId: 
       content: { type: "metric", slug: "personnelCost" },
       label: "People",
       value: formatCurrency(personnelCost, companyCurrency(company), undefined, { compact: true }),
-      description: `${summaryMetrics.personnelPercent.toFixed(0)}% of total`,
+      description: `${formatPercent(summaryMetrics.personnelPercent, undefined, 0)} of total`,
       hasData: personnelCost > 0,
       metricStyle: { icon: "TrendingUp", color: "blue", href: "/team" },
     },

@@ -1,6 +1,7 @@
 "use client";
 
 import { CurrencyInput, NumberInput, PercentageInput } from "@/components/forms/primitives";
+import { Select } from "@/components/ui";
 import { TieredPricingEditor } from "./TieredPricingEditor";
 import type { PricingTier } from "@burnless/engine";
 
@@ -57,15 +58,15 @@ export function UsageFields({ params, setParams }: FieldsProps) {
       />
       <label className="col-span-full block text-sm">
         <span className="text-surface-700 dark:text-surface-300">Pricing model</span>
-        <select
+        <Select
+          className="mt-1"
           value={pricingModel}
           onChange={(e) => set("pricingModel", e.target.value)}
-          className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800"
           aria-label="Usage pricing model"
         >
           <option value="flat">Flat (pricePerUnit)</option>
           <option value="tiered">Tiered</option>
-        </select>
+        </Select>
       </label>
       {pricingModel === "tiered" && (
         <TieredPricingEditor

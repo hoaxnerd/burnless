@@ -10,7 +10,7 @@ import {
   type ComputedMetrics,
 } from "@burnless/engine";
 import { type HeroCardDatum, type SwapCardDatum } from "./hero-card-grid";
-import { formatCurrency, pctChange, sparkline } from "./dashboard-helpers";
+import { formatCurrency, pctChange, ppDelta, sparkline } from "./dashboard-helpers";
 import { getMetricSubLabel } from "@/lib/build-slot-metrics";
 import { type CurrencyCode } from "@burnless/types";
 
@@ -58,7 +58,7 @@ export function buildHeroCards(
       if (def?.format === "percent") {
         const diff = currentVal - prevVal;
         if (diff !== 0 && Number.isFinite(diff)) {
-          change = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+          change = ppDelta(diff);
           changeLabel = "vs last month";
         }
       } else {
@@ -125,12 +125,12 @@ export function buildHeroSwapCards(
     if (swap.displayDef.format === "percent") {
       const diff = swapCurrentVal - swapPrevVal;
       if (swapPrevVal !== 0 && diff !== 0 && Number.isFinite(diff)) {
-        swapChange = `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}pp`;
+        swapChange = ppDelta(diff);
       }
     } else if (swapPrevVal !== 0) {
       const pct = pctChangeValue(swapCurrentVal, swapPrevVal) ?? 0;
       if (pct !== 0 && Number.isFinite(pct)) {
-        swapChange = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+        swapChange = pctChange(swapCurrentVal, swapPrevVal) ?? undefined;
       }
     }
 

@@ -14,6 +14,17 @@ vi.mock("@/components/ui", () => ({
         {children}
       </div>
     ) : null,
+  Select: ({ label, error, children, ...props }: { label?: string; error?: string; children?: React.ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) => (
+    <label>
+      {label && <span>{label}</span>}
+      <select aria-label={label} {...props}>{children}</select>
+      {error && <span role="alert">{error}</span>}
+    </label>
+  ),
+  IconButton: ({ icon, ...props }: { icon: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button type="button" {...props}>{icon}</button>
+  ),
+  useConfirm: () => ({ confirm: () => Promise.resolve(true), dialog: null }),
 }));
 vi.mock("@/components/locale/locale-context", () => ({
   useLocale: () => ({
@@ -137,7 +148,6 @@ describe("<EquityGrantsList>", () => {
       ok: true,
       json: async () => ({}),
     });
-    window.confirm = vi.fn(() => true);
 
     render(
       <EquityGrantsList
@@ -149,7 +159,6 @@ describe("<EquityGrantsList>", () => {
     fireEvent.click(screen.getByTestId("delete-equity-grant-a"));
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(window.confirm).toHaveBeenCalled();
     const [url, init] = (apiFetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("/api/headcount/h1/equity-grants/a");
     expect(init.method).toBe("DELETE");

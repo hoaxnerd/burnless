@@ -2,8 +2,17 @@
 
 import { useState, useCallback, type InputHTMLAttributes, forwardRef } from "react";
 import { formatNumber as fmtNum } from "@burnless/types";
+import { Field } from "./field";
+import { Input } from "./input";
 
-/* ── FormField — input with inline validation and error hints ────────────── */
+/* ── FormField — input with inline validation and error hints ──────────────
+ *
+ * Public API is byte-compatible with the pre-Batch-C version (many consumers
+ * depend on it). Internally it now delegates the label + a11y wiring to <Field>
+ * and the styled control to <Input> (bare mode). It keeps its own id-from-label
+ * derivation (so generated ids stay stable, e.g. "Company Name" → "company-name")
+ * and its touched/validate state machine.
+ */
 
 interface FormFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   label: string;
@@ -43,44 +52,26 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
     );
 
     const fieldId = id || label.toLowerCase().replace(/\s+/g, "-");
-    const errorId = `${fieldId}-error`;
-    const hintId = `${fieldId}-hint`;
-    const describedBy = error ? errorId : hint ? hintId : undefined;
 
     return (
-      <div>
-        <label htmlFor={fieldId} className="block text-sm font-medium text-surface-700 mb-2">
-          {label}
-        </label>
-        <input
-          ref={ref}
-          id={fieldId}
-          {...props}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={error ? "true" : undefined}
-          aria-describedby={describedBy}
-          className={`w-full rounded-xl border bg-surface-0 px-4 py-3 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 transition-all ${
-            error
-              ? "border-danger-500 focus:ring-danger-500/40 focus:border-danger-500"
-              : "border-surface-300 focus:ring-brand-500/40 focus:border-brand-500"
-          } ${className ?? ""}`}
-        />
-        {/* Error message with slide-in animation */}
-        {error && (
-          <p
-            id={errorId}
-            className="mt-1.5 text-xs font-medium text-danger-600 animate-slide-up"
-            role="alert"
-          >
-            {error}
-          </p>
+      <Field
+        label={label}
+        hint={hint}
+        error={error ?? undefined}
+        id={fieldId}
+      >
+        {(a11y) => (
+          <Input
+            ref={ref}
+            {...a11y}
+            invalid={Boolean(error)}
+            className={className}
+            {...props}
+            onChange={handleChange}
+            onBlur={handleBlur}
+          />
         )}
-        {/* Hint text (only when no error) */}
-        {hint && !error && (
-          <p id={hintId} className="mt-1.5 text-xs text-surface-400">{hint}</p>
-        )}
-      </div>
+      </Field>
     );
   },
 );

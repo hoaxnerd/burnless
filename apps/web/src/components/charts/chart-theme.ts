@@ -93,6 +93,39 @@ export function formatMonthYear(monthKey: string, locale?: string): string {
   return formatMonthKey(monthKey, locale, { includeYear: true });
 }
 
+/**
+ * SCN-06 + RPT-09: decide whether an x-axis month window needs the year in its
+ * tick labels. A window that spans more than 12 months or crosses a calendar
+ * year boundary renders identical short-month labels (e.g. "Nov" for both
+ * 2025-11 and 2026-11), which is ambiguous. Returns true when the year must be
+ * shown to disambiguate.
+ */
+export function shouldShowYearInTicks(months: string[]): boolean {
+  if (months.length < 2) return false;
+  const years = new Set<string>();
+  for (const m of months) {
+    const y = m.split("-")[0];
+    if (y) years.add(y);
+  }
+  // Multi-year window OR a span wider than 12 months → include the year.
+  return years.size > 1 || months.length > 12;
+}
+
+/**
+ * SCN-06 + RPT-09: an x-axis tick formatter that includes the year only when the
+ * supplied month window is ambiguous (multi-year / >12 months). Single-year
+ * windows keep the short month form. Tolerant of Recharts' implicit second
+ * (index) argument — only the month string is used.
+ */
+export function makeMonthTickFormatter(
+  months: string[],
+  locale?: string
+): (monthKey: string) => string {
+  const withYear = shouldShowYearInTicks(months);
+  return (monthKey: string) =>
+    withYear ? formatMonthYear(String(monthKey), locale) : formatMonth(String(monthKey), locale);
+}
+
 /** Tooltip styling — CRED-tier with backdrop blur effect */
 export const tooltipStyle = {
   background: "rgba(255, 255, 255, 0.95)",

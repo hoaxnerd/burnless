@@ -21,7 +21,7 @@ describe("ChatInput", () => {
 
   it("renders submit button", () => {
     render(<ChatInput {...defaultProps} />);
-    const btn = screen.getByRole("button", { name: "" });
+    const btn = screen.getByRole("button", { name: /send message/i });
     expect(btn).toBeInTheDocument();
   });
 

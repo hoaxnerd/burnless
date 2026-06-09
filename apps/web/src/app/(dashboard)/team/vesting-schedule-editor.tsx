@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { NumberInput, SingleDateInput } from "@/components/forms/primitives";
+import { IconButton } from "@/components/ui";
 
 export type VestingMilestoneType = "cliff" | "monthly" | "quarterly" | "annual" | "milestone";
 export interface VestingMilestone {
@@ -53,13 +54,14 @@ export function VestingScheduleEditor({ value, onChange, totalShares }: Props) {
               <td>{m.date}</td>
               <td>{m.sharesVested}</td>
               <td>
-                <button
+                <IconButton
                   type="button"
                   onClick={() => removeRow(i)}
                   data-testid={`remove-vesting-${i}`}
-                >
-                  ×
-                </button>
+                  aria-label={`Remove vesting milestone ${i + 1}`}
+                  size="sm"
+                  icon={<span aria-hidden="true">×</span>}
+                />
               </td>
             </tr>
           ))}

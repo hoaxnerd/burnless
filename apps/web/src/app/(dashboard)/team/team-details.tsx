@@ -6,14 +6,17 @@ import { useRouter } from "next/navigation";
 import { Users, Calendar, TrendingUp, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
-import { pctOfTotal } from "@burnless/engine";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
+import { pctOfTotal, computeMemberMonthlyCost, type HeadcountPlanInput } from "@burnless/engine";
 import { formatCurrency } from "@burnless/types";
 import type { CurrencyCode } from "@burnless/types";
-import { HeadcountForm, type EditableHeadcount } from "./headcount-form";
+import { HeadcountForm, ADD_HIRE_LABEL, type EditableHeadcount } from "./headcount-form";
 import { SalaryChangesList, type SalaryChange } from "./salary-changes-list";
 import { BonusesList, type Bonus } from "./bonuses-list";
 import { EquityGrantsList, type EquityGrant } from "./equity-grants-list";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
+import { useLocale } from "@/components/locale/locale-context";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
@@ -69,6 +72,48 @@ interface PlannedHire {
   equityGrants: EquityGrant[];
 }
 
+/**
+ * WILD-02 / TEAM-02: map a team-UI member/hire row to the engine's
+ * HeadcountPlanInput so monthly people cost is computed by the single source of
+ * truth (`computeMemberMonthlyCost`) — employeeType-aware (part-time proration,
+ * contractor hourly), with the per-slot benefitsBreakdown when present. Never
+ * re-derive the annual-salary benefits-gross-up-then-divide-by-twelve inline.
+ */
+interface PeopleCostRow {
+  id?: string;
+  departmentId?: string;
+  title?: string;
+  name?: string | null;
+  employeeType?: "full_time" | "part_time" | "contractor";
+  count: number;
+  salary: number;
+  hourlyRate?: number | null;
+  hoursPerWeek?: number | null;
+  benefitsRate: number;
+  startDate?: string;
+  endDate?: string | null;
+  parameters?: { benefitsBreakdown?: BenefitsBreakdown } | null;
+}
+
+function memberMonthlyCost(row: PeopleCostRow): number {
+  const plan: HeadcountPlanInput = {
+    id: row.id ?? "",
+    departmentId: row.departmentId ?? "",
+    title: row.title ?? "",
+    name: row.name ?? null,
+    employeeType: row.employeeType ?? "full_time",
+    count: row.count,
+    salary: row.salary,
+    hourlyRate: row.hourlyRate ?? null,
+    hoursPerWeek: row.hoursPerWeek ?? null,
+    startDate: row.startDate ? new Date(row.startDate) : new Date(),
+    endDate: row.endDate ? new Date(row.endDate) : null,
+    benefitsRate: row.benefitsRate,
+    benefitsBreakdown: row.parameters?.benefitsBreakdown,
+  };
+  return computeMemberMonthlyCost(plan);
+}
+
 const deptColors = [
   { bar: "bg-brand-500", dot: "bg-brand-500", text: "text-brand-600" },
   { bar: "bg-violet-500", dot: "bg-violet-500", text: "text-violet-600" },
@@ -96,6 +141,8 @@ export function TeamRoster({
   currency,
 }: TeamRosterProps) {
   const router = useRouter();
+  const toast = useToast();
+  const { fmtPercent } = useLocale();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -157,8 +204,7 @@ export function TeamRoster({
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete headcount entry:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -177,7 +223,7 @@ export function TeamRoster({
             Add your current team to see how headcount affects your burn rate and runway.
           </p>
           <p className="text-xs text-surface-400">
-            Use the &quot;Add Team Member&quot; button above to get started.
+            Use the &quot;{ADD_HIRE_LABEL}&quot; button above to get started.
           </p>
         </div>
       </div>
@@ -234,7 +280,7 @@ export function TeamRoster({
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs tabular-nums text-surface-500">
-                          {pct.toFixed(0)}%
+                          {fmtPercent(pct, 0)}
                         </span>
                         <span className="text-sm font-semibold tabular-nums text-surface-900">
                           {formatCurrency(dept.monthlyCost, currency, undefined, { compact: true })}
@@ -255,8 +301,7 @@ export function TeamRoster({
                   {isExpanded && (
                     <div className="mt-3 ml-5 space-y-1.5 animate-fade-in">
                       {dept.members.map((member) => {
-                        const monthlyCost =
-                          (member.salary * member.count * (1 + member.benefitsRate)) / 12;
+                        const monthlyCost = memberMonthlyCost(member);
                         const memberOverride = isInScenarioMode ? overrideMap.get(member.id) : undefined;
                         const memberOverrideTag = memberOverride?.action === "modify" ? "modified" as const : memberOverride?.action === "create" ? "created" as const : null;
 
@@ -379,6 +424,7 @@ export function PlannedHiresSection({
   currency,
 }: PlannedHiresSectionProps) {
   const router = useRouter();
+  const toast = useToast();
   const [editingHire, setEditingHire] = useState<EditableHeadcount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -398,7 +444,7 @@ export function PlannedHiresSection({
       if (!quarters.has(q)) quarters.set(q, { hires: [], totalMonthlyImpact: 0 });
       const entry = quarters.get(q)!;
       entry.hires.push(hire);
-      entry.totalMonthlyImpact += (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+      entry.totalMonthlyImpact += memberMonthlyCost(hire);
     }
     return Array.from(quarters.entries()).map(([quarter, data]) => ({
       quarter,
@@ -439,8 +485,7 @@ export function PlannedHiresSection({
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete headcount entry:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -456,7 +501,7 @@ export function PlannedHiresSection({
           </div>
           <h3 className="text-base font-semibold text-surface-900 mb-2">No planned hires yet</h3>
           <p className="text-sm text-surface-500 leading-relaxed">
-            Use the Add Hire button above to plan future team growth.
+            Use the {ADD_HIRE_LABEL} button above to plan future team growth.
           </p>
         </div>
       </div>
@@ -499,7 +544,7 @@ export function PlannedHiresSection({
               <span className="text-sm font-semibold tabular-nums text-danger-600">
                 +{formatCurrency(
                   plannedHires.reduce(
-                    (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
+                    (sum, h) => sum + memberMonthlyCost(h),
                     0,
                   ),
                   currency, undefined, { compact: true }
@@ -534,8 +579,7 @@ export function PlannedHiresSection({
                     </div>
                     <div className="divide-y divide-surface-100">
                       {q.hires.map((hire) => {
-                        const impact =
-                          (hire.salary * hire.count * (1 + hire.benefitsRate)) / 12;
+                        const impact = memberMonthlyCost(hire);
                         const hireOverride = isInScenarioMode ? overrideMap.get(hire.id) : undefined;
                         const hireOverrideTag = hireOverride?.action === "modify" ? "modified" as const : hireOverride?.action === "create" ? "created" as const : null;
 
@@ -616,7 +660,7 @@ export function PlannedHiresSection({
 // ─── HiringInsightTip ────────────────────────────────────────────────────────
 
 interface HiringInsightTipProps {
-  plannedHires: Array<{ salary: number; count: number; benefitsRate: number }>;
+  plannedHires: PlannedHire[];
   currency: CurrencyCode;
 }
 
@@ -624,7 +668,7 @@ export function HiringInsightTip({ plannedHires, currency }: HiringInsightTipPro
   const aiFlags = useOptionalAiFlags();
   const companionName = aiFlags?.companionName ?? "companion";
   const totalMonthlyImpact = plannedHires.reduce(
-    (sum, h) => sum + (h.salary * h.count * (1 + h.benefitsRate)) / 12,
+    (sum, h) => sum + memberMonthlyCost(h),
     0,
   );
 

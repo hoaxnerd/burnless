@@ -2,6 +2,7 @@
 
 import type { CurrencyCode } from "@burnless/types";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useLocale } from "@/components/locale/locale-context";
 import { formatDelta } from "./comparison-types";
 
 export function DeltaBadge({
@@ -17,6 +18,7 @@ export function DeltaBadge({
   positiveIsGood: boolean;
   currency: CurrencyCode;
 }) {
+  const { fmtPercent } = useLocale();
   if (value === 0) {
     return (
       <div className="flex items-center gap-1 text-xs text-surface-400">
@@ -41,7 +43,7 @@ export function DeltaBadge({
       {percent !== 0 && (
         <span className="opacity-70">
           ({percent >= 0 ? "+" : ""}
-          {percent.toFixed(1)}%)
+          {fmtPercent(percent, 1)})
         </span>
       )}
     </div>

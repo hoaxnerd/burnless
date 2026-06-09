@@ -13,6 +13,7 @@
  *   funding    → [dashboard, scenario, funding, reports]
  *   scenarios  → [scenario, dashboard]
  *   accounts   → [expense, revenue, dashboard, reports]
+ *   forecast-lines → [expense, revenue, dashboard, scenario, reports]
  */
 
 import { db, insightInvalidations } from "@burnless/db";
@@ -29,7 +30,9 @@ const INVALIDATION_MAP: Record<string, string[]> = {
   funding: ["dashboard", "scenario", "funding", "reports"],
   scenarios: ["scenario", "dashboard"],
   accounts: ["expense", "revenue", "dashboard", "reports"],
-  "forecast-lines": ["revenue", "dashboard", "scenario", "reports"],
+  // Expense edits ARE forecast-line mutations — they must mark the /expenses
+  // insight stale too (previously omitted "expense", so edits never refreshed it).
+  "forecast-lines": ["expense", "revenue", "dashboard", "scenario", "reports"],
   departments: ["expense", "dashboard", "team"],
 };
 

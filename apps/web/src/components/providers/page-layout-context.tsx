@@ -187,7 +187,6 @@ export function PageLayoutProvider({
                 setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
               );
             }
-            console.error(`Failed to save ${pageId} layout:`, err);
           });
 
       isSavePendingRef.current = true;

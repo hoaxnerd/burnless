@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, inviteCodes } from "@burnless/db";
-import { eq } from "drizzle-orm";
+import { db, inviteCodes, inviteCodeRedemptions } from "@burnless/db";
+import { eq, sql } from "drizzle-orm";
 import {
   requireCompanyAccess,
   requireRole,
@@ -77,7 +77,11 @@ export const PATCH = withErrorHandler(
   }
 );
 
-// DELETE /api/admin/invite-codes/:id — deactivate code (soft delete)
+// DELETE /api/admin/invite-codes/:id — hard-delete ONLY when the code has zero
+// redemptions (SET-09). The FK on invite_code_redemptions is ON DELETE CASCADE,
+// so deleting a redeemed code would silently erase its redemption history — hence
+// the zero-redemption guard: redeemed codes return 409 and stay (deactivate via
+// PATCH isActive:false instead).
 export const DELETE = withErrorHandler(
   async (
     request: Request,
@@ -94,18 +98,39 @@ export const DELETE = withErrorHandler(
 
     const { id } = await params;
 
-    const [updated] = await db
-      .update(inviteCodes)
-      .set({ isActive: false })
+    // Confirm the code exists first (so we can 404 vs 409 correctly).
+    const [existing] = await db
+      .select({ id: inviteCodes.id })
+      .from(inviteCodes)
       .where(eq(inviteCodes.id, id))
-      .returning();
+      .limit(1);
 
-    if (!updated) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Invite code not found" },
         { status: 404 }
       );
     }
+
+    // Count redemptions — block the hard-delete if any exist.
+    const countRows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(inviteCodeRedemptions)
+      .where(eq(inviteCodeRedemptions.inviteCodeId, id));
+    const redemptionCount = countRows[0]?.count ?? 0;
+
+    if (redemptionCount > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "This code has been redeemed and can't be deleted. Deactivate it instead to keep its redemption history.",
+          code: "INVITE_CODE_HAS_REDEMPTIONS",
+        },
+        { status: 409 }
+      );
+    }
+
+    await db.delete(inviteCodes).where(eq(inviteCodes.id, id));
 
     return NextResponse.json({ success: true });
   }

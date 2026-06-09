@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { NumberInput } from "@/components/forms/primitives";
+import { Input } from "@/components/ui";
 import { validateTiers } from "@/lib/revenue-params";
 import type { PricingTier } from "@burnless/engine";
 
@@ -61,11 +62,11 @@ export function TieredPricingEditor({ tiers, onChange, onValidityChange }: Tiere
         <div key={i} className="grid grid-cols-12 gap-2 items-end">
           <label className="col-span-4 text-xs">
             <span className="text-surface-700 dark:text-surface-300">Name</span>
-            <input
+            <Input
               type="text"
               value={t.name}
               onChange={(e) => updateTier(i, { name: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-surface-300 dark:bg-surface-800 text-sm"
+              className="mt-1 text-sm"
               aria-label={`Tier ${i + 1} name`}
             />
           </label>

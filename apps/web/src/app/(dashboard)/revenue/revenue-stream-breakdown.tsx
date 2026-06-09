@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { Pencil, Trash2 } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
+import { useLocale } from "@/components/locale/locale-context";
 import { BarChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
-import { ChartCard, Modal } from "@/components/ui";
+import { ChartCard, Modal, useConfirm } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import type { StreamBreakdown } from "@/lib/compute-revenue";
 import { RevenueStreamForm, type RevenueStreamFormValues } from "./revenue-stream-form";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
@@ -59,7 +61,9 @@ export function RevenueStreamBreakdown({
   scenarioId,
 }: RevenueStreamBreakdownProps) {
   const router = useRouter();
-  const { error: toastError } = useToast();
+  const { fmtPercent } = useLocale();
+  const { success, error: toastError } = useToast();
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [editingStream, setEditingStream] = useState<EditRevenueStream | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const {
@@ -89,7 +93,10 @@ export function RevenueStreamBreakdown({
         throw new Error(data.error ?? "Failed to update revenue stream");
       }
       setEditingStream(null);
+      success("Revenue stream updated");
       router.refresh();
+    } catch (err) {
+      toastError(toUserMessage(err));
     } finally {
       setEditSubmitting(false);
     }
@@ -109,7 +116,13 @@ export function RevenueStreamBreakdown({
   });
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this revenue stream? This action cannot be undone.")) return;
+    const ok = await askConfirm({
+      title: "Delete revenue stream?",
+      body: "This action cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
 
     setDeletingId(id);
     try {
@@ -120,7 +133,7 @@ export function RevenueStreamBreakdown({
       }
       router.refresh();
     } catch (err) {
-      toastError(err instanceof Error ? err.message : "Failed to delete revenue stream");
+      toastError(toUserMessage(err));
     } finally {
       setDeletingId(null);
     }
@@ -173,7 +186,7 @@ export function RevenueStreamBreakdown({
                         {formatCompactCurrency(stream.currentRevenue)}
                       </span>
                       <span className={`text-[10px] font-medium ${changeColor}`}>
-                        {changeIcon}{Math.abs(ratioToPct(stream.changePercent)).toFixed(0)}%
+                        {changeIcon}{fmtPercent(Math.abs(ratioToPct(stream.changePercent)), 0)}
                       </span>
                       {/* Edit/delete actions — visible on hover. Hidden for the
                           synthetic residual row (not a DB entity; would 404). */}
@@ -262,6 +275,8 @@ export function RevenueStreamBreakdown({
           />
         </Modal>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

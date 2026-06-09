@@ -100,6 +100,17 @@ export const GET = withErrorHandler(async (request: Request) => {
           }
         : null;
 
+    // AI-09: a pending gate is only "resumable" (genuinely-just-paused) for a
+    // short window. Older pending rows belong to a historical conversation the
+    // user is merely browsing — the client restores those as inert (resolved)
+    // rather than live controls, so a stale gate never locks the composer. TTL
+    // is read off the row's own createdAt; no extra query.
+    const RESUMABLE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+    const resumable =
+      pendingRow != null &&
+      pendingRow.createdAt != null &&
+      Date.now() - new Date(pendingRow.createdAt).getTime() < RESUMABLE_TTL_MS;
+
     return NextResponse.json({
       conversationId,
       messages,
@@ -109,6 +120,9 @@ export const GET = withErrorHandler(async (request: Request) => {
       // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
       // pause-time; the client prefers this over the per-kind pending fields.
       pendingTimeline: (pendingRow?.timeline as unknown[] | null) ?? null,
+      // AI-09: whether the restored pending gate should render live (true) or
+      // inert/resolved (false) on the client.
+      resumable,
     });
   }
 

@@ -24,6 +24,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDashboardPreferences as useDashboardPreferencesSWR } from "@/lib/swr";
+import { useToast } from "@/components/ui/toast";
+import { toUserMessage } from "@/lib/api-error";
 import {
   DEFAULT_HERO_CARDS,
   DEFAULT_SECONDARY_METRICS,
@@ -50,6 +53,12 @@ export interface DashboardLayoutState {
   secondaryMetrics: string[];
   /** Swap a hero card with a new metric */
   swapHeroCard: (index: number, newSlug: string) => Promise<void>;
+  /**
+   * Reset a hero card at `index` back to its engine default metric.
+   * DASH-01: pairs with the per-card display-mode reset so 'Reset to default'
+   * restores BOTH the slug and the mode (no Save+Reset contradiction).
+   */
+  resetHeroCard: (index: number) => Promise<void>;
   /** Reorder hero cards */
   reorderHeroCards: (cards: string[]) => void;
   /** Add a metric as a new dashboard card (hero slot) */
@@ -98,6 +107,7 @@ export function DashboardLayoutProvider({
 }: ProviderProps) {
   const { mode } = useMetrics();
   const router = useRouter();
+  const toast = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -113,25 +123,30 @@ export function DashboardLayoutProvider({
     customMetrics: initialPreferences?.customMetrics ?? [],
   }));
 
-  // Load preferences from API if not provided server-side
+  // Load card preferences via the shared SWR cache when not provided
+  // server-side. Suspended (paused) when initialPreferences seeded state so
+  // SSR'd dashboards never refetch. ESL-3: a load error leaves the engine-default
+  // card config in place (this provider has no loading flag — defaults render).
+  const { data: swrPrefs } = useDashboardPreferencesSWR(
+    initialPreferences ? { isPaused: () => true } : undefined,
+  );
+
+  // Syncing local mutable prefs from the external SWR cache — sanctioned
+  // "sync from external system" effect-setState (cf. dashboard-shell). Optimistic
+  // edits flow through updatePrefs, so the state can't be purely derived.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (initialPreferences) return;
-    let cancelled = false;
-    apiFetch("/api/dashboard-preferences")
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setPrefs({
-          heroCards: data.heroCards?.length ? data.heroCards : DEFAULT_HERO_CARDS,
-          secondaryMetrics: data.secondaryMetrics?.length
-            ? data.secondaryMetrics
-            : DEFAULT_SECONDARY_METRICS,
-          customMetrics: data.customMetrics ?? [],
-        });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [initialPreferences]);
+    if (initialPreferences || !swrPrefs) return;
+    const data = swrPrefs;
+    setPrefs({
+      heroCards: data.heroCards?.length ? data.heroCards : DEFAULT_HERO_CARDS,
+      secondaryMetrics: data.secondaryMetrics?.length
+        ? data.secondaryMetrics
+        : DEFAULT_SECONDARY_METRICS,
+      customMetrics: data.customMetrics ?? [],
+    });
+  }, [initialPreferences, swrPrefs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Track pending save for beforeunload guard
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -148,7 +163,7 @@ export function DashboardLayoutProvider({
   const savePrefs = useCallback(
     (updated: DashboardCardPreferences | undefined): Promise<void> => {
       if (!updated) {
-        console.warn("savePrefs called with undefined — skipping");
+        // No-op guard: nothing to persist.
         return Promise.resolve();
       }
       setIsSaving(true);
@@ -177,7 +192,7 @@ export function DashboardLayoutProvider({
               setTimeout(() => resolve(attempt(retries - 1, delay * 2)), delay)
             );
           }
-          console.error("Failed to save dashboard card preferences:", err);
+          toast.error(toUserMessage(err));
         });
 
       isSavePendingRef.current = true;
@@ -196,7 +211,7 @@ export function DashboardLayoutProvider({
       saveQueueRef.current = thisPromise;
       return thisPromise;
     },
-    []
+    [router, toast]
   );
 
   const updatePrefs = useCallback(
@@ -216,6 +231,26 @@ export function DashboardLayoutProvider({
       updatePrefs((p) => {
         const cards = [...p.heroCards];
         cards[index] = newSlug;
+        return { ...p, heroCards: cards };
+      }),
+    [updatePrefs]
+  );
+
+  // DASH-01: restore a hero card to its engine-default metric. swapHeroCard
+  // permanently rewrites heroCards[index] and never records the original, so
+  // the only safe restore baseline is the canonical engine default at that
+  // position. Persists + revalidates via the same updatePrefs → savePrefs path
+  // swapHeroCard uses (PATCH /api/dashboard-preferences + router.refresh()).
+  // If the index is out of the default-cards range (custom-added hero slot
+  // with no engine default), this is a no-op rather than writing `undefined`.
+  const resetHeroCard = useCallback(
+    (index: number) =>
+      updatePrefs((p) => {
+        const defaultSlug = DEFAULT_HERO_CARDS[index];
+        if (defaultSlug == null) return p;
+        if (p.heroCards[index] === defaultSlug) return p;
+        const cards = [...p.heroCards];
+        cards[index] = defaultSlug;
         return { ...p, heroCards: cards };
       }),
     [updatePrefs]
@@ -301,6 +336,7 @@ export function DashboardLayoutProvider({
       heroCards: prefs.heroCards,
       secondaryMetrics: prefs.secondaryMetrics,
       swapHeroCard,
+      resetHeroCard,
       addHeroCard,
       removeHeroCard,
       reorderHeroCards,
@@ -317,6 +353,7 @@ export function DashboardLayoutProvider({
       prefs.secondaryMetrics,
       hasIntelligenceCards,
       swapHeroCard,
+      resetHeroCard,
       addHeroCard,
       removeHeroCard,
       reorderHeroCards,

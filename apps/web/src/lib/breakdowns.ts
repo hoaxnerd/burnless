@@ -21,15 +21,24 @@ export interface RevenueBreakdownRow {
   share: number; // 0-100
 }
 
-/** People for headcount; else categorizeTransaction(account name); category fallback. */
+/** People for headcount; else an explicit per-account override (from the expense
+ *  form's Category field); else categorizeTransaction(account name); category
+ *  fallback. */
 // NOTE: mirrors the categorize+fallback in compute-expenses.ts:deriveSubcategory.
-// Task 3 rewires compute-expenses to consume these blended breakdowns; fold the
-// shared subcategory logic into one place then.
-function deriveSubcategory(line: BlendedExpenseLine): string {
+// `subcatByAccount` carries the user's explicit forecast_lines.subcategory, mapped
+// to the account the blended line aggregates, so the category chart + AI insight
+// honor the same per-entry category the expense table shows.
+function deriveSubcategory(line: BlendedExpenseLine, subcatByAccount?: Map<string, string>): string {
   if (line.accountId === "headcount-cost") return "People";
+  const override = subcatByAccount?.get(line.accountId);
+  if (override && override.trim() !== "") return override.trim();
   const result = categorizeTransaction(line.accountName);
   if (result && result.confidence >= 0.5) return result.subcategory;
-  return line.category === "cogs" ? "Cost of Goods Sold" : "Uncategorized";
+  if (line.category === "cogs") return "Cost of Goods Sold";
+  // Final fallback: an expense account is always named, and its name is a more
+  // useful category than a generic "Uncategorized" bucket (which read as a 49%
+  // mystery in board reports — RPT-06). Only truly nameless spend stays Uncategorized.
+  return line.accountName?.trim() || "Uncategorized";
 }
 
 /**
@@ -40,6 +49,7 @@ export function buildExpenseBreakdown(
   lines: BlendedExpenseLine[],
   month: string,
   total: number,
+  subcatByAccount?: Map<string, string>,
 ): ExpenseBreakdownRow[] {
   const map = new Map<string, number>();
   for (const line of lines) {
@@ -49,7 +59,7 @@ export function buildExpenseBreakdown(
     // total, and dropping them would break the breakdown↔total reconciliation.
     // The display layer is responsible for rendering negative bars/shares.
     if (amt === 0) continue;
-    const key = deriveSubcategory(line);
+    const key = deriveSubcategory(line, subcatByAccount);
     map.set(key, (map.get(key) ?? 0) + amt);
   }
   return Array.from(map.entries())
@@ -70,10 +80,11 @@ export function buildExpenseBreakdown(
  */
 export function buildExpenseMonthlyBySubcategory(
   lines: BlendedExpenseLine[],
+  subcatByAccount?: Map<string, string>,
 ): Record<string, unknown>[] {
   // deriveSubcategory is regex-heavy (categorizeTransaction); compute each line's
   // subcategory key ONCE and reuse it across every month.
-  const lineKeys = lines.map((line) => deriveSubcategory(line));
+  const lineKeys = lines.map((line) => deriveSubcategory(line, subcatByAccount));
   const months = new Set<string>();
   const subcatSet = new Set<string>();
   for (let i = 0; i < lines.length; i++) {

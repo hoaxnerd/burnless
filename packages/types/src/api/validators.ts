@@ -19,10 +19,57 @@ export const percentage = () =>
 export const ratio = () =>
   z.number().finite().min(0).max(1);
 
-/** Date string that transforms to a Date object. */
-export const dateString = () =>
-  z.string().transform((s) => new Date(s));
+/**
+ * VAL-01/DATE-01: build a LOCAL-midnight Date for a bare YYYY-MM-DD so the insert
+ * side agrees with the engine DATE-02 monthKey read side (both local). Other date
+ * strings (ISO datetimes) pass through unchanged.
+ */
+const toLocalDate = (s: string) =>
+  new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00` : s);
 
-/** Nullable date string that transforms to Date | null. */
+/** Required date string: rejects empty/unparseable; transforms to a local Date. */
+export const dateString = () =>
+  z
+    .string()
+    .min(1, "Date is required")
+    .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid date")
+    .transform(toLocalDate);
+
+/** Nullable date string: null/absent -> null; rejects '' and garbage; valid -> local Date. */
 export const nullableDateString = () =>
-  z.string().nullable().default(null).transform((s) => (s ? new Date(s) : null));
+  z
+    .string()
+    .min(1, "Date is required")
+    .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid date")
+    .transform(toLocalDate)
+    .nullable()
+    .default(null);
+
+/**
+ * VAL-03/DATE-03: cross-field date-range invariant. Wraps a ZodObject and rejects
+ * an `endDate` earlier than `startDate` when BOTH are present (non-null). An absent
+ * or null endDate (open-ended) is allowed, and an absent startDate (e.g. partial
+ * update) is allowed. Works on either post-transform `Date` values (headcount /
+ * forecast schemas) or raw `YYYY-MM-DD` strings (revenue-stream schema) — both are
+ * coerced to a comparable epoch via `Date`.
+ */
+const toEpoch = (v: unknown): number | null => {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    const t = v.getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? null : t;
+};
+
+export const withDateRange = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.refine(
+    (data: { startDate?: unknown; endDate?: unknown }) => {
+      const start = toEpoch(data?.startDate);
+      const end = toEpoch(data?.endDate);
+      if (start == null || end == null) return true; // open-ended / absent => allowed
+      return start <= end;
+    },
+    { message: "endDate must be on or after startDate", path: ["endDate"] },
+  );

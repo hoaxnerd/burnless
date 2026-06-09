@@ -8,6 +8,8 @@
 
 import { useMemo } from "react";
 import { X, ArrowDown, ArrowUp, Info } from "lucide-react";
+import { Overlay } from "./overlay";
+import { IconButton } from "./icon-button";
 import {
   getMetricDef,
   getMetricDependencyTree,
@@ -52,29 +54,37 @@ export function SharedFormulaViewer() {
       .filter((d): d is MetricDefinition => !!d);
   }, [metric]);
 
-  if (!metric || !formulaViewerSlug) return null;
+  const open = Boolean(metric && formulaViewerSlug);
 
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60] transition-opacity"
-        onClick={closeFormulaViewer}
-      />
-
-      <div className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-[60] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
+    <Overlay
+      open={open}
+      onClose={closeFormulaViewer}
+      headless
+      className="!p-0"
+      scrimClassName="bg-black/30 fixed inset-0 backdrop-blur-sm z-[60] transition-opacity"
+    >
+      {(panelProps) =>
+        metric ? (
+        <div
+          {...panelProps}
+          role="dialog"
+          aria-modal="true"
+          aria-label={metric.name}
+          className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-2xl sm:max-h-[80vh] bg-surface-0 rounded-2xl border border-surface-200 shadow-2xl z-[60] flex flex-col overflow-hidden outline-none"
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
             <h2 className="text-lg font-bold text-surface-900">{metric.name}</h2>
             <p className="text-xs text-surface-400 mt-0.5">
               {CATEGORY_META[metric.category]?.label} metric
             </p>
           </div>
-          <button
+          <IconButton
+            aria-label="Close"
             onClick={closeFormulaViewer}
-            className="p-2 rounded-lg hover:bg-surface-100 transition-colors"
-          >
-            <X className="h-4 w-4 text-surface-500" />
-          </button>
+            icon={<X className="text-surface-500" />}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -183,7 +193,9 @@ export function SharedFormulaViewer() {
           )}
         </div>
       </div>
-    </>
+        ) : null
+      }
+    </Overlay>
   );
 }
 

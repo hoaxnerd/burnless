@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useScenario } from "./scenario-context";
 import { apiFetch } from "@/lib/api-fetch";
+import {
+  useScenarioOverrides as useScenarioOverridesSWR,
+  revalidate,
+  KEYS,
+} from "@/lib/swr";
 
 export interface OverrideInfo {
   overrideId: string;
@@ -41,54 +46,37 @@ export function useScenarioOverrides(
 ): UseScenarioOverridesResult {
   const { activeScenarioId, isInScenarioMode } = useScenario();
   const router = useRouter();
-  const [overrides, setOverrides] = useState<OverrideInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const fetchOverrides = useCallback(async () => {
-    if (!activeScenarioId) {
-      setOverrides([]);
-      return;
-    }
+  // Read the override list via the shared SWR cache (DFL-01 / SCN-05) instead of
+  // a private useEffect+apiFetch snapshot. SWR keys on the scenario id, so a
+  // mutation that revalidates KEYS.scenarioOverrides on ANY surface (e.g. the
+  // banner change-counter, or a delete here) updates this read with no reload.
+  // Only fetch while in scenario mode and an active scenario exists.
+  const swrKeyId = isInScenarioMode ? activeScenarioId : null;
+  const { data, isLoading } = useScenarioOverridesSWR(swrKeyId);
 
-    setIsLoading(true);
-    try {
-      const res = await apiFetch(
-        `/api/scenarios/overrides?scenarioId=${activeScenarioId}`,
-      );
-      if (!res.ok) {
-        setOverrides([]);
-        return;
+  const overrides = useMemo<OverrideInfo[]>(() => {
+    const allOverrides: OverrideInfo[] = [];
+    for (const group of data?.groups ?? []) {
+      if (group.entityType !== entityType) continue;
+      for (const raw of group.overrides ?? []) {
+        const o = raw as {
+          id: string;
+          entityId: string;
+          action: "modify" | "create" | "delete";
+          data: Record<string, unknown> | null;
+        };
+        allOverrides.push({
+          overrideId: o.id,
+          entityId: o.entityId,
+          action: o.action,
+          data: o.data,
+          entityName: o.data?.name as string | undefined,
+        });
       }
-      const json = await res.json();
-      const allOverrides: OverrideInfo[] = [];
-
-      for (const group of json.groups ?? []) {
-        if (group.entityType !== entityType) continue;
-        for (const o of group.overrides ?? []) {
-          allOverrides.push({
-            overrideId: o.id,
-            entityId: o.entityId,
-            action: o.action,
-            data: o.data,
-            entityName: o.data?.name as string | undefined,
-          });
-        }
-      }
-      setOverrides(allOverrides);
-    } catch {
-      setOverrides([]);
-    } finally {
-      setIsLoading(false);
     }
-  }, [activeScenarioId, entityType]);
-
-  useEffect(() => {
-    if (isInScenarioMode) {
-      fetchOverrides();
-    } else {
-      setOverrides([]);
-    }
-  }, [isInScenarioMode, fetchOverrides]);
+    return allOverrides;
+  }, [data, entityType]);
 
   const { overrideMap, deletedEntities } = useMemo(() => {
     const map = new Map<string, OverrideInfo>();
@@ -113,10 +101,17 @@ export function useScenarioOverrides(
         throw new Error(data.error ?? "Failed to delete override");
       }
       router.refresh();
-      // Re-fetch overrides after deletion
-      await fetchOverrides();
+      // Revalidate the shared override read (list + count) so every surface —
+      // this table, the scenario banner change-counter — reflects the deletion
+      // without a reload.
+      if (activeScenarioId) {
+        await revalidate(
+          KEYS.scenarioOverrides(activeScenarioId),
+          KEYS.scenarioOverrideCount(activeScenarioId),
+        );
+      }
     },
-    [router, fetchOverrides],
+    [router, activeScenarioId],
   );
 
   const handleRevert = useCallback(

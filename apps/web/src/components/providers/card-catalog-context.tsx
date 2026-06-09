@@ -28,6 +28,12 @@ export interface CardCatalogValue {
   cardType: "metric" | "chart";
   /** Called when a user saves a metric selection for a specific card (cardSlug → selectedSlug). */
   onSaveForCard?: (cardSlug: string, selectedSlug: string) => void;
+  /**
+   * DASH-01: called when a user resets a specific card to its default metric.
+   * For dashboard hero cards this restores the engine-default slug, pairing
+   * with the per-card display-mode reset so 'Reset to default' is consistent.
+   */
+  onResetForCard?: (cardSlug: string) => void;
 }
 
 const CardCatalogCtx = createContext<CardCatalogValue | null>(null);

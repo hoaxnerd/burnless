@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArrowLeft, Download, Printer, Sparkles } from "lucide-react";
+import { ArrowLeft, FolderOpen, Printer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { AreaChartWidget, chartColors, formatCompactCurrency } from "@/components/charts";
 import { ChartCard, SwappableMetricCard } from "@/components/ui";
@@ -11,6 +11,8 @@ import { ConnectedPageGrid, type DefaultLayoutItem } from "@/components/ui";
 import { PageLayoutProvider } from "@/components/providers/page-layout-context";
 import { ComputedMetricsProvider } from "@/components/providers/computed-metrics-context";
 import { PageProvider } from "@/components/providers/page-context";
+import { useLocale } from "@/components/locale/locale-context";
+import { formatPercent } from "@burnless/types";
 import type { ResolvedSlotData } from "@burnless/engine";
 import type { SubcategoryBreakdown } from "@/lib/compute-expenses";
 
@@ -44,7 +46,8 @@ interface BoardData {
   };
   cash: {
     position: number;
-    burnRate: number;
+    // FMT-3: the net burn series (max(0, gross − revenue)); never the gross series.
+    netBurnRate: number;
     runway: number;
     totalFunding: number;
     netIncome: number;
@@ -66,10 +69,12 @@ interface BoardData {
   };
 }
 
-function formatMonthYear(monthKey: string): string {
+type FmtDate = (date: Date | string, options?: Intl.DateTimeFormatOptions) => string;
+
+function formatMonthYear(monthKey: string, fmtDate: FmtDate): string {
   const [year, month] = monthKey.split("-");
   const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return fmtDate(date, { month: "long", year: "numeric" });
 }
 
 // ── AI narrative generation ──────────────────────────────────────────────────
@@ -77,9 +82,9 @@ function formatMonthYear(monthKey: string): string {
 function generateRevenueNarrative(r: BoardData["revenue"]): string {
   const parts: string[] = [];
   if (r.growthPercent > 0) {
-    parts.push(`Revenue grew ${r.growthPercent.toFixed(1)}% month-over-month to ${formatCompactCurrency(r.current)}/mo.`);
+    parts.push(`Revenue grew ${formatPercent(r.growthPercent)} month-over-month to ${formatCompactCurrency(r.current)}/mo.`);
   } else if (r.growthPercent < 0) {
-    parts.push(`Revenue declined ${Math.abs(r.growthPercent).toFixed(1)}% to ${formatCompactCurrency(r.current)}/mo.`);
+    parts.push(`Revenue declined ${formatPercent(Math.abs(r.growthPercent))} to ${formatCompactCurrency(r.current)}/mo.`);
   } else {
     parts.push(`Revenue held steady at ${formatCompactCurrency(r.current)}/mo.`);
   }
@@ -87,28 +92,46 @@ function generateRevenueNarrative(r: BoardData["revenue"]): string {
   if (r.hasSaaS) {
     parts.push(`MRR stands at ${formatCompactCurrency(r.mrr)} (ARR: ${formatCompactCurrency(r.arr)}) across ${Math.round(r.customers)} customers at ${formatCompactCurrency(r.arpa)} ARPA.`);
     if (r.churnRate > 5) {
-      parts.push(`Churn at ${r.churnRate.toFixed(1)}% requires attention.`);
+      parts.push(`Churn at ${formatPercent(r.churnRate)} requires attention.`);
     } else if (r.churnRate > 0) {
-      parts.push(`Churn is healthy at ${r.churnRate.toFixed(1)}%.`);
+      parts.push(`Churn is healthy at ${formatPercent(r.churnRate)}.`);
     }
   }
 
   return parts.join(" ");
 }
 
-function generateExpenseNarrative(e: BoardData["expenses"]): string {
+// RPT-06: "Uncategorized" is a catch-all bucket, not a real spend category. It
+// must never headline the board narrative as the "largest category", and when
+// it dominates we surface a categorization prompt instead.
+const UNCATEGORIZED_LABEL = "Uncategorized";
+const UNCATEGORIZED_PROMPT_THRESHOLD = 25; // % of total spend
+
+function isUncategorized(cat: SubcategoryBreakdown): boolean {
+  return cat.subcategory.trim().toLowerCase() === UNCATEGORIZED_LABEL.toLowerCase();
+}
+
+export function generateExpenseNarrative(e: BoardData["expenses"]): string {
   const parts: string[] = [];
   if (e.changePercent > 5) {
-    parts.push(`Total spend increased ${e.changePercent.toFixed(1)}% to ${formatCompactCurrency(e.current)}/mo.`);
+    parts.push(`Total spend increased ${formatPercent(e.changePercent)} to ${formatCompactCurrency(e.current)}/mo.`);
   } else if (e.changePercent < -5) {
-    parts.push(`Spend decreased ${Math.abs(e.changePercent).toFixed(1)}% to ${formatCompactCurrency(e.current)}/mo — good cost discipline.`);
+    parts.push(`Spend decreased ${formatPercent(Math.abs(e.changePercent))} to ${formatCompactCurrency(e.current)}/mo — good cost discipline.`);
   } else {
     parts.push(`Spend is stable at ${formatCompactCurrency(e.current)}/mo.`);
   }
 
-  if (e.topCategories.length > 0) {
-    const top = e.topCategories[0]!;
-    parts.push(`Largest category: ${top.subcategory} at ${formatCompactCurrency(top.amount)} (${top.percentage.toFixed(0)}% of total).`);
+  // RPT-06: when Uncategorized exceeds the threshold, prompt to categorize
+  // rather than naming it as the largest category.
+  const uncategorized = e.topCategories.find(isUncategorized);
+  if (uncategorized && uncategorized.percentage >= UNCATEGORIZED_PROMPT_THRESHOLD) {
+    parts.push(`${formatPercent(uncategorized.percentage, undefined, 0)} of spend is uncategorized — categorize for a sharper breakdown.`);
+  }
+
+  // Pick the largest NAMED category (skip the Uncategorized catch-all).
+  const topNamed = e.topCategories.find((c) => !isUncategorized(c));
+  if (topNamed) {
+    parts.push(`Largest category: ${topNamed.subcategory} at ${formatCompactCurrency(topNamed.amount)} (${formatPercent(topNamed.percentage, undefined, 0)} of total).`);
   }
 
   if (e.anomalyCount > 0) {
@@ -118,12 +141,22 @@ function generateExpenseNarrative(e: BoardData["expenses"]): string {
   return parts.join(" ");
 }
 
+/**
+ * RPT-06: order Top Categories with named categories first (by original order)
+ * and the Uncategorized catch-all pushed to the end, so it never visually leads.
+ */
+function orderedTopCategories(cats: SubcategoryBreakdown[]): SubcategoryBreakdown[] {
+  const named = cats.filter((c) => !isUncategorized(c));
+  const unc = cats.filter(isUncategorized);
+  return [...named, ...unc];
+}
+
 function generateCashNarrative(c: BoardData["cash"]): string {
   const parts: string[] = [];
   parts.push(`Cash position: ${formatCompactCurrency(c.position)}.`);
 
-  if (c.burnRate > 0) {
-    parts.push(`Net burn rate: ${formatCompactCurrency(c.burnRate)}/mo.`);
+  if (c.netBurnRate > 0) {
+    parts.push(`Net burn rate: ${formatCompactCurrency(c.netBurnRate)}/mo.`);
     if (c.runway > 36) {
       parts.push("Runway exceeds 36 months — strong position.");
     } else if (c.runway >= 18) {
@@ -178,6 +211,7 @@ function ReportSection({
 
 export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; resolvedSlotData: ResolvedSlotData[] }) {
   const d = data;
+  const { fmtDate } = useLocale();
 
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
@@ -195,7 +229,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 6, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 9, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "ai-insights", x: 0, w: 12, h: 8, minH: 4 },
+    { i: "ai-insights", x: 0, w: 12, h: 5, minH: 3 },
     { i: "revenue-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 12, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 12, h: 14, minH: 8 },
@@ -207,7 +241,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
     { i: "metric-1", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-2", x: 0, w: 3, h: 5, minW: 2, minH: 4 },
     { i: "metric-3", x: 3, w: 3, h: 5, minW: 2, minH: 4 },
-    { i: "ai-insights", x: 0, w: 6, h: 8, minH: 4 },
+    { i: "ai-insights", x: 0, w: 6, h: 5, minH: 3 },
     { i: "revenue-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "expenses-section", x: 0, w: 6, h: 14, minH: 8 },
     { i: "cash-runway-section", x: 0, w: 6, h: 14, minH: 8 },
@@ -270,7 +304,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                 </div>
                 <div className="rounded-lg border border-surface-200 p-3">
                   <p className="text-[10px] font-medium text-surface-500 uppercase">Churn</p>
-                  <p className="text-lg font-bold text-surface-900 tabular-nums">{d.revenue.churnRate.toFixed(1)}%</p>
+                  <p className="text-lg font-bold text-surface-900 tabular-nums">{formatPercent(d.revenue.churnRate)}</p>
                 </div>
               </div>
             </div>
@@ -290,22 +324,26 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
           <div>
             <h4 className="text-xs font-medium text-surface-500 uppercase mb-3">Top Categories</h4>
             <div className="space-y-2">
-              {d.expenses.topCategories.map((cat) => (
-                <div key={cat.subcategory} className="flex items-center justify-between">
-                  <span className="text-xs text-surface-700">{cat.subcategory}</span>
-                  <div className="flex items-center gap-3">
-                    <div className="w-20 h-1.5 rounded-full bg-surface-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-surface-400"
-                        style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                      />
+              {orderedTopCategories(d.expenses.topCategories).map((cat) => {
+                // RPT-06: render the Uncategorized catch-all greyed / last.
+                const greyed = isUncategorized(cat);
+                return (
+                  <div key={cat.subcategory} className="flex items-center justify-between">
+                    <span className={`text-xs ${greyed ? "text-surface-400 italic" : "text-surface-700"}`}>{cat.subcategory}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-20 h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${greyed ? "bg-surface-300" : "bg-surface-400"}`}
+                          style={{ width: `${Math.min(cat.percentage, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-semibold tabular-nums w-14 text-right ${greyed ? "text-surface-400" : "text-surface-900"}`}>
+                        {formatCompactCurrency(cat.amount)}
+                      </span>
                     </div>
-                    <span className="text-xs font-semibold tabular-nums text-surface-900 w-14 text-right">
-                      {formatCompactCurrency(cat.amount)}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -328,7 +366,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
               </div>
               <div className="rounded-lg border border-surface-200 p-3">
                 <p className="text-[10px] font-medium text-surface-500 uppercase">Net Burn Rate</p>
-                <p className="text-lg font-bold text-surface-900 tabular-nums">{formatCompactCurrency(d.cash.burnRate)}/mo</p>
+                <p className="text-lg font-bold text-surface-900 tabular-nums">{formatCompactCurrency(d.cash.netBurnRate)}/mo</p>
               </div>
               <div className="rounded-lg border border-surface-200 p-3">
                 <p className="text-[10px] font-medium text-surface-500 uppercase">Runway</p>
@@ -363,7 +401,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                   <th scope="col" className="text-left px-6 py-3 text-xs font-medium text-surface-500 uppercase">Line Item</th>
                   {pnlMonths.map((m) => (
                     <th key={m} scope="col" className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">
-                      {formatShortMonth(m)}
+                      {formatShortMonth(m, fmtDate)}
                     </th>
                   ))}
                 </tr>
@@ -399,7 +437,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Board Update</h1>
                   <p className="mt-0.5 text-sm text-surface-500">
-                    {d.companyName} &mdash; {formatMonthYear(d.reportMonth)}
+                    {d.companyName} &mdash; {formatMonthYear(d.reportMonth, fmtDate)}
                   </p>
                 </div>
               </div>
@@ -411,12 +449,14 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
                   <Printer className="w-3.5 h-3.5" />
                   Print
                 </button>
+                {/* RPT-10: this navigates to the data room — it does not export
+                    this report. Label and icon reflect navigation, not export. */}
                 <Link
                   href="/data-room"
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  Export Package
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Open Data Room
                 </Link>
               </div>
             </div>
@@ -425,7 +465,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
             <div className="hidden print:block print:mb-8">
               <h1 className="text-3xl font-bold text-surface-900">{d.companyName}</h1>
               <p className="text-lg text-surface-600 mt-1">
-                Monthly Board Update — {formatMonthYear(d.reportMonth)}
+                Monthly Board Update — {formatMonthYear(d.reportMonth, fmtDate)}
               </p>
               <div className="h-1 w-16 bg-brand-600 mt-3 rounded-full" />
             </div>
@@ -438,7 +478,7 @@ export function BoardUpdateView({ data, resolvedSlotData }: { data: BoardData; r
 
             {/* Footer */}
             <div className="text-center text-[10px] text-surface-400 pt-4 print:pt-8">
-              Generated by burnless &mdash; {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              Generated by burnless &mdash; {fmtDate(new Date(), { month: "long", day: "numeric", year: "numeric" })}
             </div>
           </div>
         </PageProvider>
@@ -494,8 +534,8 @@ function PnlRow({
   );
 }
 
-function formatShortMonth(monthKey: string): string {
+function formatShortMonth(monthKey: string, fmtDate: FmtDate): string {
   const [year, month] = monthKey.split("-");
   const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString("en-US", { month: "short" });
+  return fmtDate(date, { month: "short" });
 }

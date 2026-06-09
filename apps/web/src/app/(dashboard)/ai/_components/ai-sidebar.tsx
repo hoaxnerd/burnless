@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import {
   MessageSquarePlus, Lightbulb, History, Settings as SettingsIcon,
   Zap, X, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
+import { Overlay } from "@/components/ui";
 
 export type AiPane = "insights" | "history" | "settings";
 
@@ -56,16 +57,6 @@ export function AiSidebar(props: AiSidebarProps) {
     getCollapsedSnapshot,
     getCollapsedServerSnapshot
   );
-
-  // Mobile drawer a11y: Escape closes it.
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onMobileClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [mobileOpen, onMobileClose]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -134,19 +125,21 @@ export function AiSidebar(props: AiSidebarProps) {
       </aside>
 
       {/* Mobile drawer */}
-      {props.mobileOpen && (
-        <>
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/40 animate-fade-in" onClick={props.onMobileClose} aria-hidden />
+      <Overlay
+        open={props.mobileOpen}
+        onClose={props.onMobileClose}
+        ariaLabel="AI menu"
+        className="lg:hidden !p-0 !items-stretch !justify-start"
+      >
+        {(panelProps) => (
           <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="AI menu"
-            className="lg:hidden fixed inset-y-0 left-0 z-50 w-80 max-w-[85%] bg-surface-0 border-r border-surface-200 shadow-xl animate-slide-up"
+            {...panelProps}
+            className="lg:hidden w-80 max-w-[85%] bg-surface-0 border-r border-surface-200 shadow-xl animate-slide-up"
           >
             {inner(true)}
           </aside>
-        </>
-      )}
+        )}
+      </Overlay>
     </>
   );
 }

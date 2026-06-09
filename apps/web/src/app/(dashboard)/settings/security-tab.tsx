@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useSecurityStatus, revalidate, KEYS } from "@/lib/swr";
 import {
   Shield,
   Lock,
@@ -13,18 +14,28 @@ import {
   Copy,
   ShieldCheck,
   ShieldOff,
+  KeyRound,
 } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 
 type Step = "idle" | "loading" | "qr" | "backup" | "disable";
 
-interface TwoFactorStatus {
-  enabled: boolean;
-  loaded: boolean;
-}
-
 export function SecurityTab() {
-  const [tfa, setTfa] = useState<TwoFactorStatus>({ enabled: false, loaded: false });
+  // 2FA enrollment status now reads from the shared SWR cache (DFL-01).
+  // `enabledOverride` lets enable/disable flip the UI instantly; we also
+  // revalidate the cache key so any other consumer stays in sync.
+  const { data: statusData, error: statusError, isLoading } = useSecurityStatus();
+  const [enabledOverride, setEnabledOverride] = useState<boolean | null>(null);
+  const loaded = !isLoading && (statusData !== undefined || statusError !== undefined);
+  const enabled =
+    enabledOverride ?? (statusError ? false : statusData?.enabled ?? false);
+
+  const setEnabled = (next: boolean) => {
+    setEnabledOverride(next);
+    void revalidate(KEYS.twoFactorStatus);
+  };
+
   const [step, setStep] = useState<Step>("idle");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
@@ -35,26 +46,6 @@ export function SecurityTab() {
   const [copied, setCopied] = useState(false);
   const [disableCode, setDisableCode] = useState("");
 
-  // Load 2FA status on mount
-  const loadStatus = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/auth/two-factor/status");
-      if (res.ok) {
-        const data = await res.json();
-        setTfa({ enabled: data.enabled, loaded: true });
-      } else {
-        setTfa({ enabled: false, loaded: true });
-      }
-    } catch {
-      setTfa({ enabled: false, loaded: true });
-    }
-  }, []);
-
-  // Trigger load on first render
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
-
   const startSetup = async () => {
     setStep("loading");
     setError(null);
@@ -63,7 +54,7 @@ export function SecurityTab() {
       if (!res.ok) {
         const data = await res.json();
         if (data.error?.includes("already enabled")) {
-          setTfa({ enabled: true, loaded: true });
+          setEnabled(true);
           setStep("idle");
           return;
         }
@@ -74,7 +65,7 @@ export function SecurityTab() {
       setSecret(data.secret);
       setStep("qr");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start 2FA setup");
+      setError(toUserMessage(err));
       setStep("idle");
     }
   };
@@ -95,10 +86,10 @@ export function SecurityTab() {
       }
       const data = await res.json();
       setBackupCodes(data.backupCodes);
-      setTfa({ enabled: true, loaded: true });
+      setEnabled(true);
       setStep("backup");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
+      setError(toUserMessage(err));
       setStep("qr");
     } finally {
       setConfirming(false);
@@ -118,11 +109,11 @@ export function SecurityTab() {
         const data = await res.json();
         throw new Error(data.error || "Failed to disable 2FA");
       }
-      setTfa({ enabled: false, loaded: true });
+      setEnabled(false);
       setStep("idle");
       setDisableCode("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to disable 2FA");
+      setError(toUserMessage(err));
     }
   };
 
@@ -130,6 +121,49 @@ export function SecurityTab() {
     navigator.clipboard.writeText(backupCodes.join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ── Change password (SET-08) ───────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  const changePassword = async () => {
+    setPwError(null);
+    setPwSuccess(false);
+    if (!currentPassword || !newPassword) {
+      setPwError("Enter your current and new password");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords don't match");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPwError(toUserMessage(data) || "Failed to change password");
+        return;
+      }
+      setPwSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch {
+      setPwError("Failed to change password");
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   return (
@@ -150,15 +184,15 @@ export function SecurityTab() {
               </p>
             </div>
           </div>
-          {tfa.loaded && (
+          {loaded && (
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                tfa.enabled
+                enabled
                   ? "bg-success-50 text-success-700"
                   : "bg-surface-100 text-surface-500"
               }`}
             >
-              {tfa.enabled ? (
+              {enabled ? (
                 <>
                   <ShieldCheck className="h-3 w-3" />
                   Enabled
@@ -180,8 +214,16 @@ export function SecurityTab() {
           </div>
         )}
 
+        {/* ESL-3 — surface a read failure instead of silently showing "Disabled". */}
+        {statusError && enabledOverride === null && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-700">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            Couldn&apos;t load your two-factor status. Showing the default state — refresh to retry.
+          </div>
+        )}
+
         {/* Idle state — show enable/disable button */}
-        {step === "idle" && tfa.loaded && !tfa.enabled && (
+        {step === "idle" && loaded && !enabled && (
           <div className="space-y-4">
             <p className="text-sm text-surface-600">
               Protect your financial data with TOTP-based two-factor authentication.
@@ -198,7 +240,7 @@ export function SecurityTab() {
           </div>
         )}
 
-        {step === "idle" && tfa.loaded && tfa.enabled && (
+        {step === "idle" && loaded && enabled && (
           <div className="space-y-4">
             <p className="text-sm text-success-700 bg-success-50 rounded-lg px-3 py-2">
               Two-factor authentication is active. Your account requires a TOTP code on every login.
@@ -254,14 +296,15 @@ export function SecurityTab() {
                 2. Enter the 6-digit code from your app
               </p>
               <div className="flex gap-3">
-                <input
+                <Input
+                  aria-label="6-digit authentication code"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   placeholder="000000"
-                  className="w-36 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-center text-lg font-mono tracking-[0.3em] text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all"
+                  className="w-36 text-center text-lg font-mono tracking-[0.3em]"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") confirmSetup();
@@ -367,7 +410,8 @@ export function SecurityTab() {
               </p>
             </div>
             <div className="flex gap-3">
-              <input
+              <Input
+                aria-label="Current TOTP code"
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
@@ -376,7 +420,7 @@ export function SecurityTab() {
                   setDisableCode(e.target.value.replace(/\D/g, ""))
                 }
                 placeholder="000000"
-                className="w-36 rounded-xl border border-surface-300 bg-surface-0 px-4 py-3 text-center text-lg font-mono tracking-[0.3em] text-surface-900 placeholder:text-surface-300 focus:outline-none focus:ring-2 focus:ring-danger-500/40 focus:border-danger-500 transition-all"
+                className="w-36 text-center text-lg font-mono tracking-[0.3em]"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") disable2FA();
@@ -403,6 +447,74 @@ export function SecurityTab() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Change Password (SET-08) */}
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-9 w-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <KeyRound className="h-[18px] w-[18px] text-brand-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-surface-900">
+              Change Password
+            </h2>
+            <p className="text-xs text-surface-500 mt-0.5">
+              Update the password you use to sign in
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4 max-w-sm">
+          <Input
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Input
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            hint="At least 8 characters with upper, lower, and a number."
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <Input
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") changePassword();
+            }}
+          />
+
+          {pwError && (
+            <div className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-700">
+              <Check className="h-3.5 w-3.5 shrink-0" />
+              Password changed successfully.
+            </div>
+          )}
+
+          <Button
+            variant="primary"
+            size="sm"
+            state={pwSaving ? "loading" : "idle"}
+            disabled={pwSaving}
+            onClick={changePassword}
+          >
+            Change password
+          </Button>
+        </div>
       </div>
 
       {/* Security & Privacy Trust Signals */}

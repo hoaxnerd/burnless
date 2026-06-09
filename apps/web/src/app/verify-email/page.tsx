@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useSearchParams } from "next/navigation";
 import { useSession, SessionProvider } from "next-auth/react";
 import Link from "next/link";
@@ -37,7 +38,7 @@ function VerifyEmailContent() {
         await updateSession();
       } else {
         const data = await res.json();
-        setError(data.error || "Verification failed. Please try again.");
+        setError(toUserMessage(data) || "Verification failed. Please try again.");
         setStep("error");
       }
     } catch {

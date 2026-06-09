@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal } from "@/components/ui";
+import { Modal, Select, useConfirm } from "@/components/ui";
 import {
   VestingScheduleEditor,
   type VestingMilestone,
 } from "./vesting-schedule-editor";
 import { CurrencyInput, NumberInput, SingleDateInput } from "@/components/forms/primitives";
+import { toUserMessage } from "@/lib/api-error";
 
 export type GrantType = "iso" | "nso" | "rsu";
 
@@ -28,6 +29,7 @@ interface Props {
 
 export function EquityGrantsList({ headcountId, grants }: Props) {
   const router = useRouter();
+  const { confirm: askConfirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [grantDate, setGrantDate] = useState("");
   const [shares, setShares] = useState<number | null>(null);
@@ -72,7 +74,7 @@ export function EquityGrantsList({ headcountId, grants }: Props) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Failed to save");
+        setError(toUserMessage(body));
         return;
       }
       close();
@@ -83,7 +85,13 @@ export function EquityGrantsList({ headcountId, grants }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this equity grant?")) return;
+    const ok = await askConfirm({
+      title: "Delete equity grant?",
+      body: "This equity grant will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const res = await apiFetch(
       `/api/headcount/${headcountId}/equity-grants/${id}`,
       {
@@ -92,7 +100,7 @@ export function EquityGrantsList({ headcountId, grants }: Props) {
     );
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to delete");
+      setError(toUserMessage(body));
       return;
     }
     router.refresh();
@@ -176,19 +184,16 @@ export function EquityGrantsList({ headcountId, grants }: Props) {
             min={0}
             step={0.01}
           />
-          <label className="block text-sm">
-            <span className="block font-medium text-surface-700 mb-1">Type</span>
-            <select
-              value={grantType}
-              onChange={(e) => setGrantType(e.target.value as GrantType)}
-              data-testid="equity-grant-type"
-              className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm"
-            >
-              <option value="iso">ISO</option>
-              <option value="nso">NSO</option>
-              <option value="rsu">RSU</option>
-            </select>
-          </label>
+          <Select
+            label="Type"
+            value={grantType}
+            onChange={(e) => setGrantType(e.target.value as GrantType)}
+            data-testid="equity-grant-type"
+          >
+            <option value="iso">ISO</option>
+            <option value="nso">NSO</option>
+            <option value="rsu">RSU</option>
+          </Select>
           <fieldset className="rounded-lg border border-surface-200 p-3">
             <legend className="px-1 text-xs font-medium text-surface-700">Vesting schedule</legend>
             <VestingScheduleEditor
@@ -222,6 +227,7 @@ export function EquityGrantsList({ headcountId, grants }: Props) {
           </div>
         </div>
       </Modal>
+      {dialog}
     </div>
   );
 }

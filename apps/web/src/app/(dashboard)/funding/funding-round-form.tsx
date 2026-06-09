@@ -2,7 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { CurrencyInput, DateRangePicker } from "@/components/forms/primitives";
+import { Input, Select, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
 import {
   defaultParamsForType,
   normalizePayload,
@@ -16,6 +18,20 @@ import { DebtFields } from "./round-fields/DebtFields";
 import { GrantFields } from "./round-fields/GrantFields";
 
 const today = new Date().toISOString().slice(0, 10);
+
+// FUND-10: human labels for the immutable round-type badge. No internal spec
+// refs in UI strings — the badge reads "<Type> (immutable)".
+const roundTypeLabels: Record<FundingRoundType, string> = {
+  pre_seed: "Pre-Seed",
+  seed: "Seed",
+  series_a: "Series A",
+  series_b: "Series B",
+  series_c_plus: "Series C+",
+  safe: "SAFE",
+  convertible: "Convertible Note",
+  debt: "Debt",
+  grant: "Grant",
+};
 
 export interface FundingRoundFormValues {
   name: string;
@@ -89,12 +105,11 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
         headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error ?? "Save failed");
+        throw new Error(await extractApiError(res));
       }
       onClose();
-    } catch (err: any) {
-      setError(err.message ?? "Save failed");
+    } catch (err) {
+      setError(toUserMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -109,40 +124,39 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="text-sm font-medium">Round name</label>
-        <input
-          className="input"
-          required
-          value={values.name}
-          onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-        />
-      </div>
+      <Input
+        label="Round name"
+        required
+        value={values.name}
+        onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+      />
 
-      <div>
-        <label className="text-sm font-medium">Round type</label>
-        {mode === "edit" ? (
+      {mode === "edit" ? (
+        <div>
+          <span className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            Round type
+          </span>
           <div className="text-sm text-muted">
-            {values.roundType} (immutable — see umbrella §1.2)
+            {(roundTypeLabels[values.roundType] ?? values.roundType)} (immutable)
           </div>
-        ) : (
-          <select
-            className="input"
-            value={values.roundType}
-            onChange={(e) => setType(e.target.value as FundingRoundType)}
-          >
-            <option value="pre_seed">Pre-seed</option>
-            <option value="seed">Seed</option>
-            <option value="series_a">Series A</option>
-            <option value="series_b">Series B</option>
-            <option value="series_c_plus">Series C+</option>
-            <option value="safe">SAFE</option>
-            <option value="convertible">Convertible Note</option>
-            <option value="debt">Debt</option>
-            <option value="grant">Grant</option>
-          </select>
-        )}
-      </div>
+        </div>
+      ) : (
+        <Select
+          label="Round type"
+          value={values.roundType}
+          onChange={(e) => setType(e.target.value as FundingRoundType)}
+        >
+          <option value="pre_seed">Pre-seed</option>
+          <option value="seed">Seed</option>
+          <option value="series_a">Series A</option>
+          <option value="series_b">Series B</option>
+          <option value="series_c_plus">Series C+</option>
+          <option value="safe">SAFE</option>
+          <option value="convertible">Convertible Note</option>
+          <option value="debt">Debt</option>
+          <option value="grant">Grant</option>
+        </Select>
+      )}
 
       <CurrencyInput
         value={values.amount}
@@ -163,8 +177,7 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
 
       <FieldsComponent params={values.parameters as any} setParameters={setParameters} />
 
-      <textarea
-        className="textarea"
+      <Textarea
         placeholder="Notes (optional)"
         value={values.notes ?? ""}
         onChange={(e) => setValues((v) => ({ ...v, notes: e.target.value || null }))}

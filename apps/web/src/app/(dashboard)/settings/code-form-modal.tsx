@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui";
 import type { CodeFormData } from "./invite-codes-types";
 
 export function CodeFormModal({
@@ -43,18 +44,14 @@ export function CodeFormModal({
       <div className="space-y-4">
         {/* Code */}
         {mode === "create" && (
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Code
-            </label>
-            <input
-              type="text"
-              value={form.code}
-              onChange={(e) => set("code", e.target.value.toUpperCase())}
-              placeholder="Auto-generated if left empty"
-              className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 font-mono"
-            />
-          </div>
+          <Input
+            label="Code"
+            type="text"
+            value={form.code}
+            onChange={(e) => set("code", e.target.value.toUpperCase())}
+            placeholder="Auto-generated if left empty"
+            className="font-mono"
+          />
         )}
 
         {/* Type */}
@@ -85,82 +82,57 @@ export function CodeFormModal({
 
         {/* Max Redemptions (only for multi_use) */}
         {form.type === "multi_use" && (
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Max Redemptions
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={10000}
-              value={form.maxRedemptions}
-              onChange={(e) => set("maxRedemptions", parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-            />
-          </div>
+          <Input
+            label="Max Redemptions"
+            type="number"
+            min={1}
+            max={10000}
+            value={form.maxRedemptions}
+            onChange={(e) => set("maxRedemptions", parseInt(e.target.value) || 1)}
+          />
         )}
 
         {/* Expiry */}
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            Expiry Date
-            <span className="text-surface-400 font-normal ml-1">(optional)</span>
-          </label>
-          <input
-            type="datetime-local"
-            value={form.expiresAt}
-            onChange={(e) => set("expiresAt", e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-          />
-        </div>
+        <Input
+          label="Expiry Date"
+          showOptional
+          type="datetime-local"
+          value={form.expiresAt}
+          onChange={(e) => set("expiresAt", e.target.value)}
+        />
 
         {/* Free Days + AI Credits — side by side */}
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Free Platform Days
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={form.freePlatformDays}
-              onChange={(e) => set("freePlatformDays", parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              AI Credits ($)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={1000}
-              value={form.aiCreditsCents / 100}
-              onChange={(e) =>
-                set("aiCreditsCents", Math.round((parseFloat(e.target.value) || 0) * 100))
-              }
-              className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-            />
-          </div>
+          <Input
+            label="Free Platform Days"
+            type="number"
+            min={0}
+            max={365}
+            value={form.freePlatformDays}
+            onChange={(e) => set("freePlatformDays", parseInt(e.target.value) || 0)}
+          />
+          <Input
+            label="AI Credits ($)"
+            type="number"
+            min={0}
+            max={1000}
+            value={form.aiCreditsCents / 100}
+            onChange={(e) =>
+              set("aiCreditsCents", Math.round((parseFloat(e.target.value) || 0) * 100))
+            }
+          />
         </div>
 
         {/* Note */}
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            Note
-            <span className="text-surface-400 font-normal ml-1">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={form.note}
-            onChange={(e) => set("note", e.target.value)}
-            placeholder="e.g. YC batch, ProductHunt launch"
-            maxLength={500}
-            className="w-full px-3 py-2 rounded-xl border border-surface-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-          />
-        </div>
+        <Input
+          label="Note"
+          showOptional
+          type="text"
+          value={form.note}
+          onChange={(e) => set("note", e.target.value)}
+          placeholder="e.g. YC batch, ProductHunt launch"
+          maxLength={500}
+        />
 
         {error && (
           <p className="text-sm text-danger-600 bg-danger-50 px-3 py-2 rounded-xl">

@@ -201,7 +201,6 @@ export function createWebSearchService(): WebSearchService {
       _webSearchService = new TavilyProvider();
       break;
     default:
-      console.warn(`[web-search] Unknown provider "${provider}", using no-op.`);
       _webSearchService = new NoopWebSearchProvider();
   }
 

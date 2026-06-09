@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { useRouter } from "next/navigation";
+import { Overlay } from "./overlay";
 import {
   LayoutDashboard,
   Receipt,
@@ -120,7 +121,9 @@ function saveRecentSearch(query: string) {
       JSON.stringify(recent.slice(0, MAX_RECENT)),
     );
   } catch {
-    // ignore storage errors
+    // Best-effort recent-search persistence; storage may be unavailable
+    // (private mode / quota). Not a user-action failure — nothing to surface.
+    return;
   }
 }
 
@@ -129,7 +132,8 @@ function clearRecentSearches() {
   try {
     localStorage.removeItem(RECENT_SEARCHES_KEY);
   } catch {
-    // ignore
+    // Best-effort clear; storage may be unavailable. Nothing to surface.
+    return;
   }
 }
 
@@ -241,16 +245,12 @@ export function CommandPalette({
           e.preventDefault();
           if (flatItems[activeIndex]) execute(flatItems[activeIndex]);
           break;
-        case "Escape":
-          e.preventDefault();
-          onClose();
-          break;
+        // Escape-to-close is owned by the <Overlay> (useDialogA11y document
+        // listener) so it fires exactly once — do not duplicate it here.
       }
     },
     [flatItems, activeIndex, execute, onClose],
   );
-
-  if (!open) return null;
 
   let itemIndex = -1;
   const showRecent = !query.trim() && categoryFilter === "all" && recentSearches.length > 0;
@@ -261,16 +261,16 @@ export function CommandPalette({
   if (onToggleAI) availableCategories.push("ai");
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9998] animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Palette */}
-      <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[12vh] px-4 pointer-events-none">
+    <Overlay
+      open={open}
+      onClose={onClose}
+      headless
+      className="z-[9999] !items-start !justify-center !p-0 pt-[12vh] px-4 pointer-events-none"
+      scrimClassName="bg-black/40 fixed inset-0 backdrop-blur-sm z-[9998] animate-fade-in"
+    >
+      {(panelProps) => (
         <div
+          {...panelProps}
           className="pointer-events-auto w-full max-w-xl bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-2xl shadow-xl overflow-hidden animate-scale-in"
           role="combobox"
           aria-expanded={true}
@@ -516,7 +516,7 @@ export function CommandPalette({
             )}
           </div>
         </div>
-      </div>
-    </>
+      )}
+    </Overlay>
   );
 }

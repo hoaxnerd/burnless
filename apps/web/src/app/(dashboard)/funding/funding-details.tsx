@@ -7,13 +7,27 @@ import { CurrencyInput } from "@/components/forms/primitives";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
 import { FundingRoundForm } from "./funding-round-form";
+import { InvestorList } from "./investor-list";
+import { MilestoneTracker } from "./milestone-tracker";
 import { Modal } from "@/components/ui";
 import { dSum } from "@burnless/engine";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
 import { useScenarioOverrides } from "@/components/scenarios/use-scenario-overrides";
+import { useLocale } from "@/components/locale/locale-context";
 import { apiFetch } from "@/lib/api-fetch";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
+import { useToast } from "@/components/ui/toast";
+
+interface GrantMilestone {
+  id: string;
+  label: string;
+  amount: number;
+  dueDate: string;
+  hitDate?: string;
+  matchWarning?: { requiredAmount: number; actualAmount: number; asOf: string };
+}
 
 interface FundingRound {
   id: string;
@@ -24,6 +38,7 @@ interface FundingRound {
   preMoneyValuation: number | null;
   dilutionPercent: number | null;
   isProjected: boolean;
+  milestones?: GrantMilestone[];
 }
 
 const roundTypeLabels: Record<string, string> = {
@@ -63,6 +78,7 @@ interface OwnershipChartProps {
 }
 
 export function OwnershipChart({ foundersOwnership, completedRounds }: OwnershipChartProps) {
+  const { fmtPercent } = useLocale();
   const capTableSegments = useMemo(() => {
     const segments: Array<{ label: string; percent: number; color: string }> = [];
     segments.push({ label: "Founders", percent: foundersOwnership, color: segmentColors[0]! });
@@ -136,7 +152,7 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-2xl font-bold tabular-nums text-surface-900">
-              {foundersOwnership.toFixed(0)}%
+              {fmtPercent(foundersOwnership, 1)}
             </span>
             <span className="text-[10px] text-surface-400 uppercase tracking-wider">
               Founders
@@ -156,7 +172,7 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
               <span className="text-xs text-surface-600">{seg.label}</span>
             </div>
             <span className="text-xs tabular-nums font-medium text-surface-900">
-              {seg.percent.toFixed(1)}%
+              {fmtPercent(seg.percent, 1)}
             </span>
           </div>
         ))}
@@ -191,9 +207,14 @@ export function FundingRoundsList({
   const completedRounds = rounds.filter((r) => !r.isProjected);
   const projectedRounds = rounds.filter((r) => r.isProjected);
 
+  const { fmtDate, fmtPercent } = useLocale();
+  const toast = useToast();
   const router = useRouter();
   // Edit modal state
   const [editingRound, setEditingRound] = useState<FundingRound | null>(null);
+  // FUND-07: round-detail panel — mounts InvestorList (+ MilestoneTracker for
+  // grant rounds). Opened by clicking a round row.
+  const [detailRound, setDetailRound] = useState<FundingRound | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const {
@@ -215,13 +236,11 @@ export function FundingRoundsList({
     try {
       const res = await apiFetch(`/api/funding-rounds/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "Failed to delete");
+        throw new Error(await extractApiError(res));
       }
       router.refresh();
     } catch (err) {
-      // eslint-disable-next-line no-console -- delete failure must reach the developer; user gets a retry-by-click anyway
-      console.error("Failed to delete funding round:", err);
+      toast.error(toUserMessage(err));
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -270,7 +289,19 @@ export function FundingRoundsList({
                   onRevert={() => handleRevert(round.id)}
                   onRemove={() => handleRemove(round.id)}
                 >
-                  <div className="group px-6 py-4 hover:bg-surface-50/50 transition-colors">
+                  <div
+                    className="group px-6 py-4 hover:bg-surface-50/50 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View details for ${round.name}`}
+                    onClick={() => setDetailRound(round)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailRound(round);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -280,13 +311,13 @@ export function FundingRoundsList({
                           </span>
                         </div>
                         <p className="text-xs text-surface-400">
-                          {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                          {fmtDate(new Date(round.date), { month: "long", year: "numeric" })}
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                           <button
-                            onClick={() => setEditingRound(round)}
+                            onClick={(e) => { e.stopPropagation(); setEditingRound(round); }}
                             className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
                             aria-label={`Edit ${round.name}`}
                           >
@@ -324,7 +355,7 @@ export function FundingRoundsList({
                             )}
                             {round.dilutionPercent && (
                               <span className="text-[10px] text-surface-400">
-                                {round.dilutionPercent.toFixed(1)}% dilution
+                                {fmtPercent(round.dilutionPercent, 1)} dilution
                               </span>
                             )}
                           </div>
@@ -348,7 +379,19 @@ export function FundingRoundsList({
                   onRevert={() => handleRevert(round.id)}
                   onRemove={() => handleRemove(round.id)}
                 >
-                  <div className="group px-6 py-4 bg-surface-50/30">
+                  <div
+                    className="group px-6 py-4 bg-surface-50/30 hover:bg-surface-50/60 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View details for ${round.name}`}
+                    onClick={() => setDetailRound(round)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailRound(round);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -362,13 +405,13 @@ export function FundingRoundsList({
                           </span>
                         </div>
                         <p className="text-xs text-surface-400">
-                          {new Date(round.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                          {fmtDate(new Date(round.date), { month: "long", year: "numeric" })}
                         </p>
                       </div>
                       <div className="flex items-start gap-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                           <button
-                            onClick={() => setEditingRound(round)}
+                            onClick={(e) => { e.stopPropagation(); setEditingRound(round); }}
                             className="rounded-lg p-1.5 text-surface-300 hover:bg-surface-100 hover:text-surface-600 transition-all"
                             aria-label={`Edit ${round.name}`}
                           >
@@ -400,7 +443,7 @@ export function FundingRoundsList({
                           </p>
                           {round.dilutionPercent && (
                             <span className="text-[10px] text-surface-400 italic">
-                              ~{round.dilutionPercent.toFixed(0)}% dilution
+                              ~{fmtPercent(round.dilutionPercent, 1)} dilution
                             </span>
                           )}
                         </div>
@@ -420,6 +463,43 @@ export function FundingRoundsList({
           entityLabel="funding round"
           onRestore={handleRestore}
         />
+      )}
+
+      {/* FUND-07: round-detail panel — investors for every round, and the
+          milestone tracker for grant rounds. roundType stays read-only here
+          (immutability contract). Milestones disburse per user-marked hitDate
+          regardless of the match-shortfall warning (Phase 2 D §D5 — the warning
+          is surfaced as data only, never gating). */}
+      {detailRound && (
+        <Modal
+          open={!!detailRound}
+          onClose={() => setDetailRound(null)}
+          title={detailRound.name}
+        >
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${roundTypeColors[detailRound.type] ?? "bg-surface-100 text-surface-600"}`}>
+                {roundTypeLabels[detailRound.type] ?? detailRound.type}
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-surface-900">
+                {formatCurrency(detailRound.amount, currency, undefined, { compact: true })}
+              </span>
+            </div>
+
+            {detailRound.type === "grant" && (detailRound.milestones?.length ?? 0) > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-surface-900">Milestones</div>
+                <MilestoneTracker
+                  roundId={detailRound.id}
+                  milestones={detailRound.milestones ?? []}
+                  onUpdate={() => router.refresh()}
+                />
+              </div>
+            )}
+
+            <InvestorList roundId={detailRound.id} />
+          </div>
+        </Modal>
       )}
 
       {/* Edit funding round modal */}
@@ -443,7 +523,14 @@ export function FundingRoundsList({
               notes: null,
               isProjected: editingRound.isProjected,
             }}
-            onClose={() => setEditingRound(null)}
+            // FUND-06: funding-details is RSC-backed (rounds come from a server
+            // prop), so refresh the route on close to pull the edited values into
+            // the card. The form calls onClose on a successful save; refreshing
+            // here is also a harmless no-op on Cancel.
+            onClose={() => {
+              setEditingRound(null);
+              router.refresh();
+            }}
           />
         </Modal>
       )}
@@ -469,6 +556,7 @@ export function DilutionCalculator({
   calcDilution: { dilution: number; postMoney: number; newOwnership: number };
   currency: CurrencyCode;
 }) {
+  const { fmtPercent } = useLocale();
   return (
     <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
       <div className="px-6 py-5 border-b border-surface-100">
@@ -529,7 +617,7 @@ export function DilutionCalculator({
               Dilution
             </p>
             <p className="text-xl font-bold tabular-nums text-danger-600">
-              {calcDilution.dilution.toFixed(1)}%
+              {fmtPercent(calcDilution.dilution, 1)}
             </p>
           </div>
           <div className="rounded-xl bg-surface-50 border border-surface-100 p-4 text-center">
@@ -545,10 +633,10 @@ export function DilutionCalculator({
               New Founder %
             </p>
             <p className="text-xl font-bold tabular-nums text-brand-600">
-              {calcDilution.newOwnership.toFixed(1)}%
+              {fmtPercent(calcDilution.newOwnership, 1)}
             </p>
             <p className="text-[10px] text-surface-400 mt-0.5">
-              was {foundersOwnership.toFixed(1)}%
+              was {fmtPercent(foundersOwnership, 1)}
             </p>
           </div>
         </div>

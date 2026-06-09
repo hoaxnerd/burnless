@@ -1,9 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { SWRConfig } from "swr";
+import { fetcher } from "@/lib/swr";
 import { AiPermissionsPanel } from "./ai-permissions-panel";
 
 const fetchMock = vi.fn();
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: (...a: unknown[]) => fetchMock(...a) }));
+
+/**
+ * The panel now reads via the shared SWR hook (useAiPermissions). Provide the
+ * real fetcher (which calls the mocked apiFetch) and a fresh per-test cache so
+ * each render starts cold.
+ */
+function renderPanel(conversationId: string | null) {
+  return render(
+    <SWRConfig value={{ fetcher, provider: () => new Map(), dedupingInterval: 0 }}>
+      <AiPermissionsPanel conversationId={conversationId} />
+    </SWRConfig>,
+  );
+}
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -17,7 +32,7 @@ beforeEach(() => {
 
 describe("AiPermissionsPanel", () => {
   it("loads and shows the five categories", async () => {
-    render(<AiPermissionsPanel conversationId={null} />);
+    renderPanel(null);
     await waitFor(() => expect(screen.getByText(/Create \/ update/i)).toBeTruthy());
     expect(screen.getByText(/Read data/i)).toBeTruthy();
     expect(screen.getByText(/Delete/i)).toBeTruthy();
@@ -26,10 +41,10 @@ describe("AiPermissionsPanel", () => {
   });
 
   it("PUTs a changed mode", async () => {
-    render(<AiPermissionsPanel conversationId={null} />);
+    renderPanel(null);
     await waitFor(() => expect(screen.getByText(/Create \/ update/i)).toBeTruthy());
     // Choose "Allow for session" for the Write category.
-    fireEvent.click(screen.getAllByRole("button", { name: /Allow for session/i })[0]!);
+    fireEvent.click(screen.getAllByRole("radio", { name: /Allow for session/i })[0]!);
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/ai/permissions",
@@ -39,10 +54,10 @@ describe("AiPermissionsPanel", () => {
   });
 
   it("Delete category does not offer 'Always allow'", async () => {
-    render(<AiPermissionsPanel conversationId={null} />);
+    renderPanel(null);
     await waitFor(() => expect(screen.getByText(/Delete/i)).toBeTruthy());
     // There are fewer "Always allow" buttons than categories because delete omits it.
-    const always = screen.queryAllByRole("button", { name: /Always allow/i });
+    const always = screen.queryAllByRole("radio", { name: /Always allow/i });
     expect(always.length).toBe(4); // read, write, web_search, browser_use
   });
 });

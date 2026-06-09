@@ -92,6 +92,8 @@ export interface NewPendingAction {
   kind?: "permission" | "input" | "plan";
   /** Active scenario the paused turn operates in (resume executes against this). */
   scenarioId: string;
+  /** AI-01: nullable WRITE target. null = base view → base-table write on resume. */
+  writeScenarioId?: string | null;
   assistantBlocks: unknown;
   completedResults: unknown;
   pending: unknown;
@@ -109,6 +111,7 @@ export async function createPendingAction(input: NewPendingAction) {
       pauseId: input.pauseId,
       kind: input.kind ?? "permission",
       scenarioId: input.scenarioId,
+      writeScenarioId: input.writeScenarioId ?? null,
       assistantBlocks: input.assistantBlocks,
       completedResults: input.completedResults,
       pending: input.pending,

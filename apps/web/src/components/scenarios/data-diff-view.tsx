@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
+import { ratioToPct } from "@burnless/engine";
+import { formatPercent } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { ScenarioBadge } from "./scenario-badge";
 import { Skeleton } from "@/components/ui";
@@ -61,6 +63,15 @@ function actionToVariant(action: OverrideItem["action"]): "modified" | "created"
   }
 }
 
+/** Turn a camelCase / snake_case field key into a readable label. */
+function humanizeKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
+
 /** Format a field value for display */
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -68,11 +79,16 @@ function formatValue(value: unknown): string {
   if (typeof value === "number") {
     // Format percentages nicely
     if (Math.abs(value) < 1 && value !== 0) {
-      return `${(value * 100).toFixed(1)}%`;
+      return formatPercent(ratioToPct(value));
     }
     return value.toLocaleString();
   }
-  if (typeof value === "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return value.map(formatValue).join(", ");
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${humanizeKey(k)}: ${formatValue(v)}`)
+      .join(", ");
+  }
   return String(value);
 }
 

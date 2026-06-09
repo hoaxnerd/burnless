@@ -2,51 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { useWeeklyDigest } from "@/lib/swr";
 import { captureException } from "@/lib/error-reporting";
 import { X, Sparkles, Calendar, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { usePageLayoutContext } from "@/components/providers/page-layout-context";
 import { useAiFeature } from "@/components/ai/ai-feature-context";
-
-interface DigestData {
-  id: string;
-  narrative: string | null;
-  deterministicSummary: string;
-  metrics: Record<string, unknown>;
-  weekStart: string;
-}
+import { useLocale } from "@/components/locale/locale-context";
 
 export function WeeklyDigestBanner() {
-  const [digest, setDigest] = useState<DigestData | null>(null);
+  const { data, error, isLoading } = useWeeklyDigest();
   const [dismissed, setDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { enabled: aiEnabled, loaded: aiLoaded } = useAiFeature("weeklyDigest");
+  const { fmtDate } = useLocale();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-
-    apiFetch("/api/digest", { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.digest) setDigest(data.digest);
-      })
-      .catch((err) => {
-        if (!(err instanceof DOMException && err.name === "AbortError")) {
-          captureException(err);
-        }
-      })
-      .finally(() => {
-        clearTimeout(timer);
-        setLoading(false);
-      });
-
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, []);
+  const digest = data?.digest ?? null;
+  // Treat a load error as "settled with nothing" — the banner is non-critical and
+  // must never block the dashboard grid; report not-ready and render nothing.
+  const loading = isLoading && !error;
 
   const { reportWidgetReady, reportWidgetNotReady } = usePageLayoutContext();
 
@@ -69,7 +43,7 @@ export function WeeklyDigestBanner() {
     ? digest.narrative
     : digest.deterministicSummary;
   const isAI = aiEnabled && !!digest.narrative;
-  const weekDate = new Date(digest.weekStart).toLocaleDateString("en-US", {
+  const weekDate = fmtDate(new Date(digest.weekStart), {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -86,8 +60,10 @@ export function WeeklyDigestBanner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "dismiss", digestId: digest!.id }),
       });
-    } catch {
-      // Non-critical
+    } catch (err) {
+      // Non-critical: the banner is already hidden optimistically. Report so a
+      // persistent server-side dismiss failure is still observable.
+      captureException(err);
     }
   }
 

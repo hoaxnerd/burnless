@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, transactions } from "@burnless/db";
+import { db, transactions, financialAccounts } from "@burnless/db";
 import { eq, and, gte, lte, gt } from "drizzle-orm";
-import { requireCompanyAccess, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireCompanyWrite, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { monetaryAmount } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
@@ -54,11 +54,25 @@ export const GET = withErrorHandler(async (request: Request) => {
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
-  const ctx = await requireCompanyAccess();
+  const ctx = await requireCompanyWrite();
   if ("error" in ctx) return ctx.error;
 
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;
+
+  // AUTHZ-02: verify the body-supplied accountId belongs to the caller's company.
+  const accCheck = await db
+    .select({ id: financialAccounts.id })
+    .from(financialAccounts)
+    .where(
+      and(
+        eq(financialAccounts.companyId, ctx.companyId),
+        eq(financialAccounts.id, parsed.data.accountId),
+      ),
+    );
+  if (accCheck.length === 0) {
+    return errorResponse("accountId does not belong to your company", 403);
+  }
 
   const [row] = await db
     .insert(transactions)

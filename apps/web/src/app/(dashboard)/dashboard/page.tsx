@@ -39,7 +39,7 @@ import { FormulaViewer } from "./formula-viewer";
 import { DashboardGrid } from "./dashboard-grid";
 import { buildHeroCards, buildHeroSwapCards } from "./dashboard-hero-data";
 import { SetupPrompt, NoScenarioPrompt } from "./dashboard-prompts";
-import { type CurrencyCode, isValidCurrency } from "@burnless/types";
+import { type CurrencyCode, isValidCurrency, formatDate } from "@burnless/types";
 import { deriveWidgetOrder, type LegacyWidgetLayout, type StoredPageLayout } from "@/lib/widget-order";
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
@@ -122,8 +122,10 @@ export default async function DashboardPage() {
   const mrrGrowthPct = pctChange(currentMrr, prevMrr) ?? 0;
   // Label the snapped "as of" month (parseMonthKey(currentMonth)), not the raw
   // calendar month, so the board header matches the KPI data it summarizes.
-  const monthLabel = parseMonthKey(currentMonth)
-    .toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = formatDate(parseMonthKey(currentMonth), company.locale, {
+    month: "long",
+    year: "numeric",
+  });
   const boardData = {
     companyName: company.name,
     monthLabel,

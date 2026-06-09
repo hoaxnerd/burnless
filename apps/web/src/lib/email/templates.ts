@@ -1,4 +1,4 @@
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, formatDate, formatPercent, type CurrencyCode } from "@burnless/types";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -113,8 +113,8 @@ interface DigestEmailData {
 }
 
 function changeArrow(pct: number): string {
-  if (pct > 0) return `<span style="color:#22c55e;">&uarr; ${pct.toFixed(1)}%</span>`;
-  if (pct < 0) return `<span style="color:#ef4444;">&darr; ${Math.abs(pct).toFixed(1)}%</span>`;
+  if (pct > 0) return `<span style="color:#22c55e;">&uarr; ${formatPercent(pct, undefined, 1)}</span>`;
+  if (pct < 0) return `<span style="color:#ef4444;">&darr; ${formatPercent(Math.abs(pct), undefined, 1)}</span>`;
   return `<span style="color:#888;">0%</span>`;
 }
 
@@ -187,7 +187,7 @@ export function paymentFailedEmail(): { subject: string; html: string; text: str
 export function subscriptionCanceledEmail(
   periodEnd: Date
 ): { subject: string; html: string; text: string } {
-  const endStr = periodEnd.toLocaleDateString("en-US", {
+  const endStr = formatDate(periodEnd, undefined, {
     month: "long",
     day: "numeric",
     year: "numeric",

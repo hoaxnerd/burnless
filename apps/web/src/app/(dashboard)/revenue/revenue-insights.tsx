@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, AlertTriangle, ArrowRight, Zap } from "lucide
 import Link from "next/link";
 import { AiGate } from "@/components/ai/ai-gate";
 import { formatCompactCurrency } from "@/components/charts";
+import { formatPercent } from "@burnless/types";
 import type { GrowthMetrics, StreamBreakdown } from "@/lib/compute-revenue";
 
 interface RevenueInsightsProps {
@@ -26,21 +27,21 @@ function generateInsights(g: GrowthMetrics, streams: StreamBreakdown[], hasSaaS:
   if (g.mrrGrowthPercent > 15) {
     insights.push({
       type: "success",
-      title: `Exceptional ${g.mrrGrowthPercent.toFixed(1)}% MoM MRR growth`,
+      title: `Exceptional ${formatPercent(g.mrrGrowthPercent)} MoM MRR growth`,
       message: `At this rate, you'll double revenue in ${g.doublingTimeMonths ? Math.ceil(g.doublingTimeMonths) : "?"} months. This puts you in the top decile for early-stage SaaS.`,
       icon: "growth",
     });
   } else if (g.mrrGrowthPercent > 5) {
     insights.push({
       type: "info",
-      title: `Healthy ${g.mrrGrowthPercent.toFixed(1)}% MoM growth`,
+      title: `Healthy ${formatPercent(g.mrrGrowthPercent)} MoM growth`,
       message: `Solid trajectory. ${g.doublingTimeMonths ? `Revenue doubling time: ${Math.ceil(g.doublingTimeMonths)} months.` : ""} Above the 3-5% benchmark for post-seed startups.`,
       icon: "growth",
     });
   } else if (g.mrrGrowthPercent < 0) {
     insights.push({
       type: "warning",
-      title: `Revenue declined ${Math.abs(g.mrrGrowthPercent).toFixed(1)}% this month`,
+      title: `Revenue declined ${formatPercent(Math.abs(g.mrrGrowthPercent))} this month`,
       message: `MRR dropped from ${formatCompactCurrency(g.prevMrr)} to ${formatCompactCurrency(g.currentMrr)}. Investigate churn drivers and customer feedback.`,
       icon: "decline",
     });
@@ -50,14 +51,14 @@ function generateInsights(g: GrowthMetrics, streams: StreamBreakdown[], hasSaaS:
   if (hasSaaS && g.churnRate > 5) {
     insights.push({
       type: "warning",
-      title: `Churn rate at ${g.churnRate.toFixed(1)}% — above healthy threshold`,
-      message: `Best-in-class SaaS targets <3% monthly churn. At ${g.churnRate.toFixed(1)}%, you're losing significant revenue. Focus on retention.`,
+      title: `Churn rate at ${formatPercent(g.churnRate)} — above healthy threshold`,
+      message: `Best-in-class SaaS targets <3% monthly churn. At ${formatPercent(g.churnRate)}, you're losing significant revenue. Focus on retention.`,
       icon: "alert",
     });
   } else if (hasSaaS && g.churnRate > 0 && g.churnRate <= 2) {
     insights.push({
       type: "success",
-      title: `Strong retention — ${g.churnRate.toFixed(1)}% monthly churn`,
+      title: `Strong retention — ${formatPercent(g.churnRate)} monthly churn`,
       message: `Below the 3% benchmark. Your LTV of ${formatCompactCurrency(g.ltv)} and ARPA of ${formatCompactCurrency(g.arpa)}/mo indicate healthy unit economics.`,
       icon: "zap",
     });
@@ -88,7 +89,7 @@ function generateInsights(g: GrowthMetrics, streams: StreamBreakdown[], hasSaaS:
     if (topStream && topStream.percentage > 80) {
       insights.push({
         type: "info",
-        title: `${topStream.percentage.toFixed(0)}% revenue from "${topStream.name}"`,
+        title: `${formatPercent(topStream.percentage, "en-US", 0)} revenue from "${topStream.name}"`,
         message: "High concentration in a single stream. Consider diversifying revenue sources to reduce risk.",
         icon: "alert",
       });

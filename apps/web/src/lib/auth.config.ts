@@ -115,14 +115,24 @@ export const authConfig = {
     async jwt({ token, user, trigger }) {
       if (user?.id) token.sub = user.id;
 
-      // Fetch emailVerified from DB on sign-in or when session is updated
+      // Fetch fresh fields from DB on sign-in or when session is updated.
+      // RPT-12: also re-read name+image so a profile rename (which calls
+      // useSession().update()) refreshes the SSR JWT token.name/token.picture,
+      // keeping the server-rendered avatar/name in sync with the client. Gated
+      // to sign-in + update-trigger to avoid a per-request DB hit. Existing
+      // token fields are preserved; name/picture only overwritten when the row
+      // is found.
       if ((user?.id || trigger === "update") && token.sub) {
         const [dbUser] = await db
-          .select({ emailVerified: users.emailVerified })
+          .select({ emailVerified: users.emailVerified, name: users.name, image: users.image })
           .from(users)
           .where(eq(users.id, token.sub))
           .limit(1);
         (token as Record<string, unknown>).isEmailVerified = !!dbUser?.emailVerified;
+        if (dbUser) {
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+        }
       }
 
       return token;
