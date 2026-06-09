@@ -546,11 +546,10 @@ export function generateBalanceSheet(
   const totalAssetsSeries = addSeries(currentAssetsSeries, fixedAssetsSeries);
   const totalLiabilitiesSeries = addSeries(currentLiabilitiesSeries, longTermLiabilitiesSeries);
 
-  // RPT-01 dev invariant (non-throwing): the accounting identity
-  // Assets === Liabilities + Equity must hold for every month. Warn instead of
-  // throw so a transient input shape never crashes a render; the guard test
-  // (balance-sheet-balances.test.ts) enforces the hard contract.
-  assertBalanceSheetBalances(totalAssetsSeries, totalLiabilitiesSeries, equitySeries);
+  // RPT-01: the accounting identity Assets === Liabilities + Equity must hold
+  // for every month. The hard contract is enforced by the guard test
+  // (balance-sheet-balances.test.ts); the engine stays I/O-free (no console
+  // logging — see no-console-in-production guard).
 
   return {
     assets: buildLineItem("Total Assets", totalAssetsSeries, filterByCategory(accounts, "asset")),
@@ -563,34 +562,6 @@ export function generateBalanceSheet(
     workingCapital: seriesToArray(workingCapitalSeries),
     currentRatio: currentRatioFixed,
   };
-}
-
-/**
- * RPT-01 dev invariant: warn (never throw) if the balance sheet does not balance
- * within 0.01 for any month. Silent in production; logs once per offending month
- * in non-production so drift surfaces during development and tests.
- */
-function assertBalanceSheetBalances(
-  assets: MonthlySeries,
-  liabilities: MonthlySeries,
-  equity: MonthlySeries,
-): void {
-  if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") return;
-  const months = Array.from(
-    new Set([...assets.keys(), ...liabilities.keys(), ...equity.keys()])
-  ).sort();
-  for (const m of months) {
-    const a = assets.get(m) ?? 0;
-    const l = liabilities.get(m) ?? 0;
-    const e = equity.get(m) ?? 0;
-    const diff = Math.abs(a - (l + e));
-    if (diff >= 0.01) {
-      console.warn(
-        `[RPT-01] Balance sheet does not balance for ${m}: ` +
-          `assets=${a} liabilities=${l} equity=${e} diff=${diff.toFixed(2)}`
-      );
-    }
-  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
