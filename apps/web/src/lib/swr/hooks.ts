@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 import { KEYS } from "./keys";
 import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
+import type { McpConnectionDto, McpToolDto } from "@/components/mcp/types";
 
 // ── Type imports ────────────────────────────────────────────────────────────
 
@@ -326,4 +327,21 @@ export function useOverrideCount(
     });
   }, [scenarioId, mutate]);
   return swr;
+}
+
+// ── MCP connections (Connections page + AI sidebar pane) ─────────────────────
+
+/** All MCP connections visible to the current user (company + own personal). */
+export function useMcpConnections(config?: SWRConfiguration<McpConnectionDto[]>) {
+  return useSWR<McpConnectionDto[]>(KEYS.mcpConnections, { ...config });
+}
+
+/** Discovered tools for one connection, merged with per-tool prefs. */
+export function useMcpConnectionTools(
+  id: string | null,
+  config?: SWRConfiguration<McpToolDto[]>,
+) {
+  return useSWR<McpToolDto[]>(id ? KEYS.mcpConnectionTools(id) : null, {
+    ...config,
+  });
 }

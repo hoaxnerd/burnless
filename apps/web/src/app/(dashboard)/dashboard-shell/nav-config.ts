@@ -7,6 +7,7 @@ import {
   GitBranch,
   Sparkles,
   FolderOpen,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +28,7 @@ export const coreNavItems: NavItem[] = [
   { id: "team", href: "/team", label: "Team", icon: Users },
   { id: "scenarios", href: "/scenarios", label: "Scenarios", icon: GitBranch },
   { id: "data-room", href: "/data-room", label: "Data Room", icon: FolderOpen },
+  { id: "connections", href: "/connections", label: "Connections", icon: Plug },
 ];
 
 export const aiNavItem: NavItem = { id: "ai", href: "/ai", label: "Companion", icon: Sparkles };

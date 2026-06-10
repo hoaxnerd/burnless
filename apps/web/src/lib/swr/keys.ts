@@ -25,7 +25,12 @@ export const KEYS = {
   integrations: "/api/integrations",
   company: "/api/company",
 
+  // MCP connections (Connections page + AI sidebar pane)
+  mcpConnections: "/api/mcp/connections",
+
   // Parameterized keys — call as functions
+  mcpConnection: (id: string) => `/api/mcp/connections/${id}`,
+  mcpConnectionTools: (id: string) => `/api/mcp/connections/${id}/tools`,
   aiDashboard: (days: number) => `/api/ai-dashboard?days=${days}`,
   scenario: (id: string) => `/api/scenarios/${id}`,
   fundingRounds: () => "/api/funding-rounds",
