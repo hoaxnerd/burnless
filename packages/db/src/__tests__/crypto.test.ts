@@ -62,3 +62,15 @@ describe("secrets crypto (AES-256-GCM)", () => {
     expect(() => encryptSecret("x")).toThrow(/32 bytes/);
   });
 });
+
+describe("auth tag pinning", () => {
+  it("rejects a truncated auth tag (forgery-resistance hardening)", () => {
+    process.env.SECRETS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    __resetSecretsKeyCache();
+    const blob = encryptSecret("payload");
+    const parts = blob.split(":");
+    const truncated = Buffer.from(parts[2]!, "base64").subarray(0, 8); // 64-bit tag
+    parts[2] = truncated.toString("base64");
+    expect(() => decryptSecret(parts.join(":"))).toThrow(/Malformed/);
+  });
+});

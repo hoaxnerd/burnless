@@ -49,8 +49,15 @@ export function decryptSecret(blob: string): string {
   if (parts.length !== 4 || parts[0] !== VERSION || !parts[1] || !parts[2] || !parts[3]) {
     throw new Error("Malformed secret blob");
   }
+  const tag = Buffer.from(parts[2], "base64");
+  // Pin the full 128-bit tag: setAuthTag otherwise accepts any Node-permitted GCM
+  // tag length (4-16 bytes), letting an attacker with DB write access weaken
+  // forgery resistance by truncating the tag (review finding, Task 1 MINOR).
+  if (tag.length !== 16) {
+    throw new Error("Malformed secret blob");
+  }
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(parts[1], "base64"));
-  decipher.setAuthTag(Buffer.from(parts[2], "base64"));
+  decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(Buffer.from(parts[3], "base64")), decipher.final()]).toString("utf8");
 }
 
