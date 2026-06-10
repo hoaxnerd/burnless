@@ -28,7 +28,7 @@ import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
 import { executeToolCall, logDeniedToolCall } from "@/lib/ai-tools";
-import { assembleMcpTools } from "@/lib/ai-tools/mcp";
+import { assembleMcpTools, type AssembledMcpTools } from "@/lib/ai-tools/mcp";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse, scenarioActivationFrom } from "@/lib/chat-stream";
@@ -95,10 +95,15 @@ async function resumeStream(args: {
   completedResults: ContentBlock[];
   resumeResults: ContentBlock[];
   writeMode?: AiWriteMode;
+  /** Companion name from the POST handler's getAiFlags (fetched once per turn). */
+  companionName: string;
+  /** MCP tools + dynamic category map, assembled ONCE in the POST handler and
+   *  shared with the decision loop (spec §3.4). */
+  mcp: AssembledMcpTools;
   seedTimeline?: TimelineNode[];
   activatedScenarios?: { scenarioId: string; name: string }[];
 }): Promise<Response> {
-  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, seedTimeline, activatedScenarios } = args;
+  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, companionName, mcp, seedTimeline, activatedScenarios } = args;
 
   const history = await db
     .select()
@@ -123,7 +128,6 @@ async function resumeStream(args: {
       : "") + baseContext;
 
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
-  const aiFlags = await getAiFlags(ctx.companyId);
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
   const defaults: PermissionDefaults = savedDefaults
     ? {
@@ -136,10 +140,6 @@ async function resumeStream(args: {
     : BUILTIN_PERMISSION_DEFAULTS;
   const sessionGrants = await getSessionGrants(conversationId);
 
-  // MCP tools for the resumed turn (spec §3.4) — same assembly as POST /api/chat
-  // so the model keeps its MCP tool set (and category map) across a pause.
-  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId);
-
   return buildChatSSEResponse({
     companyId: ctx.companyId,
     userId: ctx.userId,
@@ -148,7 +148,7 @@ async function resumeStream(args: {
     conversationId,
     messages,
     financialContext,
-    companionName: aiFlags.companionName,
+    companionName,
     providerConfig,
     defaults,
     sessionGrants,
@@ -212,6 +212,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     .where(and(eq(scenariosTable.id, pendingRow.scenarioId), eq(scenariosTable.companyId, ctx.companyId)));
   if (!scenario) return errorResponse("Scenario for the paused turn not found", 404);
 
+  // Flags fetched ONCE per resume (checkAiFeatureAllowed has its own internal read;
+  // this is the only other one). MCP tools + dynamic category map are assembled here
+  // — same assembly as POST /api/chat so the model keeps its MCP tool set across a
+  // pause — and shared by the decision loop AND the resumed stream (spec §3.4).
+  const aiFlags = await getAiFlags(ctx.companyId);
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags);
+
   // INPUT pause (genui plan 1): validate the submitted formData against the stored
   // spec, synthesize a single tool_result for the form's tool_use id, and resume
   // the loop. No permission decisions are involved (spec §7 — input and permission
@@ -247,6 +254,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       completedResults,
       resumeResults: [inputResult],
       writeMode: aiCheck.writeMode ?? "confirm",
+      companionName: aiFlags.companionName,
+      mcp,
       seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
@@ -275,6 +284,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       completedResults,
       resumeResults: [planResult],
       writeMode: aiCheck.writeMode ?? "confirm",
+      companionName: aiFlags.companionName,
+      mcp,
       seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
@@ -307,7 +318,10 @@ export const POST = withErrorHandler(async (request: Request) => {
   const hasApprovedOverlayWrite = pending.some((a) => {
     const d = decisionMap.get(a.requestId) ?? "deny";
     if (d === "deny") return false;
-    const cat = categorizeToolName(a.toolName);
+    // External MCP tools write EXTERNAL systems, never the scenario overlay — a
+    // mid-pause scenario switch can't endanger them, so they never arm the gate.
+    if (a.toolName.startsWith("mcp__")) return false;
+    const cat = categorizeToolName(a.toolName, mcp.categories);
     return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
   });
   if (headerScenarioId && hasApprovedOverlayWrite && pendingRow.writeScenarioId && headerScenarioId !== pendingRow.scenarioId) {
@@ -333,7 +347,9 @@ export const POST = withErrorHandler(async (request: Request) => {
   const pendingResults: ContentBlock[] = [];
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
-    const category = categorizeToolName(action.toolName);
+    // Dynamic map first (MCP): the granted category must match what the
+    // permission card showed (e.g. an MCP refund classified "delete").
+    const category = categorizeToolName(action.toolName, mcp.categories);
 
     if (decision === "deny") {
       logDeniedToolCall(
@@ -376,6 +392,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     completedResults,
     resumeResults: pendingResults,
     writeMode: aiCheck.writeMode ?? "confirm",
+    companionName: aiFlags.companionName,
+    mcp,
     seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     activatedScenarios,
   });

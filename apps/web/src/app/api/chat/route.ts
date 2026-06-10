@@ -175,7 +175,8 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // MCP tools for this turn (spec §3.4): cached capabilities only — no live
   // server round-trips here. Empty when the feature is off or nothing connected.
-  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId);
+  // aiFlags is passed pre-fetched so the aiFeatureFlags row isn't re-queried.
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags);
 
   return buildChatSSEResponse({
     companyId: ctx.companyId,

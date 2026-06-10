@@ -11,7 +11,9 @@ vi.mock("@burnless/db", () => ({
   getDisabledMcpConnectionIds: vi.fn(),
 }));
 
-import { assembleMcpToolsFromData, DEFER_THRESHOLD } from "../mcp";
+import { assembleMcpToolsFromData, assembleMcpTools, DEFER_THRESHOLD } from "../mcp";
+import { getAiFlags } from "@/lib/ai-feature-flags";
+import { listVisibleConnections } from "@burnless/db";
 
 const tool = (name: string, annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean }): McpToolInfo => ({
   name, inputSchema: { type: "object", properties: {} }, ...(annotations ? { annotations } : {}),
@@ -70,5 +72,36 @@ describe("assembleMcpToolsFromData", () => {
     });
     // the call_tool description tells the model how to use it
     expect(tools[1]!.description).toContain("search_tools");
+  });
+});
+
+describe("assembleMcpTools — pre-fetched flags (no duplicate aiFeatureFlags read)", () => {
+  it("uses the prefetched flags object and never calls getAiFlags", async () => {
+    vi.mocked(getAiFlags).mockClear();
+    vi.mocked(listVisibleConnections).mockResolvedValueOnce([] as never);
+
+    const out = await assembleMcpTools("c1", "u1", { masterEnabled: true, features: {} });
+    expect(out).toEqual({ tools: [], categories: {} });
+    expect(getAiFlags).not.toHaveBeenCalled();
+    expect(listVisibleConnections).toHaveBeenCalledWith("c1", "u1");
+  });
+
+  it("prefetched masterEnabled=false short-circuits without any DB reads", async () => {
+    vi.mocked(getAiFlags).mockClear();
+    vi.mocked(listVisibleConnections).mockClear();
+
+    const out = await assembleMcpTools("c1", "u1", { masterEnabled: false, features: {} });
+    expect(out).toEqual({ tools: [], categories: {} });
+    expect(getAiFlags).not.toHaveBeenCalled();
+    expect(listVisibleConnections).not.toHaveBeenCalled();
+  });
+
+  it("without prefetched flags it still falls back to getAiFlags", async () => {
+    vi.mocked(getAiFlags).mockClear();
+    vi.mocked(getAiFlags).mockResolvedValueOnce({ masterEnabled: false, features: {} } as never);
+
+    const out = await assembleMcpTools("c1", "u1");
+    expect(out).toEqual({ tools: [], categories: {} });
+    expect(getAiFlags).toHaveBeenCalledWith("c1");
   });
 });

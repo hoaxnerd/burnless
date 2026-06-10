@@ -83,7 +83,13 @@ export function categorizeToolName(
   toolName: string,
   dynamicCategories?: Record<string, PermissionCategory>
 ): PermissionCategory {
-  if (dynamicCategories && dynamicCategories[toolName]) return dynamicCategories[toolName];
+  // Own-property check: a hallucinated tool name like "constructor"/"toString"
+  // must not resolve an Object.prototype member as its category.
+  const dynamic =
+    dynamicCategories && Object.hasOwn(dynamicCategories, toolName)
+      ? dynamicCategories[toolName]
+      : undefined;
+  if (dynamic) return dynamic;
   if (toolName.startsWith("mcp__")) return "write";
   if (WEB_SEARCH_TOOLS.has(toolName)) return "web_search";
   if (BROWSER_TOOLS.has(toolName)) return "browser_use";

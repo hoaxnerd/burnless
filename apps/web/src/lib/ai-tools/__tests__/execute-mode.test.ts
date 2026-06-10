@@ -35,6 +35,11 @@ vi.mock("../analytics", () => ({ analyticsSchemas: {}, analyticsHandlers: {} }))
 vi.mock("../web-search", () => ({ webSearchSchemas: {}, webSearchHandlers: {} }));
 vi.mock("../web-scraping", () => ({ webScrapingSchemas: {}, webScrapingHandlers: {} }));
 vi.mock("../genui-display", () => ({ genuiDisplaySchemas: {}, genuiDisplayHandlers: {} }));
+// MCP dispatch boundary: executeToolCall dynamically imports ./mcp for mcp__*
+// names; stub it so we can assert plan mode never reaches the live dispatch.
+vi.mock("../mcp", () => ({
+  executeMcpTool: vi.fn(async () => JSON.stringify({ ok: true })),
+}));
 vi.mock("@burnless/ai", async (importOriginal) => {
   const real = await importOriginal<typeof import("@burnless/ai")>();
   return {
@@ -112,5 +117,35 @@ describe("plan-mode safety for facade-bypassing mutations", () => {
     (scenarioHandlers.create_scenario as ReturnType<typeof vi.fn>).mockClear();
     await executeToolCall("create_scenario", { name: "X" }, { ...ctx, mode: "commit" });
     expect(scenarioHandlers.create_scenario).toHaveBeenCalledOnce();
+  });
+});
+
+describe("plan-mode safety for external MCP tools", () => {
+  const ctx = { companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1" };
+
+  it("plan mode on an mcp__ tool NEVER dispatches to the live MCP server — returns the empty plan envelope", async () => {
+    // executeMcpTool hits the LIVE external server (send email, refund, ...) and
+    // has no plan mode. A diff-gate preview must therefore short-circuit BEFORE
+    // the mcp__ dispatch branch, or the action executes during the pause AND a
+    // second time on the approved resume.
+    const { executeMcpTool } = await import("../mcp");
+    (executeMcpTool as ReturnType<typeof vi.fn>).mockClear();
+    const out = await executeToolCall("mcp__stripe__refund", { id: "in_1" }, { ...ctx, mode: "plan" });
+    expect(JSON.parse(out)).toEqual({ planned: true, overrides: [] });
+    expect(executeMcpTool).not.toHaveBeenCalled();
+  });
+
+  it("commit mode on an mcp__ tool dispatches to executeMcpTool as before", async () => {
+    const { executeMcpTool } = await import("../mcp");
+    (executeMcpTool as ReturnType<typeof vi.fn>).mockClear();
+    await executeToolCall("mcp__stripe__refund", { id: "in_1" }, { ...ctx, mode: "commit" });
+    expect(executeMcpTool).toHaveBeenCalledOnce();
+  });
+
+  it("absent mode (default commit) on an mcp__ tool dispatches to executeMcpTool", async () => {
+    const { executeMcpTool } = await import("../mcp");
+    (executeMcpTool as ReturnType<typeof vi.fn>).mockClear();
+    await executeToolCall("mcp__stripe__refund", { id: "in_1" }, ctx);
+    expect(executeMcpTool).toHaveBeenCalledOnce();
   });
 });

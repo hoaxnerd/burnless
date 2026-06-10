@@ -223,6 +223,15 @@ export async function executeToolCall(
   // the MCP server itself (schemas live on the server, not in toolSchemas);
   // audited inside executeMcpTool with mcpConnectionId.
   if (toolName.startsWith("mcp__")) {
+    // Plan-mode safety: MCP dispatch hits the LIVE external server (send email,
+    // refund, create invoice — executeMcpTool has no plan mode). A diff-gate
+    // preview must NEVER execute one — return the empty plan envelope (no diff →
+    // plain permission card); the real call happens only on approved resume.
+    if (context.mode === "plan") {
+      const planned = { planned: true, overrides: [] };
+      logToolAudit(context, toolName, input, "pending_apply", planned, Math.round(performance.now() - startTime));
+      return JSON.stringify(planned);
+    }
     const { executeMcpTool } = await import("./mcp");
     if (!context.companyId) return "Error: Company ID is required for MCP tools.";
     return executeMcpTool(toolName, input, context as ToolContext & { companyId: string });

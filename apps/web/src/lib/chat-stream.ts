@@ -232,6 +232,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             // delta computation pauses without a diff (still safe).
             const enrichedPending = await Promise.all(
               state.pending.map(async (action) => {
+                // External MCP tools can never produce an override diff, and their
+                // dispatch hits the LIVE server regardless of mode — never "preview"
+                // one here (it would execute before approval AND again on resume).
+                if (action.toolName.startsWith("mcp__")) return action;
                 const category = categorizeToolName(action.toolName, params.mcp?.categories);
                 if (category !== "write" && category !== "delete") return action;
                 try {

@@ -92,9 +92,21 @@ export function assembleMcpToolsFromData(connections: ConnData[], disabledIds: s
   return { tools, categories };
 }
 
-/** DB-backed entry point used by the chat route. */
-export async function assembleMcpTools(companyId: string, userId: string): Promise<AssembledMcpTools> {
-  const flags = await getAiFlags(companyId);
+/** The slice of getAiFlags this module gates on. */
+export interface McpGateFlags {
+  masterEnabled: boolean;
+  features: unknown;
+}
+
+/** DB-backed entry point used by the chat route.
+ *  Pass `prefetchedFlags` (the route's own getAiFlags result) to skip the
+ *  internal aiFeatureFlags round-trip — the row is already fetched per turn. */
+export async function assembleMcpTools(
+  companyId: string,
+  userId: string,
+  prefetchedFlags?: McpGateFlags
+): Promise<AssembledMcpTools> {
+  const flags = prefetchedFlags ?? (await getAiFlags(companyId));
   if (!flags?.masterEnabled) return { tools: [], categories: {} };
   const features = (flags.features ?? {}) as unknown as Record<string, boolean>;
   if (features.mcp === false) return { tools: [], categories: {} }; // default-on
