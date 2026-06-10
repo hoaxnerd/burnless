@@ -60,3 +60,7 @@ agents/*/smoke-test/
 
 # Local pre-launch QA artifacts (screenshots, journal copy) — report is committed separately
 qa-result/
+
+# Brainstorm visual-companion sessions + verification scratch
+.superpowers/
+.verify-scratch/
