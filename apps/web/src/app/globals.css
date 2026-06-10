@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* dark: utilities follow the app's .dark class (theme-toggle/localStorage), NOT
+ * the OS prefers-color-scheme media query (Tailwind v4's default). Without this,
+ * an OS-dark + app-light machine fires every dark:* utility against the LIGHT
+ * variable palette — e.g. dark:bg-surface-900 painted navy inputs on light pages. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ── burnless Color System ─────────────────────────────────────────────── */
 
