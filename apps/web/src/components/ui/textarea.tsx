@@ -2,13 +2,15 @@
 
 import { forwardRef, type TextareaHTMLAttributes } from "react";
 import { Field } from "./field";
-import { controlClass } from "./control-styles";
+import { codeControlClass, controlClass } from "./control-styles";
 
 /* ── Textarea — canonical multi-line input (Batch-C S1-1) ─────────────────────
  *
  * forwardRef, accepts native textarea props + { label?, hint?, error?, required? }.
  * Shares the canonical control style (control-styles.ts). Bare mode renders the
  * styled <textarea> alone for use inside an existing label.
+ * `variant="code"` swaps in the dark mono code-editor surface
+ * (codeControlClass) for raw JSON/config entry.
  */
 
 export interface TextareaProps
@@ -19,6 +21,8 @@ export interface TextareaProps
   required?: boolean;
   showOptional?: boolean;
   wrapperClassName?: string;
+  /** "code" = dark mono code-editor surface (e.g. MCP config paste). */
+  variant?: "default" | "code";
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
@@ -32,11 +36,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       wrapperClassName,
       className,
       id,
+      variant = "default",
       ...props
     },
     ref,
   ) {
     const wrapped = label != null || hint != null || error != null;
+    const compose = variant === "code" ? codeControlClass : controlClass;
 
     if (!wrapped) {
       return (
@@ -45,7 +51,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={id}
           required={required}
           aria-invalid={error ? true : undefined}
-          className={controlClass(Boolean(error), className)}
+          className={compose(Boolean(error), className)}
           {...props}
         />
       );
@@ -65,7 +71,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           <textarea
             ref={ref}
             required={required}
-            className={controlClass(Boolean(error), className)}
+            className={compose(Boolean(error), className)}
             {...a11y}
             {...props}
           />

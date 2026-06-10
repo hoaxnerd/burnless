@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, KeyRound, Lock, Plus } from "lucide-react";
-import { Button, Input, Modal, Select } from "@/components/ui";
+import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import { glyphStyle } from "./provider-colors";
 
@@ -116,6 +116,13 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** True once the user closed the modal — guards in-flight resolve paths so a
+   *  late response can't advance steps / redirect on a closed modal. */
+  const closedRef = useRef(false);
+  useEffect(() => {
+    if (open) closedRef.current = false;
+  }, [open]);
+
   const parsed = useMemo(() => tryParseConfig(config), [config]);
   const serverName = created ? capitalize(created.name ?? created.slug) : "";
 
@@ -137,6 +144,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
   /** Closing after a row was created still revalidates the grid (the
    *  connection exists in needs_auth) — route through onCreated. */
   function handleClose() {
+    closedRef.current = true;
     if (created) onCreated();
     else onClose();
     reset();
@@ -171,6 +179,12 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
       const data = (await res.json().catch(() => ({}))) as Partial<CreatedConnection> & {
         error?: string;
       };
+      if (closedRef.current) {
+        // Closed mid-flight. A 2xx still created the row server-side — the
+        // grid must revalidate; but never advance steps on a closed modal.
+        if (res.ok) onCreated();
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "Failed to create the connection");
         return;
@@ -183,6 +197,8 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         onCreated();
         reset();
       }
+    } catch {
+      if (!closedRef.current) setError("Network error — please try again.");
     } finally {
       setBusy(false);
     }
@@ -200,13 +216,18 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         authorizationUrl?: string;
         error?: string;
       };
+      if (closedRef.current) return; // closed mid-flight — never redirect
       if (!res.ok || !data.authorizationUrl) {
         setError(data.error ?? "Failed to start authorization");
+        setBusy(false);
         return;
       }
       // Full-page redirect; the OAuth callback returns to /connections?connected=<slug>.
+      // Deliberately KEEP busy=true — the button stays in its loading state
+      // until the navigation unloads the page (no idle flicker mid-redirect).
       window.location.assign(data.authorizationUrl);
-    } finally {
+    } catch {
+      if (!closedRef.current) setError("Network error — please try again.");
       setBusy(false);
     }
   }
@@ -225,6 +246,11 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         status?: string;
         error?: string;
       };
+      if (closedRef.current) {
+        // Closed mid-flight. The token may have landed — revalidate the grid.
+        if (res.ok) onCreated();
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "Failed to save the token");
         return;
@@ -237,6 +263,8 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
           "Token saved, but the server is still unreachable — check the token and try again.",
         );
       }
+    } catch {
+      if (!closedRef.current) setError("Network error — please try again.");
     } finally {
       setBusy(false);
     }
@@ -283,14 +311,17 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
 
       {step === "configure" && (
         <>
-          {/* Tab row (mockup .tabs) */}
-          <div className="mb-3.5 flex gap-1 rounded-lg bg-surface-100 p-[3px]" role="tablist">
+          {/* Tab row (mockup .tabs). Plain toggle buttons + aria-pressed — NOT
+              role=tablist: the full ARIA tabs pattern requires roving tabindex,
+              arrow-key nav and aria-controls/tabpanel ids; partial semantics
+              set wrong SR expectations (SegmentedControl shows the full
+              pattern if this ever needs to graduate). */}
+          <div className="mb-3.5 flex gap-1 rounded-lg bg-surface-100 p-[3px]">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                role="tab"
-                aria-selected={tab === t.id}
+                aria-pressed={tab === t.id}
                 onClick={() => {
                   setTab(t.id);
                   setError(null);
@@ -309,13 +340,14 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
           {tab === "paste" && (
             <>
               <BlockLabel>MCP server config (JSON)</BlockLabel>
-              <textarea
+              <Textarea
+                variant="code"
                 value={config}
                 onChange={(e) => setConfig(e.target.value)}
                 placeholder={`Paste the server's JSON config — same shape as Claude Code / openclaw`}
                 aria-label="MCP server config (JSON)"
                 spellCheck={false}
-                className="min-h-[120px] w-full resize-y rounded-lg bg-surface-900 p-3 font-mono text-[11.5px] leading-[1.7] text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                className="min-h-[120px]"
               />
 
               {parsed && (
@@ -424,6 +456,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
           <div className="flex gap-2">
             <button
               type="button"
+              aria-pressed={scope === "company"}
               onClick={() => setScope("company")}
               className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
                 scope === "company"
@@ -438,6 +471,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
             </button>
             <button
               type="button"
+              aria-pressed={scope === "personal"}
               onClick={() => setScope("personal")}
               className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
                 scope === "personal"
