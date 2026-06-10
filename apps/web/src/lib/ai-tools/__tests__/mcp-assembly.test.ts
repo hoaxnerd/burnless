@@ -11,7 +11,7 @@ vi.mock("@burnless/db", () => ({
   getDisabledMcpConnectionIds: vi.fn(),
 }));
 
-import { assembleMcpToolsFromData, assembleMcpTools, DEFER_THRESHOLD } from "../mcp";
+import { assembleMcpToolsFromData, assembleMcpTools, describeMcpToolAction, DEFER_THRESHOLD } from "../mcp";
 import { getAiFlags } from "@/lib/ai-feature-flags";
 import { listVisibleConnections } from "@burnless/db";
 
@@ -96,6 +96,23 @@ describe("assembleMcpTools — pre-fetched flags (no duplicate aiFeatureFlags re
     expect(listVisibleConnections).not.toHaveBeenCalled();
   });
 
+  it("features.mcp === false turns MCP off (explicit opt-out) without DB reads", async () => {
+    vi.mocked(getAiFlags).mockClear();
+    vi.mocked(listVisibleConnections).mockClear();
+
+    const out = await assembleMcpTools("c1", "u1", { masterEnabled: true, features: { mcp: false } });
+    expect(out).toEqual({ tools: [], categories: {} });
+    expect(listVisibleConnections).not.toHaveBeenCalled();
+  });
+
+  it("absent features.mcp is default-on (proceeds to connection lookup)", async () => {
+    vi.mocked(listVisibleConnections).mockClear();
+    vi.mocked(listVisibleConnections).mockResolvedValueOnce([] as never);
+
+    await assembleMcpTools("c1", "u1", { masterEnabled: true, features: {} });
+    expect(listVisibleConnections).toHaveBeenCalledWith("c1", "u1");
+  });
+
   it("without prefetched flags it still falls back to getAiFlags", async () => {
     vi.mocked(getAiFlags).mockClear();
     vi.mocked(getAiFlags).mockResolvedValueOnce({ masterEnabled: false, features: {} } as never);
@@ -103,5 +120,24 @@ describe("assembleMcpTools — pre-fetched flags (no duplicate aiFeatureFlags re
     const out = await assembleMcpTools("c1", "u1");
     expect(out).toEqual({ tools: [], categories: {} });
     expect(getAiFlags).toHaveBeenCalledWith("c1");
+  });
+});
+
+describe("describeMcpToolAction — confirm-card label for MCP tools", () => {
+  // Live-smoke finding: describeMutation's create_/update_/else-delete heuristic
+  // labeled mcp__deepwiki__read_wiki_structure as "delete mcp deepwiki read wiki
+  // structure" on the permission card. MCP tools need their own describer.
+  it("describes a direct MCP tool call without inventing a delete verb", () => {
+    const label = describeMcpToolAction("mcp__deepwiki__read_wiki_structure", { repoName: "vercel/next.js" });
+    expect(label).toBe('call "read_wiki_structure" on deepwiki (external MCP)');
+  });
+
+  it("names the target tool for deferred call_tool dispatch", () => {
+    const label = describeMcpToolAction("mcp__github__call_tool", { tool: "create_issue", arguments: {} });
+    expect(label).toBe('call "create_issue" on github (external MCP)');
+  });
+
+  it("returns null for non-MCP tool names (caller falls back to describeMutation)", () => {
+    expect(describeMcpToolAction("delete_funding_round", { id: "x" })).toBeNull();
   });
 });

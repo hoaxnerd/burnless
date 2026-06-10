@@ -92,6 +92,10 @@ export function assembleMcpToolsFromData(connections: ConnData[], disabledIds: s
   return { tools, categories };
 }
 
+// Confirm-card describer lives in ./mcp-describe (no heavy deps); re-exported
+// here so MCP consumers have one import surface.
+export { describeMcpToolAction } from "./mcp-describe";
+
 /** The slice of getAiFlags this module gates on. */
 export interface McpGateFlags {
   masterEnabled: boolean;

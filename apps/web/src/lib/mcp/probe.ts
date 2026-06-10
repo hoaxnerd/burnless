@@ -16,7 +16,10 @@ export interface ProbeResult {
   error: string | null;
 }
 
-const UNAUTHORIZED_RE = /\b401\b|unauthorized|invalid[_ ]token/i;
+// Some servers (e.g. GitHub's MCP) return 400 "missing required Authorization
+// header" instead of a proper 401 — treat any missing/required-Authorization
+// complaint as "reachable but needs auth" too.
+const UNAUTHORIZED_RE = /\b401\b|unauthorized|invalid[_ ]token|authorization header/i;
 
 export async function probeConnection(
   spec: McpConnectionSpec,

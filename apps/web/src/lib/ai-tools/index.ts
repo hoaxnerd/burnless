@@ -34,6 +34,9 @@ import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
 import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
+// NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
+// and is loaded lazily inside executeToolCall instead.
+import { describeMcpToolAction } from "./mcp-describe";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -294,7 +297,9 @@ export async function executeToolCall(
 
 /** Human-readable description of a tool action, e.g. `create forecast line "AWS"`. */
 export function describeToolAction(toolName: string, input: Record<string, unknown>): string {
-  return describeMutation(toolName, input);
+  // MCP tools don't follow the create_/update_/delete_ naming convention —
+  // without this, the fallback below labels every MCP call "delete ...".
+  return describeMcpToolAction(toolName, input) ?? describeMutation(toolName, input);
 }
 
 /** Record an audit row for a tool the user explicitly denied (never executed). */
