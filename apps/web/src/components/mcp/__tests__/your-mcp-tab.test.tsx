@@ -18,6 +18,12 @@ vi.mock("@/lib/swr/hooks", async (importOriginal) => {
     ...actual,
     useApiTokens: mockUseApiTokens,
     useOauthGrants: mockUseOauthGrants,
+    useCompany: vi.fn().mockReturnValue({
+      data: { id: "c1", name: "Acme", currency: "USD", mcpServerEnabled: true },
+      isLoading: false,
+      error: undefined,
+      mutate: vi.fn(),
+    }),
   };
 });
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: mockApiFetch }));
@@ -90,5 +96,28 @@ describe("YourMcpTab", () => {
     render(<YourMcpTab mcpEndpoint="http://localhost:3000/mcp" userRole="viewer" />);
     expect(screen.getByText(/No tokens yet/i)).toBeTruthy();
     expect(screen.getByText(/No apps authorized yet/i)).toBeTruthy();
+  });
+
+  it("owner sees an enabled kill switch; viewer sees it inert", () => {
+    render(<YourMcpTab mcpEndpoint="http://localhost:3000/mcp" userRole="owner" />);
+    expect(screen.getByRole("switch", { name: "External agent access" })).toBeTruthy();
+    expect(screen.getByText(/tokens stay intact/i)).toBeTruthy();
+  });
+
+  it("toggling the switch PATCHes /api/company", async () => {
+    render(<YourMcpTab mcpEndpoint="http://localhost:3000/mcp" userRole="owner" />);
+    fireEvent.click(screen.getByRole("switch", { name: "External agent access" }));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/company",
+        expect.objectContaining({ method: "PATCH", body: JSON.stringify({ mcpServerEnabled: false }) })
+      );
+    });
+  });
+
+  it("non-https non-localhost endpoint shows the reachability warning", () => {
+    render(<YourMcpTab mcpEndpoint="http://192.168.1.20:3000/mcp" userRole="owner" />);
+    expect(screen.getByText(/require HTTPS or localhost/i)).toBeTruthy();
+    expect(screen.getByText("Unreachable")).toBeTruthy();
   });
 });

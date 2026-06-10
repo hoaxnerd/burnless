@@ -7,6 +7,9 @@
  */
 import Link from "next/link";
 import { useApiTokens, useOauthGrants } from "@/lib/swr/hooks";
+import { useCompany } from "@/lib/swr/hooks";
+import { useToast } from "@/components/ui/toast";
+import { apiFetch } from "@/lib/api-fetch";
 import { EndpointCard } from "./endpoint-card";
 import { PatTable } from "./pat-table";
 import { ConnectedAppsTable } from "./connected-apps-table";
@@ -27,10 +30,36 @@ export function YourMcpTab({
 }) {
   const tokensSwr = useApiTokens();
   const grantsSwr = useOauthGrants();
+  const companySwr = useCompany();
+  const { error: toastError } = useToast();
+  const serverEnabled = (companySwr.data?.mcpServerEnabled as boolean | undefined) ?? true;
+  const canToggle = userRole === "owner" || userRole === "admin";
+
+  async function toggleServer(enabled: boolean) {
+    // optimistic flip, rollback on failure
+    void companySwr.mutate(
+      companySwr.data ? { ...companySwr.data, mcpServerEnabled: enabled } : companySwr.data,
+      { revalidate: false }
+    );
+    const res = await apiFetch("/api/company", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mcpServerEnabled: enabled }),
+    });
+    if (!res.ok) {
+      toastError("Could not change agent access — please retry.");
+    }
+    void companySwr.mutate();
+  }
 
   return (
     <div className="max-w-[980px]">
-      <EndpointCard mcpEndpoint={mcpEndpoint} />
+      <EndpointCard
+        mcpEndpoint={mcpEndpoint}
+        serverEnabled={serverEnabled}
+        canToggle={canToggle}
+        onToggle={(enabled) => void toggleServer(enabled)}
+      />
       <PatTable tokens={tokensSwr.data ?? []} onChanged={() => void tokensSwr.mutate()} />
       <ConnectedAppsTable grants={grantsSwr.data ?? []} onChanged={() => void grantsSwr.mutate()} />
       <div className="flex items-center justify-between px-1 py-0.5">
