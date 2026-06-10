@@ -21,6 +21,7 @@ vi.mock("@/lib/rate-limit", () => ({
     import: { maxRequests: 5, windowMs: 60_000 },
     auth: { maxRequests: 5, windowMs: 60_000 },
     mcp: { maxRequests: 60, windowMs: 60_000 },
+    mcpIp: { maxRequests: 240, windowMs: 60_000 },
     api: { maxRequests: 100, windowMs: 60_000 },
   },
 }));
@@ -80,19 +81,58 @@ describe("/mcp middleware branch", () => {
         headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
       })
     );
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(1);
+    // credential-keyed check + IP-keyed backstop
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
     const [key, cfg] = mockCheckRateLimit.mock.calls[0]!;
     expect(key).toMatch(/^mcp:[0-9a-f]+$/);
     expect(cfg).toEqual({ maxRequests: 60, windowMs: 60_000 });
-    // two different tokens → two different keys
+    // two different tokens → two different credential keys
     middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_OTHER", "x-forwarded-for": "1.2.3.4" },
       })
     );
-    const [key2] = mockCheckRateLimit.mock.calls[1]!;
+    const [key2] = mockCheckRateLimit.mock.calls[2]!;
+    expect(key2).toMatch(/^mcp:[0-9a-f]+$/);
     expect(key2).not.toBe(key);
+  });
+
+  it("authenticated /mcp ALSO enforces an IP-keyed backstop (token rotation cannot mint unlimited buckets)", () => {
+    middleware(
+      createRequest("/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
+      })
+    );
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    const [ipKey, ipCfg] = mockCheckRateLimit.mock.calls[1]!;
+    expect(ipKey).toBe("mcp:ip:1.2.3.4");
+    expect(ipCfg).toEqual({ maxRequests: 240, windowMs: 60_000 });
+  });
+
+  it("returns 429 when the IP backstop trips, even with a fresh rotated credential", () => {
+    // Simulate an attacker rotating random bearer tokens: every credential
+    // bucket is fresh (allowed), but the per-IP backstop is exhausted.
+    mockCheckRateLimit.mockImplementation((key: string) =>
+      key.startsWith("mcp:ip:")
+        ? { allowed: false, remaining: 0, resetAt: Date.now() + 30_000 }
+        : { allowed: true, remaining: 59, resetAt: Date.now() + 60_000 }
+    );
+    const res = middleware(
+      createRequest("/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer bl_pat_rotated_999", "x-forwarded-for": "1.2.3.4" },
+      })
+    );
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBeTruthy();
+    // restore the default for subsequent tests
+    mockCheckRateLimit.mockImplementation(() => ({
+      allowed: true,
+      remaining: 59,
+      resetAt: Date.now() + 60_000,
+    }));
   });
 
   it("unauthenticated /mcp requests fall back to an IP-derived key", () => {

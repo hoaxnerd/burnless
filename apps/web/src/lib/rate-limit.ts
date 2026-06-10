@@ -186,6 +186,14 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   auth: { maxRequests: 5, windowMs: 60_000 },
   /** Inbound MCP server: 60 req/min per credential (token-hash key, expose spec §4.1) */
   mcp: { maxRequests: 60, windowMs: 60_000 },
+  /**
+   * Inbound MCP per-IP backstop. The credential key is attacker-controlled
+   * (rotating a random bearer mints a fresh bucket per request), so a second
+   * IP-keyed cap bounds total /mcp throughput — and thus the route's
+   * sha256+DB token lookups — regardless of header churn. Higher than the
+   * per-credential cap so multiple legitimate tokens behind one NAT coexist.
+   */
+  mcpIp: { maxRequests: 240, windowMs: 60_000 },
   /** Legacy alias */
   api: { maxRequests: 100, windowMs: 60_000 },
 };

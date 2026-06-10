@@ -110,33 +110,58 @@ export function middleware(request: NextRequest) {
 
   // ── /mcp (expose spec §4.1) ────────────────────────────────────────────
   // Bearer-authed, spec-defined cross-origin API: CSRF origin checks do not
-  // apply. Rate-limited on the `mcp` tier keyed PER CREDENTIAL (a stable
-  // non-cryptographic hash of the Authorization header — middleware is sync,
-  // and keying needs stability, not secrecy), falling back to IP when
-  // unauthenticated (those die with 401 in the route anyway).
+  // apply. Two-layer rate limit:
+  //   1. PER CREDENTIAL on the `mcp` tier (a stable non-cryptographic hash of
+  //      the Authorization header — middleware is sync, and keying needs
+  //      stability, not secrecy). Fairness between tokens.
+  //   2. PER IP backstop on the `mcpIp` tier (higher cap). The credential key
+  //      is attacker-controlled — rotating a random bearer per request mints a
+  //      fresh bucket — so without this cap an unauthenticated attacker gets
+  //      unbounded route-level sha256+DB token lookups. The IP key cannot be
+  //      forged behind a trusted proxy, so it bounds total throughput.
+  // Unauthenticated requests (no Authorization header) take only the IP key
+  // at the stricter `mcp` cap (they die with 401 in the route anyway).
   if (pathname === "/mcp") {
     const authHeader = request.headers.get("authorization");
     const ipForMcp =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       request.headers.get("x-real-ip") ??
       "unknown";
-    const key = authHeader ? `mcp:${fnv1a32hex(authHeader)}` : `mcp:ip:${ipForMcp}`;
     const mcpConfig = RATE_LIMITS.mcp!;
-    const mcpResult = checkRateLimit(key, mcpConfig);
-    if (!mcpResult.allowed) {
-      const retryAfter = Math.ceil((mcpResult.resetAt - Date.now()) / 1000);
+
+    const tooManyMcp = (resetAt: number, limit: number) => {
+      const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         {
           status: 429,
           headers: {
             "Retry-After": String(retryAfter),
-            "X-RateLimit-Limit": String(mcpConfig.maxRequests),
+            "X-RateLimit-Limit": String(limit),
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(mcpResult.resetAt / 1000)),
+            "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
           },
         }
       );
+    };
+
+    let mcpResult;
+    if (authHeader) {
+      mcpResult = checkRateLimit(`mcp:${fnv1a32hex(authHeader)}`, mcpConfig);
+      if (!mcpResult.allowed) {
+        return tooManyMcp(mcpResult.resetAt, mcpConfig.maxRequests);
+      }
+      // IP backstop — bounds aggregate throughput across rotated credentials.
+      const ipConfig = RATE_LIMITS.mcpIp!;
+      const ipResult = checkRateLimit(`mcp:ip:${ipForMcp}`, ipConfig);
+      if (!ipResult.allowed) {
+        return tooManyMcp(ipResult.resetAt, ipConfig.maxRequests);
+      }
+    } else {
+      mcpResult = checkRateLimit(`mcp:ip:${ipForMcp}`, mcpConfig);
+      if (!mcpResult.allowed) {
+        return tooManyMcp(mcpResult.resetAt, mcpConfig.maxRequests);
+      }
     }
     const res = next();
     res.headers.set("X-RateLimit-Limit", String(mcpConfig.maxRequests));
