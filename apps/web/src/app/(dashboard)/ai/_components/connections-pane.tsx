@@ -148,7 +148,7 @@ function ConnectionRow({
           {c.name}
         </div>
         <div className="text-[11px] text-surface-500 tabular-nums">
-          {toolCount ?? "—"} tools
+          {toolCount ?? "—"} {toolCount === 1 ? "tool" : "tools"}
         </div>
       </div>
       <ScopeBadge scope={c.ownerScope} />

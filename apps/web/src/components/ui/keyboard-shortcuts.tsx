@@ -80,6 +80,7 @@ export function KeyboardShortcutsProvider({
       { key: "s", label: "G then S", description: "Go to Scenarios", action: () => router.push("/scenarios") },
       { key: "p", label: "G then P", description: "Go to Reports", action: () => router.push("/reports") },
       { key: "i", label: "G then I", description: "Go to Data Room", action: () => router.push("/data-room") },
+      { key: "c", label: "G then C", description: "Go to Connections", action: () => router.push("/connections") },
       { key: "?", label: "?", description: "Show keyboard shortcuts", action: () => setShowHelp(true), shift: true },
     ],
     [onToggleAI, router],
@@ -200,6 +201,7 @@ export function KeyboardShortcutsProvider({
                   <ShortcutRow label="G S" description="Scenarios" />
                   <ShortcutRow label="G P" description="Reports" />
                   <ShortcutRow label="G I" description="Data Room" />
+                  <ShortcutRow label="G C" description="Connections" />
                 </div>
                 {pageShortcuts.length > 0 && (
                   <div>

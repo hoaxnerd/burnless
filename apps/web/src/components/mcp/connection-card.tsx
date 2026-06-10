@@ -56,7 +56,7 @@ export function ConnectionCard({
       <div className="mt-[13px] flex items-center gap-2 border-t border-surface-100 pt-3">
         <StatusPill status={connection.status} authType={connection.authType} />
         <span className="ml-2.5 text-[11.5px] text-surface-600">
-          <b className="font-bold text-surface-900 tabular-nums">{toolCount ?? "—"}</b> tools
+          <b className="font-bold text-surface-900 tabular-nums">{toolCount ?? "—"}</b> {toolCount === 1 ? "tool" : "tools"}
         </span>
         <button
           type="button"

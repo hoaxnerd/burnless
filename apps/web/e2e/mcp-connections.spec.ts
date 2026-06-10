@@ -181,7 +181,7 @@ test.describe.serial("MCP connections", () => {
     const card = page.getByTestId("connection-card").filter({ hasText: NAME });
     await expect(card).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText("Connected · token")).toBeVisible();
-    await expect(card.getByText("1 tools")).toBeVisible(); // ping
+    await expect(card.getByText("1 tool", { exact: true })).toBeVisible(); // ping
   });
 
   test("AI sidebar shows the connection with a kill-switch", async ({ page }) => {
