@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal, Input, Button } from "@/components/ui";
+import { Modal, Input, Button, IconButton } from "@/components/ui";
+import { Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { NumberInput } from "@/components/forms/primitives";
 import { toUserMessage } from "@/lib/api-error";
@@ -76,14 +77,25 @@ export function OptionPoolForm({ existing }: Props) {
 
   return (
     <>
-      <Button
-        variant={isEdit ? "secondary" : "primary"}
-        size="sm"
-        onClick={() => setOpen(true)}
-        data-testid="open-add-option-pool"
-      >
-        {isEdit ? "Edit" : "Add option pool"}
-      </Button>
+      {isEdit ? (
+        <IconButton
+          variant="ghost"
+          size="sm"
+          icon={<Pencil />}
+          aria-label="Edit"
+          onClick={() => setOpen(true)}
+          data-testid="open-add-option-pool"
+        />
+      ) : (
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setOpen(true)}
+          data-testid="open-add-option-pool"
+        >
+          Add option pool
+        </Button>
+      )}
 
       <Modal open={open} onClose={close} title={isEdit ? "Edit option pool" : "Add option pool"}>
         <div className="space-y-3">

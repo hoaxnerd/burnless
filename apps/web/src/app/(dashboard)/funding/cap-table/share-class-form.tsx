@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
-import { Modal, Input, Select, Button } from "@/components/ui";
+import { Modal, Input, Select, Button, IconButton } from "@/components/ui";
+import { Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { NumberInput } from "@/components/forms/primitives";
 import { toUserMessage } from "@/lib/api-error";
@@ -98,14 +99,25 @@ export function ShareClassForm({ existing }: Props) {
 
   return (
     <>
-      <Button
-        variant={isEdit ? "secondary" : "primary"}
-        size="sm"
-        onClick={() => setOpen(true)}
-        data-testid="open-add-share-class"
-      >
-        {isEdit ? "Edit" : "Add share class"}
-      </Button>
+      {isEdit ? (
+        <IconButton
+          variant="ghost"
+          size="sm"
+          icon={<Pencil />}
+          aria-label="Edit"
+          onClick={() => setOpen(true)}
+          data-testid="open-add-share-class"
+        />
+      ) : (
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setOpen(true)}
+          data-testid="open-add-share-class"
+        >
+          Add share class
+        </Button>
+      )}
 
       <Modal open={open} onClose={close} title={isEdit ? "Edit share class" : "Add share class"}>
         <div className="space-y-3">

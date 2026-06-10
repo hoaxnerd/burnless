@@ -33,6 +33,9 @@ vi.mock("@/components/ui", () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
     <button {...props}>{children}</button>
   ),
+  IconButton: ({ icon, ...props }: { icon?: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button {...props}>{icon}</button>
+  ),
 }));
 vi.mock("@/components/ui/toast", () => ({
   useToast: () => ({ success: toastSuccess, error: toastError }),
