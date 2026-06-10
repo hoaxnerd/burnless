@@ -41,7 +41,7 @@ export function DebtFields({ params, setParameters }: DebtFieldsProps) {
       >
         <option value="straight_line">Straight-line (equal principal each month)</option>
         <option value="interest_only">Interest-only with balloon</option>
-        <option value="amortized">Amortized (equal P+I each month) — coming soon</option>
+        <option value="amortized">Amortized (equal P+I each month)</option>
       </Select>
       <SingleDateInput
         label="First Payment Date"
