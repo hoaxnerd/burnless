@@ -131,6 +131,10 @@ export type RotateResult =
 /** OAuth 2.1 refresh rotation. Presenting a SUPERSEDED refresh token is
  *  evidence of theft → revoke the entire grant family (spec §5.2).
  *
+ *  Client binding (RFC 6749 §6 / OAuth 2.1): the refresh token MUST have been
+ *  issued to `clientId` — the check sits inside the atomic claim so a
+ *  mismatched client neither rotates NOR burns the legitimate token.
+ *
  *  Race-safe design (fixes TOCTOU + non-transactional issues from original):
  *  1. Atomically claim the refresh token via UPDATE…RETURNING (same pattern as
  *     consumeAuthCode) — two concurrent requests for the same token race on
@@ -140,12 +144,16 @@ export type RotateResult =
  *     db.transaction so that a failed insert (connection drop, constraint)
  *     rolls back the supersede — preventing a bricked grant where the old token
  *     is marked superseded but no replacement was ever issued. */
-export async function rotateRefreshToken(refreshToken: string): Promise<RotateResult> {
+export async function rotateRefreshToken(
+  refreshToken: string,
+  clientId: string
+): Promise<RotateResult> {
   const hash = sha256hex(refreshToken);
 
   // Perform the entire claim + issue atomically inside a transaction.
-  // The UPDATE…RETURNING WHERE supersededAt IS NULL AND revokedAt IS NULL is
-  // the single race-safe gate: at most one concurrent caller claims 1 row.
+  // The UPDATE…RETURNING WHERE clientId matches AND supersededAt IS NULL AND
+  // revokedAt IS NULL is the single race-safe gate: at most one concurrent
+  // caller claims 1 row, and only the client the token was issued to can.
   const result = await db.transaction(async (tx) => {
     const claimed = await tx
       .update(oauthTokens)
@@ -153,6 +161,7 @@ export async function rotateRefreshToken(refreshToken: string): Promise<RotateRe
       .where(
         and(
           eq(oauthTokens.refreshTokenHash, hash),
+          eq(oauthTokens.clientId, clientId),
           isNull(oauthTokens.supersededAt),
           isNull(oauthTokens.revokedAt)
         )
@@ -194,8 +203,8 @@ export async function rotateRefreshToken(refreshToken: string): Promise<RotateRe
     return { status: "rotated", ...result };
   }
 
-  // 0 rows from the atomic UPDATE — either already superseded (reuse attempt)
-  // or not found / already revoked (invalid). Re-SELECT to distinguish.
+  // 0 rows from the atomic UPDATE — superseded (reuse attempt), client_id
+  // mismatch, or not found / already revoked (invalid). Re-SELECT to distinguish.
   const existing = await db
     .select()
     .from(oauthTokens)
@@ -203,7 +212,12 @@ export async function rotateRefreshToken(refreshToken: string): Promise<RotateRe
     .limit(1);
   const row = existing[0];
   if (!row || row.revokedAt) return { status: "invalid" };
-  // supersededAt is set — presenting a superseded token is evidence of theft.
+  // Live token, claim failed → client_id mismatch (RFC 6749 §6). Reject
+  // WITHOUT burning the token or revoking the family — the legitimate
+  // client must remain able to rotate.
+  if (!row.supersededAt) return { status: "invalid" };
+  // supersededAt is set — presenting a superseded token is evidence of theft
+  // regardless of which client presents it.
   await db
     .update(oauthTokens)
     .set({ revokedAt: new Date() })

@@ -3,7 +3,8 @@
  * RFC 6749; CSRF-exempt + auth-tier rate-limited in middleware.
  * authorization_code: single-use hashed code + PKCE S256 + exact
  * redirect_uri + client + optional resource re-check. refresh_token:
- * rotation; superseded reuse revokes the grant family.
+ * client-bound (RFC 6749 §6) rotation; superseded reuse revokes the
+ * grant family.
  */
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
@@ -74,8 +75,14 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (grantType === "refresh_token") {
     const refreshToken = params.get("refresh_token");
-    if (!refreshToken) return oauthError("invalid_request", "refresh_token is required");
-    const result = await rotateRefreshToken(refreshToken);
+    const clientId = params.get("client_id");
+    if (!refreshToken || !clientId) {
+      return oauthError("invalid_request", "refresh_token and client_id are required");
+    }
+    // RFC 6749 §6 / OAuth 2.1: public clients MUST send client_id and the
+    // refresh token MUST have been issued to that client. Binding is enforced
+    // inside the atomic rotation claim so a mismatch never burns the token.
+    const result = await rotateRefreshToken(refreshToken, clientId);
     if (result.status !== "rotated") return oauthError("invalid_grant");
     return tokenResponse({
       accessToken: result.accessToken,

@@ -120,7 +120,7 @@ describe("token issuance + rotation (spec §5.2)", () => {
       scopes: ["read", "write"],
       resource: RESOURCE,
     });
-    const rotated = await rotateRefreshToken(first.refreshToken);
+    const rotated = await rotateRefreshToken(first.refreshToken, client.id);
     expect(rotated.status).toBe("rotated");
     if (rotated.status !== "rotated") throw new Error("unreachable");
     expect(rotated.row.grantId).toBe(first.row.grantId);
@@ -128,7 +128,7 @@ describe("token issuance + rotation (spec §5.2)", () => {
     const [oldRow] = await db.select().from(oauthTokens).where(eq(oauthTokens.id, first.row.id));
     expect(oldRow!.supersededAt).not.toBeNull();
     // REUSE of the superseded refresh → entire family revoked
-    const reuse = await rotateRefreshToken(first.refreshToken);
+    const reuse = await rotateRefreshToken(first.refreshToken, client.id);
     expect(reuse.status).toBe("reuse_detected");
     const family = await db
       .select()
@@ -136,11 +136,36 @@ describe("token issuance + rotation (spec §5.2)", () => {
       .where(eq(oauthTokens.grantId, first.row.grantId));
     expect(family.every((r) => r.revokedAt !== null)).toBe(true);
     // the new refresh token is now dead too
-    expect((await rotateRefreshToken(rotated.refreshToken)).status).toBe("invalid");
+    expect((await rotateRefreshToken(rotated.refreshToken, client.id)).status).toBe("invalid");
   });
 
   it("garbage refresh token is invalid", async () => {
-    expect((await rotateRefreshToken("bl_rt_garbage")).status).toBe("invalid");
+    expect((await rotateRefreshToken("bl_rt_garbage", "any-client")).status).toBe("invalid");
+  });
+
+  it("mismatched client_id is invalid WITHOUT burning the token (RFC 6749 §6)", async () => {
+    const db = getTestDb();
+    const { user, company, client } = await seed();
+    const other = await createOauthClient({
+      name: "Other",
+      redirectUris: ["https://other.example/cb"],
+    });
+    const first = await issueOauthTokens({
+      clientId: client.id,
+      userId: user.id,
+      companyId: company.id,
+      scopes: ["read"],
+      resource: RESOURCE,
+    });
+    // wrong client presents a stolen-but-live refresh token → invalid
+    const mismatch = await rotateRefreshToken(first.refreshToken, other.id);
+    expect(mismatch.status).toBe("invalid");
+    // the token must NOT be burned: not superseded, family not revoked
+    const [row] = await db.select().from(oauthTokens).where(eq(oauthTokens.id, first.row.id));
+    expect(row!.supersededAt).toBeNull();
+    expect(row!.revokedAt).toBeNull();
+    // the legitimate client can still rotate
+    expect((await rotateRefreshToken(first.refreshToken, client.id)).status).toBe("rotated");
   });
 });
 

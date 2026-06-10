@@ -290,6 +290,54 @@ describe("refresh_token grant (spec §5.2 rotation)", () => {
     expect(await verifyMcpBearer(`Bearer ${second.access_token}`)).toBeNull();
   });
 
+  it("refresh is client-bound: missing client_id → invalid_request; mismatched client_id → invalid_grant without burning the token (RFC 6749 §6)", async () => {
+    const clientId = await registerClient();
+    const otherClientId = await registerClient();
+    const { verifier, challenge } = pkcePair();
+    const code = await approveAndGetCode(clientId, challenge);
+    const first = await (
+      await token(
+        formReq({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: REDIRECT,
+          client_id: clientId,
+          code_verifier: verifier,
+        })
+      )
+    ).json();
+
+    // missing client_id → invalid_request (public client MUST send it)
+    const missing = await token(
+      formReq({ grant_type: "refresh_token", refresh_token: first.refresh_token })
+    );
+    expect(missing.status).toBe(400);
+    expect((await missing.json()).error).toBe("invalid_request");
+
+    // a different registered client presenting a stolen token → invalid_grant
+    const wrong = await token(
+      formReq({
+        grant_type: "refresh_token",
+        refresh_token: first.refresh_token,
+        client_id: otherClientId,
+      })
+    );
+    expect(wrong.status).toBe(400);
+    expect((await wrong.json()).error).toBe("invalid_grant");
+
+    // the mismatch did NOT burn the grant: access token still verifies …
+    expect(await verifyMcpBearer(`Bearer ${first.access_token}`)).not.toBeNull();
+    // … and the legitimate client still rotates fine
+    const ok = await token(
+      formReq({
+        grant_type: "refresh_token",
+        refresh_token: first.refresh_token,
+        client_id: clientId,
+      })
+    );
+    expect(ok.status).toBe(200);
+  });
+
   it("unknown grant_type → unsupported_grant_type", async () => {
     const res = await token(formReq({ grant_type: "password", username: "x", password: "y" }));
     expect(res.status).toBe(400);
