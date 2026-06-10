@@ -63,7 +63,7 @@ export function CapTableView({
         <header className="space-y-1">
           <Link
             href="/funding"
-            className="inline-flex items-center gap-1 text-sm text-muted hover:text-surface-900"
+            className="inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Funding
@@ -88,13 +88,13 @@ export function CapTableView({
       <header className="space-y-1">
         <Link
           href="/funding"
-          className="inline-flex items-center gap-1 text-sm text-muted hover:text-surface-900"
+          className="inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-900"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Funding
         </Link>
         <h1 className="text-2xl font-bold">Cap Table</h1>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-surface-500">
           {fd > 0 ? fd.toLocaleString() : "0"} shares fully diluted
         </p>
       </header>
@@ -134,26 +134,41 @@ export function CapTableView({
         />
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left p-2">Holder</th>
-            <th className="text-left p-2">Class</th>
-            <th className="text-right p-2">Shares</th>
-            <th className="text-right p-2">%</th>
-          </tr>
-        </thead>
-        <tbody>
-          {capTable.rows.map((r, i) => (
-            <tr key={i} className="border-b">
-              <td className="p-2">{r.holder}</td>
-              <td className="p-2">{r.shareClass}</td>
-              <td className="p-2 text-right">{r.shares.toLocaleString()}</td>
-              <td className="p-2 text-right">{fmtPercent(ratioToPct(r.ownershipPercent), 2)}</td>
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-base font-semibold text-surface-900">Holders</h2>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-surface-200 bg-surface-50">
+              <th className="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                Holder
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                Class
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                Shares
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                %
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-surface-100">
+            {capTable.rows.map((r, i) => (
+              <tr key={i} className="hover:bg-surface-50 transition-colors">
+                <td className="px-4 py-3">{r.holder}</td>
+                <td className="px-4 py-3">{r.shareClass}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{r.shares.toLocaleString()}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {fmtPercent(ratioToPct(r.ownershipPercent), 2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* U5: the editable Manage section lives BELOW the foots-to-100% holder
           table (moved out of page.tsx). It owns the share-class + option-pool
