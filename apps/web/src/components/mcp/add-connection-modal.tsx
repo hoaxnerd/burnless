@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ExternalLink, KeyRound, Lock, Plus } from "lucide-react";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
@@ -68,11 +68,11 @@ function tryParseConfig(
     const [name, entry] = entries[0]!;
     const e = entry as { url?: unknown; command?: unknown };
     if (typeof e.url === "string") {
-      let host = e.url;
+      let host: string;
       try {
         host = new URL(e.url).host;
       } catch {
-        /* show raw url */
+        host = e.url; // unparseable — show the raw url
       }
       return { name, transport: "streamable-http", endpoint: host };
     }
@@ -85,7 +85,9 @@ function tryParseConfig(
   }
 }
 
-function capitalize(s: string): string {
+/** Display treatment for server names/slugs ("stripe" → "Stripe") — shared
+ *  with the grid's OAuth-return toast for parity. */
+export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -116,12 +118,12 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** True once the user closed the modal — guards in-flight resolve paths so a
-   *  late response can't advance steps / redirect on a closed modal. */
-  const closedRef = useRef(false);
-  useEffect(() => {
-    if (open) closedRef.current = false;
-  }, [open]);
+  /** Modal-session generation — bumped on every close. In-flight handlers
+   *  capture the value at request start and bail if it changed by resolve
+   *  time, so a late response can't advance steps / redirect on a closed
+   *  modal. A boolean reset on reopen would let a request from a previous
+   *  session slip through after close→reopen; the counter never resets. */
+  const sessionRef = useRef(0);
 
   const parsed = useMemo(() => tryParseConfig(config), [config]);
   const serverName = created ? capitalize(created.name ?? created.slug) : "";
@@ -144,7 +146,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
   /** Closing after a row was created still revalidates the grid (the
    *  connection exists in needs_auth) — route through onCreated. */
   function handleClose() {
-    closedRef.current = true;
+    sessionRef.current += 1;
     if (created) onCreated();
     else onClose();
     reset();
@@ -159,6 +161,8 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
 
   async function handleContinue() {
     if (!canContinue || busy) return;
+    const session = sessionRef.current;
+    const stale = () => sessionRef.current !== session;
     setBusy(true);
     setError(null);
     const body =
@@ -179,9 +183,10 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
       const data = (await res.json().catch(() => ({}))) as Partial<CreatedConnection> & {
         error?: string;
       };
-      if (closedRef.current) {
+      if (stale()) {
         // Closed mid-flight. A 2xx still created the row server-side — the
-        // grid must revalidate; but never advance steps on a closed modal.
+        // grid must revalidate; but never touch the (possibly reopened)
+        // modal's state from a stale session.
         if (res.ok) onCreated();
         return;
       }
@@ -198,14 +203,16 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         reset();
       }
     } catch {
-      if (!closedRef.current) setError("Network error — please try again.");
+      if (!stale()) setError("Network error — please try again.");
     } finally {
-      setBusy(false);
+      if (!stale()) setBusy(false);
     }
   }
 
   async function handleAuthorize() {
     if (!created || busy) return;
+    const session = sessionRef.current;
+    const stale = () => sessionRef.current !== session;
     setBusy(true);
     setError(null);
     try {
@@ -216,7 +223,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         authorizationUrl?: string;
         error?: string;
       };
-      if (closedRef.current) return; // closed mid-flight — never redirect
+      if (stale()) return; // closed mid-flight — never redirect a newer session
       if (!res.ok || !data.authorizationUrl) {
         setError(data.error ?? "Failed to start authorization");
         setBusy(false);
@@ -227,13 +234,17 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
       // until the navigation unloads the page (no idle flicker mid-redirect).
       window.location.assign(data.authorizationUrl);
     } catch {
-      if (!closedRef.current) setError("Network error — please try again.");
-      setBusy(false);
+      if (!stale()) {
+        setError("Network error — please try again.");
+        setBusy(false);
+      }
     }
   }
 
   async function handleSaveToken() {
     if (!created || !token.trim() || busy) return;
+    const session = sessionRef.current;
+    const stale = () => sessionRef.current !== session;
     setBusy(true);
     setError(null);
     try {
@@ -246,7 +257,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         status?: string;
         error?: string;
       };
-      if (closedRef.current) {
+      if (stale()) {
         // Closed mid-flight. The token may have landed — revalidate the grid.
         if (res.ok) onCreated();
         return;
@@ -264,9 +275,9 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         );
       }
     } catch {
-      if (!closedRef.current) setError("Network error — please try again.");
+      if (!stale()) setError("Network error — please try again.");
     } finally {
-      setBusy(false);
+      if (!stale()) setBusy(false);
     }
   }
 
@@ -291,8 +302,13 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
           const active = step === "configure" ? i === 0 : i === 1;
           return (
             <span key={label} className="flex items-center gap-1.5">
-              {i > 0 && <span className="mx-0.5 font-normal text-surface-300">→</span>}
+              {i > 0 && (
+                <span aria-hidden="true" className="mx-0.5 font-normal text-surface-300">
+                  →
+                </span>
+              )}
               <span
+                aria-current={active ? "step" : undefined}
                 className={`flex items-center gap-1.5 ${active ? "text-brand-700" : "text-surface-400"}`}
               >
                 <span
@@ -580,7 +596,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
             disabled={!canContinue}
             onClick={() => void handleContinue()}
           >
-            Continue →
+            Continue <span aria-hidden="true">→</span>
           </Button>
         )}
       </div>

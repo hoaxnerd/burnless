@@ -1,14 +1,14 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plug, Plus } from "lucide-react";
 import { AsyncData, Button, DataEmptyState, useQueryState } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { useMcpConnections } from "@/lib/swr/hooks";
 import type { McpConnectionDto } from "./types";
 import { ConnectionCard } from "./connection-card";
-import { AddConnectionModal } from "./add-connection-modal";
+import { AddConnectionModal, capitalize } from "./add-connection-modal";
 import { ManageConnectionPanel } from "./manage-connection-panel";
 
 /** Friendly copy for the OAuth callback's `?error=` codes (api/mcp/oauth/callback). */
@@ -28,6 +28,7 @@ const OAUTH_ERROR_COPY: Record<string, string> = {
 function OAuthReturnToasts({ onConnected }: { onConnected: () => void }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { success, error } = useToast();
   const fired = useRef(false);
   const connected = searchParams.get("connected");
@@ -37,13 +38,14 @@ function OAuthReturnToasts({ onConnected }: { onConnected: () => void }) {
     if (fired.current || (!connected && !errorCode)) return;
     fired.current = true;
     if (connected) {
-      success(`Connected to ${connected}`);
+      success(`Connected to ${capitalize(connected)}`);
       onConnected();
     } else if (errorCode) {
       error(OAUTH_ERROR_COPY[errorCode] ?? "Authorization failed — please try again.");
     }
-    router.replace("/connections", { scroll: false });
-  }, [connected, errorCode, success, error, onConnected, router]);
+    // Strip the one-shot params wherever the grid is mounted (no hardcoded path).
+    router.replace(pathname, { scroll: false });
+  }, [connected, errorCode, success, error, onConnected, router, pathname]);
 
   return null;
 }
