@@ -219,6 +219,15 @@ export async function executeToolCall(
 ): Promise<string> {
   const startTime = performance.now();
 
+  // External MCP tools (spec §3.4): namespaced mcp__<slug>__<tool>, validated by
+  // the MCP server itself (schemas live on the server, not in toolSchemas);
+  // audited inside executeMcpTool with mcpConnectionId.
+  if (toolName.startsWith("mcp__")) {
+    const { executeMcpTool } = await import("./mcp");
+    if (!context.companyId) return "Error: Company ID is required for MCP tools.";
+    return executeMcpTool(toolName, input, context as ToolContext & { companyId: string });
+  }
+
   // Validate input before execution
   const validation = validateToolInput(toolName, input);
   if (!validation.success) {

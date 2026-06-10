@@ -6,16 +6,24 @@
 import {
   classifyMcpTool,
   mcpToolName,
+  parseMcpToolName,
   toToolDefinition,
+  getMcpConnectionManager,
   type BridgedToolDefinition,
   type McpToolInfo,
+  type McpSecret,
+  type McpConnectionSpec,
 } from "@burnless/mcp";
 import {
   listVisibleConnections,
   listMcpToolPrefs,
   getDisabledMcpConnectionIds,
+  getDecryptedMcpSecret,
+  aiToolAuditLogs,
+  db,
 } from "@burnless/db";
 import { getAiFlags } from "@/lib/ai-feature-flags";
+import type { ToolContext } from "./types";
 
 export type McpPermCategory = "read" | "write" | "delete";
 
@@ -109,4 +117,122 @@ export async function assembleMcpTools(companyId: string, userId: string): Promi
     }))
   );
   return assembleMcpToolsFromData(data, disabledIds);
+}
+
+// ── Dispatch (Task 13) ───────────────────────────────────────────────────────
+
+export interface McpDispatchDeps {
+  findConnectionBySlug(slug: string, companyId: string, userId: string): Promise<
+    | (McpConnectionSpec & { status: string; capabilities?: { tools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }> } | null })
+    | null
+  >;
+  getSecret(connectionId: string): Promise<McpSecret | null>;
+  callTool(spec: McpConnectionSpec, secret: McpSecret | null, tool: string, args: Record<string, unknown>): Promise<string>;
+  audit(entry: {
+    companyId: string; userId: string; conversationId: string | null;
+    mcpConnectionId: string | null; toolName: string; input: Record<string, unknown>;
+    status: "success" | "error"; result: unknown; durationMs: number;
+  }): Promise<void>;
+}
+
+/** Pure-ish core with injected deps — unit-tested directly. */
+export async function executeMcpToolWith(
+  toolName: string,
+  input: Record<string, unknown>,
+  context: ToolContext & { companyId: string },
+  deps: McpDispatchDeps
+): Promise<string> {
+  const started = Date.now();
+  const parsed = parseMcpToolName(toolName);
+  const fail = async (connectionId: string | null, message: string) => {
+    await deps.audit({
+      companyId: context.companyId, userId: context.userId,
+      conversationId: context.conversationId ?? null,
+      mcpConnectionId: connectionId, toolName, input,
+      status: "error", result: { error: message }, durationMs: Date.now() - started,
+    });
+    return `Error: ${message}`;
+  };
+
+  if (!parsed) return fail(null, `Malformed MCP tool name: ${toolName}`);
+
+  const conn = await deps.findConnectionBySlug(parsed.slug, context.companyId, context.userId);
+  if (!conn || conn.status !== "connected") {
+    return fail(null, `MCP connection "${parsed.slug}" is not connected or not found`);
+  }
+
+  // D6 meta-tools.
+  if (parsed.tool === "search_tools") {
+    const query = String(input.query ?? "").toLowerCase();
+    const matches = (conn.capabilities?.tools ?? []).filter(
+      (t) => t.name.toLowerCase().includes(query) || (t.description ?? "").toLowerCase().includes(query)
+    );
+    const result = JSON.stringify(matches.slice(0, 20), null, 2);
+    await deps.audit({
+      companyId: context.companyId, userId: context.userId,
+      conversationId: context.conversationId ?? null,
+      mcpConnectionId: conn.id, toolName, input,
+      status: "success", result: { matched: matches.length }, durationMs: Date.now() - started,
+    });
+    return matches.length ? result : `No tools matching "${input.query}". Try a broader keyword.`;
+  }
+
+  const targetTool = parsed.tool === "call_tool" ? String(input.tool ?? "") : parsed.tool;
+  const targetArgs = parsed.tool === "call_tool"
+    ? ((input.arguments ?? {}) as Record<string, unknown>)
+    : input;
+  if (!targetTool) return fail(conn.id, "call_tool requires a 'tool' argument");
+
+  try {
+    const secret = await deps.getSecret(conn.id);
+    const result = await deps.callTool(conn, secret, targetTool, targetArgs);
+    await deps.audit({
+      companyId: context.companyId, userId: context.userId,
+      conversationId: context.conversationId ?? null,
+      mcpConnectionId: conn.id, toolName, input,
+      status: "success", result: { length: result.length }, durationMs: Date.now() - started,
+    });
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return fail(conn.id, `MCP tool failed: ${message}`);
+  }
+}
+
+/** Production deps. */
+const realDeps: McpDispatchDeps = {
+  async findConnectionBySlug(slug, companyId, userId) {
+    const rows = await listVisibleConnections(companyId, userId);
+    const row = rows.find((r) => r.slug === slug);
+    if (!row) return null;
+    return {
+      id: row.id, slug: row.slug, transport: row.transport, endpoint: row.endpoint,
+      args: row.args, env: row.env, authType: row.authType,
+      status: row.status, capabilities: row.capabilities,
+    };
+  },
+  getSecret: (connectionId) => getDecryptedMcpSecret(connectionId),
+  callTool: (spec, secret, tool, args) => getMcpConnectionManager().callTool(spec, secret, tool, args),
+  async audit(entry) {
+    // Mirrors logToolAudit in index.ts (fire-and-forget there; awaited here for determinism).
+    await db.insert(aiToolAuditLogs).values({
+      companyId: entry.companyId,
+      userId: entry.userId,
+      conversationId: entry.conversationId,
+      mcpConnectionId: entry.mcpConnectionId,
+      toolName: entry.toolName,
+      input: entry.input,
+      status: entry.status,
+      result: entry.result,
+      durationMs: entry.durationMs,
+    });
+  },
+};
+
+export function executeMcpTool(
+  toolName: string,
+  input: Record<string, unknown>,
+  context: ToolContext & { companyId: string }
+): Promise<string> {
+  return executeMcpToolWith(toolName, input, context, realDeps);
 }
