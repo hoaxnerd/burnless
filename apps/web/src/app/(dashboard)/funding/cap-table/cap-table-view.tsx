@@ -5,7 +5,7 @@ import { ArrowLeft, PieChart } from "lucide-react";
 import { ratioToPct } from "@burnless/engine";
 import type { CapTable } from "@burnless/engine";
 import { useLocale } from "@/components/locale/locale-context";
-import { DataEmptyState } from "@/components/ui";
+import { DataEmptyState, HeroKpiCard } from "@/components/ui";
 import { CapTableManager } from "./cap-table-manager";
 import { ShareClassForm } from "./share-class-form";
 
@@ -99,11 +99,39 @@ export function CapTableView({
         </p>
       </header>
 
-      <div className="grid grid-cols-4 gap-3">
-        <Stat label="Common" pct={fd > 0 ? capTable.totals.commonStock / fd : 0} />
-        <Stat label="Preferred" pct={fd > 0 ? capTable.totals.preferredStock / fd : 0} />
-        <Stat label="SAFE Overhang" pct={fd > 0 ? capTable.totals.safeOverhang / fd : 0} />
-        <Stat label="Option Pool" pct={fd > 0 ? capTable.totals.optionPoolOverhang / fd : 0} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <HeroKpiCard
+          slug="captable-common"
+          label="Common"
+          value={fmtPercent(ratioToPct(fd > 0 ? capTable.totals.commonStock / fd : 0), 1)}
+          metricStyle={{ icon: "BarChart3", color: "blue", href: "#" }}
+          hasData
+          stagger={0}
+        />
+        <HeroKpiCard
+          slug="captable-preferred"
+          label="Preferred"
+          value={fmtPercent(ratioToPct(fd > 0 ? capTable.totals.preferredStock / fd : 0), 1)}
+          metricStyle={{ icon: "TrendingUp", color: "violet", href: "#" }}
+          hasData
+          stagger={1}
+        />
+        <HeroKpiCard
+          slug="captable-safe"
+          label="SAFE Overhang"
+          value={fmtPercent(ratioToPct(fd > 0 ? capTable.totals.safeOverhang / fd : 0), 1)}
+          metricStyle={{ icon: "Zap", color: "amber", href: "#" }}
+          hasData
+          stagger={2}
+        />
+        <HeroKpiCard
+          slug="captable-pool"
+          label="Option Pool"
+          value={fmtPercent(ratioToPct(fd > 0 ? capTable.totals.optionPoolOverhang / fd : 0), 1)}
+          metricStyle={{ icon: "DollarSign", color: "teal", href: "#" }}
+          hasData
+          stagger={3}
+        />
       </div>
 
       <table className="w-full text-sm">
@@ -132,16 +160,6 @@ export function CapTableView({
           structure tables (edit/delete) — base-data only; the API routes own
           scenario safety + the single-pool guard. */}
       <CapTableManager shareClasses={shareClasses} optionPools={optionPools} />
-    </div>
-  );
-}
-
-function Stat({ label, pct }: { label: string; pct: number }) {
-  const { fmtPercent } = useLocale();
-  return (
-    <div className="p-3 border rounded">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-semibold">{fmtPercent(ratioToPct(pct), 1)}</div>
     </div>
   );
 }
