@@ -22,6 +22,7 @@ import { ChatInput } from "./_components/chat-input";
 import { AiPageInsights } from "@/components/ai/ai-page-insights";
 import { AiSidebar, type AiPane } from "./_components/ai-sidebar";
 import { AiPermissionsPanel } from "./_components/ai-permissions-panel";
+import { ConnectionsPane } from "./_components/connections-pane";
 import type {
   Conversation,
   Message,
@@ -324,6 +325,8 @@ export default function AiCompanionPage() {
       <div className="p-3">
         <AiPageInsights page="dashboard" scenarioId={activeScenarioId} />
       </div>
+    ) : activePane === "connections" ? (
+      <ConnectionsPane />
     ) : activePane === "settings" ? (
       <AiPermissionsPanel conversationId={conversationId} />
     ) : null;

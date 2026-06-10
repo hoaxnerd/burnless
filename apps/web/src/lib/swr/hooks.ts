@@ -345,3 +345,21 @@ export function useMcpConnectionTools(
     ...config,
   });
 }
+
+// ── User preferences (per-user, per-company UI prefs) ────────────────────────
+
+/**
+ * Minimal slice of the `/api/user-preferences` row the client reads via SWR.
+ * (The dashboard shell still uses its own imperative fetch; this hook exists
+ * for the AI-sidebar Connections pane's D11 kill-switch.)
+ */
+export interface UserPreferencesDto {
+  disabledMcpConnections?: string[] | null;
+}
+
+/** Current user's UI preferences for the active company. */
+export function useUserPreferences(
+  config?: SWRConfiguration<UserPreferencesDto>,
+) {
+  return useSWR<UserPreferencesDto>(KEYS.userPreferences, { ...config });
+}

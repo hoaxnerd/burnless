@@ -37,6 +37,8 @@ const patchSchema = z.object({
   quickActionModeOverrides: z.record(z.enum(["intelligence", "dynamic", "custom"])).nullable().optional(),
   customQuickActions: z.array(z.string()).nullable().optional(),
   sidebarCollapsed: z.boolean().optional(),
+  // D11: per-user MCP kill-switch — connection ids excluded from AI context.
+  disabledMcpConnections: z.array(z.string().max(100)).max(200).optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {
