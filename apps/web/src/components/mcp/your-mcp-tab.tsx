@@ -10,6 +10,7 @@ import { useApiTokens, useOauthGrants } from "@/lib/swr/hooks";
 import { EndpointCard } from "./endpoint-card";
 import { PatTable } from "./pat-table";
 import { ConnectedAppsTable } from "./connected-apps-table";
+import { NewTokenModal } from "./new-token-modal";
 
 export function YourMcpTab({
   mcpEndpoint,
@@ -26,10 +27,6 @@ export function YourMcpTab({
 }) {
   const tokensSwr = useApiTokens();
   const grantsSwr = useOauthGrants();
-  // Task 12 mounts <NewTokenModal> here using tokenModalOpen/onTokenModalChange.
-  void tokenModalOpen;
-  void onTokenModalChange;
-  void userRole;
 
   return (
     <div className="max-w-[980px]">
@@ -44,6 +41,12 @@ export function YourMcpTab({
           View audit log →
         </Link>
       </div>
+      <NewTokenModal
+        open={tokenModalOpen}
+        onClose={() => onTokenModalChange?.(false)}
+        onMinted={() => void tokensSwr.mutate()}
+        userRole={userRole}
+      />
     </div>
   );
 }
