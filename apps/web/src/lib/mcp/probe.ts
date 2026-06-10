@@ -21,6 +21,16 @@ export interface ProbeResult {
 // complaint as "reachable but needs auth" too.
 const UNAUTHORIZED_RE = /\b401\b|unauthorized|invalid[_ ]token|authorization header/i;
 
+/** The SDK's StreamableHTTPError keeps the HTTP status on `code`, NOT in the
+ *  message (a bare 401 with an empty body yields "Error POSTing to endpoint: ")
+ *  — so check the code alongside the message regex. */
+function isUnauthorized(err: unknown, message: string): boolean {
+  return (
+    (err as { code?: unknown } | null)?.code === 401 ||
+    UNAUTHORIZED_RE.test(message)
+  );
+}
+
 export async function probeConnection(
   spec: McpConnectionSpec,
   secret: McpSecret | null,
@@ -32,7 +42,7 @@ export async function probeConnection(
   } catch (err) {
     await manager.invalidate(spec.id);
     const message = err instanceof Error ? err.message : String(err);
-    if (UNAUTHORIZED_RE.test(message)) {
+    if (isUnauthorized(err, message)) {
       return { status: "needs_auth", tools: [], error: null };
     }
     return { status: "error", tools: [], error: message.slice(0, 500) };
