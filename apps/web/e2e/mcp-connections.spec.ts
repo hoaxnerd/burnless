@@ -15,10 +15,33 @@ import { createServer, type Server } from "node:http";
 
 test.use({ storageState: "e2e/.auth/user.json" });
 
+// Seed cookie consent before any page script runs. The consent banner is
+// role="dialog" (localStorage-gated), so without this an unscoped dialog
+// locator strict-mode collides with it AND its fixed overlay can intercept
+// clicks. Belt-and-suspenders with the name-scoped dialog locators below
+// (per the documented pattern in scenario-delete-uniform.spec.ts).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "burnless-cookie-consent",
+      JSON.stringify({
+        version: "1",
+        preferences: { essential: true, analytics: false, marketing: false },
+        timestamp: Date.now(),
+      }),
+    );
+  });
+});
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const PAT = "test-pat";
-/** Unique per run — avoids colliding with rows left by earlier/failed runs. */
-const NAME = `e2emcp${Date.now()}`;
+/**
+ * Unique per run AND per worker — avoids colliding with rows left by
+ * earlier/failed runs, and with the parallel worker when both the `chromium`
+ * and `authenticated` projects pick this spec up (their processes can load
+ * the module in the same millisecond, so Date.now() alone is not enough).
+ */
+const NAME = `e2emcp${Date.now()}p${process.pid % 100000}`;
 
 let mockServer: Server;
 let mockPort: number;
@@ -110,7 +133,10 @@ test.describe.serial("MCP connections", () => {
         .first(),
     ).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "Add connection" }).first().click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    // Name the dialog explicitly — the Cookie-consent banner also uses
+    // role="dialog" (see scenario-delete-uniform.spec.ts for the pattern).
+    const addDialog = page.getByRole("dialog", { name: "Add connection" });
+    await expect(addDialog).toBeVisible();
 
     // Paste tab is the default — fill the config textarea.
     await page
@@ -151,7 +177,7 @@ test.describe.serial("MCP connections", () => {
     expect(((await token.json()) as { status: string }).status).toBe("connected");
 
     // Modal closes; the grid revalidates and shows the connected card.
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10_000 });
+    await expect(addDialog).not.toBeVisible({ timeout: 10_000 });
     const card = page.getByTestId("connection-card").filter({ hasText: NAME });
     await expect(card).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText("Connected · token")).toBeVisible();
