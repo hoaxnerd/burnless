@@ -129,6 +129,18 @@ export function OwnershipChart({ foundersOwnership, completedRounds, hasCapTable
     return segments;
   }, [foundersOwnership, completedRounds, capTableRows]);
 
+  // Precompute each arc's start/end angle here (a memo) rather than mutating a
+  // running accumulator inside the render JSX — the React Compiler rejects
+  // reassigning a captured variable during render. `* 360` is arc geometry
+  // (allowlisted by no-inline-financial-calc), not a financial figure.
+  const donutArcs = useMemo(() => {
+    const angles = capTableSegments.map((s) => (s.percent / 100) * 360);
+    return capTableSegments.map((seg, i) => {
+      const startAngle = angles.slice(0, i).reduce((a, b) => a + b, 0);
+      return { color: seg.color, startAngle, endAngle: startAngle + angles[i]! };
+    });
+  }, [capTableSegments]);
+
   const donutSize = 200;
   const donutCenter = donutSize / 2;
   const donutRadius = 75;
@@ -179,29 +191,18 @@ export function OwnershipChart({ foundersOwnership, completedRounds, hasCapTable
       <div className="flex justify-center mb-6">
         <div className="relative">
           <svg width={donutSize} height={donutSize} aria-hidden="true">
-            {(() => {
-              let cumAngle = 0;
-              return capTableSegments.map((seg, i) => {
-                const angle = (seg.percent / 100) * 360;
-                if (angle < 0.5) {
-                  cumAngle += angle;
-                  return null;
-                }
-                const startAngle = cumAngle;
-                cumAngle += angle;
-                const endAngle = cumAngle;
-                return (
-                  <path
-                    key={i}
-                    d={donutSegmentPath(startAngle, endAngle - 0.5)}
-                    fill="none"
-                    stroke={seg.color}
-                    strokeWidth={donutStroke}
-                    strokeLinecap="round"
-                  />
-                );
-              });
-            })()}
+            {donutArcs.map((arc, i) =>
+              arc.endAngle - arc.startAngle < 0.5 ? null : (
+                <path
+                  key={i}
+                  d={donutSegmentPath(arc.startAngle, arc.endAngle - 0.5)}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth={donutStroke}
+                  strokeLinecap="round"
+                />
+              )
+            )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-2xl font-bold tabular-nums text-surface-900">
