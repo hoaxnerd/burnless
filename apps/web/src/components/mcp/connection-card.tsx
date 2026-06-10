@@ -1,7 +1,7 @@
-import type { CSSProperties } from "react";
 import type { McpConnectionDto } from "./types";
 import { ScopeBadge } from "./scope-badge";
 import { StatusPill } from "./status-pill";
+import { glyphStyle } from "./provider-colors";
 
 /**
  * ConnectionCard — one MCP server in the Connections grid.
@@ -10,17 +10,6 @@ import { StatusPill } from "./status-pill";
  * 15px padding, shadow-sm; 38px/10px-radius brand glyph; meta row divided by a
  * surface-100 hairline (13px above / 12px below).
  */
-
-/** Known provider brand colors — the only permitted color literals (pixel contract). */
-const PROVIDER_COLORS: Record<string, string> = {
-  stripe: "#635bff",
-  linear: "#5e6ad2",
-  github: "#24292f",
-};
-
-function glyphStyle(slug: string): CSSProperties {
-  return { backgroundColor: PROVIDER_COLORS[slug] ?? "var(--color-highlight-500)" };
-}
 
 /** Card subtitle: endpoint host for HTTP servers, `stdio · <command>` for local. */
 function subtitle(c: McpConnectionDto): string {

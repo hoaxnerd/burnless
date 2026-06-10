@@ -1,13 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plug, Plus } from "lucide-react";
 import { AsyncData, Button, DataEmptyState, useQueryState } from "@/components/ui";
+import { useToast } from "@/components/ui/toast";
 import { useMcpConnections } from "@/lib/swr/hooks";
 import type { McpConnectionDto } from "./types";
 import { ConnectionCard } from "./connection-card";
 import { AddConnectionModal } from "./add-connection-modal";
 import { ManageConnectionPanel } from "./manage-connection-panel";
+
+/** Friendly copy for the OAuth callback's `?error=` codes (api/mcp/oauth/callback). */
+const OAUTH_ERROR_COPY: Record<string, string> = {
+  missing_code_or_state: "Authorization was cancelled or the provider sent an incomplete response.",
+  unknown_connection: "This authorization doesn't match any of your connections.",
+  state_mismatch: "Authorization state didn't match — please try connecting again.",
+  exchange_failed: "The provider rejected the authorization — please try again.",
+  connected_but_unauthorized: "Signed in, but the server still refused the connection.",
+};
+
+/**
+ * Surfaces the OAuth callback's `?connected=<slug>` / `?error=<code>` query
+ * params as toasts, then strips them from the URL. Isolated child so the
+ * `useSearchParams()` suspense boundary stays local to this no-op renderer.
+ */
+function OAuthReturnToasts({ onConnected }: { onConnected: () => void }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { success, error } = useToast();
+  const fired = useRef(false);
+  const connected = searchParams.get("connected");
+  const errorCode = searchParams.get("error");
+
+  useEffect(() => {
+    if (fired.current || (!connected && !errorCode)) return;
+    fired.current = true;
+    if (connected) {
+      success(`Connected to ${connected}`);
+      onConnected();
+    } else if (errorCode) {
+      error(OAUTH_ERROR_COPY[errorCode] ?? "Authorization failed — please try again.");
+    }
+    router.replace("/connections", { scroll: false });
+  }, [connected, errorCode, success, error, onConnected, router]);
+
+  return null;
+}
 
 /**
  * Connections page body — header + connection-card grid + Add-connection modal
@@ -25,6 +64,9 @@ export function ConnectionsGrid() {
 
   return (
     <div>
+      <Suspense fallback={null}>
+        <OAuthReturnToasts onConnected={() => void swr.mutate()} />
+      </Suspense>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-surface-900 sm:text-2xl">

@@ -11,6 +11,8 @@ interface ModalProps {
   children: ReactNode;
   /** Max width variant */
   size?: "sm" | "md" | "lg" | "xl";
+  /** Optional leading icon chip rendered before the title (e.g. gradient glyph). */
+  icon?: ReactNode;
 }
 
 const sizeMap = {
@@ -20,7 +22,7 @@ const sizeMap = {
   xl: "max-w-xl",
 };
 
-export function Modal({ open, onClose, title, children, size = "lg" }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = "lg", icon }: ModalProps) {
   return (
     <Overlay open={open} onClose={onClose} ariaLabel={title}>
       {(panelProps) => (
@@ -29,7 +31,10 @@ export function Modal({ open, onClose, title, children, size = "lg" }: ModalProp
           className={`bg-surface-0 rounded-2xl shadow-xl border border-surface-200 w-full ${sizeMap[size]} max-h-[90vh] overflow-auto animate-scale-in outline-none`}
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
-            <h2 className="text-lg font-semibold text-surface-900">{title}</h2>
+            <div className="flex min-w-0 items-center gap-3">
+              {icon}
+              <h2 className="text-lg font-semibold text-surface-900">{title}</h2>
+            </div>
             <button
               onClick={onClose}
               className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
