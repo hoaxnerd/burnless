@@ -132,7 +132,7 @@ describe("PATCH /api/company — foundersOwnershipPercent", () => {
     // The update payload must include foundersOwnershipPercent String-coerced
     // for the numeric() column (the exact bug class that 500'd a funding save).
     expect(mockSet).toHaveBeenCalledTimes(1);
-    const payload = mockSet.mock.calls[0][0] as Record<string, unknown>;
+    const payload = mockSet.mock.calls[0]![0] as Record<string, unknown>;
     expect(payload.foundersOwnershipPercent).toBe("80");
   });
 });
