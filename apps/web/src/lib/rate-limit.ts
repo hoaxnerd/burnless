@@ -184,6 +184,8 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   import: { maxRequests: 5, windowMs: 60_000 },
   /** Auth (register, check-email): 5 req/min per IP — brute force protection */
   auth: { maxRequests: 5, windowMs: 60_000 },
+  /** Inbound MCP server: 60 req/min per credential (token-hash key, expose spec §4.1) */
+  mcp: { maxRequests: 60, windowMs: 60_000 },
   /** Legacy alias */
   api: { maxRequests: 100, windowMs: 60_000 },
 };

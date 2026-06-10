@@ -206,6 +206,10 @@ function logToolAudit(
       permissionDecision: context.permissionDecision ?? "auto",
       result: result as Record<string, unknown>,
       durationMs,
+      source: context.auditSource ?? "chat",
+      credentialType: context.credentialType ?? null,
+      credentialId: context.credentialId ?? null,
+      clientInfo: context.clientInfo ?? null,
     })
     .catch((err) => {
       console.warn("[ai-tool-audit] Failed to log tool call:", err instanceof Error ? err.message : err);

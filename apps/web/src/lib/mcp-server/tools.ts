@@ -85,16 +85,18 @@ export function buildMcpExecuteTool(
       });
     }
 
-    // ToolContext.scenarioId semantics unchanged (spec §9.8) — the MCP
-    // session is just a new carrier for it. Audit-attribution fields
-    // (auditSource/credentialType/credentialId/clientInfo) are threaded in
-    // the Task-7 commit.
+    // ToolContext.scenarioId semantics unchanged (spec §9.8); audit
+    // attribution rides along (spec §4.3 step 7).
     return executeToolCall(toolName, input, {
       companyId: deps.auth.companyId,
       userId: deps.auth.userId,
       scenarioId: deps.state.scenarioId,
       mode: "commit",
       permissionDecision: "auto",
+      auditSource: "mcp_server",
+      credentialType: deps.auth.credentialType,
+      credentialId: deps.auth.credentialId,
+      clientInfo: deps.clientInfo,
     });
   };
 }

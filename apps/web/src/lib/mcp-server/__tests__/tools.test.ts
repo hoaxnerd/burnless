@@ -59,6 +59,10 @@ describe("buildMcpExecuteTool", () => {
       scenarioId: null,
       mode: "commit",
       permissionDecision: "auto",
+      auditSource: "mcp_server",
+      credentialType: "pat",
+      credentialId: "tok-1",
+      clientInfo: { name: "test", version: "1" },
     }));
   });
 
