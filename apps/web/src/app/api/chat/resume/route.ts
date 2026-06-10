@@ -28,6 +28,7 @@ import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
 import { executeToolCall, logDeniedToolCall } from "@/lib/ai-tools";
+import { assembleMcpTools } from "@/lib/ai-tools/mcp";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse, scenarioActivationFrom } from "@/lib/chat-stream";
@@ -135,6 +136,10 @@ async function resumeStream(args: {
     : BUILTIN_PERMISSION_DEFAULTS;
   const sessionGrants = await getSessionGrants(conversationId);
 
+  // MCP tools for the resumed turn (spec §3.4) — same assembly as POST /api/chat
+  // so the model keeps its MCP tool set (and category map) across a pause.
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId);
+
   return buildChatSSEResponse({
     companyId: ctx.companyId,
     userId: ctx.userId,
@@ -148,6 +153,7 @@ async function resumeStream(args: {
     defaults,
     sessionGrants,
     writeMode: writeMode ?? "confirm",
+    mcp,
     seedTimeline,
     activatedScenarios,
   });

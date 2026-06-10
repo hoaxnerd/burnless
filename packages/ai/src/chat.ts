@@ -15,6 +15,7 @@ import {
   type LlmMessage,
   type ContentBlock,
   type CompletionRequest,
+  type ToolDefinition,
 } from "./providers";
 import { getProviderForFeature } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
@@ -49,6 +50,8 @@ interface ChatOptions {
   feature?: string;
   /** Configured companion name for the system prompt. */
   companionName?: string;
+  /** Extra per-turn tools (MCP) appended to the financial tool set. */
+  extraTools?: ToolDefinition[];
   /** Override provider config (e.g., from per-company DB settings). */
   providerConfig?: {
     provider?: string;
@@ -75,7 +78,7 @@ export async function chat(options: ChatOptions): Promise<{
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName);
-  const tools = getFinancialTools();
+  const tools = [...getFinancialTools(), ...(options.extraTools ?? [])];
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -155,7 +158,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName);
-  const tools = getFinancialTools();
+  const tools = [...getFinancialTools(), ...(options.extraTools ?? [])];
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,

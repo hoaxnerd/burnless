@@ -76,8 +76,15 @@ export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   ...DELETE_TOOLS,
 ]);
 
-/** Classify a tool into its permission category. Unknown → read. */
-export function categorizeToolName(toolName: string): PermissionCategory {
+/** Classify a tool into its permission category. Dynamic map (MCP tools, computed
+ *  per-turn from connection prefs + hints) wins; mcp__* without an entry is
+ *  treated as write (safe-by-default, spec D5); everything else unknown → read. */
+export function categorizeToolName(
+  toolName: string,
+  dynamicCategories?: Record<string, PermissionCategory>
+): PermissionCategory {
+  if (dynamicCategories && dynamicCategories[toolName]) return dynamicCategories[toolName];
+  if (toolName.startsWith("mcp__")) return "write";
   if (WEB_SEARCH_TOOLS.has(toolName)) return "web_search";
   if (BROWSER_TOOLS.has(toolName)) return "browser_use";
   if (DELETE_TOOLS.has(toolName)) return "delete";
@@ -94,6 +101,8 @@ export interface ResolvePermissionContext {
   sessionGrants: Partial<Record<PermissionCategory, boolean>>;
   /** Company AI write mode (spec §4.4). Absent → "full" (no clamp; back-compat). */
   writeMode?: AiWriteMode;
+  /** Per-turn category map for dynamically-sourced (MCP) tools. */
+  dynamicCategories?: Record<string, PermissionCategory>;
 }
 
 /**
@@ -105,7 +114,7 @@ export function resolvePermission(
   toolName: string,
   ctx: ResolvePermissionContext
 ): PermissionDecision {
-  const category = categorizeToolName(toolName);
+  const category = categorizeToolName(toolName, ctx.dynamicCategories);
 
   // Write-mode clamp (spec §4.4): layered BEFORE the session-grant short-circuit
   // so neither a grant nor an "always" default can bypass it. Mirrors the delete
