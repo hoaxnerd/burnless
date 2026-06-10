@@ -95,6 +95,8 @@ export interface TimelineNodeClient {
   // tool
   toolName?: string;
   phase?: "pending" | "running" | "done" | "error";
+  /** Permission class of the tool, when known — drives the read/write/delete tag on MCP steps. */
+  category?: PermissionCategoryId;
   // result
   text?: string;
   block?: UiBlockClient;
