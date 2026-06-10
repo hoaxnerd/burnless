@@ -28,6 +28,33 @@ describe("McpConnectionManager", () => {
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
+  it("concurrent first-use calls create exactly one client (no leaks)", async () => {
+    const client = fakeClient();
+    const factory = vi.fn().mockResolvedValue(client);
+    const mgr = new McpConnectionManager(factory);
+    // Fire two getTools simultaneously before either resolves
+    const [tools1, tools2] = await Promise.all([
+      mgr.getTools(SPEC, null),
+      mgr.getTools(SPEC, null),
+    ]);
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(tools1).toBe(tools2);
+  });
+
+  it("closes the client and cleans up if listTools throws", async () => {
+    const client = fakeClient({ listTools: vi.fn().mockRejectedValue(new Error("list-fail")) });
+    const factory = vi.fn().mockResolvedValue(client);
+    const mgr = new McpConnectionManager(factory);
+    await expect(mgr.getTools(SPEC, null)).rejects.toThrow("list-fail");
+    expect(client.close).toHaveBeenCalled();
+    // A subsequent call must retry (not return cached rejected promise)
+    const client2 = fakeClient();
+    factory.mockResolvedValue(client2);
+    const tools = await mgr.getTools(SPEC, null);
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(tools).toHaveLength(1);
+  });
+
   it("calls a tool and stringifies text content", async () => {
     const mgr = new McpConnectionManager(vi.fn().mockResolvedValue(fakeClient()));
     const out = await mgr.callTool(SPEC, null, "echo", { msg: "x" });
@@ -43,6 +70,20 @@ describe("McpConnectionManager", () => {
     // next use re-creates
     await mgr.getTools(SPEC, null);
     expect(factory).toHaveBeenCalledTimes(2);
+  });
+
+  it("paginates listTools across multiple cursor pages", async () => {
+    // Simulates a server that returns two pages of tools
+    const pagedClient = fakeClient({
+      listTools: vi.fn()
+        .mockResolvedValueOnce({ tools: [{ name: "tool1", inputSchema: {} }], nextCursor: "page2" })
+        .mockResolvedValueOnce({ tools: [{ name: "tool2", inputSchema: {} }] }),
+    });
+    const mgr = new McpConnectionManager(vi.fn().mockResolvedValue(pagedClient));
+    const tools = await mgr.getTools(SPEC, null);
+    expect(tools).toHaveLength(2);
+    expect(tools.map((t) => t.name)).toEqual(["tool1", "tool2"]);
+    expect(pagedClient.listTools).toHaveBeenCalledTimes(2);
   });
 
   it("invalidate() closes and forgets", async () => {
