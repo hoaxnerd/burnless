@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
-import { Button, useConfirm } from "@/components/ui";
+import { IconButton, useConfirm } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { toUserMessage } from "@/lib/api-error";
 import { ShareClassForm } from "./share-class-form";
@@ -86,54 +87,65 @@ export function CapTableManager({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-surface-700">Share classes</h3>
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-base font-semibold text-surface-900">Share classes</h2>
+        </div>
         {shareClasses.length === 0 ? (
-          <p className="text-sm text-muted">No share classes yet.</p>
+          <p className="px-6 py-5 text-sm text-surface-500">No share classes yet.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-200 text-left text-xs text-surface-600">
-                <th className="p-2">Name</th>
-                <th className="p-2">Type</th>
-                <th className="p-2 text-right">Authorized</th>
-                <th className="p-2 text-right">Issued</th>
-                <th className="p-2 text-right">Liq. pref</th>
-                <th className="p-2" />
+              <tr className="border-b border-surface-200 bg-surface-50">
+                <th className="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Authorized
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Issued
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Liq. pref
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider w-24" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-surface-100">
               {shareClasses.map((sc) => (
                 <tr
                   key={sc.id}
                   data-testid={`share-class-${sc.id}`}
-                  className="border-b border-surface-200"
+                  className="hover:bg-surface-50 transition-colors"
                 >
-                  <td className="p-2">{sc.name}</td>
-                  <td className="p-2 capitalize">{sc.classType}</td>
-                  <td className="p-2 text-right">
+                  <td className="px-4 py-3">{sc.name}</td>
+                  <td className="px-4 py-3 capitalize">{sc.classType}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
                     {Number(sc.totalAuthorized).toLocaleString()}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="px-4 py-3 text-right tabular-nums">
                     {Number(sc.totalIssued).toLocaleString()}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="px-4 py-3 text-right tabular-nums">
                     {sc.liquidationPreference != null
                       ? `${Number(sc.liquidationPreference).toLocaleString()}×`
                       : "—"}
                   </td>
-                  <td className="p-2">
-                    <div className="flex justify-end gap-2">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
                       <ShareClassForm existing={sc} />
-                      <Button
-                        variant="ghost"
+                      <IconButton
+                        variant="danger"
                         size="sm"
+                        icon={<Trash2 />}
                         onClick={() => handleDeleteShareClass(sc)}
                         data-testid={`delete-share-class-${sc.id}`}
                         aria-label={`Delete share class ${sc.name}`}
-                      >
-                        Delete
-                      </Button>
+                      />
                     </div>
                   </td>
                 </tr>
@@ -143,42 +155,47 @@ export function CapTableManager({
         )}
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-surface-700">Option pools</h3>
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-base font-semibold text-surface-900">Option pools</h2>
+        </div>
         {optionPools.length === 0 ? (
-          <p className="text-sm text-muted">No option pool yet.</p>
+          <p className="px-6 py-5 text-sm text-surface-500">No option pool yet.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-200 text-left text-xs text-surface-600">
-                <th className="p-2">Name</th>
-                <th className="p-2 text-right">Reserved</th>
-                <th className="p-2" />
+              <tr className="border-b border-surface-200 bg-surface-50">
+                <th className="px-4 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                  Reserved
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider w-24" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-surface-100">
               {optionPools.map((op) => (
                 <tr
                   key={op.id}
                   data-testid={`option-pool-${op.id}`}
-                  className="border-b border-surface-200"
+                  className="hover:bg-surface-50 transition-colors"
                 >
-                  <td className="p-2">{op.name}</td>
-                  <td className="p-2 text-right">
+                  <td className="px-4 py-3">{op.name}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
                     {Number(op.totalReserved).toLocaleString()}
                   </td>
-                  <td className="p-2">
-                    <div className="flex justify-end gap-2">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
                       <OptionPoolForm existing={op} />
-                      <Button
-                        variant="ghost"
+                      <IconButton
+                        variant="danger"
                         size="sm"
+                        icon={<Trash2 />}
                         onClick={() => handleDeleteOptionPool(op)}
                         data-testid={`delete-option-pool-${op.id}`}
                         aria-label={`Delete option pool ${op.name}`}
-                      >
-                        Delete
-                      </Button>
+                      />
                     </div>
                   </td>
                 </tr>
