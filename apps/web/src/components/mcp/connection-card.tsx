@@ -31,7 +31,10 @@ export function ConnectionCard({
   const toolCount = connection.capabilities?.tools.length ?? null;
   const needsAuth = connection.status === "needs_auth";
   return (
-    <div className="rounded-lg border border-surface-200 bg-surface-0 p-[15px] shadow-sm">
+    <div
+      data-testid="connection-card"
+      className="rounded-lg border border-surface-200 bg-surface-0 p-[15px] shadow-sm"
+    >
       <div className="flex items-center gap-[11px]">
         <span
           className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] text-[15px] font-bold text-white"
