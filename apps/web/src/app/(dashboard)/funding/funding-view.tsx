@@ -42,6 +42,10 @@ interface FundingViewProps {
   }>;
   resolvedSlotData: ResolvedSlotData[];
   currency: CurrencyCode;
+  /** Whether the reconciled cap table has share data (drives the Ownership card empty state). */
+  hasCapTableData: boolean;
+  /** Reconciled cap-table holder rows so the Ownership donut matches /funding/cap-table. */
+  capTableRows: Array<{ holder: string; ownershipPercent: number }>;
 }
 
 export function FundingView({
@@ -55,6 +59,8 @@ export function FundingView({
   rounds,
   resolvedSlotData,
   currency,
+  hasCapTableData,
+  capTableRows,
 }: FundingViewProps) {
   // Render metric cards directly from resolvedSlotData (keyed by slotId)
   const slotById = useMemo(() => {
@@ -144,6 +150,8 @@ export function FundingView({
       <OwnershipChart
         foundersOwnership={foundersOwnership}
         completedRounds={rounds.filter((r) => !r.isProjected)}
+        hasCapTableData={hasCapTableData}
+        capTableRows={capTableRows}
       />
     ),
     "funding-rounds": (
@@ -177,7 +185,7 @@ export function FundingView({
         }}
       />
     ),
-  }), [slotById, rounds, foundersOwnership, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney, currency]);
+  }), [slotById, rounds, foundersOwnership, hasCapTableData, capTableRows, calcRaiseAmount, calcPreMoney, calcDilution, setCalcRaiseAmount, setCalcPreMoney, currency]);
 
 
   // Suppress unused variable warnings for props that are part of the interface

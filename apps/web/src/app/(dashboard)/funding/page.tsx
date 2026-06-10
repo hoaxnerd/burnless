@@ -55,6 +55,10 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
   // (hand-entered per-round deltas) is no longer the headline source.
   const foundersOwnership = deriveFounderOwnershipFromCapTable(capTable);
   const totalDilution = Math.max(0, 100 - foundersOwnership);
+  // No share classes / option pools → empty cap table. Founder ownership then
+  // derives to 0, which must NOT be shown as a confident "0.0%"; the Ownership
+  // card + chart branch on this to render a set-up state instead.
+  const hasCapTableData = !capTable.isEmpty;
 
   const roundsForDisplay = fundingRounds.map((r) => ({
     id: r.id,
@@ -130,9 +134,9 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
       slotId: "metric-3",
       content: { type: "metric", slug: "founderOwnership" },
       label: "Founder Ownership",
-      value: completedRounds.length > 0 ? formatPercent(foundersOwnership, undefined, 1) : "--%",
-      description: completedRounds.length > 0 ? `After ${formatPercent(totalDilution, undefined, 1)} dilution` : "Add a funding round",
-      hasData: completedRounds.length > 0,
+      value: hasCapTableData ? formatPercent(foundersOwnership, undefined, 1) : "--%",
+      description: hasCapTableData ? `After ${formatPercent(totalDilution, undefined, 1)} dilution` : "Add share classes & grants",
+      hasData: hasCapTableData,
       metricStyle: { icon: "PieChart", color: "violet", href: "/funding" },
     },
   ];
@@ -173,6 +177,8 @@ async function FundingContent({ companyId, scenarioId: paramScenarioId, currency
         rounds={roundsForDisplay}
         resolvedSlotData={resolvedSlotData}
         currency={currency}
+        hasCapTableData={hasCapTableData}
+        capTableRows={capTable.rows.map((r) => ({ holder: r.holder, ownershipPercent: r.ownershipPercent }))}
       />
     </div>
   );

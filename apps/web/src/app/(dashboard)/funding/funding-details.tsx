@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { DollarSign, Calculator, TrendingUp, Clock, Pencil, Trash2 } from "lucide-react";
+import { DollarSign, Calculator, TrendingUp, Clock, Pencil, Trash2, PieChart } from "lucide-react";
 import { CurrencyInput } from "@/components/forms/primitives";
 import { AiGate } from "@/components/ai/ai-gate";
 import { useOptionalAiFlags } from "@/components/ai/ai-feature-context";
@@ -10,7 +10,7 @@ import { FundingRoundForm } from "./funding-round-form";
 import { InvestorList } from "./investor-list";
 import { MilestoneTracker } from "./milestone-tracker";
 import { Modal } from "@/components/ui";
-import { dSum } from "@burnless/engine";
+import { dSum, ratioToPct } from "@burnless/engine";
 import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { OverrideIndicator } from "@/components/scenarios/override-indicator";
 import { HiddenEntitiesSection } from "@/components/scenarios/hidden-entities-section";
@@ -75,11 +75,38 @@ const segmentColors = [
 interface OwnershipChartProps {
   foundersOwnership: number;
   completedRounds: FundingRound[];
+  /**
+   * Whether the reconciled engine cap table actually has share data. When
+   * false (no share classes / option pools — the case for every company until
+   * a cap-table data-entry path exists), we render a set-up empty state rather
+   * than a misleading "Founders 0.0%" donut whose 100% residual is mislabeled
+   * "Option Pool". Defaults to true for backward compatibility.
+   */
+  hasCapTableData?: boolean;
+  /**
+   * Reconciled cap-table holder rows (engine output — the SAME source
+   * /funding/cap-table renders). When present, the donut shows these EXACT
+   * segments so the two surfaces never contradict each other. Absent → the
+   * legacy founders + per-round-dilution + residual model (kept as fallback).
+   */
+  capTableRows?: Array<{ holder: string; ownershipPercent: number }>;
 }
 
-export function OwnershipChart({ foundersOwnership, completedRounds }: OwnershipChartProps) {
+export function OwnershipChart({ foundersOwnership, completedRounds, hasCapTableData = true, capTableRows }: OwnershipChartProps) {
   const { fmtPercent } = useLocale();
   const capTableSegments = useMemo(() => {
+    // Preferred source: the reconciled engine cap table (foots to 100% and
+    // matches the /funding/cap-table holder table exactly). ownershipPercent is
+    // a 0-1 ratio → ratioToPct for display (never an inline *100).
+    if (capTableRows && capTableRows.length > 0) {
+      return capTableRows.map((row, i) => ({
+        label: row.holder,
+        percent: ratioToPct(row.ownershipPercent),
+        color: segmentColors[i % segmentColors.length]!,
+      }));
+    }
+
+    // Fallback (no reconciled rows): founders + per-round dilution + residual.
     const segments: Array<{ label: string; percent: number; color: string }> = [];
     segments.push({ label: "Founders", percent: foundersOwnership, color: segmentColors[0]! });
 
@@ -96,11 +123,11 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
 
     const usedPercent = dSum(segments.map((s) => s.percent));
     if (usedPercent < 100) {
-      segments.push({ label: "Option Pool", percent: 100 - usedPercent, color: "#d1d5db" });
+      segments.push({ label: "Option Pool", percent: 100 - usedPercent, color: segmentColors[segments.length % segmentColors.length]! });
     }
 
     return segments;
-  }, [foundersOwnership, completedRounds]);
+  }, [foundersOwnership, completedRounds, capTableRows]);
 
   const donutSize = 200;
   const donutCenter = donutSize / 2;
@@ -111,12 +138,38 @@ export function OwnershipChart({ foundersOwnership, completedRounds }: Ownership
     const start = polarToCartesian(donutCenter, donutCenter, donutRadius, endAngle);
     const end = polarToCartesian(donutCenter, donutCenter, donutRadius, startAngle);
     const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    return `M ${start.x} ${start.y} A ${donutRadius} ${donutRadius} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+    // Round to sub-pixel precision so the SVG path string is byte-identical on
+    // server and client. Raw Math.cos/sin can differ by 1 ULP between the Node
+    // SSR pass and the browser, producing a hydration mismatch on the donut
+    // (surfaces once a real cap table exists and the donut actually renders).
+    const f = (n: number) => n.toFixed(3);
+    return `M ${f(start.x)} ${f(start.y)} A ${donutRadius} ${donutRadius} 0 ${largeArc} 0 ${f(end.x)} ${f(end.y)}`;
   }
 
   function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
     const rad = ((angleDeg - 90) * Math.PI) / 180;
     return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  if (!hasCapTableData) {
+    // No share classes / option pools → the engine cap table is empty and
+    // founder ownership derives to 0. Show a set-up affordance instead of a
+    // misleading "Founders 0.0%" donut + a fabricated "Option Pool" residual.
+    return (
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+        <h2 className="text-base font-semibold text-surface-900 mb-4">Ownership</h2>
+        <div className="flex flex-col items-center justify-center text-center py-8 px-4">
+          <div className="h-12 w-12 rounded-full bg-surface-100 flex items-center justify-center mb-3">
+            <PieChart className="h-6 w-6 text-surface-400" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-medium text-surface-700">No cap table yet</p>
+          <p className="mt-1 text-xs text-surface-500 max-w-[15rem]">
+            Add share classes and equity grants to see founder ownership and
+            dilution. Funding rounds alone don&apos;t build a cap table.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
