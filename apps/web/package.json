@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@auth/drizzle-adapter": "^1.11.1",
     "@burnless/ai": "workspace:*",
+    "@burnless/mcp": "workspace:*",
     "@burnless/db": "workspace:*",
     "@burnless/engine": "workspace:*",
     "@burnless/types": "workspace:*",
