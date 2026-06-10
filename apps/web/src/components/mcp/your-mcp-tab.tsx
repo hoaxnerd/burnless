@@ -41,15 +41,18 @@ export function YourMcpTab({
       companySwr.data ? { ...companySwr.data, mcpServerEnabled: enabled } : companySwr.data,
       { revalidate: false }
     );
-    const res = await apiFetch("/api/company", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mcpServerEnabled: enabled }),
-    });
-    if (!res.ok) {
+    try {
+      const res = await apiFetch("/api/company", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mcpServerEnabled: enabled }),
+      });
+      if (!res.ok) throw new Error("toggle failed");
+    } catch {
       toastError("Could not change agent access — please retry.");
+    } finally {
+      void companySwr.mutate();
     }
-    void companySwr.mutate();
   }
 
   return (
