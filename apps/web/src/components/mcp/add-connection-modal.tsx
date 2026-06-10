@@ -34,15 +34,95 @@ interface CreatedConnection {
   authType: string;
 }
 
-/** Curated quick-connect entries (Browse popular tab) — prefill the paste tab. */
-const POPULAR: Array<{ name: string; slug: string; url: string }> = [
-  { name: "Stripe", slug: "stripe", url: "https://mcp.stripe.com" },
-  { name: "Linear", slug: "linear", url: "https://mcp.linear.app/mcp" },
-  { name: "GitHub", slug: "github", url: "https://api.githubcopilot.com/mcp/" },
-  { name: "Notion", slug: "notion", url: "https://mcp.notion.com/mcp" },
-  { name: "Sentry", slug: "sentry", url: "https://mcp.sentry.dev/mcp" },
-  { name: "Asana", slug: "asana", url: "https://mcp.asana.com/mcp" },
+/** Curated quick-connect catalog (Browse popular tab) — prefills the paste tab.
+ *
+ *  Every remote endpoint below was PROBE-VERIFIED (POST initialize → 401/JSON-RPC,
+ *  i.e. live Streamable HTTP behind auth) on 2026-06-11. Auth labels:
+ *  - "oauth": server advertises the OAuth discovery flow — our Authorize step handles it.
+ *  - "token": server takes a pre-issued bearer/API token (PAT path).
+ *  - "local": stdio entry (command set) — runs locally, self-host only; the
+ *    server rejects it in cloud (deploy gate) and the inline error explains why.
+ *  Notable exclusions (no official/runnable MCP as of 2026-06-11): QuickBooks
+ *  (repo-only, not npx-runnable), FreshBooks (community-only), Gusto (none).
+ */
+interface PopularEntry {
+  name: string;
+  slug: string;
+  url?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  auth: "oauth" | "token" | "local";
+  note?: string;
+}
+
+const POPULAR_SECTIONS: Array<{ category: string; entries: PopularEntry[] }> = [
+  {
+    category: "Payments",
+    entries: [
+      { name: "Stripe", slug: "stripe", url: "https://mcp.stripe.com", auth: "oauth" },
+      { name: "PayPal", slug: "paypal", url: "https://mcp.paypal.com/mcp", auth: "oauth" },
+    ],
+  },
+  {
+    category: "Banking & accounting",
+    entries: [
+      { name: "Mercury", slug: "mercury", url: "https://mcp.mercury.com/mcp", auth: "oauth" },
+      { name: "Plaid", slug: "plaid", url: "https://api.dashboard.plaid.com/mcp/sse", auth: "token", note: "Dashboard token" },
+      {
+        name: "Xero",
+        slug: "xero",
+        command: "npx",
+        args: ["-y", "@xeroapi/xero-mcp-server@latest"],
+        env: { XERO_CLIENT_ID: "your-client-id", XERO_CLIENT_SECRET: "your-client-secret" },
+        auth: "local",
+        note: "Runs locally",
+      },
+    ],
+  },
+  {
+    category: "Communication & support",
+    entries: [
+      { name: "Slack", slug: "slack", url: "https://mcp.slack.com/mcp", auth: "oauth" },
+      { name: "Intercom", slug: "intercom", url: "https://mcp.intercom.com/mcp", auth: "oauth" },
+    ],
+  },
+  {
+    category: "Notes & docs",
+    entries: [
+      { name: "Notion", slug: "notion", url: "https://mcp.notion.com/mcp", auth: "oauth" },
+      { name: "Canva", slug: "canva", url: "https://mcp.canva.com/mcp", auth: "oauth" },
+    ],
+  },
+  {
+    category: "Project management",
+    entries: [
+      { name: "Linear", slug: "linear", url: "https://mcp.linear.app/mcp", auth: "oauth" },
+      { name: "Atlassian (Jira & Confluence)", slug: "atlassian", url: "https://mcp.atlassian.com/v1/mcp", auth: "oauth" },
+    ],
+  },
+  {
+    category: "Dev & monitoring",
+    entries: [
+      { name: "GitHub", slug: "github", url: "https://api.githubcopilot.com/mcp/", auth: "token", note: "Fine-grained PAT" },
+      { name: "Sentry", slug: "sentry", url: "https://mcp.sentry.dev/mcp", auth: "oauth" },
+    ],
+  },
+  {
+    category: "CRM",
+    entries: [
+      { name: "HubSpot", slug: "hubspot", url: "https://mcp.hubspot.com/anthropic", auth: "oauth" },
+    ],
+  },
 ];
+
+/** Build the paste-tab JSON a popular entry prefills. */
+function popularEntryConfig(p: PopularEntry): string {
+  const body = p.url
+    ? { type: "http", url: p.url }
+    : { type: "stdio", command: p.command, args: p.args, env: p.env };
+  return JSON.stringify({ [p.slug]: body }, null, 2);
+}
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "paste", label: "Paste config" },
@@ -424,40 +504,55 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
           )}
 
           {tab === "popular" && (
-            <div className="grid grid-cols-2 gap-2.5">
-              {POPULAR.map((p) => (
-                <button
-                  key={p.slug}
-                  type="button"
-                  onClick={() => {
-                    setConfig(
-                      JSON.stringify(
-                        { [p.slug]: { type: "http", url: p.url } },
-                        null,
-                        2,
-                      ),
-                    );
-                    setError(null);
-                    setTab("paste");
-                  }}
-                  className="flex items-center gap-2.5 rounded-lg border border-surface-200 bg-surface-0 p-2.5 text-left transition-colors hover:border-brand-300 hover:shadow-sm"
-                >
-                  <span
-                    aria-hidden
-                    className="flex h-7 w-7 flex-none items-center justify-center rounded-lg text-xs font-bold text-white"
-                    style={glyphStyle(p.slug)}
-                  >
-                    {p.name.charAt(0)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] font-semibold text-surface-900">
-                      {p.name}
-                    </span>
-                    <span className="block truncate font-mono text-[10.5px] text-surface-500">
-                      {new URL(p.url).host}
-                    </span>
-                  </span>
-                </button>
+            <div className="max-h-[340px] space-y-3.5 overflow-y-auto pr-1" data-testid="popular-list">
+              {POPULAR_SECTIONS.map((section) => (
+                <div key={section.category}>
+                  <BlockLabel className="sticky top-0 z-10 bg-surface-0 pb-1">
+                    {section.category}
+                  </BlockLabel>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {section.entries.map((p) => (
+                      <button
+                        key={p.slug}
+                        type="button"
+                        onClick={() => {
+                          setConfig(popularEntryConfig(p));
+                          setError(null);
+                          setTab("paste");
+                        }}
+                        className="flex items-center gap-2.5 rounded-lg border border-surface-200 bg-surface-0 p-2.5 text-left transition-colors hover:border-brand-300 hover:shadow-sm"
+                      >
+                        <span
+                          aria-hidden
+                          className="flex h-7 w-7 flex-none items-center justify-center rounded-lg text-xs font-bold text-white"
+                          style={glyphStyle(p.slug)}
+                        >
+                          {p.name.charAt(0)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12.5px] font-semibold text-surface-900">
+                            {p.name}
+                          </span>
+                          <span className="block truncate font-mono text-[10.5px] text-surface-500">
+                            {p.url ? new URL(p.url).host : `${p.command} ${p.args?.join(" ") ?? ""}`}
+                          </span>
+                        </span>
+                        <span
+                          className={`flex-none rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                            p.auth === "oauth"
+                              ? "bg-brand-50 text-brand-700"
+                              : p.auth === "token"
+                                ? "bg-warning-50 text-warning-700"
+                                : "bg-surface-100 text-surface-500"
+                          }`}
+                          title={p.note}
+                        >
+                          {p.auth === "oauth" ? "OAuth" : p.auth === "token" ? "Token" : "Local"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
