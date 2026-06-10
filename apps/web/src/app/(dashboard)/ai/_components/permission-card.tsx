@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, MonitorPlay, ChevronDown, ShieldCheck } from "lucide-react";
-import { parseMcpToolName } from "@burnless/mcp";
+import { parseMcpToolName } from "@burnless/mcp/tool-bridge";
 import { Button } from "@/components/ui/button";
 import { DiffGate } from "./generative/diff-gate";
 import type { PendingPermission, PermissionCategoryId, PermissionDecisionKind } from "./types";

@@ -1,7 +1,7 @@
 // apps/web/src/app/(dashboard)/ai/_components/timeline/nodes/tool-node.tsx
 "use client";
 import { Wrench, Loader2, Check, AlertTriangle } from "lucide-react";
-import { parseMcpToolName } from "@burnless/mcp";
+import { parseMcpToolName } from "@burnless/mcp/tool-bridge";
 import { SourceChip } from "@/components/mcp/source-chip";
 import { McpBadge } from "@/components/mcp/mcp-badge";
 import { PermClassTag } from "@/components/mcp/perm-class-tag";
