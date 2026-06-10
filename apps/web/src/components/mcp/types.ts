@@ -27,3 +27,23 @@ export interface McpToolDto {
   permClass: "read" | "write" | "delete";
   permClassOverride: "read" | "write" | "delete" | null;
 }
+
+/** Public PAT shape from /api/tokens (never includes the hash). */
+export interface ApiTokenDto {
+  id: string;
+  name: string;
+  lastFour: string;
+  scopes: ("read" | "write" | "delete")[];
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/** Connected-app grant from /api/oauth/grants. */
+export interface OauthGrantDto {
+  grantId: string;
+  clientId: string;
+  clientName: string;
+  scopes: ("read" | "write" | "delete")[];
+  createdAt: string;
+}
