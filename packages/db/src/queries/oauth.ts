@@ -129,35 +129,86 @@ export type RotateResult =
   | { status: "invalid" };
 
 /** OAuth 2.1 refresh rotation. Presenting a SUPERSEDED refresh token is
- *  evidence of theft → revoke the entire grant family (spec §5.2). */
+ *  evidence of theft → revoke the entire grant family (spec §5.2).
+ *
+ *  Race-safe design (fixes TOCTOU + non-transactional issues from original):
+ *  1. Atomically claim the refresh token via UPDATE…RETURNING (same pattern as
+ *     consumeAuthCode) — two concurrent requests for the same token race on
+ *     this single UPDATE; exactly one wins rows, the other gets 0 rows and
+ *     falls through to the re-SELECT branch that detects reuse.
+ *  2. Both the supersede UPDATE and the new-token INSERT happen inside a single
+ *     db.transaction so that a failed insert (connection drop, constraint)
+ *     rolls back the supersede — preventing a bricked grant where the old token
+ *     is marked superseded but no replacement was ever issued. */
 export async function rotateRefreshToken(refreshToken: string): Promise<RotateResult> {
-  const rows = await db
+  const hash = sha256hex(refreshToken);
+
+  // Perform the entire claim + issue atomically inside a transaction.
+  // The UPDATE…RETURNING WHERE supersededAt IS NULL AND revokedAt IS NULL is
+  // the single race-safe gate: at most one concurrent caller claims 1 row.
+  const result = await db.transaction(async (tx) => {
+    const claimed = await tx
+      .update(oauthTokens)
+      .set({ supersededAt: new Date() })
+      .where(
+        and(
+          eq(oauthTokens.refreshTokenHash, hash),
+          isNull(oauthTokens.supersededAt),
+          isNull(oauthTokens.revokedAt)
+        )
+      )
+      .returning();
+
+    if (claimed.length === 0) {
+      // Not claimed in this transaction — either superseded or non-existent.
+      // Return a sentinel; the caller re-SELECTs outside the tx to distinguish
+      // reuse_detected from invalid (avoids a second lock inside the tx).
+      return null;
+    }
+
+    const claimedRow = claimed[0]!;
+    const access = generateSecretToken("bl_at_");
+    const refresh = generateSecretToken("bl_rt_");
+    const [newRow] = await tx
+      .insert(oauthTokens)
+      .values({
+        grantId: claimedRow.grantId,
+        clientId: claimedRow.clientId,
+        userId: claimedRow.userId,
+        companyId: claimedRow.companyId,
+        scopes: claimedRow.scopes,
+        accessTokenHash: access.hash,
+        refreshTokenHash: refresh.hash,
+        resource: claimedRow.resource,
+        accessExpiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+      })
+      .returning();
+    return {
+      accessToken: access.token,
+      refreshToken: refresh.token,
+      row: newRow!,
+    } satisfies IssuedOauthTokens;
+  });
+
+  if (result !== null) {
+    return { status: "rotated", ...result };
+  }
+
+  // 0 rows from the atomic UPDATE — either already superseded (reuse attempt)
+  // or not found / already revoked (invalid). Re-SELECT to distinguish.
+  const existing = await db
     .select()
     .from(oauthTokens)
-    .where(eq(oauthTokens.refreshTokenHash, sha256hex(refreshToken)))
+    .where(eq(oauthTokens.refreshTokenHash, hash))
     .limit(1);
-  const row = rows[0];
+  const row = existing[0];
   if (!row || row.revokedAt) return { status: "invalid" };
-  if (row.supersededAt) {
-    await db
-      .update(oauthTokens)
-      .set({ revokedAt: new Date() })
-      .where(and(eq(oauthTokens.grantId, row.grantId), isNull(oauthTokens.revokedAt)));
-    return { status: "reuse_detected" };
-  }
+  // supersededAt is set — presenting a superseded token is evidence of theft.
   await db
     .update(oauthTokens)
-    .set({ supersededAt: new Date() })
-    .where(eq(oauthTokens.id, row.id));
-  const issued = await issueOauthTokens({
-    grantId: row.grantId,
-    clientId: row.clientId,
-    userId: row.userId,
-    companyId: row.companyId,
-    scopes: row.scopes,
-    resource: row.resource,
-  });
-  return { status: "rotated", ...issued };
+    .set({ revokedAt: new Date() })
+    .where(and(eq(oauthTokens.grantId, row.grantId), isNull(oauthTokens.revokedAt)));
+  return { status: "reuse_detected" };
 }
 
 export interface OauthGrantSummary {
