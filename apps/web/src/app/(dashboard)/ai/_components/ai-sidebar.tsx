@@ -65,7 +65,11 @@ export function AiSidebar(props: AiSidebarProps) {
   }
 
   const inner = (mobile: boolean) => (
-    <div className="flex h-full flex-col">
+    // w-full: the desktop <aside> is display:flex, so without an explicit width
+    // this column shrinks to its intrinsic content width (~194px) and leaves a
+    // dead whitespace band on the right of the 320px card. Fill the card so the
+    // nav + active pane stretch edge-to-edge and respond to the card width.
+    <div className="flex h-full w-full flex-col">
       {/* Meta strip */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-surface-100">
         {!collapsed || mobile ? (

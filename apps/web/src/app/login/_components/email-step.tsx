@@ -27,6 +27,18 @@ export function EmailStep({
           type="email"
           value={email}
           onChange={(e) => onEmailChange(e.target.value)}
+          // Enter submits the email step even though the "Continue" button is
+          // disabled-on-empty: a disabled default button blocks the browser's
+          // implicit form submission (HTML spec), so a disabled/lagging button
+          // (empty state, autofill state-lag) would swallow Enter. Wiring it
+          // here gives Enter the same behaviour as the password step. Guarded
+          // on email + !isChecking so it mirrors the button's own enabled state.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && email && !isChecking) {
+              e.preventDefault();
+              onSubmit(e);
+            }
+          }}
           placeholder="you@startup.com"
           required
           autoFocus
