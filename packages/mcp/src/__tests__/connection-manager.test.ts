@@ -84,6 +84,9 @@ describe("McpConnectionManager", () => {
     expect(tools).toHaveLength(2);
     expect(tools.map((t) => t.name)).toEqual(["tool1", "tool2"]);
     expect(pagedClient.listTools).toHaveBeenCalledTimes(2);
+    // Cursor must be forwarded on page 2; without this guard the test passes even
+    // if listAllTools ignores the cursor and requests page 1 twice.
+    expect(pagedClient.listTools).toHaveBeenNthCalledWith(2, { cursor: "page2" });
   });
 
   it("invalidate() closes and forgets", async () => {
@@ -103,8 +106,11 @@ describe("contentToString", () => {
     expect(contentToString({ content: [{ type: "text", text: "a" }, { type: "text", text: "b" }] })).toBe("a\nb");
     expect(contentToString({ isError: true, content: [{ type: "text", text: "bad" }] })).toBe("Error from MCP tool: bad");
   });
-  it("JSON-stringifies non-content results and non-text blocks", () => {
+  it("JSON-stringifies non-content results; substitutes placeholder for non-text blocks", () => {
     expect(contentToString({ ok: 1 })).toBe('{"ok":1}');
-    expect(contentToString({ content: [{ type: "image", data: "…" }] })).toContain('"type":"image"');
+    // Non-text blocks (image, resource, etc.) are replaced with a safe placeholder to
+    // prevent megabytes of base64 data from being injected into the chat-loop string.
+    expect(contentToString({ content: [{ type: "image", data: "…" }] })).toBe("[image content omitted]");
+    expect(contentToString({ content: [{ type: "resource", uri: "x" }] })).toBe("[resource content omitted]");
   });
 });

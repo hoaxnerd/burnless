@@ -69,7 +69,11 @@ export function contentToString(result: unknown): string {
   const r = result as { content?: Array<{ type: string; text?: string }>; isError?: boolean };
   if (r && Array.isArray(r.content)) {
     const text = r.content
-      .map((c) => (c.type === "text" && typeof c.text === "string" ? c.text : JSON.stringify(c)))
+      .map((c) =>
+        c.type === "text" && typeof c.text === "string"
+          ? c.text
+          : `[${c.type} content omitted]`
+      )
       .join("\n");
     return r.isError ? `Error from MCP tool: ${text}` : text;
   }
@@ -84,15 +88,17 @@ interface Entry {
 
 export class McpConnectionManager {
   /**
-   * Stores in-flight promises rather than resolved entries so that concurrent
-   * first-use calls for the same spec.id share a single creation attempt.
-   * On rejection the promise is deleted so the next caller retries cleanly.
+   * Stores in-flight and resolved promises keyed by spec.id so that concurrent
+   * first-use calls for the same id share a single creation attempt. The promise
+   * stays in the map after resolution — it effectively serves as the cache entry.
+   * On rejection the promise is deleted (identity-guarded) so the next caller
+   * retries cleanly.
    */
-  private inflight = new Map<string, Promise<Entry>>();
+  private clientCache = new Map<string, Promise<Entry>>();
   constructor(private factory: ClientFactory = defaultClientFactory) {}
 
   private ensure(spec: McpConnectionSpec, secret: McpSecret | null): Promise<Entry> {
-    const cached = this.inflight.get(spec.id);
+    const cached = this.clientCache.get(spec.id);
     if (cached) return cached;
 
     const promise = (async () => {
@@ -110,13 +116,16 @@ export class McpConnectionManager {
       }
     })();
 
-    // Remove on rejection so a future caller retries rather than receiving a
-    // cached rejected promise.
+    // Identity-guard: only delete this specific promise. Without the guard, P1's
+    // rejection handler could evict P2 if invalidate() races a still-connecting P1
+    // (the proactive OAuth token-rotation flow the getTools JSDoc prescribes).
     promise.catch(() => {
-      this.inflight.delete(spec.id);
+      if (this.clientCache.get(spec.id) === promise) {
+        this.clientCache.delete(spec.id);
+      }
     });
 
-    this.inflight.set(spec.id, promise);
+    this.clientCache.set(spec.id, promise);
     return promise;
   }
 
@@ -155,9 +164,9 @@ export class McpConnectionManager {
   }
 
   async invalidate(connectionId: string): Promise<void> {
-    const promise = this.inflight.get(connectionId);
+    const promise = this.clientCache.get(connectionId);
     if (!promise) return;
-    this.inflight.delete(connectionId);
+    this.clientCache.delete(connectionId);
     try {
       const entry = await promise;
       await entry.client.close();
