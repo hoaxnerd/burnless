@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, MonitorPlay, ChevronDown, ShieldCheck } from "lucide-react";
+import { parseMcpToolName } from "@burnless/mcp/tool-bridge";
 import { Button } from "@/components/ui/button";
 import { DiffGate } from "./generative/diff-gate";
 import type { PendingPermission, PermissionCategoryId, PermissionDecisionKind } from "./types";
@@ -26,6 +27,13 @@ function humanizeKey(key: string): string {
     .replace(/_/g, " ")
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
+}
+
+/** MCP tools show as "slug · tool" in mono (tools-in-chat.html `.perm` body row);
+ *  native tools keep the humanized label. */
+function toolLabel(tool: string): React.ReactNode {
+  const mcp = parseMcpToolName(tool);
+  return mcp ? <span className="font-mono">{`${mcp.slug} · ${mcp.tool}`}</span> : humanizeKey(tool);
 }
 
 /** Render a tool-input value without dumping raw JSON to the approval surface. */
@@ -105,7 +113,7 @@ export function PermissionCard({
             );
             return (
               <div key={a.requestId}>
-                <p className="font-medium text-surface-700">{humanizeKey(a.tool)}</p>
+                <p className="font-medium text-surface-700">{toolLabel(a.tool)}</p>
                 {entries.length === 0 ? (
                   <p className="text-surface-400">No parameters.</p>
                 ) : (

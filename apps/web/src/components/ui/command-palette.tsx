@@ -14,6 +14,7 @@ import {
   FileBarChart,
   Upload,
   FolderOpen,
+  Plug,
   Settings,
   Sparkles,
   Search,
@@ -69,6 +70,7 @@ function buildCommands(onToggleAI?: () => void, companionName = "Companion"): Co
     { id: "nav-scenarios", label: "Scenarios", description: "What-if modeling", icon: GitBranch, href: "/scenarios", keywords: ["what if", "model", "forecast"], section: "Pages", category: "page" },
     { id: "nav-reports", label: "Reports", description: "Financial statements", icon: FileBarChart, href: "/reports", keywords: ["p&l", "cash flow", "balance sheet", "runway"], section: "Pages", category: "page" },
     { id: "nav-data-room", label: "Data Room", description: "Investor-ready snapshots", icon: FolderOpen, href: "/data-room", keywords: ["investors", "board", "share"], section: "Pages", category: "page" },
+    { id: "nav-connections", label: "Connections", description: "Connect MCP servers and tools", icon: Plug, href: "/connections", keywords: ["mcp", "integrations", "tools", "servers"], section: "Pages", category: "page" },
     { id: "nav-import", label: "Import Data", description: "Upload CSV files", icon: Upload, href: "/import", keywords: ["csv", "upload", "data"], section: "Pages", category: "page" },
     { id: "nav-settings", label: "Settings", description: "App preferences", icon: Settings, href: "/settings", keywords: ["config", "preferences", "account"], section: "Pages", category: "page" },
 

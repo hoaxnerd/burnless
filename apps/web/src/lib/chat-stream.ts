@@ -14,6 +14,8 @@ import {
   isDisplayTool,
   type ChatMessage,
   type PermissionDefaults,
+  type PermissionCategory,
+  type ToolDefinition,
   type UiBlock,
   type TimelineNode,
   type AiWriteMode,
@@ -37,6 +39,8 @@ export interface ChatStreamParams {
   /** Company AI write mode (spec §4.4). Drives the resolvePermission clamp.
    *  Optional for back-compat; the agentic surface treats absent as "confirm". */
   writeMode?: AiWriteMode;
+  /** MCP tools assembled for this turn (assembleMcpTools) — spec §3.4. */
+  mcp?: { tools: ToolDefinition[]; categories: Record<string, PermissionCategory> };
   creditWarning?: string;
   /** Worklog timeline accumulated before a pause, seeded so the resumed turn's
    *  `done` persists the FULL run (Plan 5 full-run persistence). */
@@ -150,7 +154,9 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               defaults: params.defaults,
               sessionGrants: params.sessionGrants,
               writeMode: params.writeMode ?? "confirm",
+              dynamicCategories: params.mcp?.categories,
             }),
+          extraTools: params.mcp?.tools,
           onToolCall: async (toolName, input) => {
             const raw = await executeToolCall(toolName, input, {
               companyId: params.companyId,
@@ -226,7 +232,11 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             // delta computation pauses without a diff (still safe).
             const enrichedPending = await Promise.all(
               state.pending.map(async (action) => {
-                const category = categorizeToolName(action.toolName);
+                // External MCP tools can never produce an override diff, and their
+                // dispatch hits the LIVE server regardless of mode — never "preview"
+                // one here (it would execute before approval AND again on resume).
+                if (action.toolName.startsWith("mcp__")) return action;
+                const category = categorizeToolName(action.toolName, params.mcp?.categories);
                 if (category !== "write" && category !== "delete") return action;
                 try {
                   const raw = await executeToolCall(action.toolName, action.toolInput, {
@@ -325,7 +335,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               const actions = (chunk.actions ?? []).map((a) => ({
                 requestId: a.requestId,
                 tool: a.toolName,
-                category: categorizeToolName(a.toolName),
+                category: categorizeToolName(a.toolName, params.mcp?.categories),
                 description: describeToolAction(a.toolName, a.toolInput),
                 input: a.toolInput,
                 // Diff-gate delta (spec §4.2); null for non-facade mutations.

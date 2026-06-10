@@ -3,23 +3,12 @@
  * call. Garbage ('asdf') must be rejected; a bare domain ('stripe.com') must
  * be accepted and have https:// prepended.
  *
- * Heavy server deps are mocked so importing the route module is side-effect
- * free — we only exercise the exported schema.
+ * The schema lives in its own module (../enrich/schema) — Next.js route
+ * modules may only export route fields, so route.ts can't re-export it.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
-vi.mock("@/lib/api-helpers", () => ({
-  getAuthUser: vi.fn(),
-  getUserCompany: vi.fn(),
-  errorResponse: vi.fn(),
-  withErrorHandler: (fn: unknown) => fn,
-}));
-vi.mock("@/lib/api-rate-limit", () => ({ applyRateLimit: vi.fn() }));
-vi.mock("@/lib/ai-feature-flags", () => ({ checkAiFeatureAllowed: vi.fn() }));
-vi.mock("@/lib/ai-usage-tracker", () => ({ setTrackingCompanyId: vi.fn() }));
-vi.mock("@/lib/onboarding-agent", () => ({ runOnboardingAgent: vi.fn() }));
-
-import { enrichSchema } from "../enrich/route";
+import { enrichSchema } from "../enrich/schema";
 
 describe("ONB-03 enrichSchema", () => {
   it("rejects garbage with no dot ('asdf')", () => {

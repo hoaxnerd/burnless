@@ -2,12 +2,12 @@
 
 import { useSyncExternalStore } from "react";
 import {
-  MessageSquarePlus, Lightbulb, History, Settings as SettingsIcon,
+  MessageSquarePlus, Lightbulb, History, Plug, Settings as SettingsIcon,
   Zap, X, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { Overlay } from "@/components/ui";
 
-export type AiPane = "insights" | "history" | "settings";
+export type AiPane = "insights" | "history" | "connections" | "settings";
 
 interface AiSidebarProps {
   credits: { remaining: number; total: number } | null;
@@ -24,6 +24,7 @@ interface AiSidebarProps {
 const NAV: { id: AiPane; label: string; icon: React.ReactNode }[] = [
   { id: "insights", label: "Insights", icon: <Lightbulb className="h-4 w-4" /> },
   { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
+  { id: "connections", label: "Connections", icon: <Plug className="h-4 w-4" /> },
   { id: "settings", label: "Settings", icon: <SettingsIcon className="h-4 w-4" /> },
 ];
 

@@ -109,3 +109,5 @@ export type {
   PermissionDefaultsPatch,
   NewPendingAction,
 } from "./ai-permissions";
+
+export * from "./mcp";

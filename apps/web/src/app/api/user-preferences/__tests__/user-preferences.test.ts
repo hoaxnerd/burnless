@@ -217,6 +217,35 @@ describe("/api/user-preferences", () => {
       expect(body.quickActionModeOverrides).toEqual(overrides);
     });
 
+    // D11: per-user MCP kill-switch list rides the same upsert.
+    it("accepts disabledMcpConnections as array of connection ids", async () => {
+      const upserted = { id: "pref-1", disabledMcpConnections: ["c1", "c2"] };
+      mockReturning.mockResolvedValue([upserted]);
+
+      const req = new Request("http://localhost:3000/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ disabledMcpConnections: ["c1", "c2"] }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const res = await PATCH(req);
+      const body = await res.json();
+
+      expect(body.disabledMcpConnections).toEqual(["c1", "c2"]);
+      const conflictArg = mockOnConflict.mock.calls[0]![0];
+      expect(conflictArg.set).toEqual({ disabledMcpConnections: ["c1", "c2"] });
+    });
+
+    it("rejects a non-array disabledMcpConnections", async () => {
+      const req = new Request("http://localhost:3000/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ disabledMcpConnections: "c1" }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      await expect(PATCH(req)).rejects.toThrow();
+    });
+
     it("rejects invalid quickActionMode values", async () => {
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",

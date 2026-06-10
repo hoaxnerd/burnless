@@ -100,6 +100,16 @@ const pageContextMap: Record<string, PageContext> = {
       "Help me prepare for due diligence questions",
     ],
   },
+  "/connections": {
+    pageName: "Connections",
+    description: "connected MCP servers and their tools",
+    suggestedPrompts: [
+      "What tools do my connected servers provide?",
+      "Which connections can you use right now?",
+      "Help me decide what to connect next",
+      "Show me what the Stripe connection exposes",
+    ],
+  },
   "/settings": {
     pageName: "Settings",
     description: "app configuration and billing",

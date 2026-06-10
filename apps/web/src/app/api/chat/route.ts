@@ -18,6 +18,7 @@ import { getDefaultScenario } from "@/lib/data";
 import { resolveWriteScenarioId } from "@/lib/ai-write-target";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse } from "@/lib/chat-stream";
+import { assembleMcpTools } from "@/lib/ai-tools/mcp";
 import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
 
 const chatSchema = z.object({
@@ -171,6 +172,12 @@ export const POST = withErrorHandler(async (request: Request) => {
     : undefined;
 
   const aiFlags = await getAiFlags(ctx.companyId);
+
+  // MCP tools for this turn (spec §3.4): cached capabilities only — no live
+  // server round-trips here. Empty when the feature is off or nothing connected.
+  // aiFlags is passed pre-fetched so the aiFeatureFlags row isn't re-queried.
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags);
+
   return buildChatSSEResponse({
     companyId: ctx.companyId,
     userId: ctx.userId,
@@ -184,6 +191,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     defaults,
     sessionGrants,
     writeMode: aiCheck.writeMode ?? "confirm",
+    mcp,
     creditWarning,
   });
 });

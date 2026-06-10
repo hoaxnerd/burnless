@@ -63,6 +63,7 @@ const nextConfig: NextConfig = {
     "@burnless/db",
     "@burnless/ai",
     "@burnless/engine",
+    "@burnless/mcp",
   ],
   serverExternalPackages: [
     "plaid",
@@ -70,6 +71,7 @@ const nextConfig: NextConfig = {
     "stripe",
     "openai",
     "@anthropic-ai/sdk",
+    "@modelcontextprotocol/sdk",
     "@sentry/nextjs",
     "@sentry/node",
     "@opentelemetry/instrumentation",

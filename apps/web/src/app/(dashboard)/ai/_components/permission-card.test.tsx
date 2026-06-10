@@ -81,3 +81,32 @@ describe("PermissionCard diff-gate", () => {
     expect(screen.getByRole("button", { name: /^deny$/i })).toBeTruthy();
   });
 });
+
+describe("PermissionCard — MCP tool name (tools-in-chat.html .perm)", () => {
+  const pendingMcp: PendingPermission = {
+    pauseId: "p3",
+    conversationId: "c1",
+    actions: [
+      {
+        requestId: "t1",
+        tool: "mcp__stripe__send_invoice_reminder",
+        category: "write",
+        description: "send 3 invoice reminders",
+        input: { invoiceIds: ["INV-1042"] },
+      },
+    ],
+  };
+
+  it("shows the namespaced tool as 'slug · tool' in the details, not the humanized raw name", () => {
+    render(<PermissionCard pending={pendingMcp} onDecide={() => {}} />);
+    fireEvent.click(screen.getByText(/show details/i));
+    expect(screen.getByText("stripe · send_invoice_reminder")).toBeTruthy();
+    expect(screen.queryByText(/Mcp stripe send invoice reminder/i)).toBeNull();
+  });
+
+  it("keeps the humanized label for native tools", () => {
+    render(<PermissionCard pending={pending} onDecide={() => {}} />);
+    fireEvent.click(screen.getByText(/show details/i));
+    expect(screen.getByText("Create forecast line")).toBeTruthy();
+  });
+});

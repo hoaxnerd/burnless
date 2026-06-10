@@ -116,4 +116,44 @@ describe("buildChatSSEResponse — diff-gate pause enrichment", () => {
     const pr = events.find((e) => e.type === "permission_request") as { actions: { override?: unknown[] | null }[] };
     expect(pr.actions[0]!.override ?? null).toBeNull();
   });
+
+  it("an mcp__ write pending approval is NEVER plan-executed during the pause (no live MCP call), no diff attached", async () => {
+    // MCP dispatch hits the LIVE external server and ignores mode:"plan" — the
+    // enrichment loop must skip mcp__* entirely or the action runs before the
+    // user approves (and again on resume). MCP tools can't produce an override
+    // diff anyway.
+    chatStreamMock.mockImplementation(async function* (opts: { onPause: (s: unknown) => Promise<string> }) {
+      const pending = [
+        { requestId: "tu-m", toolName: "mcp__stripe__send_reminder", toolInput: { invoice: "in_1" } },
+        { requestId: "tu-w", toolName: "create_revenue_stream", toolInput: { name: "Pro Plan" } },
+      ];
+      const pauseId = await opts.onPause({ assistantBlocks: [], completedResults: [], pending });
+      yield { type: "permission_request", pauseId, actions: pending };
+      yield { type: "paused", pauseId };
+    });
+
+    const res = buildChatSSEResponse({
+      ...baseParams,
+      mcp: { tools: [], categories: { mcp__stripe__send_reminder: "write" } },
+    } as never);
+    const events = await collect(res);
+
+    // The MCP tool was never executed in any mode during the pause…
+    const mcpCalls = executeToolCallMock.mock.calls.filter(([tool]) => tool === "mcp__stripe__send_reminder");
+    expect(mcpCalls).toHaveLength(0);
+    // …while the facade write still got its plan-mode diff.
+    expect(executeToolCallMock).toHaveBeenCalledWith(
+      "create_revenue_stream",
+      { name: "Pro Plan" },
+      expect.objectContaining({ mode: "plan" }),
+    );
+
+    const pr = events.find((e) => e.type === "permission_request") as {
+      actions: { tool: string; category: string; override?: unknown[] | null }[];
+    };
+    const mcpAction = pr.actions.find((a) => a.tool === "mcp__stripe__send_reminder")!;
+    expect(mcpAction.override ?? null).toBeNull();
+    // Category comes from the dynamic map → still gates as a write.
+    expect(mcpAction.category).toBe("write");
+  });
 });

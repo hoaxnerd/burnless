@@ -34,6 +34,9 @@ import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
 import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
+// NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
+// and is loaded lazily inside executeToolCall instead.
+import { describeMcpToolAction } from "./mcp-describe";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -219,6 +222,24 @@ export async function executeToolCall(
 ): Promise<string> {
   const startTime = performance.now();
 
+  // External MCP tools (spec §3.4): namespaced mcp__<slug>__<tool>, validated by
+  // the MCP server itself (schemas live on the server, not in toolSchemas);
+  // audited inside executeMcpTool with mcpConnectionId.
+  if (toolName.startsWith("mcp__")) {
+    // Plan-mode safety: MCP dispatch hits the LIVE external server (send email,
+    // refund, create invoice — executeMcpTool has no plan mode). A diff-gate
+    // preview must NEVER execute one — return the empty plan envelope (no diff →
+    // plain permission card); the real call happens only on approved resume.
+    if (context.mode === "plan") {
+      const planned = { planned: true, overrides: [] };
+      logToolAudit(context, toolName, input, "pending_apply", planned, Math.round(performance.now() - startTime));
+      return JSON.stringify(planned);
+    }
+    const { executeMcpTool } = await import("./mcp");
+    if (!context.companyId) return "Error: Company ID is required for MCP tools.";
+    return executeMcpTool(toolName, input, context as ToolContext & { companyId: string });
+  }
+
   // Validate input before execution
   const validation = validateToolInput(toolName, input);
   if (!validation.success) {
@@ -276,7 +297,9 @@ export async function executeToolCall(
 
 /** Human-readable description of a tool action, e.g. `create forecast line "AWS"`. */
 export function describeToolAction(toolName: string, input: Record<string, unknown>): string {
-  return describeMutation(toolName, input);
+  // MCP tools don't follow the create_/update_/delete_ naming convention —
+  // without this, the fallback below labels every MCP call "delete ...".
+  return describeMcpToolAction(toolName, input) ?? describeMutation(toolName, input);
 }
 
 /** Record an audit row for a tool the user explicitly denied (never executed). */
