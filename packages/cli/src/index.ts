@@ -6,6 +6,7 @@ import { registerLogin } from "./commands/login";
 import { registerLogout } from "./commands/logout";
 import { registerProfiles } from "./commands/profiles";
 import { registerTableCommands } from "./commands/register-table";
+import { registerServe } from "./commands/serve";
 import { registerStatus } from "./commands/status";
 import { COMMAND_TABLE } from "./commands/table";
 import { registerTools } from "./commands/tools";
@@ -29,6 +30,7 @@ export function buildProgram(): Command {
   registerLogout(program);
   registerCall(program);
   registerTableCommands(program, COMMAND_TABLE);
+  registerServe(program);
   registerAdmin(program);
   return program;
 }
