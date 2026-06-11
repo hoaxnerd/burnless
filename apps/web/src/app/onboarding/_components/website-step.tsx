@@ -79,7 +79,11 @@ export function WebsiteStep({
               ref={inputRef}
               id="onboarding-website-url"
               aria-describedby="onboarding-website-hint"
-              type="url"
+              // type="text" (not "url") so the browser's native URL validation
+              // doesn't reject a bare domain like "razorpay.com" before submit —
+              // isLikelyWebsite() gates the button and runEnrich() prepends https://.
+              type="text"
+              inputMode="url"
               value={websiteUrl}
               onChange={(e) => onWebsiteUrlChange(e.target.value)}
               placeholder="yourcompany.com"

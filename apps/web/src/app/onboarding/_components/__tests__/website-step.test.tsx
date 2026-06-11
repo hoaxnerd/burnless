@@ -43,11 +43,11 @@ describe("ONB-03 WebsiteStep", () => {
     expect(screen.getByLabelText("Company website URL")).toBeInTheDocument();
   });
 
-  it("renders the input as type=url", () => {
+  it("renders the input as type=text (not url, so bare domains aren't blocked by native URL validation)", () => {
     renderStep("");
     expect(screen.getByLabelText("Company website URL")).toHaveAttribute(
       "type",
-      "url",
+      "text",
     );
   });
 
