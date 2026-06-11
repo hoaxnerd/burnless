@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CliError } from "../errors";
 import { createKeychain, type ExecFn } from "../keychain";
 
 let home: string;
@@ -82,5 +83,38 @@ describe("keychain encrypted-file fallback", () => {
     expect(await keychain.get("local")).toBe("bl_pat_native");
     // nothing should have hit the fallback file
     expect(existsSync(join(home, ".burnless", "credentials.enc"))).toBe(false);
+  });
+});
+
+describe("keychain corrupt-file recovery", () => {
+  function writeCorruptFile(): string {
+    const dir = join(home, ".burnless");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "credentials.enc");
+    // Not even JSON — also covers the undecryptable-AES case for the read paths.
+    writeFileSync(file, "}{ this is not json", { mode: 0o600 });
+    return file;
+  }
+
+  it("get() throws a friendly CliError (not a raw crypto stack trace) on a corrupt file", async () => {
+    writeCorruptFile();
+    const keychain = createKeychain({ platform: "win32", homeDir: home });
+    await expect(keychain.get("local")).rejects.toBeInstanceOf(CliError);
+    await expect(keychain.get("local")).rejects.toThrow(/credentials\.enc/);
+  });
+
+  it("set() recovers a corrupt file instead of hard-locking the user out", async () => {
+    const file = writeCorruptFile();
+    const keychain = createKeychain({ platform: "win32", homeDir: home });
+    // set() must NOT throw on the read-merge step — it re-keys the file.
+    await keychain.set("local", "bl_pat_recovered");
+    expect(readFileSync(file, "utf8")).not.toContain("bl_pat_recovered");
+    expect(await keychain.get("local")).toBe("bl_pat_recovered");
+  });
+
+  it("delete() tolerates a corrupt file instead of throwing", async () => {
+    writeCorruptFile();
+    const keychain = createKeychain({ platform: "win32", homeDir: home });
+    await expect(keychain.delete("local")).resolves.toBeUndefined();
   });
 });

@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
 import { configDir } from "./config";
+import { CliError } from "./errors";
 
 export interface Keychain {
   get(profile: string): Promise<string | null>;
@@ -67,14 +68,41 @@ function fallbackPath(homeDir?: string): string {
   return join(configDir(homeDir), FALLBACK_FILE);
 }
 
-function readFallback(homeDir?: string): Record<string, string> {
-  const path = fallbackPath(homeDir);
-  if (!existsSync(path)) return {};
+function decodeFallback(path: string): Record<string, string> {
   const raw = JSON.parse(readFileSync(path, "utf8")) as { iv: string; tag: string; data: string };
   const decipher = createDecipheriv("aes-256-gcm", deriveKey(), Buffer.from(raw.iv, "base64"));
   decipher.setAuthTag(Buffer.from(raw.tag, "base64"));
   const plain = Buffer.concat([decipher.update(Buffer.from(raw.data, "base64")), decipher.final()]);
   return JSON.parse(plain.toString("utf8")) as Record<string, string>;
+}
+
+/**
+ * Read the encrypted fallback file. A corrupt/undecryptable file (truncated,
+ * hand-edited, or — because the scrypt key is derived from hostname+username —
+ * copied to another box / after an OS reinstall or rename) makes AES-GCM
+ * `final()`/`setAuthTag()` or `JSON.parse` throw.
+ *
+ * `tolerateCorrupt` splits the two call sites (mirrors config.ts's convention of
+ * a friendly UsageError over a raw crypto stack trace):
+ *   - read path (get) → throw a friendly CliError pointing at the file, instead
+ *     of leaking a crypto OperationError with no exit-code mapping.
+ *   - write path (set/delete) → treat a corrupt file as empty so the user can
+ *     re-key it via `login`, rather than being hard-locked out until they
+ *     manually `rm ~/.burnless/credentials.enc`.
+ */
+function readFallback(homeDir: string | undefined, tolerateCorrupt: boolean): Record<string, string> {
+  const path = fallbackPath(homeDir);
+  if (!existsSync(path)) return {};
+  try {
+    return decodeFallback(path);
+  } catch {
+    if (tolerateCorrupt) return {};
+    throw new CliError(
+      `Corrupt or undecryptable credential store at ${path} — delete it and log in again ` +
+        `(this can happen if the file was edited, or copied from another machine/user).`,
+      2
+    );
+  }
 }
 
 function writeFallback(entries: Record<string, string>, homeDir?: string): void {
@@ -97,15 +125,18 @@ export function createKeychain(options: KeychainOptions = {}): Keychain {
 
   const file: Keychain = {
     async get(profile) {
-      return readFallback(options.homeDir)[profile] ?? null;
+      // Read path: surface a friendly error rather than hiding a real
+      // credential behind a transient identity mismatch.
+      return readFallback(options.homeDir, false)[profile] ?? null;
     },
     async set(profile, secret) {
-      const entries = readFallback(options.homeDir);
+      // Write path: tolerate a corrupt file so the user can re-key it.
+      const entries = readFallback(options.homeDir, true);
       entries[profile] = secret;
       writeFallback(entries, options.homeDir);
     },
     async delete(profile) {
-      const entries = readFallback(options.homeDir);
+      const entries = readFallback(options.homeDir, true);
       delete entries[profile];
       writeFallback(entries, options.homeDir);
     },
