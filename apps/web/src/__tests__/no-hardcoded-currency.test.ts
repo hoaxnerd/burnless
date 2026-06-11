@@ -183,6 +183,10 @@ const ALLOWED = [
   "apps/web/src/app/onboarding/__tests__/",
   "apps/web/src/app/onboarding/_components/__tests__/",
   "apps/web/src/app/onboarding/_components/review/__tests__/",
+  // S4b wizard tests (Task 14a/b): draft-card.test.tsx renders `amount="$9,600/mo"`
+  // and step tests use `$`-prefixed fixtures — display fixtures in tests, not code.
+  "apps/web/src/app/onboarding/_components/wizard/__tests__/",
+  "apps/web/src/app/onboarding/_components/wizard/steps/__tests__/",
   // ai-tabs-render.test.tsx (Batch H SET-07) uses `$${n}` in a vi.mock() stub.
   "apps/web/src/app/(dashboard)/settings/__tests__/",
 

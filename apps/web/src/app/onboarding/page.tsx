@@ -2,19 +2,50 @@
 
 import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
-import { toUserMessage } from "@/lib/api-error";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 
-import type { OnboardingStep, CompanyFields, FundingRound, HeadcountRole, OperatingExpense, RevenueStream } from "./_components/types";
+import type {
+  OnboardingStep,
+  CompanyFields,
+  FundingRound,
+  HeadcountRole,
+  OperatingExpense,
+  RevenueStream,
+} from "./_components/types";
 import { DEFAULTS } from "./_components/constants";
-import { parseMoneyAmount, parseTeamSize } from "@/lib/onboarding-helpers";
 import { WebsiteStep } from "./_components/website-step";
 import { EnrichingStep } from "./_components/enriching-step";
-import { ReviewStep } from "./_components/review-step";
-import { NameFallbackStep } from "./_components/name-fallback-step";
-import { CreatingStep } from "./_components/creating-step";
 import { DoneStep } from "./_components/done-step";
+import { WizardShell } from "./_components/wizard/wizard-shell";
+import { AiErrorStep } from "./_components/wizard/ai-error-step";
+import { CompanyStep } from "./_components/wizard/steps/company-step";
+import { RevenueStep } from "./_components/wizard/steps/revenue-step";
+import { FundingStep } from "./_components/wizard/steps/funding-step";
+import { ExpensesStep } from "./_components/wizard/steps/expenses-step";
+import { TeamStep } from "./_components/wizard/steps/team-step";
+import {
+  toRevenueSuggestions,
+  toFundingSuggestions,
+  toExpenseSuggestions,
+  toHeadcountSuggestions,
+} from "./_components/wizard/suggestion-mappers";
+
+// The wizard's ordered step ids (the steps the WizardShell renders).
+const WIZARD_STEPS = ["company", "revenue", "funding", "expenses", "team"] as const;
+type WizardStepId = (typeof WIZARD_STEPS)[number];
+
+const WIZARD_STEP_META: { id: WizardStepId; label: string }[] = [
+  { id: "company", label: "Company" },
+  { id: "revenue", label: "Revenue" },
+  { id: "funding", label: "Funding" },
+  { id: "expenses", label: "Expenses" },
+  { id: "team", label: "Team" },
+];
+
+function isWizardStep(step: OnboardingStep): step is WizardStepId {
+  return (WIZARD_STEPS as readonly string[]).includes(step);
+}
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -23,25 +54,28 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<OnboardingStep>("website");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [greeting, setGreeting] = useState("");
+  // AI-derived company basics (company_name/stage/business_model/industry only).
   const [fields, setFields] = useState<CompanyFields>({ ...DEFAULTS });
   const [founders, setFounders] = useState<string[]>([]);
+  // AI suggestion arrays — fed to the wizard step panels via the mappers.
   const [fundingRounds, setFundingRounds] = useState<FundingRound[]>([]);
   const [headcount, setHeadcount] = useState<HeadcountRole[]>([]);
   const [expenses, setExpenses] = useState<OperatingExpense[]>([]);
   const [revenueStreams, setRevenueStreams] = useState<RevenueStream[]>([]);
   const [enrichedCount, setEnrichedCount] = useState(0);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
-  // Lifted so the name-fallback prompt (skip path) and the review step share a
-  // single source of the user's name. Primarily filled by the AI agent
-  // (suggested founders); the fallback prompt covers skip/AI-failure.
-  const [userName, setUserName] = useState("");
+  // Whether to feed the AI suggestions into the wizard. The "enter details
+  // manually" escape from the AI-error step enters the wizard with empty
+  // suggestions instead.
+  const [useSuggestions, setUseSuggestions] = useState(true);
+  // companyId is set once CompanyStep creates the company; departments are then
+  // fetched for the Team step.
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
-  const movedToReviewRef = useRef(false);
-  // Once the name-fallback prompt has been shown (and dismissed/answered) we
-  // don't loop back into it on the next skip.
-  const namePromptShownRef = useRef(false);
+  const movedOnRef = useRef(false);
 
   useEffect(() => {
     if (step === "website") {
@@ -49,16 +83,13 @@ export default function OnboardingPage() {
     }
   }, [step]);
 
-  // ── Website entry ───────────────────────────────────────────────────────
+  // ── Website entry / enrichment ────────────────────────────────────────────
 
-  const handleWebsiteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!websiteUrl.trim()) return;
-
+  const runEnrich = async () => {
     setStep("enriching");
     setGreeting("Analyzing...");
-    movedToReviewRef.current = false;
-    trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
+    setAgentError(null);
+    movedOnRef.current = false;
 
     try {
       const res = await apiFetch("/api/onboarding/enrich", {
@@ -68,16 +99,14 @@ export default function OnboardingPage() {
       });
 
       if (!res.ok) {
-        // AI not available — go straight to manual form
-        movedToReviewRef.current = true;
-        setStep("review");
+        // AI not available — drop into the wizard manually (no error card).
+        enterWizard(true);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        movedToReviewRef.current = true;
-        setStep("review");
+        enterWizard(true);
         return;
       }
 
@@ -101,17 +130,14 @@ export default function OnboardingPage() {
               setGreeting(event.greeting || `Onboarding ${event.companyName}`);
             } else if (event.type === "field") {
               const fieldName = event.field as keyof CompanyFields;
+              // Only the company-basics fields survive; the old scalar
+              // estimates (monthly_revenue/team_size/funding/main_expenses) are
+              // ignored — the wizard's per-domain steps replace them.
               if (fieldName in DEFAULTS) {
-                let normalizedValue = event.value;
-                if (fieldName === "monthly_revenue" || fieldName === "funding") {
-                  normalizedValue = String(parseMoneyAmount(event.value));
-                } else if (fieldName === "team_size") {
-                  normalizedValue = String(parseTeamSize(event.value));
-                }
                 setFields((prev) => ({
                   ...prev,
                   [fieldName]: {
-                    value: normalizedValue,
+                    value: event.value,
                     confidence: event.confidence,
                     source: "ai" as const,
                   },
@@ -130,60 +156,63 @@ export default function OnboardingPage() {
             } else if (event.type === "revenue_streams") {
               setRevenueStreams(event.value || []);
             } else if (event.type === "status") {
-              // Informational progress text from our own SSE stream (not an error).
-              const statusText: string = event.message;
-              setGreeting(statusText);
+              setGreeting(event.message as string);
             } else if (event.type === "done") {
-              // Move to review
-              movedToReviewRef.current = true;
-              setStep("review");
+              movedOnRef.current = true;
+              enterWizard(true);
             } else if (event.type === "agent_failed") {
-              setAgentError(toUserMessage(event) || "Onboarding agent failed");
-              setTimeout(() => {
-                movedToReviewRef.current = true;
-                setStep("review");
-              }, 2_500);
+              // Explicit failure screen — no silent timeout fallback.
+              movedOnRef.current = true;
+              setStep("ai-error");
             }
           } catch (parseErr) {
-            // Skip malformed SSE events — per-line parse failures in a streaming
-            // loop are expected and not a user-action failure to surface.
+            // Per-line parse failures in a streaming loop are expected.
             void parseErr;
           }
         }
       }
 
-      // If stream ended without a done event, move to review
-      if (!movedToReviewRef.current) {
-        movedToReviewRef.current = true;
-        setStep("review");
+      // Stream ended without an explicit done/agent_failed — enter the wizard.
+      if (!movedOnRef.current) {
+        enterWizard(true);
       }
     } catch {
-      // Network error — fall back to manual form
-      movedToReviewRef.current = true;
-      setStep("review");
+      // Network error — fall back to the wizard manually.
+      enterWizard(true);
     }
   };
 
+  const handleWebsiteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!websiteUrl.trim()) return;
+    trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
+    await runEnrich();
+  };
+
+  // ── Wizard entry / navigation ─────────────────────────────────────────────
+
+  const enterWizard = (withSuggestions: boolean) => {
+    movedOnRef.current = true;
+    setUseSuggestions(withSuggestions);
+    setStep("company");
+  };
+
+  // Manual entry from the website screen (skips enrichment entirely).
   const skipToForm = () => {
     trackEvent("onboarding_skip_enrichment", { from_step: step });
-    setStep("review");
+    enterWizard(false);
   };
 
+  // "Skip all / I'll do this later" — if the company exists go to the
+  // dashboard, otherwise create a slim company first.
   const skipOnboarding = async () => {
-    // Name-prompt fallback (founder decision #3): skipping the AI flow means we
-    // never collected a name. Give the user one explicit chance to provide one
-    // before creating the company. namePromptShownRef ensures we ask at most
-    // once — "Continue without a name" sets it and re-enters here.
-    if (!userName.trim() && !namePromptShownRef.current) {
-      setStep("name-fallback");
+    if (companyId) {
+      router.push("/dashboard");
       return;
     }
-
     if (submittingRef.current) return;
     submittingRef.current = true;
-
     trackEvent("onboarding_skip_all", { from_step: step });
-    setStep("creating");
 
     try {
       const res = await apiFetch("/api/onboarding", {
@@ -193,183 +222,195 @@ export default function OnboardingPage() {
           company_name: fields.company_name.value.trim() || "My Company",
           stage: fields.stage.value || "Pre-seed",
           business_model: fields.business_model.value || "SaaS",
-          user_name: userName.trim() || "",
         }),
       });
 
       if (res.status === 409) {
-        const data = await res.json().catch(() => ({})) as { code?: string; redirectTo?: string };
+        const data = (await res.json().catch(() => ({}))) as {
+          code?: string;
+          redirectTo?: string;
+        };
         if (data.code === "ONBOARDING_ALREADY_COMPLETE") {
           window.location.href = data.redirectTo ?? "/dashboard";
           return;
         }
       }
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not create company");
-      }
-
-      setStep("done");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong";
-      trackEvent("onboarding_skip_error", { error: message });
-      setCreateError(message);
-      setStep("review");
+      window.location.href = "/dashboard";
+    } catch {
       submittingRef.current = false;
+      // Best-effort — still send the user onward.
+      window.location.href = "/dashboard";
     }
   };
 
-  // ── Field update ────────────────────────────────────────────────────────
-
-  const updateField = (name: keyof CompanyFields, value: string) => {
-    setFields((prev) => ({
-      ...prev,
-      [name]: { ...prev[name], value, source: "user" as const },
-    }));
-  };
-
-  // ── Create company ──────────────────────────────────────────────────────
-
-  const handleCreate = async (extraData?: {
-    founders: string[];
-    fundingRounds: FundingRound[];
-    headcount: HeadcountRole[];
-    expenses: OperatingExpense[];
-    revenueStreams: RevenueStream[];
-  }) => {
-    if (!fields.company_name.value.trim()) {
-      setCreateError("Company name is required");
-      return;
-    }
-
-    // Prevent double-submit — ref survives across renders
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-
-    setStep("creating");
-    setCreateError(null);
-    trackEvent("onboarding_company_create_started");
-
+  // After CompanyStep creates the company, fetch departments for the Team step,
+  // then advance to Revenue.
+  const handleCompanyCreated = async (newCompanyId: string) => {
+    setCompanyId(newCompanyId);
     try {
-      const res = await apiFetch("/api/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_name: fields.company_name.value,
-          stage: fields.stage.value,
-          business_model: fields.business_model.value,
-          monthly_revenue: fields.monthly_revenue.value,
-          team_size: fields.team_size.value,
-          funding: fields.funding.value,
-          main_expenses: fields.main_expenses.value,
-          user_name: userName.trim() || "",
-          founders: extraData?.founders ?? [],
-          funding_rounds: extraData?.fundingRounds ?? [],
-          headcount: extraData?.headcount ?? [],
-          expenses: extraData?.expenses ?? [],
-          revenue_streams: extraData?.revenueStreams ?? [],
-        }),
-      });
-
-      if (res.status === 409) {
-        const data = await res.json().catch(() => ({})) as { code?: string; redirectTo?: string };
-        if (data.code === "ONBOARDING_ALREADY_COMPLETE") {
-          window.location.href = data.redirectTo ?? "/dashboard";
-          return;
-        }
+      const res = await apiFetch("/api/departments");
+      if (res.ok) {
+        const rows = (await res.json()) as { id: string; name: string }[];
+        setDepartments(rows.map((r) => ({ id: r.id, name: r.name })));
       }
+    } catch {
+      // Non-fatal — the Team step degrades to an empty department list.
+    }
+    trackEvent("onboarding_company_created");
+    setStep("revenue");
+  };
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to create company");
-      }
-
-      setStep("done");
-      trackEvent("onboarding_completed");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong";
-      trackEvent("onboarding_company_create_error", { error: message });
-      setCreateError(message);
-      setStep("review");
-      submittingRef.current = false;
+  // `step` is the single source of truth for wizard position; next/prev derive
+  // from its index in WIZARD_STEPS.
+  const advance = () => {
+    if (!isWizardStep(step)) return;
+    const i = WIZARD_STEPS.indexOf(step);
+    const nextId = WIZARD_STEPS[i + 1];
+    if (nextId) {
+      setStep(nextId);
+    } else {
+      // Last step ("team") → finish.
+      router.push("/dashboard");
     }
   };
 
-  // ── Render steps ──────────────────────────────────────────────────────
+  const goBack = () => {
+    if (!isWizardStep(step)) return;
+    const i = WIZARD_STEPS.indexOf(step);
+    const prevId = WIZARD_STEPS[i - 1];
+    if (prevId) setStep(prevId);
+  };
 
-  switch (step) {
-    case "website":
-      return (
-        <WebsiteStep
-          websiteUrl={websiteUrl}
-          onWebsiteUrlChange={setWebsiteUrl}
-          onSubmit={handleWebsiteSubmit}
-          onSkipToForm={skipToForm}
-          onSkipOnboarding={skipOnboarding}
-          inputRef={inputRef}
-        />
-      );
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-    case "enriching":
-      return (
-        <EnrichingStep
-          greeting={greeting}
-          websiteUrl={websiteUrl}
-          enrichedCount={enrichedCount}
-          onSkipToForm={skipToForm}
-          onSkipOnboarding={skipOnboarding}
-          agentError={agentError}
-        />
-      );
-
-    case "review":
-      return (
-        <ReviewStep
-          fields={fields}
-          createError={createError}
-          onUpdateField={updateField}
-          onCreate={handleCreate}
-          onSkipOnboarding={skipOnboarding}
-          userName={userName}
-          onUserNameChange={setUserName}
-          initialFounders={founders}
-          initialFundingRounds={fundingRounds}
-          initialHeadcount={headcount}
-          initialExpenses={expenses}
-          initialRevenueStreams={revenueStreams}
-        />
-      );
-
-    case "name-fallback":
-      return (
-        <NameFallbackStep
-          name={userName}
-          onNameChange={setUserName}
-          onContinue={() => {
-            namePromptShownRef.current = true;
-            void skipOnboarding();
-          }}
-          onSkip={() => {
-            namePromptShownRef.current = true;
-            void skipOnboarding();
-          }}
-        />
-      );
-
-    case "creating":
-      return (
-        <CreatingStep companyName={fields.company_name.value} />
-      );
-
-    case "done":
-      return (
-        <DoneStep
-          companyName={fields.company_name.value}
-          onGoToDashboard={() => router.push("/dashboard")}
-        />
-      );
+  if (step === "website") {
+    return (
+      <WebsiteStep
+        websiteUrl={websiteUrl}
+        onWebsiteUrlChange={setWebsiteUrl}
+        onSubmit={handleWebsiteSubmit}
+        onSkipToForm={skipToForm}
+        onSkipOnboarding={skipOnboarding}
+        inputRef={inputRef}
+      />
+    );
   }
+
+  if (step === "enriching") {
+    return (
+      <EnrichingStep
+        greeting={greeting}
+        websiteUrl={websiteUrl}
+        enrichedCount={enrichedCount}
+        onSkipToForm={skipToForm}
+        onSkipOnboarding={skipOnboarding}
+        agentError={agentError}
+      />
+    );
+  }
+
+  if (step === "ai-error") {
+    return (
+      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <AiErrorStep
+            onRetry={() => void runEnrich()}
+            onManual={() => enterWizard(false)}
+            onLater={() => void skipOnboarding()}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "done") {
+    return (
+      <DoneStep
+        companyName={fields.company_name.value}
+        onGoToDashboard={() => router.push("/dashboard")}
+      />
+    );
+  }
+
+  if (isWizardStep(step)) {
+    // Suggestions only feed the wizard when we came through a successful AI run.
+    const panel = (() => {
+      switch (step) {
+        case "company":
+          return (
+            <CompanyStep
+              initial={{
+                company_name: fields.company_name.value,
+                stage: fields.stage.value || undefined,
+                business_model: fields.business_model.value || undefined,
+                industry: fields.industry.value || undefined,
+                founders: useSuggestions ? founders : [],
+              }}
+              onCreated={(id) => void handleCompanyCreated(id)}
+            />
+          );
+        case "revenue":
+          return (
+            <RevenueStep
+              suggestions={
+                useSuggestions ? toRevenueSuggestions(revenueStreams) : []
+              }
+            />
+          );
+        case "funding":
+          return (
+            <FundingStep
+              suggestions={
+                useSuggestions ? toFundingSuggestions(fundingRounds) : []
+              }
+            />
+          );
+        case "expenses":
+          // ExpensesStep fetches its own accounts; the mapper falls back to the
+          // first account when none are provided here.
+          return (
+            <ExpensesStep
+              suggestions={
+                useSuggestions ? toExpenseSuggestions(expenses, []) : []
+              }
+            />
+          );
+        case "team":
+          return (
+            <TeamStep
+              departments={departments}
+              suggestions={
+                useSuggestions
+                  ? toHeadcountSuggestions(headcount, departments)
+                  : []
+              }
+            />
+          );
+      }
+    })();
+
+    // CompanyStep owns its own Continue (it must create the company first), so
+    // the shell's Continue is disabled there; once the company exists the shell
+    // drives navigation.
+    const onCompanyStep = step === "company";
+
+    return (
+      <WizardShell
+        steps={WIZARD_STEP_META}
+        activeId={step}
+        canContinue={!onCompanyStep}
+        isLast={step === "team"}
+        onBack={goBack}
+        onSkip={advance}
+        onContinue={advance}
+        hideBack={onCompanyStep}
+      >
+        {panel}
+      </WizardShell>
+    );
+  }
+
+  // step === "creating" (unused fallthrough) — render nothing.
+  return null;
 }

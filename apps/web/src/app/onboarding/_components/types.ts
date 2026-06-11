@@ -1,8 +1,12 @@
 export type OnboardingStep =
   | "website"
   | "enriching"
-  | "review"
-  | "name-fallback"
+  | "ai-error"
+  | "company"
+  | "revenue"
+  | "funding"
+  | "expenses"
+  | "team"
   | "creating"
   | "done";
 
@@ -17,10 +21,6 @@ export interface CompanyFields {
   stage: FieldData;
   business_model: FieldData;
   industry: FieldData;
-  monthly_revenue: FieldData;
-  team_size: FieldData;
-  funding: FieldData;
-  main_expenses: FieldData;
 }
 
 export interface FundingRound {
