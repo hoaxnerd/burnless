@@ -1,10 +1,35 @@
-/**
- * CLI entry point — placeholder scaffolded by Task 1.
- * Task 9 (commander skeleton) replaces this with the full buildProgram() implementation.
- */
+import { pathToFileURL } from "node:url";
+import { Command } from "commander";
+import { registerAdmin } from "./commands/admin";
+import { registerLogout } from "./commands/logout";
+import { registerProfiles } from "./commands/profiles";
+import { registerWhoami } from "./commands/whoami";
 import { CLI_VERSION } from "./version";
 
-process.stderr.write(
-  `burnless v${CLI_VERSION} — CLI not yet fully implemented. Re-run after Task 9.\n`
-);
-process.exit(2);
+export function buildProgram(): Command {
+  const program = new Command();
+  program
+    .name("burnless")
+    .description("Burnless from your terminal — an MCP client of your own Burnless instance")
+    .version(CLI_VERSION)
+    .option("--profile <name>", "named profile (overrides BURNLESS_PROFILE and the configured default)")
+    .option("--json", "machine-readable output on stdout (logs and errors stay on stderr)");
+
+  registerProfiles(program);
+  registerWhoami(program);
+  registerLogout(program);
+  registerAdmin(program);
+  return program;
+}
+
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  const program = buildProgram();
+  // Commander usage errors (unknown command, missing arg) are user errors → exit 2.
+  program.exitOverride((err) => {
+    process.exit(err.exitCode === 0 ? 0 : 2);
+  });
+  await program.parseAsync(process.argv);
+}
