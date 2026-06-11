@@ -1,31 +1,9 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 
-// The route module value-imports server-only deps (api-helpers → next-auth,
-// @burnless/db, next/cache) that don't resolve in the vitest node env. We only
-// exercise the PURE `resolveOwnerScope` helper, which depends solely on
-// `getCapabilities()` (real, reads process.env) — so stub the heavy deps to
-// make the module importable without touching the capability path under test.
-vi.mock("@/lib/api-helpers", () => ({
-  withErrorHandler: (fn: unknown) => fn,
-  requireCompanyAccess: vi.fn(),
-  requireRole: vi.fn(),
-  parseBody: vi.fn(),
-}));
-vi.mock("@burnless/db", () => ({
-  listVisibleConnections: vi.fn(),
-  createMcpConnection: vi.fn(),
-  updateMcpConnection: vi.fn(),
-  getDecryptedMcpSecret: vi.fn(),
-}));
-vi.mock("@burnless/mcp", () => ({
-  parseMcpConfig: vi.fn(),
-  McpConfigError: class extends Error {},
-}));
-vi.mock("@/lib/mcp/probe", () => ({
-  probeConnection: vi.fn(),
-  specFromRow: vi.fn(),
-}));
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+// `resolveOwnerScope` lives in its own sibling module (`connections/owner-scope.ts`),
+// NOT in `route.ts` — the Next.js App Router rejects non-HTTP-method exports from a
+// route file at build time. The helper depends solely on `getCapabilities()` (real,
+// reads process.env), so no server deps need stubbing.
 
 describe("resolveOwnerScope", () => {
   const ORIG = process.env;
@@ -35,12 +13,12 @@ describe("resolveOwnerScope", () => {
   it("forces company under self_host", async () => {
     process.env = { ...ORIG };
     delete process.env.BURNLESS_DEPLOYMENT;
-    const { resolveOwnerScope } = await import("../connections/route");
+    const { resolveOwnerScope } = await import("../connections/owner-scope");
     expect(resolveOwnerScope("personal")).toBe("company");
   });
   it("honors personal under cloud", async () => {
     process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud" };
-    const { resolveOwnerScope } = await import("../connections/route");
+    const { resolveOwnerScope } = await import("../connections/owner-scope");
     expect(resolveOwnerScope("personal")).toBe("personal");
   });
 });

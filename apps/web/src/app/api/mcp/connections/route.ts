@@ -16,18 +16,7 @@ import {
 } from "@/lib/api-helpers";
 import { probeConnection, specFromRow } from "@/lib/mcp/probe";
 import { getCapabilities } from "@/lib/capabilities";
-
-/**
- * Pure server helper (Task 13). When `multiTenant` is off (self_host), personal
- * scope is meaningless (single user) — coerce to `company`. Cloud honors the
- * requested scope. The client also hides the toggle, but the server is the
- * authoritative coercion point.
- */
-export function resolveOwnerScope(
-  requested: "company" | "personal"
-): "company" | "personal" {
-  return getCapabilities().multiTenant ? requested : "company";
-}
+import { resolveOwnerScope } from "./owner-scope";
 
 export const GET = withErrorHandler(async () => {
   const ctx = await requireCompanyAccess();
