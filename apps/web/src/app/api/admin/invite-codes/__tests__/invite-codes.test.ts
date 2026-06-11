@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextResponse } from "next/server";
+
+const ORIG_ENV = process.env;
 
 const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
@@ -95,8 +97,16 @@ const adminCtx = {
 };
 
 describe("Admin Invite Codes API", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: invite-codes is only ON in the cloud edition.
+    // Run the functional tests in cloud mode so the gate passes; the gate's
+    // both-mode behavior is covered explicitly below.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireCompanyAccess.mockResolvedValue(adminCtx);
     mockRequireRole.mockReturnValue(null);
 
@@ -286,6 +296,76 @@ describe("Admin Invite Codes API", () => {
       const data = await res.json();
       expect(data.freePlatformDays).toBe(90);
       expect(data.aiCreditsCents).toBe(10000);
+    });
+  });
+});
+
+// ── Capability gate (REAL requireCapability) — both editions ─────────────────
+// inviteCodes is OFF on self_host (default) and ON on cloud. The handlers must
+// be server-authoritative: a self_host user with admin role + auth still gets a
+// 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+
+describe("Admin Invite Codes API — capability gate (both editions)", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue(adminCtx);
+    mockRequireRole.mockReturnValue(null);
+
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ orderBy: mockOrderBy, innerJoin: mockInnerJoin, where: mockWhere });
+    mockOrderBy.mockResolvedValue([]);
+    mockInnerJoin.mockReturnValue({ where: mockWhere });
+    mockWhere.mockImplementation(() => ({
+      limit: mockLimit,
+      orderBy: mockOrderBy,
+      then: (resolve: (v: unknown[]) => void) => resolve([]),
+    }));
+    mockLimit.mockResolvedValue([]);
+    mockInsert.mockReturnValue({ values: mockValues });
+    mockValues.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([{ id: "code-1", code: "X" }]);
+  });
+
+  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+    });
+
+    it("GET returns 403 CAPABILITY_DISABLED for inviteCodes", async () => {
+      const res = await GET(jsonRequest("/api/admin/invite-codes", "GET"));
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("inviteCodes");
+    });
+
+    it("POST returns 403 CAPABILITY_DISABLED for inviteCodes", async () => {
+      const res = await POST(jsonRequest("/api/admin/invite-codes", "POST", {}));
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("inviteCodes");
+    });
+  });
+
+  describe("cloud (BURNLESS_DEPLOYMENT=cloud)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
+    });
+
+    it("GET passes the capability gate (not a 403)", async () => {
+      const res = await GET(jsonRequest("/api/admin/invite-codes", "GET"));
+      expect(res.status).not.toBe(403);
+    });
+
+    it("POST passes the capability gate (not a 403)", async () => {
+      const res = await POST(jsonRequest("/api/admin/invite-codes", "POST", {}));
+      expect(res.status).not.toBe(403);
     });
   });
 });

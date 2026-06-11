@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextResponse } from "next/server";
+
+const ORIG_ENV = process.env;
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -110,8 +112,15 @@ function makeParams(id: string) {
 // ── Tests: GET /api/integrations ─────────────────────────────────────────────
 
 describe("GET /api/integrations", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: integrations is only ON in the cloud edition.
+    // Run functional tests in cloud mode; both-mode gate behavior is covered below.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireRole.mockReturnValue(null);
     mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
@@ -163,8 +172,13 @@ describe("GET /api/integrations", () => {
 // ── Tests: POST /api/integrations ────────────────────────────────────────────
 
 describe("POST /api/integrations", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireRole.mockReturnValue(null);
     mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
@@ -444,5 +458,67 @@ describe("DELETE /api/integrations/[id]", () => {
 
     expect(res.status).toBe(404);
     expect(body.error).toBe("Integration not found");
+  });
+});
+
+// ── Capability gate (REAL requireCapability) — both editions ─────────────────
+// integrations is OFF on self_host (default) and ON on cloud. The handlers must
+// be server-authoritative: a self_host user with admin role + auth still gets a
+// 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+
+describe("Integrations API — capability gate (both editions)", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue({
+      userId: "user-1", companyId: "company-1", role: "admin",
+    });
+    mockRequireRole.mockReturnValue(null);
+    mockRequirePlanFeature.mockResolvedValue(null);
+    // POST path: existing-check (none) → insert returning a serializable row.
+    dbResults = [[], [{ id: "int-1", companyId: "company-1", type: "quickbooks", status: "active", metadata: null }]];
+    dbResultIdx = 0;
+  });
+
+  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+    });
+
+    it("GET returns 403 CAPABILITY_DISABLED for integrations", async () => {
+      const res = await GET(makeRequest("http://localhost/api/integrations"));
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("integrations");
+    });
+
+    it("POST returns 403 CAPABILITY_DISABLED for integrations", async () => {
+      const res = await POST(jsonRequest("http://localhost/api/integrations", "POST", { type: "quickbooks" }));
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("integrations");
+    });
+  });
+
+  describe("cloud (BURNLESS_DEPLOYMENT=cloud)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
+    });
+
+    it("GET passes the capability gate (not a 403)", async () => {
+      const res = await GET(makeRequest("http://localhost/api/integrations"));
+      expect(res.status).not.toBe(403);
+    });
+
+    it("POST passes the capability gate (not a 403)", async () => {
+      const res = await POST(jsonRequest("http://localhost/api/integrations", "POST", { type: "quickbooks" }));
+      expect(res.status).not.toBe(403);
+    });
   });
 });

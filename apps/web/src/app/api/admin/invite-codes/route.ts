@@ -10,6 +10,7 @@ import {
   parseBody,
 } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
+import { requireCapability } from "@/lib/capabilities";
 
 function generateInviteCode(): string {
   return randomBytes(6).toString("hex").toUpperCase();
@@ -35,6 +36,9 @@ export const GET = withErrorHandler(async (request: Request) => {
 
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  const capErr = requireCapability("inviteCodes");
+  if (capErr) return capErr;
 
   // Only show codes created by the current user (multi-tenant isolation)
   const codes = await db
@@ -88,6 +92,9 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  const capErr = requireCapability("inviteCodes");
+  if (capErr) return capErr;
 
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;

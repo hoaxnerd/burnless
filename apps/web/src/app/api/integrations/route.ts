@@ -3,12 +3,16 @@ import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { createIntegrationSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, requirePlanFeature, parseBody, withErrorHandler } from "@/lib/api-helpers";
+import { requireCapability } from "@/lib/capabilities";
 
 // ── GET /api/integrations — List all integrations for company ───────────────
 
 export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+
+  const capErr = requireCapability("integrations");
+  if (capErr) return capErr;
 
   const rows = await db
     .select()
@@ -25,6 +29,9 @@ export const POST = withErrorHandler(async (request: Request) => {
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  const capErr = requireCapability("integrations");
+  if (capErr) return capErr;
 
   // Integrations require Team plan
   const planGate = await requirePlanFeature(ctx.companyId, "custom_integrations");
