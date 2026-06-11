@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -66,5 +66,19 @@ describe("config store", () => {
 
   it("getProfile throws UsageError (exit 2) for an unknown profile", () => {
     expect(() => getProfile(loadConfig(home), "nope")).toThrow(UsageError);
+  });
+
+  it("loadConfig throws UsageError for a profile missing baseUrl", () => {
+    const bad = { defaultProfile: "bad", profiles: { bad: { authMode: "pat" } } };
+    mkdirSync(join(home, ".burnless"), { recursive: true });
+    writeFileSync(join(home, ".burnless", "config.json"), JSON.stringify(bad));
+    expect(() => loadConfig(home)).toThrow(UsageError);
+  });
+
+  it("loadConfig throws UsageError for a profile with invalid authMode", () => {
+    const bad = { defaultProfile: "bad", profiles: { bad: { baseUrl: "http://localhost:3000", authMode: "invalid" } } };
+    mkdirSync(join(home, ".burnless"), { recursive: true });
+    writeFileSync(join(home, ".burnless", "config.json"), JSON.stringify(bad));
+    expect(() => loadConfig(home)).toThrow(UsageError);
   });
 });

@@ -53,9 +53,30 @@ export function loadConfig(homeDir?: string): CliConfig {
   ) {
     throw new UsageError(`Invalid config at ${path} — expected { defaultProfile, profiles }.`);
   }
+  const profiles: Record<string, Profile> = {};
+  for (const [name, raw] of Object.entries(candidate.profiles as Record<string, unknown>)) {
+    if (
+      raw === null ||
+      typeof raw !== "object" ||
+      typeof (raw as Record<string, unknown>).baseUrl !== "string" ||
+      !(raw as Record<string, unknown>).baseUrl ||
+      ((raw as Record<string, unknown>).authMode !== "pat" &&
+        (raw as Record<string, unknown>).authMode !== "oauth")
+    ) {
+      throw new UsageError(
+        `Invalid config at ${path} — profile "${name}" must have a non-empty baseUrl and authMode "pat"|"oauth".`
+      );
+    }
+    const p = raw as Record<string, unknown>;
+    profiles[name] = {
+      baseUrl: p.baseUrl as string,
+      authMode: p.authMode as "pat" | "oauth",
+      ...(typeof p.defaultCompany === "string" ? { defaultCompany: p.defaultCompany } : {}),
+    };
+  }
   return {
     defaultProfile: candidate.defaultProfile,
-    profiles: candidate.profiles as Record<string, Profile>,
+    profiles,
   };
 }
 
