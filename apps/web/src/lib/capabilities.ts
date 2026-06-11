@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 export type Capability =
   | "marketingSite" | "billing" | "multiTenant" | "selfServeSignup"
   | "oauthLogin" | "autoLogin" | "stdioMcp" | "planEnforcement"
@@ -81,4 +83,12 @@ export function getCapabilities(): Capabilities {
   if (!hasEmailProvider()) base.emailVerification = false;
   if (getEdition() === "cloud") base.stdioMcp = false; // hard rule, cannot override up
   return base;
+}
+
+export function requireCapability(cap: Capability): NextResponse | null {
+  if (getCapabilities()[cap]) return null;
+  return NextResponse.json(
+    { error: `This feature is not available on this deployment`, code: "CAPABILITY_DISABLED", capability: cap },
+    { status: 403 }
+  );
 }

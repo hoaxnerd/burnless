@@ -98,3 +98,20 @@ describe("back-compat alias", () => {
     expect(getCapabilities().stdioMcp).toBe(false);
   });
 });
+
+describe("requireCapability", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("returns null when capability enabled", async () => {
+    process.env = { ...ORIG }; delete process.env.BURNLESS_DEPLOYMENT; // self_host
+    const { requireCapability } = await import("../capabilities");
+    expect(requireCapability("stdioMcp")).toBeNull();
+  });
+  it("returns a 403 response when capability disabled", async () => {
+    process.env = { ...ORIG }; // self_host: billing off
+    const { requireCapability } = await import("../capabilities");
+    const res = requireCapability("billing");
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(403);
+  });
+});
