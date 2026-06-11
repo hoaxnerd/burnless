@@ -66,3 +66,25 @@ describe("per-flag overrides", () => {
     expect(getCapabilities().autoLogin).toBe(false);
   });
 });
+
+describe("auto-degrade", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("billing forced off when no payment provider, even if overridden on", async () => {
+    process.env = { ...ORIG, BURNLESS_CAP_BILLING: "on" };
+    delete process.env.STRIPE_SECRET_KEY; delete process.env.RAZORPAY_KEY_ID;
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().billing).toBe(false);
+  });
+  it("stdioMcp forced off in cloud even if overridden on", async () => {
+    process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud", BURNLESS_CAP_STDIO_MCP: "on" };
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().stdioMcp).toBe(false);
+  });
+  it("oauthLogin forced off when no OAuth creds", async () => {
+    process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud" };
+    delete process.env.AUTH_GITHUB_ID; delete process.env.AUTH_GOOGLE_ID;
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().oauthLogin).toBe(false);
+  });
+});

@@ -48,6 +48,20 @@ function envFlag(name: string): boolean | undefined {
   return undefined;
 }
 
+function hasPaymentProvider(): boolean {
+  return !!process.env.STRIPE_SECRET_KEY ||
+    !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+}
+function hasManagedAiKey(): boolean {
+  return !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+}
+function hasOAuth(): boolean {
+  return !!(process.env.AUTH_GITHUB_ID || process.env.AUTH_GOOGLE_ID);
+}
+function hasEmailProvider(): boolean {
+  return !!(process.env.RESEND_API_KEY || process.env.SMTP_HOST || process.env.EMAIL_PROVIDER);
+}
+
 export function getEdition(): Edition {
   return process.env.BURNLESS_DEPLOYMENT === "cloud" ? "cloud" : "self_host";
 }
@@ -58,5 +72,11 @@ export function getCapabilities(): Capabilities {
     const override = envFlag(CAP_ENV[cap]);
     if (override !== undefined) base[cap] = override;
   }
-  return base; // degrade added in later tasks
+  // auto-degrade: capabilities that need credentials/runtime cannot be forced on
+  if (!hasPaymentProvider()) base.billing = false;
+  if (!hasManagedAiKey()) base.managedAiProvider = false;
+  if (!hasOAuth()) base.oauthLogin = false;
+  if (!hasEmailProvider()) base.emailVerification = false;
+  if (getEdition() === "cloud") base.stdioMcp = false; // hard rule, cannot override up
+  return base;
 }
