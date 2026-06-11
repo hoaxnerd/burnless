@@ -15,7 +15,7 @@ import {
   parseBody,
 } from "@/lib/api-helpers";
 import { probeConnection, specFromRow } from "@/lib/mcp/probe";
-import { env } from "@/lib/env";
+import { getCapabilities } from "@/lib/capabilities";
 
 export const GET = withErrorHandler(async () => {
   const ctx = await requireCompanyAccess();
@@ -97,7 +97,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   // Deploy-mode gate (spec §3.6): stdio only when the operator allows it.
-  if (server.transport === "stdio" && !env.allowStdioMcp) {
+  if (server.transport === "stdio" && !getCapabilities().stdioMcp) {
     return NextResponse.json(
       {
         error:

@@ -128,15 +128,4 @@ export const env = {
     }
     return "http://localhost:3000";
   },
-
-  // ── MCP deploy-mode gate (spec §3.6, D3) ──────────────────────────────────
-  /** "cloud" = hosted SaaS (stdio MCP hard-off). Anything else = self_host. */
-  get deploymentMode(): "cloud" | "self_host" {
-    return process.env.BURNLESS_DEPLOYMENT === "cloud" ? "cloud" : "self_host";
-  },
-  /** stdio MCP servers spawn local processes — operator-gated, never in cloud. */
-  get allowStdioMcp(): boolean {
-    if (this.deploymentMode === "cloud") return false;
-    return process.env.BURNLESS_ALLOW_STDIO_MCP !== "false";
-  },
 } as const;
