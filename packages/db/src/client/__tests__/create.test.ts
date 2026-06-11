@@ -38,7 +38,7 @@ describe("createClient (pglite)", () => {
     const h2 = await createClient({ driver: "pglite", dataDir });
     const res = await h2.db.execute(sql`SELECT id FROM t`);
     const rows = Array.isArray(res) ? res : (res as { rows: { id: number }[] }).rows;
-    expect(rows[0].id).toBe(42);
+    expect(rows[0]?.id).toBe(42);
     await h2.close();
   });
 });
