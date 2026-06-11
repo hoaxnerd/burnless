@@ -4,6 +4,8 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AnalyticsProvider } from "@/components/analytics-provider";
 import { CookieConsentLoader } from "@/components/cookie-consent-loader";
+import { CapabilityProvider } from "@/components/providers/capability-context";
+import { getCapabilities } from "@/lib/capabilities";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -62,14 +64,16 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <div id="main-content">{children}</div>
-        <Suspense fallback={null}>
-          <AnalyticsProvider />
-        </Suspense>
-        <CookieConsentLoader />
+        <CapabilityProvider value={getCapabilities()}>
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
+          <div id="main-content">{children}</div>
+          <Suspense fallback={null}>
+            <AnalyticsProvider />
+          </Suspense>
+          <CookieConsentLoader />
+        </CapabilityProvider>
       </body>
     </html>
   );
