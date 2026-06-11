@@ -154,7 +154,7 @@ export function PreviewStep({
                       {isEditing ? (
                         <Input
                           type="number"
-                          step="0.01"
+                          step="any"
                           aria-label="Amount"
                           defaultValue={t.amount}
                           onBlur={(e) => updatePreviewRow(i, "amount", e.target.value)}

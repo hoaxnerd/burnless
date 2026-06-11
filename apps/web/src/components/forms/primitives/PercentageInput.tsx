@@ -56,7 +56,7 @@ export function PercentageInput({
           value={display}
           min={min * 100}
           max={max * 100}
-          step={step}
+          step="any"
           required={required}
           disabled={disabled}
           onChange={handleChange}

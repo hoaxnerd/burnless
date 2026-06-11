@@ -60,6 +60,31 @@ describe("NumberInput", () => {
     expect(onChange).toHaveBeenCalledWith(10);
   });
 
+  it('renders step="any" in non-integer mode so arbitrary decimals are accepted and arrows step by 1', () => {
+    render(
+      <NumberInput value={null} onChange={() => {}} label="Price" step={0.01} />,
+    );
+    const input = screen.getByLabelText("Price") as HTMLInputElement;
+    expect(input.getAttribute("step")).toBe("any");
+  });
+
+  it('renders step="1" when integerOnly is true', () => {
+    render(
+      <NumberInput value={null} onChange={() => {}} label="Seats" integerOnly />,
+    );
+    const input = screen.getByLabelText("Seats") as HTMLInputElement;
+    expect(input.getAttribute("step")).toBe("1");
+  });
+
+  it("accepts an arbitrary-precision decimal (0.027) without snapping", () => {
+    const onChange = vi.fn();
+    render(<NumberInput value={null} onChange={onChange} label="Price" />);
+    fireEvent.change(screen.getByLabelText("Price"), {
+      target: { value: "0.027" },
+    });
+    expect(onChange).toHaveBeenCalledWith(0.027);
+  });
+
   it("renders null value as empty string in the input", () => {
     render(<NumberInput value={null} onChange={() => {}} label="Units" />);
     const input = screen.getByLabelText("Units") as HTMLInputElement;

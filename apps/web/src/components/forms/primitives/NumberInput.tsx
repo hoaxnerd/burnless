@@ -38,7 +38,7 @@ export function NumberInput({
         value={value === null ? "" : value}
         min={min}
         max={max ?? undefined}
-        step={integerOnly ? 1 : step}
+        step={integerOnly ? 1 : "any"}
         required={required}
         disabled={disabled}
         aria-label={label}

@@ -38,7 +38,7 @@ export function CurrencyInput({
         <Input
           type="number"
           min={min}
-          step={step}
+          step="any"
           value={Number.isFinite(value) ? value : 0}
           required={required}
           disabled={disabled}
