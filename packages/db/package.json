@@ -18,11 +18,12 @@
   },
   "dependencies": {
     "@burnless/types": "workspace:*",
+    "@electric-sql/pglite": "^0.5.2",
+    "@electric-sql/pglite-pgvector": "^0.0.3",
     "drizzle-orm": "^0.38.0",
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.2",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^3.2.4",
     "drizzle-kit": "^0.30.0",

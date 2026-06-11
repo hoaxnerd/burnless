@@ -255,16 +255,19 @@ importers:
       '@burnless/types':
         specifier: workspace:*
         version: link:../types
+      '@electric-sql/pglite':
+        specifier: ^0.5.2
+        version: 0.5.2
+      '@electric-sql/pglite-pgvector':
+        specifier: ^0.0.3
+        version: 0.0.3(@electric-sql/pglite@0.5.2)
       drizzle-orm:
         specifier: ^0.38.0
-        version: 0.38.4(@electric-sql/pglite@0.4.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
+        version: 0.38.4(@electric-sql/pglite@0.5.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4)
       postgres:
         specifier: ^3.4.0
         version: 3.4.8
     devDependencies:
-      '@electric-sql/pglite':
-        specifier: ^0.4.2
-        version: 0.4.2
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
@@ -567,8 +570,16 @@ packages:
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
 
+  '@electric-sql/pglite-pgvector@0.0.3':
+    resolution: {integrity: sha512-7v4G40FiVBx2PnDm/ljgXlOtPs/s0Nvam276626IHy9tuiaLQTNzIxntQv+sOsX0yx7A46uvjTKNTGB7N9D1lw==}
+    peerDependencies:
+      '@electric-sql/pglite': 0.5.2
+
   '@electric-sql/pglite@0.4.2':
     resolution: {integrity: sha512-1GUUl/MZpy5QWgWisD3Epho3GkJrZ1MzVgQpo2pifQWUs96F9rXKZxeVLPhkwFYck34CH/kQ8lis6wX9ifn3kg==}
+
+  '@electric-sql/pglite@0.5.2':
+    resolution: {integrity: sha512-y6ySdFE7FQB7BkVaSNaPINgY7mXCyvi+3GQB5ySX9WGwgrdh31WXMP5RM40oAyYff47lIr7xdcW8UbCW5NHDmw==}
 
   '@emnapi/core@1.9.1':
     resolution: {integrity: sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA==}
@@ -6106,7 +6117,13 @@ snapshots:
 
   '@drizzle-team/brocli@0.10.2': {}
 
+  '@electric-sql/pglite-pgvector@0.0.3(@electric-sql/pglite@0.5.2)':
+    dependencies:
+      '@electric-sql/pglite': 0.5.2
+
   '@electric-sql/pglite@0.4.2': {}
+
+  '@electric-sql/pglite@0.5.2': {}
 
   '@emnapi/core@1.9.1':
     dependencies:
@@ -8468,6 +8485,15 @@ snapshots:
   drizzle-orm@0.38.4(@electric-sql/pglite@0.4.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4):
     optionalDependencies:
       '@electric-sql/pglite': 0.4.2
+      '@opentelemetry/api': 1.9.0
+      '@types/pg': 8.15.6
+      '@types/react': 19.2.14
+      postgres: 3.4.8
+      react: 19.2.4
+
+  drizzle-orm@0.38.4(@electric-sql/pglite@0.5.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@types/react@19.2.14)(postgres@3.4.8)(react@19.2.4):
+    optionalDependencies:
+      '@electric-sql/pglite': 0.5.2
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.15.6
       '@types/react': 19.2.14
