@@ -211,6 +211,7 @@ describe("protocol roundtrip", () => {
       )
     );
     const body = await res.json();
+    expect(body.result.isError).toBe(true);
     expect(JSON.parse(body.result.content[0].text).error).toContain("read-only");
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
   });
@@ -262,6 +263,7 @@ describe("scope enforcement with a real read-only PAT", () => {
       )
     );
     const body = await res.json();
+    expect(body.result.isError).toBe(true);
     expect(JSON.parse(body.result.content[0].text).error).toContain('"write"');
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
   });

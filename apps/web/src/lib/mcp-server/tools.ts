@@ -32,20 +32,24 @@ export function buildMcpExecuteTool(
   const exposed = new Set(getMcpExposedTools().map((t) => t.name));
 
   return async (toolName, input) => {
+    // Gate refusals THROW (not return-as-string): createBurnlessMcpServer turns a
+    // throw into an `isError: true` tool result, so an agent that branches on
+    // isError sees the refusal as a failure — not a silent success. Returning the
+    // error as a normal payload would flag isError:false and mislead the caller.
     if (!exposed.has(toolName)) {
-      return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+      throw new Error(`Unknown tool: ${toolName}`);
     }
 
     // Scope gate (spec §4.3 step 5). web_search/browser_use cannot appear —
     // the exclusion set keeps those tools out — but guard defensively.
     const category = categorizeToolName(toolName);
     if (category === "web_search" || category === "browser_use") {
-      return JSON.stringify({ error: `Tool ${toolName} is not available over MCP.` });
+      throw new Error(`Tool ${toolName} is not available over MCP.`);
     }
     if (!deps.state.scopes.includes(category)) {
-      return JSON.stringify({
-        error: `Insufficient scope: ${toolName} requires the "${category}" scope, but this credential grants [${deps.state.scopes.join(", ")}].`,
-      });
+      throw new Error(
+        `Insufficient scope: ${toolName} requires the "${category}" scope, but this credential grants [${deps.state.scopes.join(", ")}].`
+      );
     }
 
     // Defense in depth (spec §4.3 step 5): company-level read_only beats any
@@ -53,9 +57,7 @@ export function buildMcpExecuteTool(
     if (category === "write" || category === "delete") {
       const flags = await getAiFlags(deps.auth.companyId);
       if (flags.writeMode === "read_only") {
-        return JSON.stringify({
-          error: "Write refused: this company's AI write mode is read-only.",
-        });
+        throw new Error("Write refused: this company's AI write mode is read-only.");
       }
     }
 
@@ -74,7 +76,7 @@ export function buildMcpExecuteTool(
       }
       const scenario = await getScenarioForCompany(scenarioId, deps.auth.companyId);
       if (!scenario) {
-        return JSON.stringify({ error: `Scenario ${scenarioId} not found for this company.` });
+        throw new Error(`Scenario ${scenarioId} not found for this company.`);
       }
       deps.state.scenarioId = scenario.id;
       return JSON.stringify({

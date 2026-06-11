@@ -66,21 +66,21 @@ describe("buildMcpExecuteTool", () => {
     }));
   });
 
-  it("write tool WITHOUT write scope → scope error naming the missing scope, no dispatch", async () => {
+  // Gate refusals THROW so createBurnlessMcpServer flags the tool result
+  // isError:true (an agent must not read a refusal as a silent success).
+  it("write tool WITHOUT write scope → throws naming the missing scope, no dispatch", async () => {
     const user = await createUser();
     const company = await createCompany(user.id);
     const { execute } = makeDeps(["read"], company.id, user.id);
-    const result = JSON.parse(await execute("create_scenario", { name: "X" }));
-    expect(result.error).toContain('"write"');
+    await expect(execute("create_scenario", { name: "X" })).rejects.toThrow('"write"');
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
   });
 
-  it("delete tool needs delete scope", async () => {
+  it("delete tool needs delete scope (throws)", async () => {
     const user = await createUser();
     const company = await createCompany(user.id);
     const { execute } = makeDeps(["read", "write"], company.id, user.id);
-    const result = JSON.parse(await execute("delete_scenario", { id: "s1" }));
-    expect(result.error).toContain('"delete"');
+    await expect(execute("delete_scenario", { id: "s1" })).rejects.toThrow('"delete"');
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
   });
 
@@ -89,8 +89,7 @@ describe("buildMcpExecuteTool", () => {
     const user = await createUser();
     const company = await createCompany(user.id);
     const { execute } = makeDeps(["read", "write", "delete"], company.id, user.id);
-    const result = JSON.parse(await execute("create_scenario", { name: "X" }));
-    expect(result.error).toContain("read-only");
+    await expect(execute("create_scenario", { name: "X" })).rejects.toThrow("read-only");
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
     // reads still pass
     const read = JSON.parse(await execute("get_metrics", {}));
@@ -120,17 +119,16 @@ describe("buildMcpExecuteTool", () => {
     const otherCompany = await createCompany(otherOwner.id);
     const foreign = await createScenario(otherCompany.id);
     const { execute, state } = makeDeps(["read"], company.id, user.id);
-    const result = JSON.parse(await execute("activate_scenario", { scenarioId: foreign.id }));
-    expect(result.error).toContain("not found");
+    await expect(execute("activate_scenario", { scenarioId: foreign.id })).rejects.toThrow("not found");
     expect(state.scenarioId).toBeNull();
   });
 
-  it("unknown / excluded tool → error, no dispatch", async () => {
+  it("unknown / excluded tool → throws, no dispatch", async () => {
     const user = await createUser();
     const company = await createCompany(user.id);
     const { execute } = makeDeps(["read", "write", "delete"], company.id, user.id);
-    expect(JSON.parse(await execute("show_metric_card", {})).error).toContain("Unknown tool");
-    expect(JSON.parse(await execute("totally_made_up", {})).error).toContain("Unknown tool");
+    await expect(execute("show_metric_card", {})).rejects.toThrow("Unknown tool");
+    await expect(execute("totally_made_up", {})).rejects.toThrow("Unknown tool");
     expect(mockExecuteToolCall).not.toHaveBeenCalled();
   });
 });
