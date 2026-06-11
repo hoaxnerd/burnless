@@ -1,4 +1,5 @@
 import { PassThrough } from "node:stream";
+import { MUTATION_TOOL_NAMES } from "@burnless/ai";
 import { describe, expect, it } from "vitest";
 import { UsageError } from "../errors";
 import { categorizeTool, confirmMutation, type ConfirmIo } from "../write-safety";
@@ -21,6 +22,23 @@ describe("categorizeTool (local prefix heuristic, spec §7.4)", () => {
     expect(categorizeTool("get_metrics")).toBe("read");
     expect(categorizeTool("list_scenarios")).toBe("read");
     expect(categorizeTool("activate_scenario")).toBe("read"); // view change, not a mutation
+  });
+});
+
+// Registry drift guard (major #1/#2): the local prefix heuristic must never let
+// an authoritative mutation tool slip through as "read" and skip the Proceed?
+// (y/N) confirmation. Every member of @burnless/ai's MUTATION_TOOL_NAMES (the
+// server-side write/delete set) must classify as a non-read category here. Today
+// every name is prefixed create_/update_/delete_ so this is green; the moment a
+// non-prefixed mutation tool (e.g. promote_scenario, mark_grant_milestone_hit,
+// set_*) is added server-side, CI fails here instead of silently bypassing the
+// write gate.
+describe("categorizeTool drift guard vs @burnless/ai MUTATION_TOOL_NAMES", () => {
+  it("classifies every authoritative mutation tool as write or delete (never read)", () => {
+    expect(MUTATION_TOOL_NAMES.size).toBeGreaterThan(0);
+    for (const name of MUTATION_TOOL_NAMES) {
+      expect(categorizeTool(name), name).not.toBe("read");
+    }
   });
 });
 
