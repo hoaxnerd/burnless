@@ -3,19 +3,22 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-type G = { __burnless_db?: unknown; __burnless_pglite?: unknown };
+type G = { __burnless_db?: unknown; __burnless_pglite?: unknown; __burnless_handle?: unknown };
 const g = globalThis as unknown as G;
 
 let savedDb: unknown;
 let savedPglite: unknown;
+let savedHandle: unknown;
 const dirs: string[] = [];
 
 beforeEach(() => {
   // setup.ts pre-seeds these; stash + clear so we test the real init path.
   savedDb = g.__burnless_db;
   savedPglite = g.__burnless_pglite;
+  savedHandle = g.__burnless_handle;
   delete g.__burnless_db;
   delete g.__burnless_pglite;
+  delete g.__burnless_handle;
 });
 
 afterEach(async () => {
@@ -23,6 +26,7 @@ afterEach(async () => {
   await closeDatabase();
   g.__burnless_db = savedDb;
   g.__burnless_pglite = savedPglite;
+  g.__burnless_handle = savedHandle;
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 

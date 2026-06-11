@@ -17,19 +17,21 @@ export function shouldAutoMigrate(dialect: Dialect, env: NodeJS.ProcessEnv): boo
   return dialect === "pglite";
 }
 
-// packages/db/src/client/ -> packages/db/drizzle
-const MIGRATIONS_FOLDER = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../drizzle",
-);
+function getMigrationsFolder(): string {
+  const override = process.env.BURNLESS_MIGRATIONS_DIR;
+  if (override && override.trim().length > 0) return override;
+  // packages/db/src/client/ -> packages/db/drizzle (source/dev resolution)
+  return join(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
+}
 
 /** Apply the drizzle migration baseline for the handle's dialect. See spec §5. */
 export async function applyMigrations(handle: DbHandle): Promise<void> {
+  const migrationsFolder = getMigrationsFolder();
   if (handle.dialect === "pglite") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await migratePglite(handle.db as any, { migrationsFolder: MIGRATIONS_FOLDER });
+    await migratePglite(handle.db as any, { migrationsFolder });
   } else {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await migratePostgres(handle.db as any, { migrationsFolder: MIGRATIONS_FOLDER });
+    await migratePostgres(handle.db as any, { migrationsFolder });
   }
 }
