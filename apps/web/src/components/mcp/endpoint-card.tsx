@@ -86,7 +86,7 @@ export function EndpointCard({
         )}
       </div>
       <p className="mt-[3px] text-xs text-surface-500">
-        Any MCP-capable agent can operate this company's financial model — scoped by token,
+        Any MCP-capable agent can operate this company&apos;s financial model — scoped by token,
         every action audited.
       </p>
       {!reachable && (
@@ -94,7 +94,7 @@ export function EndpointCard({
           <span>⚠</span>
           <span>
             Strict MCP clients (Claude Desktop, claude.ai) require HTTPS or localhost.
-            This instance's URL is neither — set NEXT_PUBLIC_APP_URL to an https://
+            This instance&apos;s URL is neither — set NEXT_PUBLIC_APP_URL to an https://
             address or use localhost.
           </span>
         </div>

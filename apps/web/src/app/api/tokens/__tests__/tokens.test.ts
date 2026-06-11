@@ -18,7 +18,7 @@ vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
   withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
   errorResponse: (msg: string, status: number) =>
-    new (require("next/server").NextResponse)(JSON.stringify({ error: msg }), {
+    new NextResponse(JSON.stringify({ error: msg }), {
       status,
       headers: { "Content-Type": "application/json" },
     }),

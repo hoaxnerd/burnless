@@ -41,11 +41,11 @@ export function PatTable({
         Personal access tokens
       </h3>
       <p className="mt-[3px] text-xs text-surface-500">
-        Tokens act as you, inside this company, capped by your role and the token's scopes.
+        Tokens act as you, inside this company, capped by your role and the token&apos;s scopes.
       </p>
       {tokens.length === 0 ? (
         <p className="mt-3 text-[12.5px] text-surface-400">
-          No tokens yet — mint one with "New token" to connect an agent.
+          No tokens yet — mint one with &quot;New token&quot; to connect an agent.
         </p>
       ) : (
         <table className="mt-3 w-full border-collapse">
