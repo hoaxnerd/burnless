@@ -1,6 +1,38 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkRateLimit, RATE_LIMITS } from "./lib/rate-limit";
+import { getCapabilities, type Capabilities } from "./lib/capabilities";
+
+type GuardResult = { action: "redirect"; to: string } | { action: "notFound" } | null;
+
+const MARKETING_EXACT = new Set([
+  "/",
+  "/pricing",
+  "/about",
+  "/contact",
+  "/help",
+  "/security",
+  "/terms",
+  "/privacy",
+]);
+const PREFIX_CAP: Array<{ prefix: string; cap: keyof Capabilities }> = [
+  { prefix: "/api/billing", cap: "billing" },
+];
+
+/**
+ * Pure capability URL guard. Given a pathname + resolved capabilities, decides
+ * whether the request should be redirected, 404'd, or allowed through (null).
+ * Unit-tested directly — keep free of NextRequest/runtime deps.
+ */
+export function resolveCapabilityGuard(pathname: string, caps: Capabilities): GuardResult {
+  if (!caps.marketingSite && MARKETING_EXACT.has(pathname)) {
+    return pathname === "/" ? { action: "redirect", to: "/dashboard" } : { action: "notFound" };
+  }
+  for (const { prefix, cap } of PREFIX_CAP) {
+    if (pathname.startsWith(prefix) && !caps[cap]) return { action: "notFound" };
+  }
+  return null;
+}
 
 /** HTTP methods that represent mutations */
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -64,6 +96,22 @@ function fnv1a32hex(value: string): string {
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Capability URL guards (S1 edition spine). Runs before the API-only early
+  // return so marketing pages are evaluated too. Health/auth/webhook bypass
+  // paths are neither marketing nor billing routes, so the guard returns null
+  // for them — placing it here does not wrongly gate them.
+  const guard = resolveCapabilityGuard(pathname, getCapabilities());
+  if (guard?.action === "redirect") {
+    return NextResponse.redirect(new URL(guard.to, request.url));
+  }
+  if (guard?.action === "notFound") {
+    // API routes: return a real 404 status; pages: rewrite to the not-found UI.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.rewrite(new URL("/not-found", request.url));
+  }
 
   // Rate-limit API routes + the MCP endpoint (expose spec §4.1)
   if (!pathname.startsWith("/api/") && pathname !== "/mcp") return NextResponse.next();
@@ -282,5 +330,17 @@ function resolveTierKey(pathname: string, method: string): string {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/mcp"],
+  matcher: [
+    "/api/:path*",
+    "/mcp",
+    // Marketing routes — guarded so they redirect/404 when marketingSite is off.
+    "/",
+    "/pricing",
+    "/about",
+    "/contact",
+    "/help",
+    "/security",
+    "/terms",
+    "/privacy",
+  ],
 };
