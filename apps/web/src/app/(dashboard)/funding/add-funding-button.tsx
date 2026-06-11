@@ -12,11 +12,6 @@ export function AddFundingButton() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
-  function handleClose() {
-    setOpen(false);
-    router.refresh();
-  }
-
   async function handleSubmit(payload: FundingRoundSubmitPayload) {
     const res = await apiFetch("/api/funding-rounds", {
       method: "POST",
@@ -24,6 +19,8 @@ export function AddFundingButton() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(await extractApiError(res));
+    // Refresh only after a successful save — Cancel/close must not hit the server.
+    router.refresh();
   }
 
   return (
@@ -37,7 +34,7 @@ export function AddFundingButton() {
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add Funding Round">
-        <FundingRoundForm mode="add" onSubmit={handleSubmit} onClose={handleClose} />
+        <FundingRoundForm mode="add" onSubmit={handleSubmit} onClose={() => setOpen(false)} />
       </Modal>
     </>
   );
