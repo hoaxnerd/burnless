@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { EDITION_PRESETS, type Capability } from "../capabilities";
 
 const ALL_CAPS: Capability[] = [
@@ -27,5 +27,27 @@ describe("EDITION_PRESETS", () => {
     expect(EDITION_PRESETS.cloud.multiTenant).toBe(true);
     expect(EDITION_PRESETS.cloud.autoLogin).toBe(false);
     expect(EDITION_PRESETS.cloud.stdioMcp).toBe(false);
+  });
+});
+
+describe("getEdition / getCapabilities preset", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+
+  it("defaults to self_host when BURNLESS_DEPLOYMENT unset", async () => {
+    process.env = { ...ORIG }; delete process.env.BURNLESS_DEPLOYMENT;
+    const { getEdition, getCapabilities } = await import("../capabilities");
+    expect(getEdition()).toBe("self_host");
+    expect(getCapabilities().autoLogin).toBe(true);
+    expect(getCapabilities().billing).toBe(false);
+  });
+  it("uses cloud preset when BURNLESS_DEPLOYMENT=cloud", async () => {
+    process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud",
+      STRIPE_SECRET_KEY: "sk_test", STRIPE_WEBHOOK_SECRET: "whsec",
+      AI_API_KEY: "k", AUTH_GITHUB_ID: "x", AUTH_GITHUB_SECRET: "y", RESEND_API_KEY: "r" };
+    const { getEdition, getCapabilities } = await import("../capabilities");
+    expect(getEdition()).toBe("cloud");
+    expect(getCapabilities().billing).toBe(true);
+    expect(getCapabilities().stdioMcp).toBe(false);
   });
 });

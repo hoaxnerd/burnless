@@ -21,3 +21,12 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
     inviteCodes: true, semanticSearch: false, dataResidency: true,
   },
 };
+
+export function getEdition(): Edition {
+  return process.env.BURNLESS_DEPLOYMENT === "cloud" ? "cloud" : "self_host";
+}
+
+export function getCapabilities(): Capabilities {
+  const base: Capabilities = { ...EDITION_PRESETS[getEdition()] };
+  return base; // overrides + degrade added in later tasks
+}
