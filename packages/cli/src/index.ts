@@ -1,8 +1,11 @@
 import { pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { registerAdmin } from "./commands/admin";
+import { registerLogin } from "./commands/login";
 import { registerLogout } from "./commands/logout";
 import { registerProfiles } from "./commands/profiles";
+import { registerStatus } from "./commands/status";
+import { registerTools } from "./commands/tools";
 import { registerWhoami } from "./commands/whoami";
 import { CLI_VERSION } from "./version";
 
@@ -15,6 +18,9 @@ export function buildProgram(): Command {
     .option("--profile <name>", "named profile (overrides BURNLESS_PROFILE and the configured default)")
     .option("--json", "machine-readable output on stdout (logs and errors stay on stderr)");
 
+  registerLogin(program);
+  registerStatus(program);
+  registerTools(program);
   registerProfiles(program);
   registerWhoami(program);
   registerLogout(program);
