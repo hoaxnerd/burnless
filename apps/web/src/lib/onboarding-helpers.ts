@@ -23,65 +23,70 @@ export const SANE_MAX_COUNT = 1e5;
 export const SANE_MAX_SALARY = 1e10;
 
 /**
- * Refine a string money/count field so its PARSED numeric value is bounded.
- * The parser MUST match how the value is later consumed so the schema never
- * accepts a value the inserter then re-parses past the bound.
+ * Slimmed onboarding payload (S4b wizard).
+ *
+ * The wizard creates the company FIRST via this route, then drives the REAL
+ * per-domain endpoints for the detailed entities (revenue streams, funding,
+ * headcount, expenses). So this route no longer accepts the old scalar
+ * estimates (`monthly_revenue`/`team_size`/`funding`/`main_expenses`) nor the
+ * AI-suggested detailed arrays — it only needs what describes the company.
  */
-const cappedNumericString = (max: number, parse: (s: string) => number) =>
-  z.string().refine((s) => parse(s) <= max, {
-    message: "This value looks unusually large — please double-check",
-  });
-
 export const onboardingSchema = z.object({
   company_name: z.string().min(1, "Company name is required"),
   stage: z.string().default("Pre-seed"),
   business_model: z.string().default("SaaS"),
-  monthly_revenue: cappedNumericString(SANE_MAX_AMOUNT, parseMoneyAmount)
-    .optional()
-    .default("0"),
-  team_size: cappedNumericString(SANE_MAX_COUNT, parseTeamSize)
-    .optional()
-    .default("1"),
-  funding: cappedNumericString(SANE_MAX_AMOUNT, parseMoneyAmount)
-    .optional()
-    .default("0"),
-  main_expenses: z.string().optional().default("General operations"),
+  industry: z.string().optional(),
   user_name: z.string().optional(),
   founders: z.array(z.string()).optional().default([]),
-  funding_rounds: z.array(z.object({
-    name: z.string(),
-    type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
-    amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-    date: z.string(),
-    preMoneyValuation: z.number().nullable().optional(),
-    dilutionPercent: z.number().nullable().optional(),
-    notes: z.string().nullable().optional(),
-  })).optional().default([]),
-  headcount: z.array(z.object({
-    title: z.string(),
-    department: z.enum(["Engineering", "Sales", "Marketing", "Operations", "General & Admin"]),
-    employeeType: z.enum(["full_time", "part_time", "contractor"]),
-    salary: z.number().nonnegative().max(SANE_MAX_SALARY),
-    startDate: z.string(),
-  })).optional().default([]),
-  expenses: z.array(z.object({
-    name: z.string(),
-    category: z.enum(["Cloud Infrastructure", "Marketing", "Office & Admin", "Software & Tools"]),
-    amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-    startDate: z.string(),
-    isRecurring: z.boolean(),
-  })).optional().default([]),
-  revenue_streams: z.array(z.object({
-    name: z.string(),
-    type: z.enum(["subscription", "one_time", "usage_based", "services", "marketplace", "ecommerce", "hardware"]),
-    amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-    quantity: z.number().nonnegative().max(SANE_MAX_COUNT),
-    startDate: z.string(),
-    notes: z.string().nullable().optional(),
-  })).optional().default([]),
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
+
+/**
+ * Detailed-entity element schemas previously embedded in `onboardingSchema`.
+ * Retained as standalone exports so the (now route-unused) bulk-import helpers
+ * in `onboarding-imports.ts` stay type-safe until they are retired (Task 14).
+ * The SANE_MAX_* bounds still guard any caller that re-uses them.
+ */
+export const suggestedFundingRoundSchema = z.object({
+  name: z.string(),
+  type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
+  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
+  date: z.string(),
+  preMoneyValuation: z.number().nullable().optional(),
+  dilutionPercent: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export const suggestedHeadcountSchema = z.object({
+  title: z.string(),
+  department: z.enum(["Engineering", "Sales", "Marketing", "Operations", "General & Admin"]),
+  employeeType: z.enum(["full_time", "part_time", "contractor"]),
+  salary: z.number().nonnegative().max(SANE_MAX_SALARY),
+  startDate: z.string(),
+});
+
+export const suggestedExpenseSchema = z.object({
+  name: z.string(),
+  category: z.enum(["Cloud Infrastructure", "Marketing", "Office & Admin", "Software & Tools"]),
+  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
+  startDate: z.string(),
+  isRecurring: z.boolean(),
+});
+
+export const suggestedRevenueStreamSchema = z.object({
+  name: z.string(),
+  type: z.enum(["subscription", "one_time", "usage_based", "services", "marketplace", "ecommerce", "hardware"]),
+  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
+  quantity: z.number().nonnegative().max(SANE_MAX_COUNT),
+  startDate: z.string(),
+  notes: z.string().nullable().optional(),
+});
+
+export type SuggestedFundingRound = z.infer<typeof suggestedFundingRoundSchema>;
+export type SuggestedHeadcount = z.infer<typeof suggestedHeadcountSchema>;
+export type SuggestedExpense = z.infer<typeof suggestedExpenseSchema>;
+export type SuggestedRevenueStream = z.infer<typeof suggestedRevenueStreamSchema>;
 
 /** Map user-friendly stage names to enum values */
 export function parseStage(

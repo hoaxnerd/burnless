@@ -8,6 +8,9 @@ import {
   SANE_MAX_AMOUNT,
   SANE_MAX_COUNT,
   SANE_MAX_SALARY,
+  suggestedFundingRoundSchema,
+  suggestedHeadcountSchema,
+  suggestedRevenueStreamSchema,
 } from "../onboarding-helpers";
 
 // ── parseStage ────────────────────────────────────────────────────────────────
@@ -210,22 +213,23 @@ describe("parseTeamSize", () => {
 
 // ── onboardingSchema (Zod validation) ─────────────────────────────────────────
 
-describe("onboardingSchema", () => {
+describe("onboardingSchema (slim: company + scaffolding fields only)", () => {
   it("validates a complete input", () => {
     const input = {
       company_name: "Acme Corp",
       stage: "Seed",
       business_model: "SaaS",
-      monthly_revenue: "$10k",
-      team_size: "5",
-      funding: "$1m",
-      main_expenses: "Salaries, Cloud",
+      industry: "Fintech",
+      user_name: "Jane Founder",
+      founders: ["Jane Founder"],
     };
     const result = onboardingSchema.parse(input);
     expect(result.company_name).toBe("Acme Corp");
     expect(result.stage).toBe("Seed");
     expect(result.business_model).toBe("SaaS");
-    expect(result.monthly_revenue).toBe("$10k");
+    expect(result.industry).toBe("Fintech");
+    expect(result.user_name).toBe("Jane Founder");
+    expect(result.founders).toEqual(["Jane Founder"]);
   });
 
   it("requires company_name", () => {
@@ -238,75 +242,48 @@ describe("onboardingSchema", () => {
     expect(() => onboardingSchema.parse({})).toThrow();
   });
 
-  it("applies defaults when skip is used (minimal input)", () => {
+  it("applies defaults when minimal input is given", () => {
     const result = onboardingSchema.parse({ company_name: "My Startup" });
     expect(result.company_name).toBe("My Startup");
     expect(result.stage).toBe("Pre-seed");
     expect(result.business_model).toBe("SaaS");
-    expect(result.monthly_revenue).toBe("0");
-    expect(result.team_size).toBe("1");
-    expect(result.funding).toBe("0");
-    expect(result.main_expenses).toBe("General operations");
+    expect(result.founders).toEqual([]);
+    expect(result.user_name).toBeUndefined();
+    expect(result.industry).toBeUndefined();
   });
 
   it("preserves user-provided values over defaults", () => {
     const result = onboardingSchema.parse({
       company_name: "My Startup",
       stage: "Series A",
-      monthly_revenue: "$50k",
     });
     expect(result.stage).toBe("Series A");
-    expect(result.monthly_revenue).toBe("$50k");
     // Others should still get defaults
     expect(result.business_model).toBe("SaaS");
-    expect(result.team_size).toBe("1");
   });
 
-  describe("skip flow: all fields use sensible defaults", () => {
-    // This simulates what happens when a user clicks "Skip" on the onboarding page.
-    // The frontend sends DEFAULTS values to the API. The schema should accept them.
-    const SKIP_DEFAULTS = {
-      company_name: "My Company",
-      stage: "Pre-seed",
-      business_model: "SaaS",
-      monthly_revenue: "0",
-      team_size: "1",
-      funding: "0",
-      main_expenses: "General operations",
-    };
-
-    it("accepts the default values used when skipping", () => {
-      const result = onboardingSchema.parse(SKIP_DEFAULTS);
-      expect(result).toEqual({
-        ...SKIP_DEFAULTS,
-        user_name: undefined,
-        founders: [],
-        funding_rounds: [],
-        headcount: [],
-        expenses: [],
-        revenue_streams: [],
-      });
-    });
-
-    it("parseStage handles the default 'Pre-seed'", () => {
-      expect(parseStage(SKIP_DEFAULTS.stage)).toBe("pre_seed");
-    });
-
-    it("parseBusinessModel handles the default 'SaaS'", () => {
-      expect(parseBusinessModel(SKIP_DEFAULTS.business_model)).toBe("saas");
-    });
-
-    it("parseMoneyAmount handles the default '0' for revenue", () => {
-      expect(parseMoneyAmount(SKIP_DEFAULTS.monthly_revenue)).toBe(0);
-    });
-
-    it("parseMoneyAmount handles the default '0' for funding", () => {
-      expect(parseMoneyAmount(SKIP_DEFAULTS.funding)).toBe(0);
-    });
-
-    it("parseTeamSize handles the default '1'", () => {
-      expect(parseTeamSize(SKIP_DEFAULTS.team_size)).toBe(1);
-    });
+  it("strips the retired scalar + detailed-array fields", () => {
+    // The wizard now uses the real per-domain endpoints for these; the slim
+    // schema drops them entirely (Zod strips unknown keys).
+    const result = onboardingSchema.parse({
+      company_name: "Acme Corp",
+      monthly_revenue: "$50k",
+      team_size: "5",
+      funding: "$1m",
+      main_expenses: "Salaries",
+      revenue_streams: [{ name: "Pro" }],
+      funding_rounds: [{ name: "Seed" }],
+      headcount: [{ title: "Eng" }],
+      expenses: [{ name: "AWS" }],
+    }) as Record<string, unknown>;
+    expect(result.monthly_revenue).toBeUndefined();
+    expect(result.team_size).toBeUndefined();
+    expect(result.funding).toBeUndefined();
+    expect(result.main_expenses).toBeUndefined();
+    expect(result.revenue_streams).toBeUndefined();
+    expect(result.funding_rounds).toBeUndefined();
+    expect(result.headcount).toBeUndefined();
+    expect(result.expenses).toBeUndefined();
   });
 
   describe("error messages are user-friendly", () => {
@@ -334,252 +311,139 @@ describe("onboardingSchema", () => {
       }
     });
   });
+});
 
-  describe("complex arrays validation", () => {
-    it("validates and parses valid founders, funding rounds, headcount, expenses, and revenue streams", () => {
-      const input = {
-        company_name: "Acme Corp",
-        founders: ["John Doe", "Jane Smith"],
-        funding_rounds: [
-          {
-            name: "Seed Round",
-            type: "seed",
-            amount: 1500000,
-            date: "2026-05-15",
-            preMoneyValuation: 8000000,
-            dilutionPercent: 15,
-            notes: "VC lead",
-          },
-        ],
-        headcount: [
-          {
-            title: "Engineer",
-            department: "Engineering",
-            employeeType: "full_time",
-            salary: 120000,
-            startDate: "2026-06-01",
-          },
-        ],
-        expenses: [
-          {
-            name: "AWS",
-            category: "Cloud Infrastructure",
-            amount: 2000,
-            startDate: "2026-06-01",
-            isRecurring: true,
-          },
-        ],
-        revenue_streams: [
-          {
-            name: "SaaS Pro",
-            type: "subscription",
-            amount: 49,
-            quantity: 100,
-            startDate: "2026-06-01",
-            notes: "Self-serve",
-          },
-        ],
-      };
-      const result = onboardingSchema.parse(input);
-      expect(result.founders).toEqual(["John Doe", "Jane Smith"]);
-      expect(result.funding_rounds[0]?.amount).toBe(1500000);
-      expect(result.headcount[0]?.salary).toBe(120000);
-      expect(result.expenses[0]?.amount).toBe(2000);
-      expect(result.revenue_streams[0]?.quantity).toBe(100);
-    });
+// ── Standalone suggestion schemas (retained for the bulk-import helpers) ──────
+// These were extracted out of `onboardingSchema` when the route was slimmed;
+// the ONB-02 sane bounds still guard them.
+describe("suggestion element schemas", () => {
+  it("validates a valid funding round / headcount / revenue stream", () => {
+    expect(
+      suggestedFundingRoundSchema.parse({
+        name: "Seed Round",
+        type: "seed",
+        amount: 1500000,
+        date: "2026-05-15",
+        preMoneyValuation: 8000000,
+        dilutionPercent: 15,
+        notes: "VC lead",
+      }).amount,
+    ).toBe(1500000);
 
-    it("rejects invalid types or missing fields in arrays", () => {
-      const input = {
-        company_name: "Acme Corp",
-        funding_rounds: [
-          {
-            name: "Seed Round",
-            // missing type
-            amount: 1500000,
-            date: "2026-05-15",
-          },
-        ],
-      };
-      expect(() => onboardingSchema.parse(input)).toThrow();
-    });
+    expect(
+      suggestedHeadcountSchema.parse({
+        title: "Engineer",
+        department: "Engineering",
+        employeeType: "full_time",
+        salary: 120000,
+        startDate: "2026-06-01",
+      }).salary,
+    ).toBe(120000);
+
+    expect(
+      suggestedRevenueStreamSchema.parse({
+        name: "SaaS Pro",
+        type: "subscription",
+        amount: 49,
+        quantity: 100,
+        startDate: "2026-06-01",
+        notes: "Self-serve",
+      }).quantity,
+    ).toBe(100);
   });
 
-  // ── ONB-02: sane upper bounds on financial values ─────────────────────────
-  describe("ONB-02 financial value bounds", () => {
-    const base = { company_name: "Acme Corp" };
+  it("rejects a funding round missing required fields", () => {
+    expect(() =>
+      suggestedFundingRoundSchema.parse({
+        name: "Seed Round",
+        amount: 1500000,
+        date: "2026-05-15",
+      }),
+    ).toThrow();
+  });
 
-    it("rejects a revenue_streams amount above the hard max", () => {
+  describe("ONB-02 financial value bounds", () => {
+    it("rejects a revenue stream amount above the hard max", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          revenue_streams: [
-            {
-              name: "Huge",
-              type: "subscription",
-              amount: SANE_MAX_AMOUNT + 1,
-              quantity: 10,
-              startDate: "2026-06-01",
-            },
-          ],
+        suggestedRevenueStreamSchema.parse({
+          name: "Huge",
+          type: "subscription",
+          amount: SANE_MAX_AMOUNT + 1,
+          quantity: 10,
+          startDate: "2026-06-01",
         }),
       ).toThrow();
     });
 
-    it("rejects a negative revenue_streams amount", () => {
+    it("rejects a negative revenue stream amount", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          revenue_streams: [
-            {
-              name: "Neg",
-              type: "subscription",
-              amount: -5,
-              quantity: 10,
-              startDate: "2026-06-01",
-            },
-          ],
+        suggestedRevenueStreamSchema.parse({
+          name: "Neg",
+          type: "subscription",
+          amount: -5,
+          quantity: 10,
+          startDate: "2026-06-01",
         }),
       ).toThrow();
     });
 
     it("rejects a quantity above the count max", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          revenue_streams: [
-            {
-              name: "Q",
-              type: "usage_based",
-              amount: 1,
-              quantity: SANE_MAX_COUNT + 1,
-              startDate: "2026-06-01",
-            },
-          ],
+        suggestedRevenueStreamSchema.parse({
+          name: "Q",
+          type: "usage_based",
+          amount: 1,
+          quantity: SANE_MAX_COUNT + 1,
+          startDate: "2026-06-01",
         }),
       ).toThrow();
     });
 
     it("rejects a headcount salary above the salary max", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          headcount: [
-            {
-              title: "CEO",
-              department: "Engineering",
-              employeeType: "full_time",
-              salary: SANE_MAX_SALARY + 1,
-              startDate: "2026-06-01",
-            },
-          ],
+        suggestedHeadcountSchema.parse({
+          title: "CEO",
+          department: "Engineering",
+          employeeType: "full_time",
+          salary: SANE_MAX_SALARY + 1,
+          startDate: "2026-06-01",
         }),
       ).toThrow();
     });
 
     it("rejects a negative headcount salary", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          headcount: [
-            {
-              title: "CEO",
-              department: "Engineering",
-              employeeType: "full_time",
-              salary: -1,
-              startDate: "2026-06-01",
-            },
-          ],
+        suggestedHeadcountSchema.parse({
+          title: "CEO",
+          department: "Engineering",
+          employeeType: "full_time",
+          salary: -1,
+          startDate: "2026-06-01",
         }),
       ).toThrow();
     });
 
-    it("rejects a funding_rounds amount above the hard max", () => {
+    it("rejects a funding round amount above the hard max", () => {
       expect(() =>
-        onboardingSchema.parse({
-          ...base,
-          funding_rounds: [
-            {
-              name: "Mega",
-              type: "seed",
-              amount: SANE_MAX_AMOUNT + 1,
-              date: "2026-06-01",
-            },
-          ],
+        suggestedFundingRoundSchema.parse({
+          name: "Mega",
+          type: "seed",
+          amount: SANE_MAX_AMOUNT + 1,
+          date: "2026-06-01",
         }),
       ).toThrow();
     });
 
-    it("rejects a monthly_revenue string whose parsed value exceeds the hard max", () => {
-      // 2 trillion > SANE_MAX_AMOUNT (1e12)
-      expect(() =>
-        onboardingSchema.parse({ ...base, monthly_revenue: "2000000000000" }),
-      ).toThrow();
-    });
-
-    it("rejects a funding string whose parsed value exceeds the hard max", () => {
-      expect(() =>
-        onboardingSchema.parse({ ...base, funding: "5000000000000" }),
-      ).toThrow();
-    });
-
-    it("rejects a team_size string whose parsed value exceeds the count max", () => {
-      expect(() =>
-        onboardingSchema.parse({ ...base, team_size: "200000" }),
-      ).toThrow();
-    });
-
-    it("accepts reasonable financial values", () => {
-      const result = onboardingSchema.parse({
-        ...base,
-        monthly_revenue: "$50k",
-        funding: "$2m",
-        team_size: "12",
-        revenue_streams: [
-          {
-            name: "Pro",
-            type: "subscription",
-            amount: 99,
-            quantity: 500,
-            startDate: "2026-06-01",
-          },
-        ],
-        headcount: [
-          {
-            title: "Engineer",
-            department: "Engineering",
-            employeeType: "full_time",
-            salary: 180000,
-            startDate: "2026-06-01",
-          },
-        ],
-        funding_rounds: [
-          {
-            name: "Seed",
-            type: "seed",
-            amount: 2_000_000,
-            date: "2026-06-01",
-          },
-        ],
-      });
-      expect(result.revenue_streams[0]?.amount).toBe(99);
-      expect(result.headcount[0]?.salary).toBe(180000);
-      expect(result.funding_rounds[0]?.amount).toBe(2_000_000);
-    });
-
-    it("accepts amount/salary exactly at the max", () => {
-      const result = onboardingSchema.parse({
-        ...base,
-        headcount: [
-          {
-            title: "Founder",
-            department: "Engineering",
-            employeeType: "full_time",
-            salary: SANE_MAX_SALARY,
-            startDate: "2026-06-01",
-          },
-        ],
-      });
-      expect(result.headcount[0]?.salary).toBe(SANE_MAX_SALARY);
+    it("accepts salary exactly at the max", () => {
+      expect(
+        suggestedHeadcountSchema.parse({
+          title: "Founder",
+          department: "Engineering",
+          employeeType: "full_time",
+          salary: SANE_MAX_SALARY,
+          startDate: "2026-06-01",
+        }).salary,
+      ).toBe(SANE_MAX_SALARY);
     });
   });
 });

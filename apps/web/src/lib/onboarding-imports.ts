@@ -18,7 +18,20 @@ import {
   type Database,
 } from "@burnless/db";
 import { paramsFromUnitPricing, type RevenueStreamType } from "./revenue-params";
-import type { OnboardingInput } from "./onboarding-helpers";
+import type {
+  SuggestedFundingRound,
+  SuggestedHeadcount,
+  SuggestedExpense,
+  SuggestedRevenueStream,
+} from "./onboarding-helpers";
+
+/** Detailed AI-suggestion collections (no longer carried by `onboardingSchema`). */
+export interface OnboardingSuggestions {
+  funding_rounds?: SuggestedFundingRound[];
+  headcount?: SuggestedHeadcount[];
+  expenses?: SuggestedExpense[];
+  revenue_streams?: SuggestedRevenueStream[];
+}
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -36,7 +49,7 @@ interface BulkContext {
 
 export async function insertSuggestedFundingRounds(
   ctx: BulkContext,
-  rounds: OnboardingInput["funding_rounds"],
+  rounds: OnboardingSuggestions["funding_rounds"],
 ): Promise<void> {
   if (!rounds || rounds.length === 0) return;
   await ctx.tx.insert(fundingRounds).values(
@@ -55,7 +68,7 @@ export async function insertSuggestedFundingRounds(
 
 export async function insertSuggestedHeadcount(
   ctx: BulkContext,
-  roles: OnboardingInput["headcount"],
+  roles: OnboardingSuggestions["headcount"],
 ): Promise<void> {
   if (!roles || roles.length === 0) return;
   await ctx.tx.insert(headcountPlans).values(
@@ -81,7 +94,7 @@ export async function insertSuggestedHeadcount(
 
 export async function insertSuggestedExpenses(
   ctx: BulkContext,
-  expenses: OnboardingInput["expenses"],
+  expenses: OnboardingSuggestions["expenses"],
 ): Promise<void> {
   if (!expenses || expenses.length === 0) return;
   await ctx.tx.insert(forecastLines).values(
@@ -110,7 +123,7 @@ export async function insertSuggestedExpenses(
 
 export async function insertSuggestedRevenueStreams(
   ctx: BulkContext,
-  streams: OnboardingInput["revenue_streams"],
+  streams: OnboardingSuggestions["revenue_streams"],
 ): Promise<void> {
   if (!streams || streams.length === 0) return;
   await ctx.tx.insert(revenueStreams).values(
@@ -131,7 +144,7 @@ export async function insertSuggestedRevenueStreams(
  */
 export async function applyOnboardingSuggestions(
   ctx: BulkContext,
-  body: OnboardingInput,
+  body: OnboardingSuggestions,
 ): Promise<void> {
   await insertSuggestedFundingRounds(ctx, body.funding_rounds);
   await insertSuggestedHeadcount(ctx, body.headcount);

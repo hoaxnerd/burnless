@@ -49,14 +49,17 @@ vi.mock("@burnless/db", () => ({
     insert: mockInsert,
     transaction: mockTransaction,
   },
-  companies: { id: "id", name: "name" },
-  companyMembers: {},
-  scenarios: { id: "id", companyId: "companyId", deletedAt: "deletedAt" },
-  financialAccounts: {},
-  departments: {},
-  forecastLines: {},
-  revenueStreams: {},
-  aiFeatureFlags: {},
+  companies: { __table: "companies", id: "id", name: "name" },
+  companyMembers: { __table: "companyMembers" },
+  scenarios: { __table: "scenarios", id: "id", companyId: "companyId", deletedAt: "deletedAt" },
+  financialAccounts: { __table: "financialAccounts" },
+  departments: { __table: "departments" },
+  forecastLines: { __table: "forecastLines" },
+  revenueStreams: { __table: "revenueStreams" },
+  fundingRounds: { __table: "fundingRounds" },
+  headcountPlans: { __table: "headcountPlans" },
+  aiFeatureFlags: { __table: "aiFeatureFlags" },
+  users: { __table: "users", id: "id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -85,11 +88,39 @@ const validBody = {
   company_name: "Acme Corp",
   stage: "Seed",
   business_model: "SaaS",
-  monthly_revenue: "$10k",
-  team_size: "5",
-  funding: "500000",
-  main_expenses: "Engineering salaries",
+  user_name: "Jane Founder",
 };
+
+/**
+ * Drive the REAL transaction callback against a recording fake `tx`, capturing
+ * the rows inserted per table. Lets us assert what the slim route actually
+ * persists (company, scenario, default accounts/departments) and what it
+ * IGNORES (detailed arrays — revenue streams, funding, headcount, expenses).
+ */
+function recordTransactionInserts() {
+  const inserts: { table: string; rows: unknown[] }[] = [];
+  const txInsert = vi.fn().mockImplementation((table: { __table?: string }) => ({
+    values: vi.fn().mockImplementation((rows: unknown) => {
+      const arr = Array.isArray(rows) ? rows : [rows];
+      inserts.push({ table: table?.__table ?? "unknown", rows: arr });
+      return {
+        returning: vi
+          .fn()
+          .mockResolvedValue(arr.map((_, i) => ({ id: `${table?.__table}-${i}`, name: (arr[i] as { name?: string })?.name }))),
+      };
+    }),
+  }));
+  const txUpdate = vi.fn().mockReturnValue({
+    set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+  });
+  mockTransaction.mockImplementation(
+    async (fn: (tx: { insert: typeof txInsert; update: typeof txUpdate }) => Promise<unknown>) =>
+      fn({ insert: txInsert, update: txUpdate }),
+  );
+  const rowsFor = (table: string) =>
+    inserts.filter((i) => i.table === table).flatMap((i) => i.rows);
+  return { inserts, rowsFor };
+}
 
 /* ── Tests ──────────────────────────────────────────────────────────── */
 
@@ -212,38 +243,95 @@ describe("POST /api/onboarding", () => {
     expect(mockTransaction).toHaveBeenCalled();
   });
 
-  /* ── Regression: no silent revenue stream auto-create ─────────── */
+  /* ── Slim route: company + scaffolding only ───────────────────── */
 
-  // Onboarding used to insert a subscription revenueStream with
-  // startingCustomers=1, +5 new/month, 5% churn — so a "Monthly Revenue $15k"
-  // answer ballooned to ~$351k MRR by month 6 on a brand-new dashboard.
-  // Now: monthly_revenue is captured but no data row is created on the user's
-  // behalf — they add a real stream via /revenue.
-  it("does not insert into revenueStreams even when monthly_revenue is set", async () => {
+  // The wizard (S4b) creates the company first, then drives the REAL
+  // per-domain endpoints for detailed entities. So /api/onboarding now
+  // creates ONLY the company + scaffolding (company, member, base scenario,
+  // default accounts, default departments, aiFeatureFlags) — never the
+  // detailed arrays.
+  it("creates company + base scenario + ≥6 expense/cogs accounts + 5 departments", async () => {
     mockGetAuthUser.mockResolvedValue({ id: "user-1" });
     mockGetUserCompany.mockResolvedValue(null);
 
-    const dbMod = await import("@burnless/db");
-    const tablesInserted: unknown[] = [];
-    const txInsert = vi.fn().mockImplementation((table: unknown) => {
-      tablesInserted.push(table);
-      return {
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: "new-id" }]),
-        }),
-      };
-    });
-    mockTransaction.mockImplementation(
-      async (fn: (tx: { insert: typeof txInsert }) => Promise<unknown>) =>
-        fn({ insert: txInsert })
-    );
+    const { rowsFor } = recordTransactionInserts();
 
     const res = await POST(
-      makeRequest({ ...validBody, monthly_revenue: "$50k" })
+      makeRequest({
+        company_name: "Acme Corp",
+        stage: "Seed",
+        business_model: "SaaS",
+        user_name: "Jane Founder",
+      }),
     );
 
     expect(res.status).toBe(201);
-    expect(tablesInserted).not.toContain(dbMod.revenueStreams);
+
+    // A company row
+    const companyRows = rowsFor("companies") as { name: string }[];
+    expect(companyRows).toHaveLength(1);
+    expect(companyRows[0]?.name).toBe("Acme Corp");
+
+    // A base scenario
+    const scenarioRows = rowsFor("scenarios") as { name: string }[];
+    expect(scenarioRows).toHaveLength(1);
+
+    // ≥6 expense/cogs accounts
+    const accountRows = rowsFor("financialAccounts") as {
+      category: string;
+      type: string;
+    }[];
+    const expenseLike = accountRows.filter(
+      (a) => a.category === "cogs" || a.type === "expense",
+    );
+    expect(expenseLike.length).toBeGreaterThanOrEqual(6);
+
+    // 5 default departments
+    const deptRows = rowsFor("departments");
+    expect(deptRows).toHaveLength(5);
+  });
+
+  // Onboarding used to bulk-insert detailed arrays the user reviewed. The
+  // wizard now persists those via the real endpoints, so the slim route
+  // IGNORES any detailed arrays in the body — zero rows inserted.
+  it("inserts ZERO revenue_streams even when revenue_streams is in the body", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue(null);
+
+    const { rowsFor } = recordTransactionInserts();
+
+    const res = await POST(
+      makeRequest({
+        ...validBody,
+        revenue_streams: [
+          {
+            name: "Pro Plan",
+            type: "subscription",
+            amount: 49,
+            quantity: 100,
+            startDate: "2026-06-01",
+          },
+        ],
+        funding_rounds: [
+          { name: "Seed", type: "seed", amount: 1_000_000, date: "2026-06-01" },
+        ],
+        headcount: [
+          {
+            title: "Engineer",
+            department: "Engineering",
+            employeeType: "full_time",
+            salary: 120000,
+            startDate: "2026-06-01",
+          },
+        ],
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(rowsFor("revenueStreams")).toHaveLength(0);
+    expect(rowsFor("fundingRounds")).toHaveLength(0);
+    expect(rowsFor("headcountPlans")).toHaveLength(0);
+    expect(rowsFor("forecastLines")).toHaveLength(0);
   });
 
   /* ── Error handling ───────────────────────────────────────────── */

@@ -1,15 +1,14 @@
 /**
- * POST /api/onboarding — Creates a company, base scenario, and initial
- * financial structure from the conversational onboarding data.
+ * POST /api/onboarding — Creates a company + scaffolding only: the company,
+ * the owner membership, a base scenario, default accounts, default
+ * departments, and the (disabled) aiFeatureFlags row.
  *
  * Wrapped in a transaction so partial failures don't leave orphaned records.
  *
- * Note on AI-suggested data: the request body MAY include `funding_rounds`,
- * `headcount`, `expenses`, and `revenue_streams` from the AI research agent.
- * These are inserted verbatim because the user has just reviewed and selected
- * them in the Review step. We do NOT auto-extrapolate any of these (no growth
- * curves, no churn assumptions) — anything that ships here is something the
- * user opted into. The bulk-insert logic lives in `lib/onboarding-imports.ts`.
+ * Detailed entities (revenue streams, funding rounds, headcount, expenses) are
+ * NO LONGER created here. The S4b onboarding wizard creates the company first
+ * (via this route), then drives the REAL per-domain endpoints for each detail.
+ * If a body still carries those arrays they are silently ignored.
  */
 
 import { NextResponse } from "next/server";
@@ -32,7 +31,6 @@ import {
   parseStage,
   parseBusinessModel,
 } from "@/lib/onboarding-helpers";
-import { applyOnboardingSuggestions } from "@/lib/onboarding-imports";
 
 const DEFAULT_ACCOUNTS = [
   { name: "Revenue", type: "income", category: "revenue", isSystem: true },
@@ -97,6 +95,7 @@ export const POST = withErrorHandler(async (request: Request) => {
           name: body.company_name,
           stage,
           businessModel,
+          industry: body.industry ?? null,
           ownerId: userId,
         })
         .returning();
@@ -126,17 +125,13 @@ export const POST = withErrorHandler(async (request: Request) => {
         .returning();
       if (!scenario) throw new Error("Could not set up your financial model — please try again");
 
-      const insertedAccounts = await tx
+      await tx
         .insert(financialAccounts)
-        .values(DEFAULT_ACCOUNTS.map((a) => ({ companyId: company.id, ...a })))
-        .returning();
-      const accountMap = new Map(insertedAccounts.map((a) => [a.name, a.id]));
+        .values(DEFAULT_ACCOUNTS.map((a) => ({ companyId: company.id, ...a })));
 
-      const insertedDepts = await tx
+      await tx
         .insert(departments)
-        .values(DEFAULT_DEPARTMENTS.map((name) => ({ companyId: company.id, name })))
-        .returning();
-      const deptMap = new Map(insertedDepts.map((d) => [d.name, d.id]));
+        .values(DEFAULT_DEPARTMENTS.map((name) => ({ companyId: company.id, name })));
 
       // AI features start disabled — user must opt in via Settings > AI Features.
       // This ensures no AI calls are made without explicit consent.
@@ -153,12 +148,6 @@ export const POST = withErrorHandler(async (request: Request) => {
           weeklyDigest: true,
         },
       });
-
-      // User-reviewed AI suggestions — only what they checked in the Review step.
-      await applyOnboardingSuggestions(
-        { tx, companyId: company.id, accountMap, deptMap },
-        body,
-      );
 
       return { companyId: company.id, scenarioId: scenario.id };
     });
