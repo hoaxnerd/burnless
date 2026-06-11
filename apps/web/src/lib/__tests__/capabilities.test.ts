@@ -51,3 +51,18 @@ describe("getEdition / getCapabilities preset", () => {
     expect(getCapabilities().stdioMcp).toBe(false);
   });
 });
+
+describe("per-flag overrides", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("BURNLESS_CAP_MARKETING_SITE=on enables it under self_host", async () => {
+    process.env = { ...ORIG, BURNLESS_CAP_MARKETING_SITE: "on" };
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().marketingSite).toBe(true);
+  });
+  it("BURNLESS_CAP_AUTO_LOGIN=off disables it under self_host", async () => {
+    process.env = { ...ORIG, BURNLESS_CAP_AUTO_LOGIN: "false" };
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().autoLogin).toBe(false);
+  });
+});
