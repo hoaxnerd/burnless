@@ -21,6 +21,15 @@ export interface ToolContext {
    *  writing, skips cache invalidation, and audits pending_apply. "commit"
    *  (default) is today's behavior: write + invalidate + audit success. */
   mode?: "plan" | "commit";
+  /** Audit attribution (expose spec B5): where the call came from.
+   *  Absent → "chat" (existing chat writers unchanged). */
+  auditSource?: "chat" | "mcp_server";
+  /** Set for MCP calls: which credential kind authorized them. */
+  credentialType?: "pat" | "oauth";
+  /** apiTokens.id (PAT) or oauthTokens.grantId (OAuth grant family). */
+  credentialId?: string;
+  /** MCP initialize handshake identity ({ name, version }). */
+  clientInfo?: { name?: string; version?: string } | null;
 }
 
 // ── Validation primitives ────────────────────────────────────────────────────

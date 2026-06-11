@@ -1,5 +1,5 @@
 {
-  "name": "burnless",
+  "name": "burnless-monorepo",
   "private": true,
   "scripts": {
     "dev": "turbo dev",

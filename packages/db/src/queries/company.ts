@@ -47,3 +47,18 @@ export async function getCompanyById(companyId: string) {
     .limit(1);
   return row ?? null;
 }
+
+/** All memberships of a user with company display fields — used by the OAuth
+ *  consent company picker (expose spec §5.2: multi-company users pick the
+ *  tenant a grant is bound to). */
+export async function listCompaniesForUser(userId: string) {
+  return db
+    .select({
+      companyId: companyMembers.companyId,
+      role: companyMembers.role,
+      name: companies.name,
+    })
+    .from(companyMembers)
+    .innerJoin(companies, eq(companyMembers.companyId, companies.id))
+    .where(eq(companyMembers.userId, userId));
+}

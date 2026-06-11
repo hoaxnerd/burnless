@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import useSWR, { type SWRConfiguration } from "swr";
 import { KEYS } from "./keys";
 import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
-import type { McpConnectionDto, McpToolDto } from "@/components/mcp/types";
+import type { ApiTokenDto, McpConnectionDto, McpToolDto, OauthGrantDto } from "@/components/mcp/types";
 
 // ── Type imports ────────────────────────────────────────────────────────────
 
@@ -344,6 +344,16 @@ export function useMcpConnectionTools(
   return useSWR<McpToolDto[]>(id ? KEYS.mcpConnectionTools(id) : null, {
     ...config,
   });
+}
+
+/** The caller's personal access tokens (Your MCP tab). */
+export function useApiTokens(config?: SWRConfiguration<ApiTokenDto[]>) {
+  return useSWR<ApiTokenDto[]>(KEYS.apiTokens, { ...config });
+}
+
+/** OAuth grants the caller authorized (Connected apps). */
+export function useOauthGrants(config?: SWRConfiguration<OauthGrantDto[]>) {
+  return useSWR<OauthGrantDto[]>(KEYS.oauthGrants, { ...config });
 }
 
 // ── User preferences (per-user, per-company UI prefs) ────────────────────────

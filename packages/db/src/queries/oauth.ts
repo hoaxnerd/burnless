@@ -1,0 +1,281 @@
+/**
+ * Minimal OAuth 2.1 AS queries (expose spec §5.2): public clients + PKCE,
+ * hashed codes/tokens at rest, refresh rotation with reuse-detection family
+ * revocation (OAuth 2.1 public-client posture).
+ */
+import { and, eq, gt, isNull } from "drizzle-orm";
+import { db } from "../index";
+import { oauthClients, oauthAuthCodes, oauthTokens } from "../schema";
+import { generateSecretToken, sha256hex } from "../token-hash";
+import type { McpScope } from "./api-tokens";
+
+export type OauthClientRow = typeof oauthClients.$inferSelect;
+export type OauthAuthCodeRow = typeof oauthAuthCodes.$inferSelect;
+export type OauthTokenRow = typeof oauthTokens.$inferSelect;
+
+/** Spec §5.2: 10-min single-use codes, 1-hour access tokens. */
+const AUTH_CODE_TTL_MS = 10 * 60 * 1000;
+const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+export async function createOauthClient(input: {
+  name: string;
+  redirectUris: string[];
+}): Promise<OauthClientRow> {
+  const [row] = await db
+    .insert(oauthClients)
+    .values({ name: input.name, redirectUris: input.redirectUris })
+    .returning();
+  return row!;
+}
+
+export async function getOauthClientById(clientId: string): Promise<OauthClientRow | null> {
+  const rows = await db
+    .select()
+    .from(oauthClients)
+    .where(eq(oauthClients.id, clientId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createAuthCode(input: {
+  clientId: string;
+  userId: string;
+  companyId: string;
+  scopes: McpScope[];
+  codeChallenge: string;
+  resource: string;
+  redirectUri: string;
+}): Promise<{ code: string }> {
+  const generated = generateSecretToken("bl_ac_");
+  await db.insert(oauthAuthCodes).values({
+    codeHash: generated.hash,
+    clientId: input.clientId,
+    userId: input.userId,
+    companyId: input.companyId,
+    scopes: input.scopes,
+    codeChallenge: input.codeChallenge,
+    resource: input.resource,
+    redirectUri: input.redirectUri,
+    expiresAt: new Date(Date.now() + AUTH_CODE_TTL_MS),
+  });
+  return { code: generated.token };
+}
+
+/** Atomically consume a code: sets usedAt iff unused AND unexpired.
+ *  The UPDATE … RETURNING makes single-use race-safe. */
+export async function consumeAuthCode(code: string): Promise<OauthAuthCodeRow | null> {
+  const rows = await db
+    .update(oauthAuthCodes)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(oauthAuthCodes.codeHash, sha256hex(code)),
+        isNull(oauthAuthCodes.usedAt),
+        gt(oauthAuthCodes.expiresAt, new Date())
+      )
+    )
+    .returning();
+  return rows[0] ?? null;
+}
+
+export interface IssuedOauthTokens {
+  accessToken: string;
+  refreshToken: string;
+  row: OauthTokenRow;
+}
+
+export async function issueOauthTokens(input: {
+  /** Omit for a fresh grant; pass to keep a rotation in the same family. */
+  grantId?: string;
+  clientId: string;
+  userId: string;
+  companyId: string;
+  scopes: McpScope[];
+  resource: string;
+}): Promise<IssuedOauthTokens> {
+  const access = generateSecretToken("bl_at_");
+  const refresh = generateSecretToken("bl_rt_");
+  const [row] = await db
+    .insert(oauthTokens)
+    .values({
+      grantId: input.grantId ?? crypto.randomUUID(),
+      clientId: input.clientId,
+      userId: input.userId,
+      companyId: input.companyId,
+      scopes: input.scopes,
+      accessTokenHash: access.hash,
+      refreshTokenHash: refresh.hash,
+      resource: input.resource,
+      accessExpiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+    })
+    .returning();
+  return { accessToken: access.token, refreshToken: refresh.token, row: row! };
+}
+
+export async function findOauthTokenByAccessHash(
+  accessTokenHash: string
+): Promise<OauthTokenRow | null> {
+  const rows = await db
+    .select()
+    .from(oauthTokens)
+    .where(eq(oauthTokens.accessTokenHash, accessTokenHash))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export type RotateResult =
+  | ({ status: "rotated" } & IssuedOauthTokens)
+  | { status: "reuse_detected" }
+  | { status: "invalid" };
+
+/** OAuth 2.1 refresh rotation. Presenting a SUPERSEDED refresh token is
+ *  evidence of theft → revoke the entire grant family (spec §5.2).
+ *
+ *  Client binding (RFC 6749 §6 / OAuth 2.1): the refresh token MUST have been
+ *  issued to `clientId` — the check sits inside the atomic claim so a
+ *  mismatched client neither rotates NOR burns the legitimate token.
+ *
+ *  Race-safe design (fixes TOCTOU + non-transactional issues from original):
+ *  1. Atomically claim the refresh token via UPDATE…RETURNING (same pattern as
+ *     consumeAuthCode) — two concurrent requests for the same token race on
+ *     this single UPDATE; exactly one wins rows, the other gets 0 rows and
+ *     falls through to the re-SELECT branch that detects reuse.
+ *  2. Both the supersede UPDATE and the new-token INSERT happen inside a single
+ *     db.transaction so that a failed insert (connection drop, constraint)
+ *     rolls back the supersede — preventing a bricked grant where the old token
+ *     is marked superseded but no replacement was ever issued. */
+export async function rotateRefreshToken(
+  refreshToken: string,
+  clientId: string
+): Promise<RotateResult> {
+  const hash = sha256hex(refreshToken);
+
+  // Perform the entire claim + issue atomically inside a transaction.
+  // The UPDATE…RETURNING WHERE clientId matches AND supersededAt IS NULL AND
+  // revokedAt IS NULL is the single race-safe gate: at most one concurrent
+  // caller claims 1 row, and only the client the token was issued to can.
+  const result = await db.transaction(async (tx) => {
+    const claimed = await tx
+      .update(oauthTokens)
+      .set({ supersededAt: new Date() })
+      .where(
+        and(
+          eq(oauthTokens.refreshTokenHash, hash),
+          eq(oauthTokens.clientId, clientId),
+          isNull(oauthTokens.supersededAt),
+          isNull(oauthTokens.revokedAt)
+        )
+      )
+      .returning();
+
+    if (claimed.length === 0) {
+      // Not claimed in this transaction — either superseded or non-existent.
+      // Return a sentinel; the caller re-SELECTs outside the tx to distinguish
+      // reuse_detected from invalid (avoids a second lock inside the tx).
+      return null;
+    }
+
+    const claimedRow = claimed[0]!;
+    const access = generateSecretToken("bl_at_");
+    const refresh = generateSecretToken("bl_rt_");
+    const [newRow] = await tx
+      .insert(oauthTokens)
+      .values({
+        grantId: claimedRow.grantId,
+        clientId: claimedRow.clientId,
+        userId: claimedRow.userId,
+        companyId: claimedRow.companyId,
+        scopes: claimedRow.scopes,
+        accessTokenHash: access.hash,
+        refreshTokenHash: refresh.hash,
+        resource: claimedRow.resource,
+        accessExpiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+      })
+      .returning();
+    return {
+      accessToken: access.token,
+      refreshToken: refresh.token,
+      row: newRow!,
+    } satisfies IssuedOauthTokens;
+  });
+
+  if (result !== null) {
+    return { status: "rotated", ...result };
+  }
+
+  // 0 rows from the atomic UPDATE — superseded (reuse attempt), client_id
+  // mismatch, or not found / already revoked (invalid). Re-SELECT to distinguish.
+  const existing = await db
+    .select()
+    .from(oauthTokens)
+    .where(eq(oauthTokens.refreshTokenHash, hash))
+    .limit(1);
+  const row = existing[0];
+  if (!row || row.revokedAt) return { status: "invalid" };
+  // Live token, claim failed → client_id mismatch (RFC 6749 §6). Reject
+  // WITHOUT burning the token or revoking the family — the legitimate
+  // client must remain able to rotate.
+  if (!row.supersededAt) return { status: "invalid" };
+  // supersededAt is set — presenting a superseded token is evidence of theft
+  // regardless of which client presents it.
+  await db
+    .update(oauthTokens)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(oauthTokens.grantId, row.grantId), isNull(oauthTokens.revokedAt)));
+  return { status: "reuse_detected" };
+}
+
+export interface OauthGrantSummary {
+  grantId: string;
+  clientId: string;
+  clientName: string;
+  scopes: McpScope[];
+  createdAt: Date;
+}
+
+/** Connected-apps list: the current (non-superseded, non-revoked) row per
+ *  grant family for this user+company. */
+export async function listOauthGrantsForUser(
+  companyId: string,
+  userId: string
+): Promise<OauthGrantSummary[]> {
+  return db
+    .select({
+      grantId: oauthTokens.grantId,
+      clientId: oauthTokens.clientId,
+      clientName: oauthClients.name,
+      scopes: oauthTokens.scopes,
+      createdAt: oauthTokens.createdAt,
+    })
+    .from(oauthTokens)
+    .innerJoin(oauthClients, eq(oauthTokens.clientId, oauthClients.id))
+    .where(
+      and(
+        eq(oauthTokens.companyId, companyId),
+        eq(oauthTokens.userId, userId),
+        isNull(oauthTokens.revokedAt),
+        isNull(oauthTokens.supersededAt)
+      )
+    );
+}
+
+/** Revoke an entire grant family — kills access + refresh instantly (spec §5.2). */
+export async function revokeOauthGrant(
+  grantId: string,
+  companyId: string,
+  userId: string
+): Promise<boolean> {
+  const rows = await db
+    .update(oauthTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(oauthTokens.grantId, grantId),
+        eq(oauthTokens.companyId, companyId),
+        eq(oauthTokens.userId, userId),
+        isNull(oauthTokens.revokedAt)
+      )
+    )
+    .returning({ id: oauthTokens.id });
+  return rows.length > 0;
+}

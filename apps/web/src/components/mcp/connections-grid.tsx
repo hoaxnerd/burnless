@@ -58,7 +58,7 @@ function OAuthReturnToasts({ onConnected }: { onConnected: () => void }) {
  * (Task 4); the grid itself is pixel-matched to the mockup's `.grid` / `.conn`
  * blocks (2-col, 14px gap, dashed add-card).
  */
-export function ConnectionsGrid() {
+export function ConnectionsGrid({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const swr = useMcpConnections();
   const query = useQueryState(swr);
   const [adding, setAdding] = useState(false);
@@ -69,20 +69,22 @@ export function ConnectionsGrid() {
       <Suspense fallback={null}>
         <OAuthReturnToasts onConnected={() => void swr.mutate()} />
       </Suspense>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-surface-900 sm:text-2xl">
-            Connections
-          </h1>
-          <p className="mt-1 text-sm text-surface-500">
-            Connect any MCP server. Your Companion can use their tools; you can
-            browse their data.
-          </p>
+      {!hideHeader && (
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-surface-900 sm:text-2xl">
+              Connections
+            </h1>
+            <p className="mt-1 text-sm text-surface-500">
+              Connect any MCP server. Your Companion can use their tools; you can
+              browse their data.
+            </p>
+          </div>
+          <Button icon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>
+            Add connection
+          </Button>
         </div>
-        <Button icon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>
-          Add connection
-        </Button>
-      </div>
+      )}
 
       <AsyncData
         query={query}

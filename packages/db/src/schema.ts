@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   primaryKey,
   pgEnum,
+  check,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -299,6 +300,9 @@ export const companies = pgTable("companies", {
   foundersOwnershipPercent: numeric("founders_ownership_percent", { precision: 7, scale: 4 })
     .notNull()
     .default("100.0000"),
+  /** B8 kill switch (expose spec §3): false ⇒ every inbound /mcp call 403s.
+   *  Tokens stay intact; flipping back on restores access. Default true. */
+  mcpServerEnabled: boolean("mcp_server_enabled").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()
@@ -998,6 +1002,10 @@ export const mcpConnections = pgTable(
     index("mcp_connections_owner_idx").on(table.companyId, table.ownerScope, table.ownerUserId),
     uniqueIndex("mcp_connections_company_name_idx").on(table.companyId, table.name),
     uniqueIndex("mcp_connections_company_slug_idx").on(table.companyId, table.slug),
+    check(
+      "mcp_connections_personal_owner_check",
+      sql`(owner_scope = 'personal') = (owner_user_id IS NOT NULL)`
+    ),
   ]
 );
 
@@ -1040,6 +1048,94 @@ export const mcpToolPrefs = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => [uniqueIndex("mcp_tool_prefs_connection_tool_idx").on(table.mcpConnectionId, table.toolName)]
+);
+
+// ── MCP Expose: PATs + OAuth AS (expose spec 2026-06-11 §5.3) ───────────────
+
+/** Personal access tokens for the exposed MCP server (spec §5.1). The secret
+ *  is stored ONLY as a SHA-256 hash (deliberately hash-not-encrypt — it never
+ *  needs to be read back; crypto.ts AES stays for retrievable secrets).
+ *  `lastFour` is UI mask material (`bl_pat_••••f42a`), not secret. */
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    scopes: jsonb("scopes").$type<("read" | "write" | "delete")[]>().notNull(),
+    lastFour: text("last_four").notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    lastUsedAt: timestamp("last_used_at", { mode: "date" }),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("api_tokens_hash_idx").on(table.tokenHash),
+    index("api_tokens_user_company_idx").on(table.userId, table.companyId),
+    index("api_tokens_company_idx").on(table.companyId),
+  ]
+);
+
+/** OAuth 2.1 public clients (RFC 7591 dynamic registration). id = client_id.
+ *  v1 registers public clients + PKCE only — no client secrets (spec §1). */
+export const oauthClients = pgTable("oauth_clients", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  redirectUris: jsonb("redirect_uris").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** Single-use authorization codes (10-min TTL), hashed at rest (spec §5.2). */
+export const oauthAuthCodes = pgTable(
+  "oauth_auth_codes",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    codeHash: text("code_hash").notNull(),
+    clientId: text("client_id").notNull().references(() => oauthClients.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    scopes: jsonb("scopes").$type<("read" | "write" | "delete")[]>().notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    resource: text("resource").notNull(),
+    redirectUri: text("redirect_uri").notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    usedAt: timestamp("used_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("oauth_auth_codes_hash_idx").on(table.codeHash)]
+);
+
+/** Access+refresh token pairs, hashed at rest. `grantId` groups a rotation
+ *  family: refresh rotation supersedes the old row; presenting a superseded
+ *  refresh token revokes the whole family (spec §5.2 reuse detection).
+ *  `resource` is the RFC 8707 audience — must equal `${APP_URL}/mcp`. */
+export const oauthTokens = pgTable(
+  "oauth_tokens",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    grantId: text("grant_id").notNull(),
+    clientId: text("client_id").notNull().references(() => oauthClients.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    scopes: jsonb("scopes").$type<("read" | "write" | "delete")[]>().notNull(),
+    accessTokenHash: text("access_token_hash").notNull(),
+    refreshTokenHash: text("refresh_token_hash").notNull(),
+    resource: text("resource").notNull(),
+    accessExpiresAt: timestamp("access_expires_at", { mode: "date" }).notNull(),
+    supersededAt: timestamp("superseded_at", { mode: "date" }),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("oauth_tokens_access_hash_idx").on(table.accessTokenHash),
+    uniqueIndex("oauth_tokens_refresh_hash_idx").on(table.refreshTokenHash),
+    index("oauth_tokens_grant_idx").on(table.grantId),
+    index("oauth_tokens_user_company_idx").on(table.userId, table.companyId),
+  ]
 );
 
 // ── AI Feature Flags ─────────────────────────────────────────────────────────
@@ -1880,6 +1976,15 @@ export const aiToolAuditLogs = pgTable(
     permissionDecision: aiToolPermissionDecisionEnum("permission_decision"),
     result: jsonb("result"),
     durationMs: integer("duration_ms"),
+    /** Audit attribution (expose spec B5): where the call came from.
+     *  Existing chat writers rely on the default — do not backfill. */
+    source: text("source").notNull().default("chat"),
+    /** "pat" | "oauth" — set only for source='mcp_server' rows. */
+    credentialType: text("credential_type"),
+    /** apiTokens.id (PAT) or oauthTokens.grantId (OAuth grant family). */
+    credentialId: text("credential_id"),
+    /** MCP initialize handshake identity, e.g. { name: "burnless-cli", version: "0.1.0" }. */
+    clientInfo: jsonb("client_info").$type<{ name?: string; version?: string }>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
@@ -1888,6 +1993,7 @@ export const aiToolAuditLogs = pgTable(
     index("ai_tool_audit_created_idx").on(table.companyId, table.createdAt),
     index("ai_tool_audit_tool_idx").on(table.companyId, table.toolName),
     index("ai_tool_audit_conversation_idx").on(table.conversationId),
+    index("ai_tool_audit_mcp_connection_idx").on(table.mcpConnectionId),
   ]
 );
 

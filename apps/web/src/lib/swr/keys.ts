@@ -28,6 +28,10 @@ export const KEYS = {
   // MCP connections (Connections page + AI sidebar pane)
   mcpConnections: "/api/mcp/connections",
 
+  // MCP expose (Your MCP tab)
+  apiTokens: "/api/tokens",
+  oauthGrants: "/api/oauth/grants",
+
   // Per-user UI preferences (AI sidebar D11 kill-switch reads/writes this)
   userPreferences: "/api/user-preferences",
 

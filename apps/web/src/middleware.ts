@@ -5,6 +5,10 @@ import { checkRateLimit, RATE_LIMITS } from "./lib/rate-limit";
 /** HTTP methods that represent mutations */
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/** Spec-defined cross-origin OAuth endpoints (expose spec §4.1) — bearer/
+ *  PKCE-authed, exempt from the browser-origin CSRF allowlist. */
+const CSRF_EXEMPT_PATHS = new Set(["/api/oauth/token", "/api/oauth/register"]);
+
 /**
  * Allowed origins for CSRF protection.
  * In production, this should be set via NEXT_PUBLIC_APP_URL or ALLOWED_ORIGINS env var.
@@ -35,6 +39,20 @@ function isDevLoopbackOrigin(source: string): boolean {
 }
 
 /**
+ * Tiny synchronous 32-bit FNV-1a hash → hex. Used ONLY for rate-limit key
+ * derivation from bearer headers (per-credential keying without putting raw
+ * token material in keys). NOT cryptographic — never use for verification.
+ */
+function fnv1a32hex(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
  * Next.js middleware for tiered rate limiting.
  *
  * Tiers:
@@ -47,8 +65,8 @@ function isDevLoopbackOrigin(source: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only rate-limit API routes
-  if (!pathname.startsWith("/api/")) return NextResponse.next();
+  // Rate-limit API routes + the MCP endpoint (expose spec §4.1)
+  if (!pathname.startsWith("/api/") && pathname !== "/mcp") return NextResponse.next();
 
   // Inject correlation ID for all API requests (readable by route handlers via headers)
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -90,8 +108,69 @@ export function middleware(request: NextRequest) {
   // Skip webhooks (they have their own signature verification)
   if (pathname.startsWith("/api/webhooks/")) return next();
 
+  // ── /mcp (expose spec §4.1) ────────────────────────────────────────────
+  // Bearer-authed, spec-defined cross-origin API: CSRF origin checks do not
+  // apply. Two-layer rate limit:
+  //   1. PER CREDENTIAL on the `mcp` tier (a stable non-cryptographic hash of
+  //      the Authorization header — middleware is sync, and keying needs
+  //      stability, not secrecy). Fairness between tokens.
+  //   2. PER IP backstop on the `mcpIp` tier (higher cap). The credential key
+  //      is attacker-controlled — rotating a random bearer per request mints a
+  //      fresh bucket — so without this cap an unauthenticated attacker gets
+  //      unbounded route-level sha256+DB token lookups. The IP key cannot be
+  //      forged behind a trusted proxy, so it bounds total throughput.
+  // Unauthenticated requests (no Authorization header) take only the IP key
+  // at the stricter `mcp` cap (they die with 401 in the route anyway).
+  if (pathname === "/mcp") {
+    const authHeader = request.headers.get("authorization");
+    const ipForMcp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+    const mcpConfig = RATE_LIMITS.mcp!;
+
+    const tooManyMcp = (resetAt: number, limit: number) => {
+      const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfter),
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
+          },
+        }
+      );
+    };
+
+    let mcpResult;
+    if (authHeader) {
+      mcpResult = checkRateLimit(`mcp:${fnv1a32hex(authHeader)}`, mcpConfig);
+      if (!mcpResult.allowed) {
+        return tooManyMcp(mcpResult.resetAt, mcpConfig.maxRequests);
+      }
+      // IP backstop — bounds aggregate throughput across rotated credentials.
+      const ipConfig = RATE_LIMITS.mcpIp!;
+      const ipResult = checkRateLimit(`mcp:ip:${ipForMcp}`, ipConfig);
+      if (!ipResult.allowed) {
+        return tooManyMcp(ipResult.resetAt, ipConfig.maxRequests);
+      }
+    } else {
+      mcpResult = checkRateLimit(`mcp:ip:${ipForMcp}`, mcpConfig);
+      if (!mcpResult.allowed) {
+        return tooManyMcp(mcpResult.resetAt, mcpConfig.maxRequests);
+      }
+    }
+    const res = next();
+    res.headers.set("X-RateLimit-Limit", String(mcpConfig.maxRequests));
+    res.headers.set("X-RateLimit-Remaining", String(mcpResult.remaining));
+    return res;
+  }
+
   // CSRF protection: verify Origin header on mutation requests
-  if (MUTATION_METHODS.has(request.method)) {
+  if (MUTATION_METHODS.has(request.method) && !CSRF_EXEMPT_PATHS.has(pathname)) {
     const origin = request.headers.get("origin");
     const referer = request.headers.get("referer");
     const source = origin ?? (referer ? new URL(referer).origin : null);
@@ -175,6 +254,9 @@ function resolveRateLimitTier(pathname: string, method: string) {
     return RATE_LIMITS.auth!;
   }
 
+  // OAuth AS endpoints ride the auth tier (expose spec §4.1)
+  if (pathname.startsWith("/api/oauth/")) return RATE_LIMITS.auth!;
+
   // AI endpoints — cost-controlled tier (LLM calls are expensive)
   if (pathname.startsWith("/api/chat")) return RATE_LIMITS.chat!;
   if (pathname.startsWith("/api/insights")) return RATE_LIMITS.ai!;
@@ -190,6 +272,7 @@ function resolveRateLimitTier(pathname: string, method: string) {
 
 function resolveTierKey(pathname: string, method: string): string {
   if (pathname.startsWith("/api/auth/")) return "auth";
+  if (pathname.startsWith("/api/oauth/")) return "auth";
   if (pathname.startsWith("/api/chat")) return "chat";
   if (pathname.startsWith("/api/insights")) return "ai";
   if (pathname.startsWith("/api/onboarding/enrich")) return "ai";
@@ -199,5 +282,5 @@ function resolveTierKey(pathname: string, method: string): string {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/api/:path*", "/mcp"],
 };

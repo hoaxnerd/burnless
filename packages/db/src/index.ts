@@ -7,6 +7,13 @@ export { schema };
 export * from "./queries";
 export { encryptSecret, decryptSecret, encryptJson, decryptJson } from "./crypto";
 
+export {
+  sha256hex,
+  generateSecretToken,
+  type GeneratedSecret,
+  type BurnlessTokenPrefix,
+} from "./token-hash";
+
 const connectionString =
   process.env.DATABASE_URL ?? "postgresql://localhost:5432/burnless";
 

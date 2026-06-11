@@ -51,6 +51,9 @@ const ALLOWED_EXACT: { match: string; why: string }[] = [
   { match: "chat/reset-grants/route.ts", why: "AI chat grant reset — conversation scoped." },
   { match: "onboarding/route.ts", why: "Onboarding bootstrap for the caller's own brand-new company." },
   { match: "onboarding/enrich/route.ts", why: "Onboarding AI enrichment (no persistence of others' data)." },
+  { match: "tokens/route.ts", why: "PAT mint: any member may mint (expose spec §5.1); write authority enforced per-scope via roleScopeCap (viewer → read-only). Self-scoped credential." },
+  { match: "tokens/[id]/route.ts", why: "PAT revoke: userId-scoped — revokes only the caller's own token." },
+  { match: "oauth/grants/[grantId]/route.ts", why: "OAuth grant revoke: userId-scoped — revokes only the caller's own grant family." },
 ];
 
 const MUTATION_EXPORT = /export\s+(?:const|async\s+function)\s+(POST|PUT|PATCH|DELETE)\b/;

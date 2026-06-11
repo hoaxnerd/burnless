@@ -1114,6 +1114,30 @@ export function getFinancialTools(): ToolDefinition[] {
 }
 
 /**
+ * Tools NOT exposed over the remote MCP server (expose spec §4.4):
+ * - genui show_x/request_x — render only inside our chat UI;
+ * - propose_plan — a chat-loop gating construct;
+ * - search_web / read_webpage / read_webpage_rendered — agents bring their
+ *   own web access; keeps SearXNG/Crawl4AI off the external surface.
+ * Genui names are DERIVED from the genui arrays so new genui tools are
+ * excluded automatically. Guarded by __tests__/mcp-exposed-tools.test.ts.
+ */
+export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
+  ...GENUI_DISPLAY_TOOLS.map((t) => t.name),
+  ...GENUI_INPUT_TOOLS.map((t) => t.name),
+  "propose_plan",
+  "search_web",
+  "read_webpage",
+  "read_webpage_rendered",
+]);
+
+/** The remote MCP server's tool surface: the full Companion mirror minus the
+ *  exclusion set. Same names, same JSON schemas (spec B1). */
+export function getMcpExposedTools(): ToolDefinition[] {
+  return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name));
+}
+
+/**
  * @deprecated Use getFinancialTools() instead. Kept for backward compatibility.
  * Will be removed in the next major version.
  */

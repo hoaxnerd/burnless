@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tool-bridge": "./src/tool-bridge.ts"
+    "./tool-bridge": "./src/tool-bridge.ts",
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "test": "vitest run",

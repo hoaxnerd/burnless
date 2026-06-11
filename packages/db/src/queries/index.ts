@@ -2,6 +2,7 @@ export {
   getCompanyForUser,
   getUserWithCompany,
   getCompanyById,
+  listCompaniesForUser,
 } from "./company";
 
 export {
@@ -111,3 +112,33 @@ export type {
 } from "./ai-permissions";
 
 export * from "./mcp";
+
+export {
+  roleScopeCap,
+  mintApiToken,
+  listApiTokensForUser,
+  revokeApiToken,
+  findApiTokenByHash,
+  touchApiTokenLastUsed,
+  type McpScope,
+  type ApiTokenRow,
+  type MintedApiToken,
+} from "./api-tokens";
+
+export {
+  createOauthClient,
+  getOauthClientById,
+  createAuthCode,
+  consumeAuthCode,
+  issueOauthTokens,
+  findOauthTokenByAccessHash,
+  rotateRefreshToken,
+  listOauthGrantsForUser,
+  revokeOauthGrant,
+  type OauthClientRow,
+  type OauthAuthCodeRow,
+  type OauthTokenRow,
+  type IssuedOauthTokens,
+  type RotateResult,
+  type OauthGrantSummary,
+} from "./oauth";
