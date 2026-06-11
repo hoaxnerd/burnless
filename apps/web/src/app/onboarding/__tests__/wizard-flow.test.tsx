@@ -77,15 +77,33 @@ beforeEach(() => {
 });
 
 describe("S4b onboarding wizard flow", () => {
-  it("(a) enrich `done` → renders the wizard Company step, not the review surface", async () => {
+  it("(a) enrich `done` → renders the wizard Company step (fields), not the review surface", async () => {
     mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
 
     render(<OnboardingPage />);
     await submitWebsite();
 
-    expect(await screen.findByTestId("company-continue")).toBeInTheDocument();
+    // The company step renders its fields under the shell; navigation is driven
+    // by the single global shell Continue (there is no step-owned Continue).
+    expect(
+      await screen.findByRole("heading", { name: /your company/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/company name/i)).toBeInTheDocument();
     // The old review surface is gone.
     expect(screen.queryByLabelText("Your Name")).not.toBeInTheDocument();
+  });
+
+  it("C0: there is exactly ONE Continue control (the global shell button) on the Company step", async () => {
+    mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
+
+    render(<OnboardingPage />);
+    await submitWebsite();
+
+    await screen.findByRole("heading", { name: /your company/i });
+    // No step-owned Continue (#3): only the shell's "Continue →" button exists.
+    expect(screen.queryByTestId("company-continue")).not.toBeInTheDocument();
+    const continueButtons = screen.getAllByRole("button", { name: /continue/i });
+    expect(continueButtons).toHaveLength(1);
   });
 
   it("C1: the Company step does NOT render the shell's 'Skip this step' control", async () => {
@@ -96,13 +114,47 @@ describe("S4b onboarding wizard flow", () => {
 
     // Company step is mandatory (it creates the company) — skipping it would
     // jump to Revenue with no company. The shell hides Skip on this step.
-    expect(await screen.findByTestId("company-continue")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: /your company/i });
     expect(
       screen.queryByRole("button", { name: /skip this step/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("C2: a 409 ONBOARDING_ALREADY_COMPLETE on company POST advances (onCreated path), not an error", async () => {
+  it("C2: filling the name + clicking the shell Continue creates the company and advances to Revenue", async () => {
+    // First call: the enrich stream → wizard Company step.
+    mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
+    // Second call: the company POST → success with a companyId.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ companyId: "company-xyz" }),
+    } as unknown as Response);
+    // Third call: handleCompanyCreated fetches /api/departments.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as unknown as Response);
+
+    render(<OnboardingPage />);
+    await submitWebsite();
+
+    await screen.findByRole("heading", { name: /your company/i });
+    // Company name is required before the shell Continue submits.
+    fireEvent.change(screen.getByLabelText(/company name/i), {
+      target: { value: "Acme Inc." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // Advanced to Revenue (the Revenue heading is now shown).
+    expect(
+      await screen.findByRole("heading", { name: /revenue/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("C3: a 409 ONBOARDING_ALREADY_COMPLETE on company POST advances (onCreated path), not an error", async () => {
     // First call: the enrich stream → wizard Company step.
     mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
     // Second call: the company POST → 409 already-complete with companyId.
@@ -126,13 +178,13 @@ describe("S4b onboarding wizard flow", () => {
     render(<OnboardingPage />);
     await submitWebsite();
 
-    const continueBtn = await screen.findByTestId("company-continue");
-    // Company name is required before Continue submits.
+    await screen.findByRole("heading", { name: /your company/i });
+    // Company name is required before the shell Continue submits.
     fireEvent.change(screen.getByLabelText(/company name/i), {
       target: { value: "Acme Inc." },
     });
     await act(async () => {
-      fireEvent.click(continueBtn);
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     });
 
     // Advanced to Revenue (stepper highlights Revenue) — no "Company already exists" error shown.
@@ -170,7 +222,9 @@ describe("S4b onboarding wizard flow", () => {
     render(<OnboardingPage />);
     await submitWebsite();
 
-    expect(await screen.findByTestId("company-continue")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /your company/i }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /try again/i }),
     ).not.toBeInTheDocument();

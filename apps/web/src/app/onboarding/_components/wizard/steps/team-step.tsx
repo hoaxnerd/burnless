@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError } from "@/lib/api-error";
@@ -9,6 +9,7 @@ import type { EditableHeadcount } from "@/app/(dashboard)/team/headcount-form";
 import type { BenefitsBreakdown } from "@/lib/headcount-params";
 import { normalizeHeadcountPayload } from "@/lib/headcount-params";
 import { DraftCard } from "../draft-card";
+import type { WizardStepHandle } from "../types";
 
 type HeadcountPayload = ReturnType<typeof normalizeHeadcountPayload>;
 
@@ -29,15 +30,15 @@ type Mode = { kind: "list" } | { kind: "add" } | { kind: "edit"; index: number }
  * "saved" list.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 5).
  */
-export function TeamStep({
-  suggestions = [],
-  departments,
-  companyBenefitsRates,
-}: TeamStepProps) {
+export const TeamStep = forwardRef<WizardStepHandle, TeamStepProps>(
+  function TeamStep({ suggestions = [], departments, companyBenefitsRates }, ref) {
   // Draft cards seeded from AI suggestions; an accepted draft is removed once saved.
   const [drafts, setDrafts] = useState<EditableHeadcount[]>(suggestions);
   const [saved, setSaved] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
+
+  // RC2: implement auto-save-on-continue
+  useImperativeHandle(ref, () => ({ submit: async () => true }));
 
   const handleSubmit = async (payload: HeadcountPayload) => {
     const res = await apiFetch("/api/headcount", {
@@ -123,4 +124,4 @@ export function TeamStep({
       </button>
     </div>
   );
-}
+});

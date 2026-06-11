@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError } from "@/lib/api-error";
@@ -9,6 +9,7 @@ import {
   type RevenueStreamFormValues,
 } from "@/app/(dashboard)/revenue/revenue-stream-form";
 import { DraftCard } from "../draft-card";
+import type { WizardStepHandle } from "../types";
 
 interface RevenueStepProps {
   suggestions?: RevenueStreamFormValues[];
@@ -26,11 +27,15 @@ type Mode =
  * by this step). Saved streams move from drafts into a "saved" list.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 2).
  */
-export function RevenueStep({ suggestions = [] }: RevenueStepProps) {
+export const RevenueStep = forwardRef<WizardStepHandle, RevenueStepProps>(
+  function RevenueStep({ suggestions = [] }, ref) {
   // Draft cards seeded from AI suggestions; an accepted draft is removed once saved.
   const [drafts, setDrafts] = useState<RevenueStreamFormValues[]>(suggestions);
   const [saved, setSaved] = useState<RevenueStreamFormValues[]>([]);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
+
+  // RC2: implement auto-save-on-continue
+  useImperativeHandle(ref, () => ({ submit: async () => true }));
 
   const handleSubmit = async (values: RevenueStreamFormValues) => {
     const res = await apiFetch("/api/revenue-streams", {
@@ -114,4 +119,4 @@ export function RevenueStep({ suggestions = [] }: RevenueStepProps) {
       </button>
     </div>
   );
-}
+});

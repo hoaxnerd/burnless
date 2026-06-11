@@ -24,6 +24,7 @@ import { RevenueStep } from "./_components/wizard/steps/revenue-step";
 import { FundingStep } from "./_components/wizard/steps/funding-step";
 import { ExpensesStep } from "./_components/wizard/steps/expenses-step";
 import { TeamStep } from "./_components/wizard/steps/team-step";
+import type { WizardStepHandle } from "./_components/wizard/types";
 import {
   toRevenueSuggestions,
   toFundingSuggestions,
@@ -76,6 +77,8 @@ export default function OnboardingPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
   const movedOnRef = useRef(false);
+  // Ref to the active wizard step panel; the global Continue calls its submit().
+  const stepRef = useRef<WizardStepHandle>(null);
 
   useEffect(() => {
     if (step === "website") {
@@ -92,10 +95,13 @@ export default function OnboardingPage() {
     movedOnRef.current = false;
 
     try {
+      // #1: accept a bare domain (example.com) — prefix https:// if no scheme.
+      const raw = websiteUrl.trim();
+      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
       const res = await apiFetch("/api/onboarding/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ websiteUrl: websiteUrl.trim() }),
+        body: JSON.stringify({ websiteUrl: url }),
       });
 
       if (!res.ok) {
@@ -244,8 +250,10 @@ export default function OnboardingPage() {
     }
   };
 
-  // After CompanyStep creates the company, fetch departments for the Team step,
-  // then advance to Revenue.
+  // After CompanyStep creates the company, store the id and fetch departments
+  // for the Team step. Navigation is owned by `handleContinue` (the global
+  // Continue advances once submit() resolves true) — do NOT setStep here, or the
+  // company→revenue transition would fire twice.
   const handleCompanyCreated = async (newCompanyId: string) => {
     setCompanyId(newCompanyId);
     try {
@@ -258,7 +266,6 @@ export default function OnboardingPage() {
       // Non-fatal — the Team step degrades to an empty department list.
     }
     trackEvent("onboarding_company_created");
-    setStep("revenue");
   };
 
   // `step` is the single source of truth for wizard position; next/prev derive
@@ -280,6 +287,14 @@ export default function OnboardingPage() {
     const i = WIZARD_STEPS.indexOf(step);
     const prevId = WIZARD_STEPS[i - 1];
     if (prevId) setStep(prevId);
+  };
+
+  // The global Continue: persist the active step's pending work via its
+  // imperative submit(), then advance only if it allows. Skip (onSkip) advances
+  // WITHOUT calling submit() — it discards that step's pending work.
+  const handleContinue = async () => {
+    const ok = await stepRef.current?.submit();
+    if (ok) advance();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -340,12 +355,15 @@ export default function OnboardingPage() {
         case "company":
           return (
             <CompanyStep
+              ref={stepRef}
               initial={{
                 company_name: fields.company_name.value,
                 stage: fields.stage.value || undefined,
                 business_model: fields.business_model.value || undefined,
                 industry: fields.industry.value || undefined,
                 founders: useSuggestions ? founders : [],
+                // #2: seed "Your name" from the AI-suggested first founder.
+                user_name: useSuggestions ? (founders[0] ?? "") : "",
               }}
               onCreated={(id) => void handleCompanyCreated(id)}
             />
@@ -353,6 +371,7 @@ export default function OnboardingPage() {
         case "revenue":
           return (
             <RevenueStep
+              ref={stepRef}
               suggestions={
                 useSuggestions ? toRevenueSuggestions(revenueStreams) : []
               }
@@ -361,6 +380,7 @@ export default function OnboardingPage() {
         case "funding":
           return (
             <FundingStep
+              ref={stepRef}
               suggestions={
                 useSuggestions ? toFundingSuggestions(fundingRounds) : []
               }
@@ -371,6 +391,7 @@ export default function OnboardingPage() {
           // first account when none are provided here.
           return (
             <ExpensesStep
+              ref={stepRef}
               suggestions={
                 useSuggestions ? toExpenseSuggestions(expenses, []) : []
               }
@@ -379,6 +400,7 @@ export default function OnboardingPage() {
         case "team":
           return (
             <TeamStep
+              ref={stepRef}
               departments={departments}
               suggestions={
                 useSuggestions
@@ -390,20 +412,21 @@ export default function OnboardingPage() {
       }
     })();
 
-    // CompanyStep owns its own Continue (it must create the company first), so
-    // the shell's Continue is disabled there; once the company exists the shell
-    // drives navigation.
+    // The single global Continue drives every step via its submit() (see
+    // handleContinue). The company step can't be skipped or gone-back-from (it
+    // creates the company), so hide Back/Skip there — but Continue is always
+    // enabled; the step's submit() gates advancement.
     const onCompanyStep = step === "company";
 
     return (
       <WizardShell
         steps={WIZARD_STEP_META}
         activeId={step}
-        canContinue={!onCompanyStep}
+        canContinue={true}
         isLast={step === "team"}
         onBack={goBack}
         onSkip={advance}
-        onContinue={advance}
+        onContinue={handleContinue}
         hideBack={onCompanyStep}
         hideSkip={onCompanyStep}
       >

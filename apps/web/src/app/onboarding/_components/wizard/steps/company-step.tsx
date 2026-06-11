@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { Input, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import { STAGE_OPTIONS, MODEL_OPTIONS } from "../../constants";
+import type { WizardStepHandle } from "../types";
 
 export interface CompanyValues {
   company_name: string;
@@ -30,13 +30,17 @@ const DEFAULTS: CompanyValues = {
 };
 
 /**
- * Wizard step 1 — the only step that creates the company. On Continue it POSTs
+ * Wizard step 1 — the only step that creates the company. Its `submit()` POSTs
  * the slim `/api/onboarding` (company + base scenario + default accounts +
  * departments) and calls `onCreated(companyId)` so the orchestrator can advance
- * to Revenue. Company name is required (blocks Continue when empty).
+ * to Revenue. Company name is required: `submit()` returns false (with an inline
+ * error) when empty or when the POST errors, and true on success / 409
+ * already-complete. The global shell Continue drives `submit()` via a ref — this
+ * step renders ONLY the fields, no Continue of its own.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 1).
  */
-export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
+export const CompanyStep = forwardRef<WizardStepHandle, CompanyStepProps>(
+  function CompanyStep({ initial, onCreated }, ref) {
   const [values, setValues] = useState<CompanyValues>({
     ...DEFAULTS,
     ...initial,
@@ -48,12 +52,12 @@ export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
   const set = <K extends keyof CompanyValues>(key: K, v: CompanyValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: v }));
 
-  const handleContinue = async () => {
-    if (submitting) return;
+  const handleContinue = async (): Promise<boolean> => {
+    if (submitting) return false;
     const name = values.company_name.trim();
     if (!name) {
       setNameError("Company name is required");
-      return;
+      return false;
     }
     setNameError(null);
     setSubmitError(null);
@@ -81,7 +85,7 @@ export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
         // Treat it as success and advance with the existing companyId.
         if (res.status === 409 && body.code === "ONBOARDING_ALREADY_COMPLETE" && body.companyId) {
           onCreated(body.companyId);
-          return;
+          return true;
         }
         throw new Error(
           body.error ?? "Could not create your company. Please try again.",
@@ -89,12 +93,16 @@ export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
       }
       const { companyId } = (await res.json()) as { companyId: string };
       onCreated(companyId);
+      return true;
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not create your company. Please try again.");
+      return false;
     } finally {
       setSubmitting(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({ submit: handleContinue }));
 
   return (
     <div className="space-y-5">
@@ -165,17 +173,6 @@ export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
       {submitError && (
         <p className="text-sm font-medium text-danger-600 dark:text-danger-400">{submitError}</p>
       )}
-
-      <button
-        type="button"
-        data-testid="company-continue"
-        onClick={handleContinue}
-        disabled={submitting}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {submitting ? "Creating…" : "Continue"}
-        {!submitting && <ArrowRight className="h-4 w-4" />}
-      </button>
     </div>
   );
-}
+});

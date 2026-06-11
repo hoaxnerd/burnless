@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError } from "@/lib/api-error";
@@ -10,6 +10,7 @@ import {
   type ExpenseSubmitPayload,
 } from "@/app/(dashboard)/expenses/expense-form";
 import { DraftCard } from "../draft-card";
+import type { WizardStepHandle } from "../types";
 
 interface ExpensesStepProps {
   suggestions?: ExpenseRow[];
@@ -55,7 +56,8 @@ function mapSuggestionToAccount(
  * draft into a saved list.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 4).
  */
-export function ExpensesStep({ suggestions = [] }: ExpensesStepProps) {
+export const ExpensesStep = forwardRef<WizardStepHandle, ExpensesStepProps>(
+  function ExpensesStep({ suggestions = [] }, ref) {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -63,6 +65,9 @@ export function ExpensesStep({ suggestions = [] }: ExpensesStepProps) {
   const [drafts, setDrafts] = useState<ExpenseRow[]>(suggestions);
   const [saved, setSaved] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>({ kind: "list" });
+
+  // RC2: implement auto-save-on-continue
+  useImperativeHandle(ref, () => ({ submit: async () => true }));
 
   useEffect(() => {
     let cancelled = false;
@@ -219,4 +224,4 @@ export function ExpensesStep({ suggestions = [] }: ExpensesStepProps) {
       )}
     </div>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError } from "@/lib/api-error";
@@ -18,6 +18,7 @@ import {
   type OptionPoolValues,
 } from "@/app/(dashboard)/funding/cap-table/option-pool-form-fields";
 import { DraftCard } from "../draft-card";
+import type { WizardStepHandle } from "../types";
 
 interface FundingStepProps {
   suggestions?: FundingRoundSubmitPayload[];
@@ -42,11 +43,15 @@ type RoundMode =
  * surface the route's message inline rather than crashing.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 3).
  */
-export function FundingStep({ suggestions = [] }: FundingStepProps) {
+export const FundingStep = forwardRef<WizardStepHandle, FundingStepProps>(
+  function FundingStep({ suggestions = [] }, ref) {
   // Zone 1 — funding rounds.
   const [drafts, setDrafts] = useState<FundingRoundSubmitPayload[]>(suggestions);
   const [savedRounds, setSavedRounds] = useState<FundingRoundSubmitPayload[]>([]);
   const [roundMode, setRoundMode] = useState<RoundMode>({ kind: "list" });
+
+  // RC2: implement auto-save-on-continue
+  useImperativeHandle(ref, () => ({ submit: async () => true }));
 
   // Zone 2 — cap table.
   const [shareClasses, setShareClasses] = useState<ShareClassValues[]>([]);
@@ -280,4 +285,4 @@ export function FundingStep({ suggestions = [] }: FundingStepProps) {
       </section>
     </div>
   );
-}
+});
