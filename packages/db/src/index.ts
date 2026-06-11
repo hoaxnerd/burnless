@@ -26,6 +26,7 @@ export type Database = PostgresJsDatabase<typeof schema>;
 interface DbGlobal {
   __burnless_db?: Database;
   __burnless_handle?: DbHandle;
+  __burnless_pglite?: unknown;
 }
 const g = globalThis as unknown as DbGlobal;
 
@@ -83,6 +84,7 @@ export async function initDatabase(): Promise<Database> {
   }
   g.__burnless_db = handle.db;
   g.__burnless_handle = handle;
+  if (handle.dialect === "pglite") g.__burnless_pglite = handle.raw;
   return handle.db;
 }
 
@@ -91,6 +93,7 @@ export async function closeDatabase(): Promise<void> {
   const handle = g.__burnless_handle;
   delete g.__burnless_db;
   delete g.__burnless_handle;
+  delete g.__burnless_pglite;
   if (handle) await handle.close();
 }
 

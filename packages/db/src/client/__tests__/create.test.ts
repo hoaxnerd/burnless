@@ -17,11 +17,12 @@ afterEach(() => {
 });
 
 describe("createClient (pglite)", () => {
-  it("creates a file-backed pglite handle with the vector extension loaded", async () => {
+  it("creates a file-backed pglite handle with the vector extension enabled at creation", async () => {
     const handle = await createClient({ driver: "pglite", dataDir: join(tmp(), "data") });
     expect(handle.dialect).toBe("pglite");
-    // vector extension is available to be created
-    await handle.db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
+    // Fix 1 (spec §5): CREATE EXTENSION vector runs at client creation, NOT in
+    // the migrate gate — so the extension is present immediately after
+    // createClient returns, WITHOUT manually running CREATE EXTENSION here.
     const res = await handle.db.execute(sql`SELECT extname FROM pg_extension WHERE extname = 'vector'`);
     const rows = Array.isArray(res) ? res : (res as { rows: unknown[] }).rows;
     expect(rows.length).toBe(1);

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
+import { sql } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -30,10 +31,15 @@ export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> 
 
   mkdirSync(resolved.dataDir, { recursive: true });
   const pglite = await PGlite.create(resolved.dataDir, { extensions: { vector } });
+  // PGLite-drizzle is runtime-identical for the query builder; cast to the
+  // single public Database type (spec §6) so the 254 importers stay unchanged.
+  const db = drizzlePglite(pglite, { schema });
+  // CREATE EXTENSION vector runs at client creation — independent of the
+  // migrate gate — so a pglite instance always has vector available even when
+  // BURNLESS_AUTO_MIGRATE is disabled. (spec §5)
+  await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   return {
-    // PGLite-drizzle is runtime-identical for the query builder; cast to the
-    // single public Database type (spec §6) so the 254 importers stay unchanged.
-    db: drizzlePglite(pglite, { schema }) as unknown as Database,
+    db: db as unknown as Database,
     dialect: "pglite",
     raw: pglite,
     close: () => pglite.close(),
