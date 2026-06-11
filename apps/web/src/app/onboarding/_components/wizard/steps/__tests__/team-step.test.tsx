@@ -1,7 +1,9 @@
+import { createRef } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { apiFetch } from "@/lib/api-fetch";
 import { TeamStep } from "../team-step";
+import type { WizardStepHandle } from "../../types";
 import type { EditableHeadcount } from "@/app/(dashboard)/team/headcount-form";
 
 vi.mock("@/lib/api-fetch", () => ({
@@ -55,5 +57,41 @@ describe("TeamStep", () => {
     expect(call[1]?.method).toBe("POST");
     const body = JSON.parse(call[1]?.body as string);
     expect(body.title).toBe("Engineer");
+  });
+
+  it("#7 submit() auto-saves every un-saved suggestion (POST) and returns true", async () => {
+    const ref = createRef<WizardStepHandle>();
+    render(<TeamStep ref={ref} departments={departments} suggestions={[suggestion]} />);
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(true);
+
+    const posted = vi
+      .mocked(apiFetch)
+      .mock.calls.find(
+        ([u, init]) => String(u) === "/api/headcount" && init?.method === "POST",
+      );
+    expect(posted).toBeTruthy();
+    const body = JSON.parse(posted![1]?.body as string);
+    expect(body.title).toBe("Engineer");
+
+    // After auto-save the row is "Saved" and still editable (#5).
+    await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy());
+    expect(screen.getByRole("button", { name: /edit/i })).toBeTruthy();
+  });
+
+  it("#7 submit() returns false when a POST fails", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "boom" }),
+      text: async () => "boom",
+    } as Response);
+
+    const ref = createRef<WizardStepHandle>();
+    render(<TeamStep ref={ref} departments={departments} suggestions={[suggestion]} />);
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(false);
   });
 });

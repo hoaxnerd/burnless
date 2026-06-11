@@ -1,7 +1,9 @@
+import { createRef } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { apiFetch } from "@/lib/api-fetch";
 import { ExpensesStep } from "../expenses-step";
+import type { WizardStepHandle } from "../../types";
 
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: vi.fn() }));
 
@@ -85,5 +87,89 @@ describe("ExpensesStep", () => {
         .mock.calls.find(([u, init]) => String(u) === "/api/forecast-lines" && init?.method === "POST");
       expect(posted).toBeTruthy();
     });
+  });
+
+  it("#7 submit() auto-saves every un-saved suggestion (POST) and returns true", async () => {
+    const ref = createRef<WizardStepHandle>();
+    render(
+      <ExpensesStep
+        ref={ref}
+        suggestions={[
+          {
+            id: "draft-1",
+            accountId: "a1",
+            method: "fixed",
+            parameters: { amount: 1000 },
+            startDate: "2025-01-01",
+            endDate: null,
+            name: "AWS",
+            subcategory: "Cloud Infrastructure",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/accounts"));
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(true);
+
+    const posted = vi
+      .mocked(apiFetch)
+      .mock.calls.find(
+        ([u, init]) => String(u) === "/api/forecast-lines" && init?.method === "POST",
+      );
+    expect(posted).toBeTruthy();
+    const body = JSON.parse(posted![1]?.body as string);
+    expect(body.name).toBe("AWS");
+
+    // After auto-save the row is "Saved" and still editable (#5).
+    await waitFor(() => expect(screen.getByText("Saved")).toBeTruthy());
+    expect(screen.getByRole("button", { name: /edit/i })).toBeTruthy();
+  });
+
+  it("#7 submit() returns false when a POST fails", async () => {
+    vi.mocked(apiFetch).mockImplementation(((url: unknown, init?: RequestInit) => {
+      const u = String(url);
+      const method = init?.method ?? "GET";
+      if (u === "/api/accounts" && method === "GET") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: "a1", name: "Cloud Infrastructure", category: "operating_expense" },
+          ],
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "boom" }),
+        text: async () => "boom",
+      } as Response);
+    }) as typeof apiFetch);
+
+    const ref = createRef<WizardStepHandle>();
+    render(
+      <ExpensesStep
+        ref={ref}
+        suggestions={[
+          {
+            id: "draft-1",
+            accountId: "a1",
+            method: "fixed",
+            parameters: { amount: 1000 },
+            startDate: "2025-01-01",
+            endDate: null,
+            name: "AWS",
+            subcategory: "Cloud Infrastructure",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/accounts"));
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(false);
   });
 });
