@@ -577,6 +577,14 @@ export function FundingRoundsList({
               notes: null,
               isProjected: editingRound.isProjected,
             }}
+            onSubmit={async (payload) => {
+              const res = await apiFetch(`/api/funding-rounds/${editingRound.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              if (!res.ok) throw new Error(await extractApiError(res));
+            }}
             // FUND-06: funding-details is RSC-backed (rounds come from a server
             // prop), so refresh the route on close to pull the edited values into
             // the card. The form calls onClose on a successful save; refreshing

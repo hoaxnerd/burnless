@@ -14,6 +14,7 @@ describe("FundingRoundForm — immutable round-type badge (FUND-10)", () => {
       <FundingRoundForm
         mode="edit"
         initial={{ id: "r1", name: "Series A round", roundType: "series_a", amount: 5_000_000 }}
+        onSubmit={async () => {}}
         onClose={() => {}}
       />,
     );
@@ -34,6 +35,7 @@ describe("FundingRoundForm — immutable round-type badge (FUND-10)", () => {
       <FundingRoundForm
         mode="edit"
         initial={{ id: "r2", name: "Seed", roundType: "seed", amount: 1_000_000 }}
+        onSubmit={async () => {}}
         onClose={() => {}}
       />,
     );

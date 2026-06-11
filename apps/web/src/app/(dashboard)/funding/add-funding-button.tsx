@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui";
-import { FundingRoundForm } from "./funding-round-form";
+import { FundingRoundForm, type FundingRoundSubmitPayload } from "./funding-round-form";
+import { apiFetch } from "@/lib/api-fetch";
+import { extractApiError } from "@/lib/api-error";
 import { useRouter } from "next/navigation";
 
 export function AddFundingButton() {
@@ -13,6 +15,15 @@ export function AddFundingButton() {
   function handleClose() {
     setOpen(false);
     router.refresh();
+  }
+
+  async function handleSubmit(payload: FundingRoundSubmitPayload) {
+    const res = await apiFetch("/api/funding-rounds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await extractApiError(res));
   }
 
   return (
@@ -26,7 +37,7 @@ export function AddFundingButton() {
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Add Funding Round">
-        <FundingRoundForm mode="add" onClose={handleClose} />
+        <FundingRoundForm mode="add" onSubmit={handleSubmit} onClose={handleClose} />
       </Modal>
     </>
   );

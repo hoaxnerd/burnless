@@ -3,8 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { CurrencyInput, DateRangePicker } from "@/components/forms/primitives";
 import { Input, Select, Textarea } from "@/components/ui";
-import { apiFetch } from "@/lib/api-fetch";
-import { extractApiError, toUserMessage } from "@/lib/api-error";
+import { toUserMessage } from "@/lib/api-error";
 import {
   defaultParamsForType,
   normalizePayload,
@@ -44,13 +43,27 @@ export interface FundingRoundFormValues {
   isProjected: boolean;
 }
 
+// The shape the caller (AddFundingButton / funding-details edit) will POST/PATCH.
+// roundType is present on add, omitted on edit (Phase 2 D §1.5 D2).
+export interface FundingRoundSubmitPayload {
+  name: string;
+  roundType?: FundingRoundType;
+  amount: number;
+  date: string;
+  closeDate: string | null;
+  notes: string | null;
+  parameters: Record<string, unknown>;
+  isProjected: boolean;
+}
+
 interface FundingRoundFormProps {
   mode: "add" | "edit";
   initial?: Partial<FundingRoundFormValues> & { id?: string };
+  onSubmit: (payload: FundingRoundSubmitPayload) => Promise<void>;
   onClose: () => void;
 }
 
-export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormProps) {
+export function FundingRoundForm({ mode, initial, onSubmit, onClose }: FundingRoundFormProps) {
   const [values, setValues] = useState<FundingRoundFormValues>(() => {
     const roundType = (initial?.roundType ?? "seed") as FundingRoundType;
     return {
@@ -74,8 +87,8 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
     updater: (prev: Record<string, unknown>) => Record<string, unknown>,
   ) => setValues((v) => ({ ...v, parameters: updater(v.parameters) }));
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: FormEvent) => {
+    e?.preventDefault();
     setError(null);
     const validationError = validateParams(values.roundType, values.parameters);
     if (validationError) {
@@ -84,7 +97,7 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
     }
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: FundingRoundSubmitPayload = {
         name: values.name,
         ...(mode === "add" ? { roundType: values.roundType } : {}), // Phase 2 D §1.5 D2: omit roundType on edit
         amount: values.amount,
@@ -94,19 +107,7 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
         parameters: normalizePayload(values.roundType, values.parameters),
         isProjected: values.isProjected,
       };
-      const url =
-        mode === "add"
-          ? "/api/funding-rounds"
-          : `/api/funding-rounds/${(initial as any).id}`;
-      const method = mode === "add" ? "POST" : "PATCH";
-      const res = await apiFetch(url, {
-        method,
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) {
-        throw new Error(await extractApiError(res));
-      }
+      await onSubmit(payload);
       onClose();
     } catch (err) {
       setError(toUserMessage(err));
@@ -196,7 +197,12 @@ export function FundingRoundForm({ mode, initial, onClose }: FundingRoundFormPro
 
       <div className="flex gap-2 justify-end">
         <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-        <button type="submit" className="btn-primary" disabled={submitting}>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={submitting}
+          onClick={() => handleSubmit()}
+        >
           {submitting ? "Saving…" : "Save"}
         </button>
       </div>
