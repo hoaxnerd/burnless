@@ -10,3 +10,29 @@ export function shouldAutoMigrate(dialect: Dialect, env: NodeJS.ProcessEnv): boo
   if (typeof raw === "string" && raw.length > 0) return raw === "true";
   return dialect === "pglite";
 }
+
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { sql } from "drizzle-orm";
+import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
+import type { DbHandle } from "./create";
+
+// packages/db/src/client/ -> packages/db/drizzle
+const MIGRATIONS_FOLDER = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../drizzle",
+);
+
+/** Apply the drizzle migration baseline for the handle's dialect. See spec §5. */
+export async function applyMigrations(handle: DbHandle): Promise<void> {
+  if (handle.dialect === "pglite") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await migratePglite(handle.db as any, { migrationsFolder: MIGRATIONS_FOLDER });
+    // Engine ready for future semantic-search columns; idempotent. (spec §5)
+    await handle.db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await migratePostgres(handle.db as any, { migrationsFolder: MIGRATIONS_FOLDER });
+  }
+}
