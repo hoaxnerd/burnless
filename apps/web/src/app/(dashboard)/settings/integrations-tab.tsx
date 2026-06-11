@@ -7,6 +7,7 @@ import {
   COMING_SOON_INTEGRATIONS,
   type ConnectedIntegration,
 } from "./settings-data";
+import { useCapabilities } from "@/components/providers/capability-context";
 
 interface IntegrationsTabProps {
   connectedIntegrations: ConnectedIntegration[];
@@ -25,6 +26,8 @@ export function IntegrationsTab({
   getIntegrationStatus,
   getConnectedId,
 }: IntegrationsTabProps) {
+  // Task 12: the coming-soon (cloud-only) integration tiles are gated.
+  const caps = useCapabilities();
   return (
     <div className="max-w-3xl space-y-8">
       {/* Available Integrations */}
@@ -98,7 +101,8 @@ export function IntegrationsTab({
         </div>
       </div>
 
-      {/* Coming Soon Integrations */}
+      {/* Coming Soon Integrations — Task 12: gated on integrations capability */}
+      {caps.integrations && (
       <div>
         <h2 className="text-sm font-semibold text-surface-500 mb-3">Coming Soon</h2>
         <div className="space-y-3">
@@ -157,6 +161,7 @@ export function IntegrationsTab({
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }

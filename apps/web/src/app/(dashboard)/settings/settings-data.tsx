@@ -7,6 +7,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { CURRENCIES, DATA_REGIONS, type DataRegion } from "@burnless/types";
+import type { Capabilities } from "@/lib/capabilities";
 
 export interface IntegrationDef {
   type: string;
@@ -171,3 +172,16 @@ export const tabs = [
   { key: "invite-codes" as const, label: "Invite Codes" },
   { key: "billing" as const, label: "Billing" },
 ];
+
+/**
+ * Task 12 (S1 edition/capability spine): hide capability-gated tabs.
+ * Defense-in-depth — server guards (requireCapability) remain authoritative.
+ * Pure helper so it can be unit-tested without the provider.
+ */
+export function visibleTabs(caps: Capabilities) {
+  return tabs.filter((t) => {
+    if (t.key === "billing") return caps.billing;
+    if (t.key === "invite-codes") return caps.inviteCodes;
+    return true;
+  });
+}

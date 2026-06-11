@@ -6,7 +6,8 @@ import { apiFetch } from "@/lib/api-fetch";
 import { KEYS, revalidate } from "@/lib/swr";
 import { toUserMessage } from "@/lib/api-error";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
-import { type CompanyProfile, type ConnectedIntegration, tabs } from "./settings-data";
+import { type CompanyProfile, type ConnectedIntegration, visibleTabs } from "./settings-data";
+import { useCapabilities } from "@/components/providers/capability-context";
 import { GeneralTab } from "./general-tab";
 import { AiFeaturesTab } from "./ai-features-tab";
 import { AiDashboardTab } from "./ai-dashboard-tab";
@@ -21,6 +22,8 @@ export default function SettingsPage() {
     "general" | "security" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
   >("general");
   const { flags, updateFlags, loaded: aiLoaded, credits, providerConfig } = useAiFlags();
+  // Task 12: hide capability-gated tabs (defense-in-depth; server guards authoritative).
+  const caps = useCapabilities();
 
   // Company profile state
   const [company, setCompany] = useState<CompanyProfile>({
@@ -148,7 +151,7 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-surface-200 mb-6 sm:mb-8 overflow-x-auto">
-        {tabs.map((tab) => (
+        {visibleTabs(caps).map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -202,11 +205,11 @@ export default function SettingsPage() {
         />
       )}
 
-      {/* Invite Codes Tab */}
-      {activeTab === "invite-codes" && <InviteCodesTab />}
+      {/* Invite Codes Tab — Task 12: capability-gated (defense-in-depth) */}
+      {activeTab === "invite-codes" && caps.inviteCodes && <InviteCodesTab />}
 
-      {/* Billing Tab */}
-      {activeTab === "billing" && (
+      {/* Billing Tab — Task 12: capability-gated (defense-in-depth) */}
+      {activeTab === "billing" && caps.billing && (
         <BillingTab />
       )}
 

@@ -24,6 +24,12 @@ vi.mock("@/components/locale/locale-context", () => ({
 import { AiFeaturesTab } from "../ai-features-tab";
 import { AiDashboardTab } from "../ai-dashboard-tab";
 import { tabs } from "../settings-data";
+import { CapabilityProvider } from "@/components/providers/capability-context";
+import { EDITION_PRESETS } from "@/lib/capabilities";
+
+// AiFeaturesTab now reads useCapabilities() (Task 12), so it must mount inside the provider.
+const renderWithCaps = (ui: React.ReactElement) =>
+  render(<CapabilityProvider value={EDITION_PRESETS.cloud}>{ui}</CapabilityProvider>);
 
 const providerConfig: AiProviderConfig = {
   byokEnabled: false,
@@ -42,7 +48,7 @@ describe("SET-07 — AI settings tabs are shipped", () => {
 
   it("AiFeaturesTab mounts without throwing against live flags", () => {
     expect(() =>
-      render(
+      renderWithCaps(
         <AiFeaturesTab
           flags={DEFAULT_AI_FLAGS}
           updateFlags={vi.fn()}
@@ -55,7 +61,7 @@ describe("SET-07 — AI settings tabs are shipped", () => {
 
   it("AiFeaturesTab mounts with master switch ON (provider section reachable)", () => {
     expect(() =>
-      render(
+      renderWithCaps(
         <AiFeaturesTab
           flags={{ ...DEFAULT_AI_FLAGS, masterEnabled: true }}
           updateFlags={vi.fn()}

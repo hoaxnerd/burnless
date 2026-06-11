@@ -7,6 +7,7 @@ import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-
 import { AiPermissionsPanel } from "@/app/(dashboard)/ai/_components/ai-permissions-panel";
 import { ProviderSection } from "./ai-provider-section";
 import { Input } from "@/components/ui";
+import { useCapabilities } from "@/components/providers/capability-context";
 
 interface AiFeaturesTabProps {
   flags: AiFeatureFlagsState;
@@ -22,6 +23,8 @@ const DATA_MODES: { value: AiDataMode; label: string; desc: string }[] = [
 ];
 
 export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: AiFeaturesTabProps) {
+  // Task 12: credits are a billing concept — hide the block when billing is off.
+  const caps = useCapabilities();
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Level 1: Master Switch */}
@@ -141,8 +144,8 @@ export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: A
         </section>
       )}
 
-      {/* AI Credits Status */}
-      {credits && (
+      {/* AI Credits Status — Task 12: gated on billing capability */}
+      {caps.billing && credits && (
         <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
           <div className="flex items-center gap-4 mb-5">
             <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">

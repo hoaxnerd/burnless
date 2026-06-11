@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 import { fetcher } from "@/lib/swr/fetcher";
 import type { ReactElement } from "react";
+import { CapabilityProvider } from "@/components/providers/capability-context";
+import { EDITION_PRESETS } from "@/lib/capabilities";
 
 // Mock apiFetch before importing the component
 vi.mock("@/lib/api-fetch", () => ({
@@ -25,7 +27,8 @@ function renderWithSWR(ui: ReactElement) {
         errorRetryCount: 0,
       }}
     >
-      {ui}
+      {/* SettingsPage reads useCapabilities() (Task 12) — wrap in the provider. */}
+      <CapabilityProvider value={EDITION_PRESETS.cloud}>{ui}</CapabilityProvider>
     </SWRConfig>,
   );
 }
