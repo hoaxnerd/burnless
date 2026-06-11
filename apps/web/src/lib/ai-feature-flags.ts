@@ -16,6 +16,7 @@ import {
   type AiWriteMode,
 } from "@burnless/ai";
 import { getCompanyPlan } from "./api-helpers";
+import { getCapabilities } from "./capabilities";
 
 // 1 credit = 1000 microdollars (matches MICROS_PER_CREDIT in plans.config.ts)
 const MICROS_PER_CREDIT = 1000;
@@ -143,6 +144,14 @@ export async function checkAiFeatureAllowed(
 
   // BYOK users skip credit enforcement — they pay their own LLM provider
   if (flags.byokEnabled && flags.aiApiKey) {
+    return { allowed: true, writeMode: flags.writeMode };
+  }
+
+  // Spec S1 §5: credits are a billing concept. When billing is off (self_host,
+  // or no payment provider configured), there is no credit ledger to enforce —
+  // a self-host operator who brings their own AI provider via env must not be
+  // throttled at a plan's credit cap. Mirrors feature-gate's planEnforcement bypass.
+  if (!getCapabilities().billing) {
     return { allowed: true, writeMode: flags.writeMode };
   }
 
