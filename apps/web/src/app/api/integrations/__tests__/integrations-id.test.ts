@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextResponse } from "next/server";
+
+const ORIG_ENV = process.env;
 
 const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
@@ -47,8 +49,16 @@ function makeRequest(url: string, method: string, body?: unknown): Request {
 const authCtx = { userId: "user-1", companyId: "company-1", role: "admin" };
 
 describe("integrations/[id] PATCH", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: integrations is only ON in the cloud edition.
+    // Run the functional tests in cloud mode so the gate passes; the gate's
+    // both-mode behavior is covered explicitly below.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireCompanyAccess.mockResolvedValue(authCtx);
     mockRequireRole.mockReturnValue(null);
   });
@@ -116,8 +126,13 @@ describe("integrations/[id] PATCH", () => {
 });
 
 describe("integrations/[id] DELETE", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireCompanyAccess.mockResolvedValue(authCtx);
     mockRequireRole.mockReturnValue(null);
   });
@@ -162,5 +177,74 @@ describe("integrations/[id] DELETE", () => {
       makeParams("int-999"),
     );
     expect(res.status).toBe(404);
+  });
+});
+
+// ── Capability gate (REAL requireCapability) — both editions ─────────────────
+// integrations is OFF on self_host (default) and ON on cloud. The [id] mutation
+// handlers must be server-authoritative: a self_host user with admin role + auth
+// still gets a 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+
+describe("integrations/[id] — capability gate (both editions)", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue(authCtx);
+    mockRequireRole.mockReturnValue(null);
+    mockReturning.mockResolvedValue([{ id: "int-1" }]);
+  });
+
+  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+    });
+
+    it("PATCH returns 403 CAPABILITY_DISABLED for integrations", async () => {
+      const res = await PATCH(
+        makeRequest("/api/integrations/int-1", "PATCH", { status: "active" }),
+        makeParams("int-1"),
+      );
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("integrations");
+    });
+
+    it("DELETE returns 403 CAPABILITY_DISABLED for integrations", async () => {
+      const res = await DELETE(
+        makeRequest("/api/integrations/int-1", "DELETE"),
+        makeParams("int-1"),
+      );
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("integrations");
+    });
+  });
+
+  describe("cloud (BURNLESS_DEPLOYMENT=cloud)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
+    });
+
+    it("PATCH passes the capability gate (not a 403)", async () => {
+      const res = await PATCH(
+        makeRequest("/api/integrations/int-1", "PATCH", { status: "active" }),
+        makeParams("int-1"),
+      );
+      expect(res.status).not.toBe(403);
+    });
+
+    it("DELETE passes the capability gate (not a 403)", async () => {
+      const res = await DELETE(
+        makeRequest("/api/integrations/int-1", "DELETE"),
+        makeParams("int-1"),
+      );
+      expect(res.status).not.toBe(403);
+    });
   });
 });

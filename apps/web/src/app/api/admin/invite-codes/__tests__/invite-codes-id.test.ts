@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextResponse } from "next/server";
+
+const ORIG_ENV = process.env;
 
 const { mockRequireCompanyAccess, mockRequireRole } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
@@ -96,8 +98,16 @@ const adminCtx = {
 const makeParams = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("Admin Invite Codes [id] API", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: invite-codes is only ON in the cloud edition.
+    // Run the functional tests in cloud mode so the gate passes; the gate's
+    // both-mode behavior is covered explicitly below.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireCompanyAccess.mockResolvedValue(adminCtx);
     mockRequireRole.mockReturnValue(null);
 
@@ -306,6 +316,93 @@ describe("Admin Invite Codes [id] API", () => {
         makeParams("code-1")
       );
       expect(res.status).toBe(401);
+    });
+  });
+});
+
+// ── Capability gate (REAL requireCapability) — both editions ─────────────────
+// inviteCodes is OFF on self_host (default) and ON on cloud. The [id] mutation
+// handlers must be server-authoritative: a self_host user with admin role + auth
+// still gets a 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+
+describe("Admin Invite Codes [id] API — capability gate (both editions)", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue(adminCtx);
+    mockRequireRole.mockReturnValue(null);
+
+    mockUpdate.mockReturnValue({ set: mockSet });
+    mockSet.mockReturnValue({ where: mockWhere });
+    mockWhere.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([{ id: "code-1" }]);
+
+    mockSelect.mockReturnValue({ from: mockSelectFrom });
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
+    mockSelectWhere.mockReturnValue({
+      limit: mockSelectLimit,
+      then: (resolve: (v: unknown) => unknown) => resolve([{ count: 0 }]),
+    });
+    mockSelectLimit.mockResolvedValue([{ id: "code-1" }]);
+    mockDelete.mockReturnValue({ where: mockDeleteWhere });
+    mockDeleteWhere.mockResolvedValue(undefined);
+  });
+
+  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+    });
+
+    it("PATCH returns 403 CAPABILITY_DISABLED for inviteCodes", async () => {
+      const res = await PATCH(
+        jsonRequest("/api/admin/invite-codes/code-1", "PATCH", {
+          isActive: false,
+        }),
+        makeParams("code-1")
+      );
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("inviteCodes");
+    });
+
+    it("DELETE returns 403 CAPABILITY_DISABLED for inviteCodes", async () => {
+      const res = await DELETE(
+        jsonRequest("/api/admin/invite-codes/code-1", "DELETE"),
+        makeParams("code-1")
+      );
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.code).toBe("CAPABILITY_DISABLED");
+      expect(data.capability).toBe("inviteCodes");
+    });
+  });
+
+  describe("cloud (BURNLESS_DEPLOYMENT=cloud)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
+    });
+
+    it("PATCH passes the capability gate (not a 403)", async () => {
+      const res = await PATCH(
+        jsonRequest("/api/admin/invite-codes/code-1", "PATCH", {
+          isActive: false,
+        }),
+        makeParams("code-1")
+      );
+      expect(res.status).not.toBe(403);
+    });
+
+    it("DELETE passes the capability gate (not a 403)", async () => {
+      const res = await DELETE(
+        jsonRequest("/api/admin/invite-codes/code-1", "DELETE"),
+        makeParams("code-1")
+      );
+      expect(res.status).not.toBe(403);
     });
   });
 });

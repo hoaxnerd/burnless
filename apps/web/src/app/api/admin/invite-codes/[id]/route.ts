@@ -9,6 +9,7 @@ import {
   parseBody,
 } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
+import { requireCapability } from "@/lib/capabilities";
 
 const updateSchema = z.object({
   isActive: z.boolean().optional(),
@@ -33,6 +34,9 @@ export const PATCH = withErrorHandler(
 
     const roleErr = requireRole(ctx, "admin");
     if (roleErr) return roleErr;
+
+    const capErr = requireCapability("inviteCodes");
+    if (capErr) return capErr;
 
     const { id } = await params;
 
@@ -95,6 +99,9 @@ export const DELETE = withErrorHandler(
 
     const roleErr = requireRole(ctx, "admin");
     if (roleErr) return roleErr;
+
+    const capErr = requireCapability("inviteCodes");
+    if (capErr) return capErr;
 
     const { id } = await params;
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, integrations } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { requireCapability } from "@/lib/capabilities";
 
 // ── PATCH /api/integrations/[id] — Update integration status ────────────────
 
@@ -19,6 +20,9 @@ export const PATCH = withErrorHandler(async (
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  const capErr = requireCapability("integrations");
+  if (capErr) return capErr;
 
   const { id } = await params;
   const parsed = await parseBody(request, updateSchema);
@@ -52,6 +56,9 @@ export const DELETE = withErrorHandler(async (
   if ("error" in ctx) return ctx.error;
   const roleErr = requireRole(ctx, "admin");
   if (roleErr) return roleErr;
+
+  const capErr = requireCapability("integrations");
+  if (capErr) return capErr;
 
   const { id } = await params;
 

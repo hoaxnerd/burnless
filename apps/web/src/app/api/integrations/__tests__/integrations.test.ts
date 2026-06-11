@@ -315,8 +315,14 @@ describe("POST /api/integrations", () => {
 // ── Tests: PATCH /api/integrations/[id] ──────────────────────────────────────
 
 describe("PATCH /api/integrations/[id]", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: integrations is only ON in the cloud edition.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireRole.mockReturnValue(null);
     mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
@@ -401,8 +407,14 @@ describe("PATCH /api/integrations/[id]", () => {
 // ── Tests: DELETE /api/integrations/[id] ─────────────────────────────────────
 
 describe("DELETE /api/integrations/[id]", () => {
+  afterEach(() => {
+    process.env = ORIG_ENV;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // Capability gate is REAL: integrations is only ON in the cloud edition.
+    process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" };
     mockRequireRole.mockReturnValue(null);
     mockRequirePlanFeature.mockResolvedValue(null);
     dbResults = [];
