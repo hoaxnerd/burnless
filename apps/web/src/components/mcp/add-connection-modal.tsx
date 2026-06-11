@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { ExternalLink, KeyRound, Lock, Plus } from "lucide-react";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { useCapabilities } from "@/components/providers/capability-context";
 import { glyphStyle } from "./provider-colors";
 
 /**
@@ -183,8 +184,11 @@ function BlockLabel({ children, className = "" }: { children: string; className?
 }
 
 export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionModalProps) {
+  const caps = useCapabilities();
   const [step, setStep] = useState<Step>("configure");
   const [tab, setTab] = useState<Tab>("paste");
+  // Default "company" so when the toggle is hidden (!multiTenant) we submit
+  // company scope, matching the server's coercion in resolveOwnerScope.
   const [scope, setScope] = useState<"company" | "personal">("company");
   const [config, setConfig] = useState("");
   const [formName, setFormName] = useState("");
@@ -563,37 +567,45 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
             </p>
           )}
 
-          <BlockLabel className="mt-4">Who can use this connection?</BlockLabel>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              aria-pressed={scope === "company"}
-              onClick={() => setScope("company")}
-              className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
-                scope === "company"
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-surface-200 hover:border-surface-300"
-              }`}
-            >
-              <b className="text-[12.5px] font-bold text-surface-900">Company</b>
-              <small className="text-[10.5px] text-surface-500">
-                Shared with all members
-              </small>
-            </button>
-            <button
-              type="button"
-              aria-pressed={scope === "personal"}
-              onClick={() => setScope("personal")}
-              className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
-                scope === "personal"
-                  ? "border-accent-500 bg-accent-50"
-                  : "border-surface-200 hover:border-surface-300"
-              }`}
-            >
-              <b className="text-[12.5px] font-bold text-surface-900">Personal</b>
-              <small className="text-[10.5px] text-surface-500">Only you</small>
-            </button>
-          </div>
+          {/* Task 13: personal scope is meaningless single-user — hide the
+              toggle when !multiTenant (self_host). The server coerces to
+              company regardless (resolveOwnerScope), and the default `scope`
+              state stays "company" so the hidden case submits company. */}
+          {caps.multiTenant && (
+            <>
+              <BlockLabel className="mt-4">Who can use this connection?</BlockLabel>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={scope === "company"}
+                  onClick={() => setScope("company")}
+                  className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
+                    scope === "company"
+                      ? "border-brand-500 bg-brand-50"
+                      : "border-surface-200 hover:border-surface-300"
+                  }`}
+                >
+                  <b className="text-[12.5px] font-bold text-surface-900">Company</b>
+                  <small className="text-[10.5px] text-surface-500">
+                    Shared with all members
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={scope === "personal"}
+                  onClick={() => setScope("personal")}
+                  className={`flex flex-1 flex-col gap-0.5 rounded-lg border-[1.5px] px-[11px] py-[9px] text-left transition-colors ${
+                    scope === "personal"
+                      ? "border-accent-500 bg-accent-50"
+                      : "border-surface-200 hover:border-surface-300"
+                  }`}
+                >
+                  <b className="text-[12.5px] font-bold text-surface-900">Personal</b>
+                  <small className="text-[10.5px] text-surface-500">Only you</small>
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
 

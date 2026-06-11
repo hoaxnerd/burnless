@@ -1,11 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as baseRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { AddConnectionModal } from "../add-connection-modal";
+import { CapabilityProvider } from "@/components/providers/capability-context";
+import { EDITION_PRESETS } from "@/lib/capabilities";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
 beforeEach(() => fetchMock.mockReset());
+
+// The modal reads useCapabilities() to decide whether to show the scope
+// toggle (Task 13). Render under the cloud preset (multiTenant: true) so the
+// Company/Personal toggle is present, matching these tests' expectations.
+function render(ui: ReactElement) {
+  return baseRender(
+    <CapabilityProvider value={EDITION_PRESETS.cloud}>{ui}</CapabilityProvider>,
+  );
+}
 
 describe("AddConnectionModal", () => {
   it("opens on the Paste config tab with scope defaulting to Company", () => {
