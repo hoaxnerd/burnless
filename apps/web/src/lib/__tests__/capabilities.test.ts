@@ -88,3 +88,13 @@ describe("auto-degrade", () => {
     expect(getCapabilities().oauthLogin).toBe(false);
   });
 });
+
+describe("back-compat alias", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("BURNLESS_ALLOW_STDIO_MCP=false disables stdioMcp under self_host", async () => {
+    process.env = { ...ORIG, BURNLESS_ALLOW_STDIO_MCP: "false" };
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().stdioMcp).toBe(false);
+  });
+});

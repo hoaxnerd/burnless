@@ -72,6 +72,8 @@ export function getCapabilities(): Capabilities {
     const override = envFlag(CAP_ENV[cap]);
     if (override !== undefined) base[cap] = override;
   }
+  // Back-compat: legacy env that predates BURNLESS_CAP_STDIO_MCP.
+  if (process.env.BURNLESS_ALLOW_STDIO_MCP === "false") base.stdioMcp = false;
   // auto-degrade: capabilities that need credentials/runtime cannot be forced on
   if (!hasPaymentProvider()) base.billing = false;
   if (!hasManagedAiKey()) base.managedAiProvider = false;
