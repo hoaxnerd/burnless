@@ -12,6 +12,7 @@ interface WizardShellProps {
   onSkip: () => void;
   onContinue: () => void;
   hideBack?: boolean;
+  hideSkip?: boolean;
   children: ReactNode; // the active step panel
 }
 
@@ -30,6 +31,7 @@ export function WizardShell({
   onSkip,
   onContinue,
   hideBack,
+  hideSkip,
   children,
 }: WizardShellProps) {
   const activeIndex = steps.findIndex((s) => s.id === activeId);
@@ -96,13 +98,15 @@ export function WizardShell({
                 ← Back
               </button>
             )}
-            <button
-              type="button"
-              onClick={onSkip}
-              className="rounded-xl border-none bg-transparent px-2 py-2.5 text-xs font-medium text-surface-500 transition-colors hover:text-surface-700 dark:hover:text-surface-300"
-            >
-              Skip this step
-            </button>
+            {!hideSkip && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="rounded-xl border-none bg-transparent px-2 py-2.5 text-xs font-medium text-surface-500 transition-colors hover:text-surface-700 dark:hover:text-surface-300"
+              >
+                Skip this step
+              </button>
+            )}
             <button
               type="button"
               onClick={onContinue}

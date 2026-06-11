@@ -44,9 +44,9 @@ export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
 /**
  * Detailed-entity element schemas previously embedded in `onboardingSchema`.
- * Retained as standalone exports so the (now route-unused) bulk-import helpers
- * in `onboarding-imports.ts` stay type-safe until they are retired (Task 14).
- * The SANE_MAX_* bounds still guard any caller that re-uses them.
+ * Retained as standalone exports for the enrich agent / future callers that
+ * validate AI-suggested detailed entities. The SANE_MAX_* bounds still guard
+ * any caller that re-uses them.
  */
 export const suggestedFundingRoundSchema = z.object({
   name: z.string(),

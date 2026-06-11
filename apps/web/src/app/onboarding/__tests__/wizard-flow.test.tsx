@@ -88,6 +88,62 @@ describe("S4b onboarding wizard flow", () => {
     expect(screen.queryByLabelText("Your Name")).not.toBeInTheDocument();
   });
 
+  it("C1: the Company step does NOT render the shell's 'Skip this step' control", async () => {
+    mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
+
+    render(<OnboardingPage />);
+    await submitWebsite();
+
+    // Company step is mandatory (it creates the company) — skipping it would
+    // jump to Revenue with no company. The shell hides Skip on this step.
+    expect(await screen.findByTestId("company-continue")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /skip this step/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("C2: a 409 ONBOARDING_ALREADY_COMPLETE on company POST advances (onCreated path), not an error", async () => {
+    // First call: the enrich stream → wizard Company step.
+    mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
+    // Second call: the company POST → 409 already-complete with companyId.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        error: "Company already exists for this user",
+        code: "ONBOARDING_ALREADY_COMPLETE",
+        companyId: "company-abc",
+        redirectTo: "/dashboard",
+      }),
+    } as unknown as Response);
+    // Third call: handleCompanyCreated fetches /api/departments.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as unknown as Response);
+
+    render(<OnboardingPage />);
+    await submitWebsite();
+
+    const continueBtn = await screen.findByTestId("company-continue");
+    // Company name is required before Continue submits.
+    fireEvent.change(screen.getByLabelText(/company name/i), {
+      target: { value: "Acme Inc." },
+    });
+    await act(async () => {
+      fireEvent.click(continueBtn);
+    });
+
+    // Advanced to Revenue (stepper highlights Revenue) — no "Company already exists" error shown.
+    expect(
+      await screen.findByRole("heading", { name: /revenue/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/company already exists/i),
+    ).not.toBeInTheDocument();
+  });
+
   it("(b) enrich `agent_failed` → renders the explicit AI-error step", async () => {
     mockApiFetch.mockResolvedValue(
       sseResponse([{ type: "agent_failed", message: "boom", recoverable: true }]),

@@ -72,9 +72,19 @@ export function CompanyStep({ initial, onCreated }: CompanyStepProps) {
         }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          companyId?: string;
+        };
+        // Back → Company → Continue re-confirm: the company already exists.
+        // Treat it as success and advance with the existing companyId.
+        if (res.status === 409 && body.code === "ONBOARDING_ALREADY_COMPLETE" && body.companyId) {
+          onCreated(body.companyId);
+          return;
+        }
         throw new Error(
-          (body as { error?: string }).error ?? "Could not create your company. Please try again.",
+          body.error ?? "Could not create your company. Please try again.",
         );
       }
       const { companyId } = (await res.json()) as { companyId: string };

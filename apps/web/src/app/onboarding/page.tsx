@@ -405,6 +405,7 @@ export default function OnboardingPage() {
         onSkip={advance}
         onContinue={advance}
         hideBack={onCompanyStep}
+        hideSkip={onCompanyStep}
       >
         {panel}
       </WizardShell>
