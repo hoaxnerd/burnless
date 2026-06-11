@@ -1,5 +1,6 @@
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
+import { PgDatabase } from "drizzle-orm/pg-core";
 import postgres from "postgres";
 import * as schema from "./schema";
 import { resolveDriver } from "./client/resolve";
@@ -68,6 +69,15 @@ export const db: Database = new Proxy({} as Database, {
   },
   has(_t, prop) {
     return Reflect.has(resolveLiveDb() as object, prop);
+  },
+  // Drizzle's `is(db, PgDatabase)` (used by @auth/drizzle-adapter at import time,
+  // before initDatabase() runs) checks the prototype chain. Both postgres-js and
+  // PGLite drizzle instances are PgDatabase subclasses (public type is
+  // PostgresJsDatabase, a PgDatabase). Forwarding getPrototypeOf to PgDatabase.prototype
+  // makes the Proxy type-detectable WITHOUT a live instance — so adapter construction
+  // works during `next build` page-data collection (no DATABASE_URL yet). spec §6.
+  getPrototypeOf() {
+    return PgDatabase.prototype;
   },
 });
 
