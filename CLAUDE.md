@@ -176,7 +176,28 @@ AI (pick one): `AI_PROVIDER` + matching key (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY
 OAuth: `AUTH_GITHUB_{ID,SECRET}`, `AUTH_GOOGLE_{ID,SECRET}`.
 Billing: `STRIPE_SECRET_KEY` / `RAZORPAY_*`.
 Ops: `CRON_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_APP_URL`, `ALLOWED_ORIGINS`.
-Detection helpers in `lib/env.ts`: `hasAiProvider`, `hasStripe`, `hasRazorpay`, `hasBilling`.
+MCP platform: `SECRETS_ENCRYPTION_KEY` (32-byte base64), `BURNLESS_DEPLOYMENT` (`cloud`|`self_host`), `BURNLESS_ALLOW_STDIO_MCP` — see the release checklist below for who needs which.
+Detection helpers in `lib/env.ts`: `hasAiProvider`, `hasStripe`, `hasRazorpay`, `hasBilling`; deploy gate `deploymentMode`/`allowStdioMcp`.
+
+## Release & deployment checklist (MCP platform A+B+C)
+
+> The MCP platform shipped in three sub-projects: A (consume external MCPs), B (expose our own MCP server), C (the `burnless` CLI). This checklist captures what each deployment target needs — it is **not** a "set everything everywhere" list.
+
+### 🚨 Before the open-source release — publish the `burnless` CLI
+The CLI (`packages/cli`, npm name **`burnless`**) is the **only public package** in this monorepo (everything else is `private: true`; the root package is named `burnless-monorepo` to free the name). It is **not yet published**. Before/at open-source release:
+- `pnpm --filter burnless build` then `npm publish --dry-run` (sanity), then **`npm publish`** (needs `npm login`; `publishConfig.access` is `public`). Confirm the `license` field is intentional first.
+- This is a deliberate human step — never auto-published by CI or an agent. Until it ships, `npx burnless` / `npm i -g burnless` will not resolve for users.
+
+### Per-target requirements
+
+| Requirement | Local standalone (self-host) | Hosted cloud |
+|---|---|---|
+| **DB schema** — apply migrations (`pnpm db:migrate`; dev may `db:push`). Universal: the schema must exist on the instance's DB (embedded PGLite *or* Postgres), **not prod-only**. Current head includes `0003` (consume, A) + `0004` (expose, B). | **Required** | **Required** |
+| **`SECRETS_ENCRYPTION_KEY`** (32-byte base64; `openssl rand -base64 32`) — encrypts **external-MCP connection credentials** at rest (consume side, `queries/mcp.ts` only). The expose side (PATs/OAuth we issue) is SHA-256 **hashed**, not encrypted, so it does NOT need this. Lazily enforced: the app boots without it and only throws when a user saves/reads an external-MCP credential. | **Only if connecting external MCPs** (the consume feature) | **Set it** (cloud offers consume) |
+| **`BURNLESS_DEPLOYMENT`** — `deploymentMode` defaults to `self_host` (stdio MCP enabled). `=cloud` forces stdio MCP hard-off (no local process spawning on hosted). | **Leave unset** (default is correct) | **`=cloud`** |
+| **`BURNLESS_ALLOW_STDIO_MCP`** — self-host operator opt-out (`=false` disables stdio even on self-host); ignored/forced-off in cloud. | Optional | n/a |
+
+The expose server (B) and CLI (C) add **no new required env** beyond the above — both key off the existing `NEXT_PUBLIC_APP_URL` (the OAuth AS issuer + PRM `resource` derive from it). Remaining MCP sub-projects, scoped but not built: **D** (scheduled/periodic MCP calls via the cron-worker) and **E** (dynamic schema-driven UI per connected MCP) — see `docs/research/2026-06-10-mcp-and-cli-standards.md` §6 and the out-of-scope sections of the two MCP design specs.
 
 ## Top-level docs (informational; may drift from code — verify)
 
