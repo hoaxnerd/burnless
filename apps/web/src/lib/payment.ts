@@ -6,6 +6,7 @@
  */
 
 import { env } from "@/lib/env";
+import { getCapabilities } from "./capabilities";
 import {
   StripePaymentProvider,
   RazorpayPaymentProvider,
@@ -100,8 +101,11 @@ export function planFromPlanId(planId: string | undefined): "free" | "pro" | "te
 }
 
 /**
- * Check if any billing provider is configured.
+ * Whether billing is enabled — gated by edition/capability, not mere config
+ * presence. `capabilities.billing` auto-degrades to false when no payment
+ * provider is configured (so `true` implies a provider exists) and is off
+ * under self_host. (S1 Task 9 — capability spine.)
  */
 export function isBillingEnabled(): boolean {
-  return env.hasBilling;
+  return getCapabilities().billing;
 }
