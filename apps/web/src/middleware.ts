@@ -110,7 +110,7 @@ export function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.rewrite(new URL("/not-found", request.url));
+    return NextResponse.rewrite(new URL("/not-found", request.url), { status: 404 });
   }
 
   // Rate-limit API routes + the MCP endpoint (expose spec §4.1)
