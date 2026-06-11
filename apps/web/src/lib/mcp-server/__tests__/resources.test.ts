@@ -84,4 +84,22 @@ describe("buildMcpReadResource", () => {
     const read = makeReader(["read"]);
     await expect(read("burnless://reports/nope")).rejects.toThrow(/Unknown resource/);
   });
+
+  it("never leaks the whole payload under a narrow key — error path throws", async () => {
+    // get_financial_statements error shape (no scenario) has neither section.
+    mockExecuteToolCall.mockResolvedValue(JSON.stringify({ success: false, error: "No scenario found" }));
+    const read = makeReader(["read"]);
+    await expect(read("burnless://reports/pnl")).rejects.toThrow(/No scenario found/);
+    await expect(read("burnless://reports/cash-flow")).rejects.toThrow(/No scenario found/);
+  });
+
+  it("throws rather than returning the sibling section when a key is absent", async () => {
+    // Hypothetical unwrapped shape: cashFlow present, profitAndLoss missing.
+    mockExecuteToolCall.mockResolvedValue(JSON.stringify({ success: true, cashFlow: { endingCash: 5 } }));
+    const read = makeReader(["read"]);
+    await expect(read("burnless://reports/pnl")).rejects.toThrow(/no "profitAndLoss" section/);
+    // cash-flow still resolves to exactly its own section (no leak of anything else).
+    const cf = JSON.parse(await read("burnless://reports/cash-flow"));
+    expect(cf).toEqual({ cashFlow: { endingCash: 5 } });
+  });
 });

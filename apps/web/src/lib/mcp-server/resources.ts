@@ -57,6 +57,20 @@ export interface McpResourceDeps {
   state: McpSessionState;
 }
 
+/** Extract one named section from a get_financial_statements payload. Throws if
+ *  the tool reported an error or the section is absent — so a resource read
+ *  never silently returns the wrong/whole payload under a narrow key. */
+function pickSection(payload: Record<string, unknown>, key: "profitAndLoss" | "cashFlow"): unknown {
+  if (payload && payload.success === false) {
+    throw new Error(`Report unavailable: ${String(payload.error ?? "unknown error")}`);
+  }
+  const section = payload?.[key];
+  if (section === undefined || section === null) {
+    throw new Error(`Report unavailable: get_financial_statements returned no "${key}" section.`);
+  }
+  return section;
+}
+
 export function buildMcpReadResource(deps: McpResourceDeps): (uri: string) => Promise<string> {
   return async (uri) => {
     if (!deps.state.scopes.includes("read")) {
@@ -74,11 +88,14 @@ export function buildMcpReadResource(deps: McpResourceDeps): (uri: string) => Pr
     switch (base) {
       case "burnless://reports/pnl": {
         const payload = JSON.parse(await executeToolCall("get_financial_statements", period, ctx));
-        return JSON.stringify({ profitAndLoss: payload.profitAndLoss ?? payload });
+        // Pick the named section explicitly — never fall back to the whole payload
+        // (that would leak the sibling cash-flow section under the P&L key, and on
+        // the error path would surface the raw {success:false,error} object).
+        return JSON.stringify({ profitAndLoss: pickSection(payload, "profitAndLoss") });
       }
       case "burnless://reports/cash-flow": {
         const payload = JSON.parse(await executeToolCall("get_financial_statements", period, ctx));
-        return JSON.stringify({ cashFlow: payload.cashFlow ?? payload });
+        return JSON.stringify({ cashFlow: pickSection(payload, "cashFlow") });
       }
       case "burnless://reports/metrics":
         return executeToolCall("get_metrics", period, ctx);
