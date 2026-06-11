@@ -11,6 +11,15 @@ test.use({ storageState: "e2e/.auth/user.json" });
 // role="dialog" and intercepts clicks otherwise — documented pattern from
 // mcp-connections.spec.ts).
 test.beforeEach(async ({ page }) => {
+  // This spec mints/revokes tokens and toggles the company kill switch — mutating,
+  // shared-company state. The default "chromium" project (testIgnore-based) also
+  // picks it up via the saved storageState and would race the "authenticated"
+  // project in parallel on the same company. Pin it to its registered project
+  // (playwright.config projects[2]); test.info() reliably exposes the project name.
+  test.skip(
+    test.info().project.name !== "authenticated",
+    "expose flows run only in the authenticated project (shared mutating state)",
+  );
   await page.addInitScript(() => {
     window.localStorage.setItem(
       "burnless-cookie-consent",
