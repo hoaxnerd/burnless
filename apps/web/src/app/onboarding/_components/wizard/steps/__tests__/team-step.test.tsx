@@ -80,6 +80,43 @@ describe("TeamStep", () => {
     expect(screen.getByRole("button", { name: /edit/i })).toBeTruthy();
   });
 
+  it("#7 submit() POSTs a normalized payload with a resolved departmentId", async () => {
+    const ref = createRef<WizardStepHandle>();
+    // Suggestion carries a resolved departmentId (the page's toHeadcountSuggestions
+    // resolves the AI role's department NAME against the loaded departments before
+    // it reaches the step) and a contractor type to exercise normalization.
+    const contractor: EditableHeadcount = {
+      ...suggestion,
+      departmentId: "d1",
+      title: "Contract Designer",
+      employeeType: "contractor",
+      salary: 99999, // contractor → normalizer forces salary to 0
+      hourlyRate: 80,
+      hoursPerWeek: 30,
+    };
+    render(<TeamStep ref={ref} departments={departments} suggestions={[contractor]} />);
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(true);
+
+    const posted = vi
+      .mocked(apiFetch)
+      .mock.calls.find(
+        ([u, init]) => String(u) === "/api/headcount" && init?.method === "POST",
+      );
+    expect(posted).toBeTruthy();
+    const body = JSON.parse(posted![1]?.body as string);
+
+    // departmentId resolved to a real department, not blank.
+    expect(body.departmentId).toBe("d1");
+    expect(body.departmentId).not.toBe("");
+    expect(body.title).toBe("Contract Designer");
+    // normalizeHeadcountPayload zeroes contractor salary + keeps hourly fields.
+    expect(body.salary).toBe(0);
+    expect(body.hourlyRate).toBe(80);
+    expect(body.hoursPerWeek).toBe(30);
+  });
+
   it("#7 submit() returns false when a POST fails", async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       ok: false,

@@ -1,9 +1,11 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { forecastLineName } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { extractApiError } from "@/lib/api-error";
+import { normalizeExpensePayload } from "@/lib/expense-params";
 import {
   ExpenseForm,
   type ExpenseRow,
@@ -41,6 +43,47 @@ function mapSuggestionToAccount(
     if (match) return match.id;
   }
   return accounts[0]!.id;
+}
+
+/**
+ * Build the API payload from a stored `ExpenseRow` the SAME way the real
+ * `ExpenseForm.onSubmit` does — via `normalizeExpensePayload` — so the headless
+ * auto-save flush (#7, never opens the form) POSTs the exact shape the form would
+ * have produced. Without this, `flush()` POSTed the raw `ExpenseRow`, which:
+ *   - carried `accountId: ""` (AI suggestions are mapped against an EMPTY accounts
+ *     list at page-build time — accounts load async inside this step), and
+ *   - carried a free-form display `name` (e.g. "AWS Hosting") that fails
+ *     `createForecastLineSchema`'s `forecastLineName()` bare-identifier regex
+ *     → the "name: Invalid" 400 seen on Continue.
+ *
+ * Here we resolve a real `accountId` (the row's own id, else the closest default
+ * account by category name) and pass it + the row's method/parameters/dates/etc.
+ * through the real normalizer. A display `name` that is not a valid forecast-line
+ * identifier is dropped to null (the form likewise leaves name blank → null unless
+ * the user typed a valid identifier).
+ */
+function safeLineName(name: string | null | undefined): string | null {
+  const v = (name ?? "").trim();
+  if (v === "") return null;
+  return forecastLineName().safeParse(v).success ? v : null;
+}
+
+function rowToPayload(row: ExpenseRow, accountId: string): ExpenseSubmitPayload {
+  return normalizeExpensePayload({
+    method: row.method,
+    parameters: row.parameters,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    frequency: row.frequency ?? "monthly",
+    isOneTime: row.isOneTime ?? false,
+    isRecurring: row.isRecurring ?? null,
+    vendor: row.vendor ?? null,
+    notes: row.notes ?? null,
+    name: safeLineName(row.name),
+    subcategory: row.subcategory ?? null,
+    departmentId: row.departmentId ?? null,
+    accountId,
+  });
 }
 
 /**
@@ -88,23 +131,33 @@ export const ExpensesStep = forwardRef<WizardStepHandle, ExpensesStepProps>(
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Accounts load async (GET /api/accounts) AFTER useDraftList is created, so a
+  // create()/update() closure capturing `accounts` from first render would see
+  // [] and POST a blank accountId. Read the latest accounts from a ref instead so
+  // the Continue-time flush uses the loaded accounts (stale-closure fix).
+  const accountsRef = useRef<AccountRow[]>([]);
+
   const api = useDraftList<ExpenseRow, ExpenseSubmitPayload>({
     suggestions,
     create: async (values) => {
+      const accountId =
+        values.accountId || mapSuggestionToAccount(values, accountsRef.current);
       const res = await apiFetch("/api/forecast-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(rowToPayload(values, accountId)),
       });
       if (!res.ok) throw new Error(await extractApiError(res));
       const body = (await res.json()) as { id: string };
       return body.id;
     },
     update: async (id, values) => {
+      const accountId =
+        values.accountId || mapSuggestionToAccount(values, accountsRef.current);
       const res = await apiFetch(`/api/forecast-lines/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(rowToPayload(values, accountId)),
       });
       if (!res.ok) throw new Error(await extractApiError(res));
     },
@@ -125,6 +178,7 @@ export const ExpensesStep = forwardRef<WizardStepHandle, ExpensesStepProps>(
         const expenseAccounts = rows.filter(
           (a) => a.category === "operating_expense" || a.category === "cogs",
         );
+        accountsRef.current = expenseAccounts;
         setAccounts(expenseAccounts);
       } catch (err) {
         if (!cancelled) {

@@ -128,6 +128,55 @@ describe("ExpensesStep", () => {
     expect(screen.getByRole("button", { name: /edit/i })).toBeTruthy();
   });
 
+  it("#7 submit() resolves a blank accountId and normalizes the payload (fixes name:Invalid)", async () => {
+    const ref = createRef<WizardStepHandle>();
+    render(
+      <ExpensesStep
+        ref={ref}
+        suggestions={[
+          {
+            // The page maps AI suggestions with an EMPTY accounts list, so the
+            // stored row's accountId is blank and the name is a free-form display
+            // label with spaces (invalid as a forecast-line identifier).
+            id: "draft-1",
+            accountId: "",
+            method: "fixed",
+            parameters: { amount: 1000 },
+            startDate: "2025-01-01",
+            endDate: null,
+            name: "AWS Hosting",
+            subcategory: "Cloud Infrastructure",
+          },
+        ]}
+      />,
+    );
+
+    // Accounts load async AFTER useDraftList is created — the flush must see them
+    // via the ref, not a stale [] closure.
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/accounts"));
+
+    const result = await ref.current!.submit();
+    expect(result).toBe(true);
+
+    const posted = vi
+      .mocked(apiFetch)
+      .mock.calls.find(
+        ([u, init]) => String(u) === "/api/forecast-lines" && init?.method === "POST",
+      );
+    expect(posted).toBeTruthy();
+    const body = JSON.parse(posted![1]?.body as string);
+
+    // accountId resolved to a real loaded account (matched "Cloud Infrastructure").
+    expect(body.accountId).toBe("a1");
+    expect(body.accountId).not.toBe("");
+    // The free-form display name (spaces) is dropped to null so it passes
+    // createForecastLineSchema's forecastLineName() identifier regex.
+    expect(body.name).toBeNull();
+    // Normalized shape: method + parameters present.
+    expect(body.method).toBe("fixed");
+    expect(body.parameters).toEqual({ amount: 1000 });
+  });
+
   it("#7 submit() returns false when a POST fails", async () => {
     vi.mocked(apiFetch).mockImplementation(((url: unknown, init?: RequestInit) => {
       const u = String(url);
