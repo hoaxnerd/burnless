@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { canPerformAction } from "../feature-gate";
 
 // Mock @burnless/ai so tests are isolated from plan config changes
@@ -37,6 +37,10 @@ vi.mock("@burnless/ai", () => {
 
 describe("feature-gate", () => {
   describe("canPerformAction", () => {
+    const ORIG_ENV = process.env;
+    beforeEach(() => { process.env = { ...ORIG_ENV, BURNLESS_DEPLOYMENT: "cloud" }; });
+    afterEach(() => { process.env = ORIG_ENV; });
+
     describe("create_scenario", () => {
       it("blocks free plan at limit", () => {
         const result = canPerformAction("free", "create_scenario", 1);
@@ -170,5 +174,16 @@ describe("feature-gate", () => {
         expect(result.allowed).toBe(true);
       });
     });
+  });
+});
+
+describe("planEnforcement bypass", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("allows a normally-blocked action when planEnforcement is off (self_host)", () => {
+    process.env = { ...ORIG }; delete process.env.BURNLESS_DEPLOYMENT; // self_host → planEnforcement off
+    // 'free' plan normally caps create_scenario at 1; usage 5 would be blocked.
+    const result = canPerformAction("free", "create_scenario", 5);
+    expect(result.allowed).toBe(true);
   });
 });

@@ -5,6 +5,7 @@
  */
 
 import { getPlan, type PlanKey } from "@burnless/ai";
+import { getCapabilities } from "./capabilities";
 
 export type Plan = PlanKey;
 
@@ -20,6 +21,7 @@ export function canPerformAction(
   action: GatedAction,
   currentUsage?: number
 ): { allowed: boolean; reason?: string; upgradeTarget?: Plan } {
+  if (!getCapabilities().planEnforcement) return { allowed: true };
   const def = getPlan(plan);
 
   switch (action) {
