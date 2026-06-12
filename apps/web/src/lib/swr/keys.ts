@@ -37,7 +37,11 @@ export const KEYS = {
 
   notifications: "/api/notifications",
 
+  // Scheduled automations (Automations page + chat-create proposal card)
+  automations: "/api/automations",
+
   // Parameterized keys — call as functions
+  automation: (id: string) => `/api/automations/${id}`,
   mcpConnection: (id: string) => `/api/mcp/connections/${id}`,
   mcpConnectionTools: (id: string) => `/api/mcp/connections/${id}/tools`,
   aiDashboard: (days: number) => `/api/ai-dashboard?days=${days}`,

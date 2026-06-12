@@ -398,3 +398,46 @@ export function useNotifications(config?: SWRConfiguration<NotificationsResponse
     ...config,
   });
 }
+
+export interface AutomationDto {
+  id: string;
+  name: string;
+  prompt: string;
+  actionKind: "write" | "notify";
+  allowedTools: string[];
+  boundConnectionIds: string[];
+  schedule: string;
+  timezone: string;
+  enabled: boolean;
+  status: "active" | "disabled" | "auto_disabled" | "error";
+  notifyPolicy: "smart" | "failures" | "every" | "off";
+  consecutiveFailures: number;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+}
+export interface AutomationRunDto {
+  id: string;
+  status: "running" | "success" | "failed" | "missed";
+  trigger: "schedule" | "manual" | "dry_run";
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  tokensUsed: number | null;
+  summary: string | null;
+  output: Record<string, unknown> | null;
+  error: string | null;
+}
+
+export function useAutomations(config?: SWRConfiguration<{ jobs: AutomationDto[] }>) {
+  return useSWR<{ jobs: AutomationDto[] }>(KEYS.automations, config);
+}
+export function useAutomation(
+  id: string | null,
+  config?: SWRConfiguration<{ job: AutomationDto; runs: AutomationRunDto[] }>,
+) {
+  return useSWR<{ job: AutomationDto; runs: AutomationRunDto[] }>(
+    id ? KEYS.automation(id) : null,
+    config,
+  );
+}
