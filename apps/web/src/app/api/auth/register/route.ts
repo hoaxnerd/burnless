@@ -7,6 +7,7 @@ import { hashPassword } from "@/lib/password";
 import { email } from "@/lib/email";
 import { verificationEmail } from "@/lib/email/templates";
 import { withErrorHandler } from "@/lib/api-helpers";
+import { requireCapability } from "@/lib/capabilities";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -26,6 +27,11 @@ const registerSchema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
+  // S4a — self-host is single-user: public signup is closed (additional users
+  // come via the S5 CLI `users create`). Cloud keeps self-serve signup.
+  const denied = requireCapability("selfServeSignup");
+  if (denied) return denied;
+
   const blocked = await applyRateLimit(request, "auth");
   if (blocked) return blocked;
 
