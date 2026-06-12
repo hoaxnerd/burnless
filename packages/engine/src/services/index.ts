@@ -20,6 +20,8 @@ export {
   type CrawlOptions,
 } from "./crawl";
 
+export { DirectFetchProvider } from "./direct-fetch";
+
 export {
   createWebSearchService,
   resetWebSearchService,

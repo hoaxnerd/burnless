@@ -11,6 +11,8 @@
  *   console.log(result.markdown); // clean text content
  */
 
+import { DirectFetchProvider } from "./direct-fetch";
+
 // ── Interface ────────────────────────────────────────────────────────────────
 
 export interface CrawlResult {
@@ -162,9 +164,12 @@ let _crawlService: CrawlService | null = null;
 export function createCrawlService(): CrawlService {
   if (_crawlService) return _crawlService;
 
-  const provider = process.env.CRAWL_PROVIDER ?? "crawl4ai";
+  const provider = process.env.CRAWL_PROVIDER ?? "direct-fetch";
 
   switch (provider) {
+    case "direct-fetch":
+      _crawlService = new DirectFetchProvider();
+      break;
     case "crawl4ai":
       _crawlService = new Crawl4AIProvider();
       break;
