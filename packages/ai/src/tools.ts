@@ -799,6 +799,12 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "list_accounts",
+    description:
+      "List the company's chart of accounts (id, name, type, category). Use this to resolve an account NAME to its id before recording a transaction with record_transaction. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "create_department",
     description:
       "Create a new department for organizing headcount plans.",

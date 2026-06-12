@@ -34,6 +34,7 @@ import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
 import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
+import { transactionSchemas, transactionHandlers } from "./transactions";
 // NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
 // and is loaded lazily inside executeToolCall instead.
 import { describeMcpToolAction } from "./mcp-describe";
@@ -68,6 +69,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...webSearchSchemas,
   ...webScrapingSchemas,
   ...genuiDisplaySchemas,
+  ...transactionSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -80,6 +82,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...webSearchHandlers,
   ...webScrapingHandlers,
   ...genuiDisplayHandlers,
+  ...transactionHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
