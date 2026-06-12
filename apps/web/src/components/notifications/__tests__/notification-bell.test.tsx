@@ -7,6 +7,7 @@ const { mockUseNotifications, mockApiFetch } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/swr/hooks", () => ({ useNotifications: mockUseNotifications }));
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: mockApiFetch }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import { NotificationBell } from "../notification-bell";
 

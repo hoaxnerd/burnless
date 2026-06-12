@@ -29,6 +29,7 @@ export {
   useScenarioComparison,
   useScenarioOverrides,
   useOverrideCount,
+  useNotifications,
 } from "./hooks";
 export type {
   Scenario,
@@ -47,6 +48,8 @@ export type {
   Integration,
   Company,
   ScenarioOverridesPayload,
+  NotificationDto,
+  NotificationsResponse,
 } from "./hooks";
 export {
   createScenario,

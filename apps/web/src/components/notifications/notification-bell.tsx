@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Info, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useNotifications, type NotificationDto } from "@/lib/swr/hooks";
 import { apiFetch } from "@/lib/api-fetch";
@@ -31,9 +32,19 @@ function timeAgo(iso: string): string {
 
 export function NotificationBell({ collapsed = false }: { collapsed?: boolean }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const { data, mutate } = useNotifications();
   const unread = data?.unreadCount ?? 0;
   const items = data?.notifications ?? [];
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
   async function patch(payload: Record<string, unknown>) {
     await apiFetch(KEYS.notifications, {
@@ -48,6 +59,8 @@ export function NotificationBell({ collapsed = false }: { collapsed?: boolean })
     <div className="relative">
       <button
         aria-label="Notifications"
+        aria-expanded={open}
+        aria-haspopup="true"
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
       >
@@ -84,7 +97,15 @@ export function NotificationBell({ collapsed = false }: { collapsed?: boolean })
             ) : (
               <ul>
                 {items.map((n) => (
-                  <Row key={n.id} n={n} onClick={() => void patch({ ids: [n.id] })} />
+                  <Row
+                    key={n.id}
+                    n={n}
+                    onClick={() => void patch({ ids: [n.id] })}
+                    onNavigate={async (link) => {
+                      await patch({ ids: [n.id] });
+                      router.push(link);
+                    }}
+                  />
                 ))}
               </ul>
             )}
@@ -95,10 +116,18 @@ export function NotificationBell({ collapsed = false }: { collapsed?: boolean })
   );
 }
 
-function Row({ n, onClick }: { n: NotificationDto; onClick: () => void }) {
+function Row({
+  n,
+  onClick,
+  onNavigate,
+}: {
+  n: NotificationDto;
+  onClick: () => void;
+  onNavigate: (link: string) => Promise<void>;
+}) {
   const Icon = SEVERITY_ICON[n.severity];
   const body = (
-    <div className={`flex gap-2.5 px-4 py-3 ${n.readAt ? "opacity-60" : "bg-brand-50/40"}`}>
+    <div className={`flex gap-2.5 px-4 py-3 ${n.readAt ? "opacity-60" : "bg-brand-100/40"}`}>
       <Icon className={`mt-0.5 h-4 w-4 flex-none ${SEVERITY_TONE[n.severity]}`} />
       <div className="min-w-0">
         <p className="text-[12.5px] font-semibold text-surface-900">{n.title}</p>
@@ -112,7 +141,14 @@ function Row({ n, onClick }: { n: NotificationDto; onClick: () => void }) {
   return (
     <li className="border-b border-surface-100 last:border-b-0">
       {n.link ? (
-        <a href={n.link} onClick={onClick} className="block hover:bg-surface-50">
+        <a
+          href={n.link}
+          onClick={(e) => {
+            e.preventDefault();
+            void onNavigate(n.link!);
+          }}
+          className="block hover:bg-surface-50"
+        >
           {body}
         </a>
       ) : (
