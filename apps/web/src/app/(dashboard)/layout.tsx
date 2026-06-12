@@ -5,6 +5,7 @@ import { getCompanyForAuthUser, getDashboardPreferences } from "@/lib/data";
 import { DashboardShell } from "./dashboard-shell";
 import { SentryUserContext } from "@/components/sentry-user-context";
 import { ChatSessionProvider } from "@/components/ai/chat-session-context";
+import { getCapabilities } from "@/lib/capabilities";
 
 export default async function DashboardLayout({
   children,
@@ -13,8 +14,14 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  // Email verification temporarily disabled (BUR-161)
-  // if (!session.user.isEmailVerified) redirect("/verify-email");
+  // Email verification — cap-gated (S4a). Off on self_host (no wall); restored
+  // for cloud. OAuth users auto-verify (signIn callback), so only cloud
+  // credentials signups hit this. `emailVerification` auto-degrades off in S1
+  // when no email provider is configured, so a misconfigured cloud instance
+  // won't wall users.
+  if (getCapabilities().emailVerification && !session.user.isEmailVerified) {
+    redirect("/verify-email");
+  }
 
   const company = await getCompanyForAuthUser(session.user.id!);
   if (!company) redirect("/onboarding");
