@@ -5,7 +5,10 @@
  * is real; only framework seams that the import graph pulls are mocked.
  */
 import { describe, it, expect, vi } from "vitest";
+import { and, eq } from "drizzle-orm";
 import { createUser, createCompany, createFinancialAccount } from "@db-test/factories";
+import { getTestDb } from "@db-test/setup";
+import { transactions } from "@burnless/db";
 import type { ToolContext } from "../types";
 
 // Import-graph isolation (same idiom as audit-attribution.test.ts): the
@@ -25,6 +28,15 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("next/headers", () => ({
   cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
+}));
+// The handler's trackDataMutation fires invalidateInsights fire-and-forget (correct
+// production behavior — matches the api/transactions route). Under PGLite (single
+// connection, no pool) that in-flight INSERT...ON CONFLICT overlaps the next
+// record_transaction call's own upsert and deadlocks. Stub the tracker so the test
+// exercises only the transaction write path (the assertions don't cover insight
+// restaling). Real postgres-js pools have no such overlap.
+vi.mock("@/lib/data-mutation-tracker", () => ({
+  trackDataMutation: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { transactionHandlers } from "../transactions";
@@ -93,6 +105,35 @@ describe("record_transaction classification", () => {
     expect(MUTATION_TOOL_NAMES.has("record_transaction")).toBe(true);
     const { __testables } = await import("../index");
     expect(__testables.NON_FACADE_MUTATION_TOOLS.has("record_transaction")).toBe(true);
+  });
+});
+
+describe("record_transaction (idempotent upsert)", () => {
+  it("re-running with the same externalId updates the existing row, not a duplicate", async () => {
+    const { ctx, revenueAccountId, companyId } = await setup();
+    const first = JSON.parse(await transactionHandlers.record_transaction!(
+      { accountId: revenueAccountId, date: "2026-06-08", amount: 100, externalId: "ch_dup" }, ctx
+    ));
+    expect(first.action).toBe("created");
+    const second = JSON.parse(await transactionHandlers.record_transaction!(
+      { accountId: revenueAccountId, date: "2026-06-08", amount: 250, externalId: "ch_dup" }, ctx
+    ));
+    expect(second.action).toBe("updated");
+
+    // exactly one row for that externalId, amount reflects the update
+    const rows = await getTestDb()
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.companyId, companyId), eq(transactions.externalId, "ch_dup")));
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0]!.amount)).toBe(250);
+  });
+
+  it("two transactions with NO externalId both insert (nulls are not deduped)", async () => {
+    const { ctx, revenueAccountId } = await setup();
+    const a = JSON.parse(await transactionHandlers.record_transaction!({ accountId: revenueAccountId, date: "2026-06-08", amount: 1 }, ctx));
+    const b = JSON.parse(await transactionHandlers.record_transaction!({ accountId: revenueAccountId, date: "2026-06-08", amount: 2 }, ctx));
+    expect(a.id).not.toBe(b.id);
   });
 });
 
