@@ -9,6 +9,7 @@ import {
   useQueryState,
 } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { KEYS, revalidate } from "@/lib/swr";
 import { useMcpConnectionTools } from "@/lib/swr/hooks";
 import { glyphStyle } from "./provider-colors";
@@ -78,7 +79,7 @@ export function ManageConnectionPanel({
         { optimisticData: apply, rollbackOnError: true, revalidate: false },
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update tool");
+      setError(toUserMessage(e));
     }
   }
 
@@ -96,7 +97,7 @@ export function ManageConnectionPanel({
         error?: string;
       };
       if (!res.ok || !data.authorizationUrl) {
-        setError(data.error ?? "Failed to start authorization");
+        setError(toUserMessage(data));
         setBusy(false);
         return;
       }
@@ -124,7 +125,7 @@ export function ManageConnectionPanel({
       const res = await apiFetch(KEYS.mcpConnection(id), { method: "DELETE" });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Failed to remove connection");
+        setError(toUserMessage(body));
         setBusy(false);
         return;
       }

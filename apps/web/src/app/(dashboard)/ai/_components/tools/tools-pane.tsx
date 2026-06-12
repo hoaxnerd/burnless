@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { KEYS } from "@/lib/swr";
 import {
   useUserPreferences,
@@ -77,7 +78,7 @@ export function ToolsPane({ conversationId }: { conversationId: string | null })
         { optimisticData: apply, rollbackOnError: true, revalidate: false },
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update tool for this chat");
+      setError(toUserMessage(e));
     }
   }
 
@@ -168,7 +169,7 @@ export function ToolsPane({ conversationId }: { conversationId: string | null })
         await toggleSession(key, false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update preferences");
+      setError(toUserMessage(e));
     }
   }
 
@@ -197,7 +198,7 @@ export function ToolsPane({ conversationId }: { conversationId: string | null })
       }
       if (sessionKey != null) await mutate(sessionKey);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to reset session grants");
+      setError(toUserMessage(e));
     } finally {
       setResetting(false);
     }

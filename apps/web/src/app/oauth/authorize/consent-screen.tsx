@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { Button, Select } from "@/components/ui";
 import { PermClassTag } from "@/components/mcp/perm-class-tag";
+import { toUserMessage } from "@/lib/api-error";
 
 type Scope = "read" | "write" | "delete";
 
@@ -68,7 +69,7 @@ export function ConsentScreen({
       });
       const body = await res.json();
       if (!res.ok) {
-        setError(body.error ?? "Authorization failed");
+        setError(toUserMessage(body));
         setSubmitting(false);
         return;
       }

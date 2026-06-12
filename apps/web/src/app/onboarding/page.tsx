@@ -162,7 +162,8 @@ export default function OnboardingPage() {
             } else if (event.type === "revenue_streams") {
               setRevenueStreams(event.value || []);
             } else if (event.type === "status") {
-              setGreeting(event.message as string);
+              const statusText = event.message as string;
+              setGreeting(statusText);
             } else if (event.type === "done") {
               movedOnRef.current = true;
               enterWizard(true);

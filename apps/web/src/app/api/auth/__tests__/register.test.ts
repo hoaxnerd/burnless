@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist mock functions so vi.mock factories can reference them
 const {
@@ -82,8 +82,18 @@ function jsonRequest(body: unknown): Request {
   });
 }
 
+const ENV = { ...process.env };
+
 describe("POST /api/auth/register", () => {
   beforeEach(() => {
+    // S1 capability spine: public self-serve signup is gated by the
+    // `selfServeSignup` capability, which is OFF in the self_host preset (single
+    // user, auto-login) and ON in cloud. The create/validate/duplicate flow these
+    // tests exercise only runs once past that gate, so pin the edition to cloud.
+    // The self_host 403 behavior is covered separately in route.capability.test.ts.
+    process.env.BURNLESS_DEPLOYMENT = "cloud";
+    delete process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP;
+
     vi.clearAllMocks();
     // Re-setup chains after clearAllMocks
     mockSelect.mockReturnValue({ from: mockFrom });
@@ -95,6 +105,10 @@ describe("POST /api/auth/register", () => {
       then: (cb: (v: unknown) => void) => Promise.resolve().then(cb),
       catch: () => Promise.resolve(),
     });
+  });
+
+  afterEach(() => {
+    process.env = { ...ENV };
   });
 
   describe("successful registration", () => {

@@ -116,6 +116,11 @@ const ALLOWED = [
   "packages/ai/src/routing.ts",
   // page-insights.ts line 155: comment example "$1M ARR". Not display code.
   "packages/ai/src/page-insights.ts",
+  // tools-genui.ts line 400: the `dryRunPreview` tool-schema field DESCRIPTION
+  // shows the model an example narration ("Fetched $12,480 from Stripe …") of
+  // what shape to return — an AI prompt/schema example string, not display code.
+  // Same rationale as the AI-prompt-template / page-context allowlist entries.
+  "packages/ai/src/tools-genui.ts",
 
   // ── DB schema / seed: comments only ─────────────────────────────────────
   // schema.ts: "// $50 default" comments on integer columns.
@@ -189,6 +194,14 @@ const ALLOWED = [
   "apps/web/src/app/onboarding/_components/wizard/steps/__tests__/",
   // ai-tabs-render.test.tsx (Batch H SET-07) uses `$${n}` in a vi.mock() stub.
   "apps/web/src/app/(dashboard)/settings/__tests__/",
+
+  // ── Automations dry-run / runner tests (S3a) ──────────────────────────────
+  // These tests assert on MOCKED AI chat/dry-run responses ("Set MRR to $12,480.",
+  // "would set MRR $11,900 → $12,480") — the dollar strings are the model's own
+  // narrated output stubbed into a vi.fn(), fixture text, not display code.
+  "apps/web/src/app/api/automations/dry-run/__tests__/",
+  "apps/web/src/app/(dashboard)/ai/_components/generative/__tests__/",
+  "apps/web/src/lib/automations/__tests__/",
 
   // ── Regex backreferences ($1/$2), NOT currency ────────────────────────────
   // These lines contain String.replace() backreference templates ("$1 $2" /

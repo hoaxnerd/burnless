@@ -20,6 +20,7 @@ import { useState } from "react";
 import { Sparkles, Pencil, ShieldCheck, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { describeCron } from "@/lib/automations/schedule-presets";
 import { ScheduleEditor } from "../../../automations/_components/schedule-editor";
 
@@ -127,7 +128,7 @@ export function GenProposeScheduledJob({
       onAction?.(`Scheduled '${name}'. Anything else?`);
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Could not schedule.");
+      setErrorMsg(toUserMessage(err));
     }
   }
 
@@ -151,7 +152,7 @@ export function GenProposeScheduledJob({
       setStatus("idle");
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "The run failed.");
+      setErrorMsg(toUserMessage(err));
     }
   }
 

@@ -3,7 +3,9 @@
  * exact JSON input and require `Proceed? (y/N)` unless --yes/-y. Non-TTY
  * without --yes refuses with exit 2 (CI must be explicit). Category comes from
  * a deliberately tiny local prefix heuristic — pinned in the design:
- * delete_ → delete; create_ / update_ → write; everything else → read.
+ * delete_ → delete; create_ / update_ / record_ → write; everything else →
+ * read. (record_ covers record_transaction, the one mutation tool that does not
+ * use a create_/update_/delete_ prefix.)
  *
  * The heuristic stays runtime-dependency-free on purpose (importing the
  * authoritative @burnless/ai `categorizeToolName` would bundle the whole AI
@@ -11,8 +13,8 @@
  * honest by a registry drift guard in `__tests__/write-safety.test.ts`: that
  * test enumerates @burnless/ai's `MUTATION_TOOL_NAMES` (the server-side
  * write+delete set) and asserts every member classifies here as non-`read`.
- * Today all mutation tools are prefixed create_/update_/delete_, so the
- * heuristic is exhaustive; the moment a non-prefixed mutation tool is added
+ * Mutation tools are prefixed create_/update_/delete_/record_, so the heuristic
+ * is exhaustive; the moment a mutation tool with a new prefix is added
  * server-side, that test fails instead of letting the write gate be bypassed.
  */
 import { createInterface } from "node:readline/promises";
@@ -22,7 +24,7 @@ export type ToolCategory = "read" | "write" | "delete";
 
 export function categorizeTool(name: string): ToolCategory {
   if (name.startsWith("delete_")) return "delete";
-  if (name.startsWith("create_") || name.startsWith("update_")) return "write";
+  if (name.startsWith("create_") || name.startsWith("update_") || name.startsWith("record_")) return "write";
   return "read";
 }
 

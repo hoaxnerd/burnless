@@ -102,6 +102,10 @@ vi.mock("@burnless/db", () => ({
   // active pending action so the existing scenarios stay unaffected.
   getActivePendingAction: vi.fn().mockResolvedValue(undefined),
   resolvePendingAction: vi.fn().mockResolvedValue(undefined),
+  // S3b §11 disabled-tools overlay: default to nothing disabled so existing
+  // scenarios stay unaffected.
+  getSessionDisabledTools: vi.fn().mockResolvedValue({}),
+  getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -144,6 +148,11 @@ vi.mock("@burnless/ai", () => ({
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
+}));
+
+// MCP tools assembly (spec §3.4): empty for these tests — no connected servers.
+vi.mock("@/lib/ai-tools/mcp", () => ({
+  assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], handlers: {} }),
 }));
 
 vi.mock("@/lib/chat-stream", () => ({

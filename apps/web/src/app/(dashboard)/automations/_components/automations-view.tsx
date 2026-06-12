@@ -10,7 +10,7 @@
  * Card handlers fire-and-mutate via apiFetch:
  *   onToggle(enabled) → PATCH /api/automations/[id] { enabled }
  *   onRunNow          → POST  /api/automations/[id]/run
- *   onDelete          → window.confirm → DELETE /api/automations/[id]
+ *   onDelete          → useConfirm() → DELETE /api/automations/[id]
  *   onEdit            → open <AutomationEditModal>; onSave(patch) → PATCH + mutate
  *
  * Design-system: token utilities + primitives only. The "＋ New job" pill mirrors
@@ -24,6 +24,7 @@ import { Clock, Plus } from "lucide-react";
 import { useAutomations } from "@/lib/swr/hooks";
 import type { AutomationDto } from "@/lib/swr/hooks";
 import { apiFetch } from "@/lib/api-fetch";
+import { useConfirm } from "@/components/ui";
 import { PageEmptyState } from "@/components/ui/empty-state";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { AutomationCard } from "./automation-card";
@@ -32,6 +33,7 @@ import { AutomationEditModal, type AutomationEditPatch } from "./automation-edit
 export function AutomationsView() {
   const { data, mutate, isLoading } = useAutomations();
   const [editing, setEditing] = useState<AutomationDto | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   const jobs = data?.jobs ?? [];
 
@@ -49,7 +51,13 @@ export function AutomationsView() {
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm("Delete this automation? This can't be undone.")) return;
+    const ok = await confirm({
+      title: "Delete this automation?",
+      body: "This can't be undone — the scheduled job and its run history are removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     await apiFetch(`/api/automations/${id}`, { method: "DELETE" });
     await mutate();
   }
@@ -117,6 +125,7 @@ export function AutomationsView() {
           onSave={(patch) => onSaveEdit(editing.id, patch)}
         />
       )}
+      {dialog}
     </div>
   );
 }

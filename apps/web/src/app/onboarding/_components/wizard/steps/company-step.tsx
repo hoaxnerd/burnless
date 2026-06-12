@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { Input, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { STAGE_OPTIONS, MODEL_OPTIONS } from "../../constants";
 import type { WizardStepHandle } from "../types";
 
@@ -95,7 +96,7 @@ export const CompanyStep = forwardRef<WizardStepHandle, CompanyStepProps>(
       onCreated(companyId);
       return true;
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Could not create your company. Please try again.");
+      setSubmitError(toUserMessage(err));
       return false;
     } finally {
       setSubmitting(false);

@@ -45,6 +45,10 @@ const ALLOWED: { match: string; why: string }[] = [
     match: "app/verify-email/page.tsx",
     why: "Resend verification is fire-and-forget; the send-verification API always returns 200, so there is no failure to surface.",
   },
+  {
+    match: "app/onboarding/page.tsx",
+    why: "Post-create departments GET is a best-effort READ (not a mutation); the Team step intentionally degrades to an empty department list on failure — no user action to report.",
+  },
 ];
 
 function isAllowed(file: string): boolean {

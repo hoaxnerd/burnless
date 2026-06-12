@@ -12,6 +12,22 @@ vi.mock("next-auth/react", () => ({
   signOut: vi.fn(),
 }));
 
+// The sidebar renders <NotificationBell>, which calls useRouter(). Outside an
+// app-router context that hook throws ("invariant expected app router to be
+// mounted"), so stub next/navigation with a no-op router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+  }),
+  usePathname: () => "/dashboard",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // The sidebar now reads capability + account-status context. Default to a
 // cloud-style claimed user so the Sign out control still renders (these tests
 // assert the ThemeToggle, which sits next to it, is present in both branches).

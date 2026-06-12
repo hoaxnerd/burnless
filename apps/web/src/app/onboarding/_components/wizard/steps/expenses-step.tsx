@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { Plus } from "lucide-react";
 import { forecastLineName } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
-import { extractApiError } from "@/lib/api-error";
+import { extractApiError, toUserMessage } from "@/lib/api-error";
 import { normalizeExpensePayload } from "@/lib/expense-params";
 import {
   ExpenseForm,
@@ -182,7 +182,7 @@ export const ExpensesStep = forwardRef<WizardStepHandle, ExpensesStepProps>(
         setAccounts(expenseAccounts);
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : "Failed to load accounts");
+          setLoadError(toUserMessage(err));
         }
       } finally {
         if (!cancelled) setLoading(false);

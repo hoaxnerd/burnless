@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Modal, Button, Input, Select } from "@/components/ui";
 import { useToast } from "@/components/ui/toast";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { PermClassTag } from "./perm-class-tag";
 
 type Scope = "read" | "write" | "delete";
@@ -93,7 +94,7 @@ export function NewTokenModal({
       });
       const body = await res.json();
       if (!res.ok) {
-        setError(body.error ?? "Could not create the token");
+        setError(toUserMessage(body));
         return;
       }
       setMinted({ token: body.token, name: body.name, scopes: body.scopes, expiresAt: body.expiresAt });

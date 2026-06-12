@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { ExternalLink, KeyRound, Lock, Plus } from "lucide-react";
 import { Button, Input, Modal, Select, Textarea } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
+import { toUserMessage } from "@/lib/api-error";
 import { useCapabilities } from "@/components/providers/capability-context";
 import { glyphStyle } from "./provider-colors";
 
@@ -275,7 +276,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         return;
       }
       if (!res.ok) {
-        setError(data.error ?? "Failed to create the connection");
+        setError(toUserMessage(data));
         return;
       }
       if (data.status === "needs_auth") {
@@ -309,7 +310,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
       };
       if (stale()) return; // closed mid-flight — never redirect a newer session
       if (!res.ok || !data.authorizationUrl) {
-        setError(data.error ?? "Failed to start authorization");
+        setError(toUserMessage(data));
         setBusy(false);
         return;
       }
@@ -347,7 +348,7 @@ export function AddConnectionModal({ open, onClose, onCreated }: AddConnectionMo
         return;
       }
       if (!res.ok) {
-        setError(data.error ?? "Failed to save the token");
+        setError(toUserMessage(data));
         return;
       }
       if (data.status === "connected") {

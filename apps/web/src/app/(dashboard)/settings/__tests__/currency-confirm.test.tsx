@@ -12,6 +12,22 @@ vi.mock("@/lib/api-fetch", () => ({
   apiFetch: vi.fn(),
 }));
 
+// SettingsPage reads useSearchParams() (to pick the active tab from ?tab=...).
+// Outside an app-router context that hook returns null, so the page's
+// `searchParams.get("tab")` throws. Stub next/navigation with empty params.
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+  }),
+  usePathname: () => "/settings",
+}));
+
 // Render helper: the settings page reads company + integrations via the shared
 // SWR cache (DFL-01), so the page must be wrapped in an SWRConfig whose fetcher
 // routes through the mocked apiFetch. A fresh Map cache isolates each test.
