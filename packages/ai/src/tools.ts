@@ -62,7 +62,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "activate_scenario",
     description:
-      "Switch the user's ACTIVE scenario view to an existing scenario by id, so it appears in the UI (the scenario bar at the top) and their pages reflect it. Use when the user asks to open / switch to / work in a specific existing scenario. This is a read-only VIEW change — it does not modify any data and is not gated. For a NEW scenario use create_scenario (which activates it automatically). Reading from a scenario for comparison does NOT need this — get_scenario_comparison reads any scenario by id.",
+      "Switch the user's ACTIVE scenario view to an existing scenario by id, so it appears in the UI (the scenario bar at the top) and their pages reflect it. Use when the user asks to open / switch to / work in a specific existing scenario. This is a UI-ONLY view change — it modifies NO data and is not gated. It only takes effect in a live, FOREGROUND conversation, where the user's browser applies the switch and the always-visible scenario top-bar tells them it happened. In a background or scheduled run there is no browser to apply it, so it changes nothing (no data, and not the user's active scenario) — do not call it to 'switch scenarios' in a scheduled job; just operate on the job's scenario directly. For a NEW scenario use create_scenario (which activates it automatically). Reading a scenario for comparison does NOT need this — get_scenario_comparison reads any scenario by id.",
     inputSchema: {
       type: "object",
       properties: {
