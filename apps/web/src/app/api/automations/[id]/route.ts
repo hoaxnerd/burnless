@@ -60,6 +60,8 @@ export const DELETE = withErrorHandler(async (_request: Request, { params }: Ctx
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const { id } = await params;
+  const job = await getScheduledJob(id, ctx.companyId);
+  if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await softDeleteScheduledJob(id, ctx.companyId);
   return NextResponse.json({ ok: true });
 });

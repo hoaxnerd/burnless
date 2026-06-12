@@ -55,4 +55,11 @@ describe("/api/automations/[id]", () => {
     expect(res.status).toBe(200);
     expect(h.del).toHaveBeenCalledWith("j1", "c1");
   });
+
+  it("DELETE 404s an unknown / cross-company job and does not soft-delete", async () => {
+    h.get.mockResolvedValue(null);
+    const res = await DELETE(new Request("http://x", { method: "DELETE" }), params("nope"));
+    expect(res.status).toBe(404);
+    expect(h.del).not.toHaveBeenCalled();
+  });
 });

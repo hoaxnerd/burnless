@@ -35,13 +35,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     return NextResponse.json({ error: "Invalid schedule expression." }, { status: 400 });
   }
 
-  // SAFETY (both editions): per-company job cap (#28).
-  const limits = getSafetyLimits();
-  if ((await countScheduledJobs(ctx.companyId)) >= limits.maxJobsPerCompany) {
-    return NextResponse.json({ error: `Job limit reached (${limits.maxJobsPerCompany}).` }, { status: 429 });
-  }
-
   // D10: write-mode read_only → only notify-only jobs creatable.
+  // Evaluated before the job cap so a categorically-forbidden write job
+  // surfaces the 409 gate rather than being masked by a 429 quota error.
   if (draft.actionKind === "write") {
     const ai = await checkAiFeatureAllowed(ctx.companyId, "chat");
     if (ai.writeMode === "read_only") {
@@ -50,6 +46,12 @@ export const POST = withErrorHandler(async (request: Request) => {
         { status: 409 }
       );
     }
+  }
+
+  // SAFETY (both editions): per-company job cap (#28).
+  const limits = getSafetyLimits();
+  if ((await countScheduledJobs(ctx.companyId)) >= limits.maxJobsPerCompany) {
+    return NextResponse.json({ error: `Job limit reached (${limits.maxJobsPerCompany}).` }, { status: 429 });
   }
 
   const job = await createScheduledJob({
