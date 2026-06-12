@@ -7,6 +7,10 @@ import type { SystemJob } from "../types";
 // fails to resolve under happy-dom) are not pulled into this pure-logic test.
 vi.mock("../system-jobs", () => ({ SYSTEM_JOBS: [] }));
 
+// core.ts now imports the DB-backed scheduled-job dispatcher; stub it so this
+// pure-logic test does not pull @burnless/db transitively.
+vi.mock("@/lib/automations/dispatch", () => ({ runDueScheduledJobs: vi.fn().mockResolvedValue({ ran: 0, failed: 0 }) }));
+
 const { runDueJobs } = await import("../core");
 
 const at = (iso: string) => new Date(iso);
