@@ -5,6 +5,11 @@ import { SYSTEM_JOBS } from "../system-jobs";
 vi.mock("@/lib/data-retention", () => ({
   cleanupExpiredData: vi.fn().mockResolvedValue({ conversationsDeleted: 2, cacheDeleted: 5 }),
 }));
+// The registry now imports the extracted cron libs, whose transitive deps pull
+// next-auth (unresolvable under happy-dom). Stub them — the data-retention job
+// under test does not touch them.
+vi.mock("@/lib/cron/weekly-digest", () => ({ runWeeklyDigest: vi.fn() }));
+vi.mock("@/lib/cron/batch-regenerate", () => ({ runBatchRegenerate: vi.fn() }));
 
 describe("SYSTEM_JOBS registry", () => {
   it("has unique ids", () => {
