@@ -6,6 +6,8 @@ import { db, users } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "./password";
 import { verifyTotpCode, verifyBackupCode } from "./two-factor";
+import { getCapabilities } from "./capabilities";
+import { getLocalOwner } from "./local-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -93,6 +95,24 @@ export const authConfig = {
           name: user.name,
           image: user.image,
         };
+      },
+    }),
+    /**
+     * S4a — local auto-login. Field-less: ignores all input and can return ONLY
+     * the single local owner, so a forged/CSRF call yields exactly the session
+     * auto-login would create anyway — no privilege escalation. Inert on cloud
+     * (autoLogin off). Safety ultimately rests on the 127.0.0.1 bind (spec §11).
+     */
+    Credentials({
+      id: "local-auto",
+      name: "Local",
+      credentials: {},
+      authorize: async () => {
+        if (!getCapabilities().autoLogin) return null;
+        const owner = await getLocalOwner();
+        return owner
+          ? { id: owner.id, email: owner.email, name: owner.name, image: owner.image }
+          : null;
       },
     }),
   ],
