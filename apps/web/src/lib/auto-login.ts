@@ -13,7 +13,7 @@ export function isAuthPage(pathname: string): boolean {
 /** Same-origin path only. Rejects absolute/protocol-relative URLs and auth pages. */
 export function sanitizeCallback(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
-  if (isAuthPage(raw.split("?")[0])) return "/dashboard";
+  if (isAuthPage(raw.split("?")[0] ?? raw)) return "/dashboard";
   return raw;
 }
 
