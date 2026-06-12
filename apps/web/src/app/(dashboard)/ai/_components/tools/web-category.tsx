@@ -66,12 +66,17 @@ function WebSearchRow({ ctx }: { ctx: ToolsCtx }) {
           conversationId={ctx.conversationId}
           sessionKey="builtin:search_web"
           label="Use web search in chat"
-          onToggleSession={(d) =>
-            Promise.all(WEB_TOOL_KEYS.map((k) => ctx.toggleSession(k, d))).then(() => {})
-          }
-          onKeepPermanently={(d) =>
-            Promise.all(WEB_TOOL_KEYS.map((k) => ctx.keepPermanent(k, d))).then(() => {})
-          }
+          // Fan out across BOTH web tool names, but SEQUENTIALLY — toggleSession /
+          // keepPermanent are read-modify-write (the session map / the prefs array);
+          // firing them concurrently (Promise.all) races and drops one key
+          // (last-write-wins), leaving web search half-disabled. Awaiting in series
+          // serializes the writes so both keys land.
+          onToggleSession={async (d) => {
+            for (const k of WEB_TOOL_KEYS) await ctx.toggleSession(k, d);
+          }}
+          onKeepPermanently={async (d) => {
+            for (const k of WEB_TOOL_KEYS) await ctx.keepPermanent(k, d);
+          }}
         />
       </div>
       <PostureRow modeKey="webSearchMode" label="Web search posture" />
