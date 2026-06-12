@@ -5,11 +5,6 @@ import type { AiProviderConfig } from "@/components/ai/ai-feature-context";
 
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: vi.fn() }));
 
-// AiPermissionsPanel pulls in SWR + apiFetch; stub it so the tab mounts cleanly.
-vi.mock("@/app/(dashboard)/ai/_components/ai-permissions-panel", () => ({
-  AiPermissionsPanel: () => <div data-testid="ai-permissions-panel" />,
-}));
-
 // AiDashboardTab data hook + locale formatting.
 vi.mock("@/lib/swr", () => ({
   useAiDashboard: () => ({ data: null, isLoading: false }),

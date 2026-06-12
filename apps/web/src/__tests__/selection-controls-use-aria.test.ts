@@ -33,10 +33,11 @@ const SRC = join(__dirname, "..");
 
 // The specific segmented/toggle/mode control files this guard pins.
 const TARGET_FILES = [
-  "app/(dashboard)/ai/_components/ai-permissions-panel.tsx", // AI-03 permission-level buttons (via SegmentedControl)
+  "app/(dashboard)/ai/_components/tools/posture-control.tsx", // AI-03 permission posture (via SegmentedControl) — S3b Tools pane
   // mode-switcher.tsx (deleted in Batch I — dead/unwired) carried inline aria;
   // the live canonical toggle is now the shared SegmentedControl primitive, which
-  // ai-permissions-panel and other toggles render.
+  // the Tools pane posture-control and other toggles render. (ai-permissions-panel.tsx
+  // was retired in S3b — its posture rows moved into the unified Tools pane.)
   "components/ui/segmented-control.tsx", // role="radio" + aria-checked (A11Y-CTRL-02 single-source)
 ];
 

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Power, Database, Sparkles, Pencil, Key } from "lucide-react";
 import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
 import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
-import { AiPermissionsPanel } from "@/app/(dashboard)/ai/_components/ai-permissions-panel";
 import { ProviderSection } from "./ai-provider-section";
 import { Input } from "@/components/ui";
 import { useCapabilities } from "@/components/providers/capability-context";
@@ -135,14 +134,9 @@ export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: A
         />
       )}
 
-      {/* AI Tool Permissions (per-user) */}
-      {flags.masterEnabled && (
-        <section className="rounded-2xl border border-surface-200 bg-surface-0 p-4">
-          <h3 className="text-sm font-semibold text-surface-800 mb-1">AI tool permissions</h3>
-          <p className="text-xs text-surface-500 mb-2">What the AI may do on its own in chat.</p>
-          <AiPermissionsPanel conversationId={null} />
-        </section>
-      )}
+      {/* AI tool permissions (per-user) now live in the AI Companion → Tools pane
+          (S3b unified Tools pane: Workspace + Web posture). Removed from here to
+          keep a single home for tool enablement + posture. */}
 
       {/* AI Credits Status — Task 12: gated on billing capability */}
       {caps.billing && credits && (
