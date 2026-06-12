@@ -184,6 +184,13 @@ export const headcountEmployeeTypeEnum = pgEnum("headcount_employee_type", [
   "contractor",
 ]);
 
+export const notificationSeverityEnum = pgEnum("notification_severity", [
+  "info",
+  "success",
+  "warning",
+  "error",
+]);
+
 // ── MCP (spec 2026-06-10 §3.3) ───────────────────────────────────────────────
 export const mcpTransportEnum = pgEnum("mcp_transport", ["streamable_http", "stdio"]);
 export const mcpOwnerScopeEnum = pgEnum("mcp_owner_scope", ["company", "personal"]);
@@ -2268,5 +2275,37 @@ export const exportLogs = pgTable(
     index("export_logs_company_idx").on(table.companyId),
     index("export_logs_company_created_idx").on(table.companyId, table.createdAt),
     index("export_logs_user_idx").on(table.userId),
+  ]
+);
+
+/**
+ * Generic in-app notifications (S3a Plan 2). Feature-agnostic: any server code
+ * posts via createNotification(). `category` is a free-form source tag (e.g.
+ * "automation", "connection"); `link` is an in-app deep link; `readAt` null =
+ * unread. Recipient = (companyId, userId).
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: text("category").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    severity: notificationSeverityEnum("severity").notNull().default("info"),
+    link: text("link"),
+    metadata: jsonb("metadata"),
+    readAt: timestamp("read_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("notifications_user_idx").on(table.userId, table.companyId),
+    index("notifications_unread_idx").on(table.userId, table.readAt),
+    index("notifications_created_idx").on(table.createdAt),
   ]
 );

@@ -36,6 +36,13 @@
       "when": 1781128391613,
       "tag": "0004_steady_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781235349398,
+      "tag": "0005_pale_wild_child",
+      "breakpoints": true
     }
   ]
 }
