@@ -384,6 +384,39 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       required: ["steps"],
     },
   },
+  {
+    name: "propose_scheduled_job",
+    description:
+      "Propose a scheduled automation (a recurring AI job) to the user as a confirmable card. Call this ONLY after you've inspected the data with read tools (a read-only dry-run) so you can fill an accurate `dryRunPreview`. The user confirms/edits/cancels in the card — do NOT create the job yourself. `allowedTools` is the MINIMAL frozen set the job may use at run time (scope minimization): include each tool you actually used plus the one write tool the job needs. Use `actionKind:\"write\"` if it changes data, `\"notify\"` if it only fetches and reports.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Short job name, e.g. 'Weekly Stripe revenue sync'." },
+        prompt: { type: "string", description: "The instruction the job runs each time (the 'skill')." },
+        schedule: { type: "string", description: "5-field UTC cron expression, e.g. '0 9 * * 1'." },
+        scheduleLabel: { type: "string", description: "Human-readable schedule, e.g. 'Every Monday at 9:00 AM'." },
+        actionKind: { type: "string", enum: ["write", "notify"], description: "write = changes data; notify = fetch + report only." },
+        whatItDoes: { type: "string", description: "One-sentence plain description of the job's effect." },
+        dryRunPreview: { type: "string", description: "What the read-only dry-run found + what the real run WOULD change, e.g. 'Fetched $12,480 from Stripe (Jun 2–8). Would set Subscriptions MRR 11,900 → 12,480.'" },
+        allowedTools: {
+          type: "array",
+          description: "Minimal frozen tool allowlist. Each: { name, perm, category, connector? }.",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              perm: { type: "string", enum: ["read", "write"] },
+              category: { type: "string", enum: ["connectors", "web", "workspace"] },
+              connectorLabel: { type: "string", description: "Optional connector display name (e.g. 'Stripe')." },
+            },
+            required: ["name", "perm", "category"],
+          },
+        },
+        boundConnectionIds: { type: "array", items: { type: "string" }, description: "MCP connection ids the job resolves creds for." },
+      },
+      required: ["name", "prompt", "schedule", "scheduleLabel", "actionKind", "whatItDoes", "allowedTools"],
+    },
+  },
 ];
 
 /** Input (form) tools. Populated by Plan 4. */
