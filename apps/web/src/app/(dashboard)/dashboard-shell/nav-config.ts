@@ -8,6 +8,7 @@ import {
   Sparkles,
   FolderOpen,
   Plug,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ export const coreNavItems: NavItem[] = [
   { id: "scenarios", href: "/scenarios", label: "Scenarios", icon: GitBranch },
   { id: "data-room", href: "/data-room", label: "Data Room", icon: FolderOpen },
   { id: "connections", href: "/connections", label: "Connections", icon: Plug },
+  { id: "automations", href: "/automations", label: "Automations", icon: Clock },
 ];
 
 export const aiNavItem: NavItem = { id: "ai", href: "/ai", label: "Companion", icon: Sparkles };
