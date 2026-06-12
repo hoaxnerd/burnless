@@ -13,6 +13,15 @@ export async function register() {
     } catch (e) {
       console.warn("[s4a] ensureLocalUser at boot skipped:", (e as Error).message);
     }
+
+    // S3a — start the in-process scheduler driver (self_host). No-op under the
+    // external driver (cloud / Docker+sidecar). Non-fatal.
+    try {
+      const { startInProcessScheduler } = await import("@/lib/scheduler/driver");
+      startInProcessScheduler();
+    } catch (e) {
+      console.warn("[s3a] scheduler boot skipped:", (e as Error).message);
+    }
   }
 
   const dsn = process.env.SENTRY_DSN;
