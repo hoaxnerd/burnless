@@ -215,6 +215,7 @@ function logToolAudit(
       result: result as Record<string, unknown>,
       durationMs,
       source: context.auditSource ?? "chat",
+      scheduledJobRunId: context.scheduledJobRunId ?? null,
       credentialType: context.credentialType ?? null,
       credentialId: context.credentialId ?? null,
       clientInfo: context.clientInfo ?? null,

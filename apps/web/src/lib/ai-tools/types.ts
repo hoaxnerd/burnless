@@ -23,7 +23,9 @@ export interface ToolContext {
   mode?: "plan" | "commit";
   /** Audit attribution (expose spec B5): where the call came from.
    *  Absent → "chat" (existing chat writers unchanged). */
-  auditSource?: "chat" | "mcp_server";
+  auditSource?: "chat" | "mcp_server" | "scheduled_job";
+  /** When set, links every tool call to its scheduled-job run (S3a Plan 4). */
+  scheduledJobRunId?: string;
   /** Set for MCP calls: which credential kind authorized them. */
   credentialType?: "pat" | "oauth";
   /** apiTokens.id (PAT) or oauthTokens.grantId (OAuth grant family). */
