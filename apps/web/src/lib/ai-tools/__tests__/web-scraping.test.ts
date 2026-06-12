@@ -1,4 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock the engine crawl service — read_webpage now routes through it (C3),
+// not the hosted Jina Reader.
+const crawlMock = vi.fn();
+vi.mock("@burnless/engine", () => ({
+  createCrawlService: () => ({ crawl: crawlMock }),
+}));
+
 import { crawlSchema, browserUseSchema, webScrapingHandlers } from "../web-scraping";
 
 describe("web-scraping AI tools", () => {
@@ -7,6 +15,7 @@ describe("web-scraping AI tools", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     vi.restoreAllMocks();
+    crawlMock.mockReset();
   });
 
   afterEach(() => {
@@ -38,25 +47,45 @@ describe("web-scraping AI tools", () => {
   });
 
   describe("handlers execution", () => {
-    it("executes crawl handler successfully", async () => {
-      process.env.JINA_API_KEY = "test-jina-key2";
-      const mockFetchResponse = {
-        ok: true,
-        text: async () => "Jina Crawl page content...",
-      };
-      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(mockFetchResponse as any);
+    it("read_webpage uses the engine crawl service (not Jina) and returns its markdown", async () => {
+      crawlMock.mockResolvedValue({
+        url: "https://example.com/pricing",
+        markdown: "# Pricing\n\nDirect-fetched page content.",
+        statusCode: 200,
+        success: true,
+      });
+      const fetchSpy = vi.spyOn(global, "fetch");
 
-      const result = await webScrapingHandlers.read_webpage({ url: "https://example.com/pricing" }, {} as any);
-      expect(result).toBe("Jina Crawl page content...");
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "https://r.jina.ai/https://example.com/pricing",
-        expect.objectContaining({
-          headers: {
-            "User-Agent": "burnless/1.0",
-            Authorization: "Bearer test-jina-key2",
-          },
-        })
+      const result = await webScrapingHandlers.read_webpage(
+        { url: "https://example.com/pricing" },
+        {} as any
       );
+
+      expect(result).toBe("# Pricing\n\nDirect-fetched page content.");
+      expect(crawlMock).toHaveBeenCalledWith("https://example.com/pricing", undefined);
+      // Must NOT hit the hosted Jina Reader.
+      const hitJina = fetchSpy.mock.calls.some(
+        ([u]) => typeof u === "string" && u.includes("r.jina.ai")
+      );
+      expect(hitJina).toBe(false);
+    });
+
+    it("read_webpage returns a graceful message when the crawl fails", async () => {
+      crawlMock.mockResolvedValue({
+        url: "https://example.com/blocked",
+        markdown: "",
+        statusCode: 403,
+        success: false,
+        error: "HTTP 403",
+      });
+
+      const result = await webScrapingHandlers.read_webpage(
+        { url: "https://example.com/blocked" },
+        {} as any
+      );
+
+      expect(result).toContain("Could not read");
+      expect(result).toContain("HTTP 403");
     });
 
     it("executes browser_use handler successfully with Playwright mock", async () => {

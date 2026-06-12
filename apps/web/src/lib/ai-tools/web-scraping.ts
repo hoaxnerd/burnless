@@ -1,7 +1,12 @@
 /**
  * Web scraping tools — read a single page and a browser-rendering fallback for
- * pages that anti-bot defenses block. Centralized handlers for Jina AI's
- * Reader API and Cloudflare Browser Rendering.
+ * pages that anti-bot defenses block.
+ *
+ * `read_webpage` routes through the engine `CrawlService` (default
+ * `DirectFetchProvider` — native, keyless, no Docker; see
+ * `packages/engine/src/services/crawl.ts`). This keeps the readable-page tool
+ * fully local for the OSS standalone edition. (S3a #33.)
+ * `read_webpage_rendered` uses Cloudflare Browser Rendering as a last resort.
  *
  * Each handler caps its output at MAX_RESULT_CHARS and appends a truncation
  * marker so the agent knows the content was cut. Without that marker the
@@ -9,6 +14,7 @@
  * info that lives below the fold (pricing tables, founder bios, etc.).
  */
 
+import { createCrawlService } from "@burnless/engine";
 import { z } from "zod";
 import type { ToolHandler } from "./types";
 
@@ -16,10 +22,8 @@ import type { ToolHandler } from "./types";
 
 const MAX_RESULT_CHARS = 8_000;
 const TRUNCATION_SUFFIX = "\n\n…[truncated — content exceeded result limit]";
-const FETCH_TIMEOUT_MS = 12_000;
 const BROWSER_NAV_TIMEOUT_MS = 15_000;
 const BROWSER_CDP_ENDPOINT = "wss://chrome.cloudflare.com/cdp";
-const USER_AGENT = "burnless/1.0";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -38,30 +42,16 @@ function truncate(text: string): string {
   return text.slice(0, MAX_RESULT_CHARS) + TRUNCATION_SUFFIX;
 }
 
-function jinaHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (process.env.JINA_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.JINA_API_KEY}`;
-  }
-  return headers;
-}
-
-async function fetchJina(url: string, kind: "reader"): Promise<string> {
-  const res = await fetch(url, {
-    headers: jinaHeaders(),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new Error(`Jina ${kind} returned status ${res.status}: ${res.statusText}`);
-  }
-  return truncate(await res.text());
-}
-
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const handleCrawl: ToolHandler = async (input) => {
   const { url } = crawlSchema.parse(input);
-  return fetchJina(`https://r.jina.ai/${url}`, "reader");
+  const result = await createCrawlService().crawl(url, undefined);
+  if (!result.success || !result.markdown) {
+    const reason = result.error ?? `HTTP ${result.statusCode}`;
+    return `Could not read ${url} (${reason}). The page may be unreachable or block automated reads — try search_web for the same information.`;
+  }
+  return truncate(result.markdown);
 };
 
 const handleBrowserUse: ToolHandler = async (input) => {
