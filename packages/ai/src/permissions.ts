@@ -68,6 +68,7 @@ const WRITE_TOOLS = new Set<string>([
   "update_funding_round",
   "create_funding_round_investor",
   "update_grant_milestone",
+  "record_transaction",
 ]);
 
 /** All tools that mutate data (write + delete). */

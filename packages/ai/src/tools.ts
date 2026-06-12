@@ -805,6 +805,23 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "record_transaction",
+    description:
+      "Record an ACTUAL transaction (real money that occurred) on an account — e.g. a Stripe charge or a bank debit. This writes the actuals ledger, NOT a forecast or projection. The account (accountId) determines whether it counts as revenue or expense — call list_accounts first to get the id. Pass externalId (e.g. the source system's id) to make re-runs idempotent: the same externalId updates the existing transaction instead of duplicating it. To change projections/assumptions use update_revenue_stream or update_forecast_line instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        accountId: { type: "string", description: "Target account id (from list_accounts). Determines revenue vs expense." },
+        date: { type: "string", description: "Transaction date, YYYY-MM-DD." },
+        amount: { type: "number", description: "Transaction amount (positive)." },
+        description: { type: "string", description: "Optional description / memo." },
+        vendor: { type: "string", description: "Optional vendor / counterparty." },
+        externalId: { type: "string", description: "Optional source-system id for idempotent upsert (e.g. Stripe charge id)." },
+      },
+      required: ["accountId", "date", "amount"],
+    },
+  },
+  {
     name: "create_department",
     description:
       "Create a new department for organizing headcount plans.",

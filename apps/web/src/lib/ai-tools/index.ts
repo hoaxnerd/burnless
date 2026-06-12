@@ -107,6 +107,9 @@ const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
   "update_scenario",
   "delete_scenario",
   "create_funding_round_investor",
+  // Base-table actuals writer (S3a Plan 3): writes `transactions` directly, not a
+  // scenario overlay → plan mode must return the empty envelope, not a diff.
+  "record_transaction",
 ]);
 
 /** A mutation whose plan mode yields a real scenario-override delta (diff-gate). */
