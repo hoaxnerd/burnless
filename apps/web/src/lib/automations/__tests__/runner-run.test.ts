@@ -43,7 +43,7 @@ vi.mock("@/lib/ai-tools", () => ({ executeToolCall: vi.fn().mockResolvedValue("{
 import { runScheduledJob } from "../runner";
 
 describe("runScheduledJob", () => {
-  beforeEach(() => { vi.clearAllMocks(); h.job.consecutiveFailures = 0; h.job.actionKind = "write"; h.aiCheck.mockResolvedValue({ allowed: true, writeMode: "full" }); h.chat.mockResolvedValue({ response: "Updated MRR.", toolResults: [{ tool: "update_revenue_stream", input: {}, result: "{}" }] }); });
+  beforeEach(() => { vi.clearAllMocks(); h.job.consecutiveFailures = 0; h.job.actionKind = "write"; h.job.notifyPolicy = "smart"; h.aiCheck.mockResolvedValue({ allowed: true, writeMode: "full" }); h.chat.mockResolvedValue({ response: "Updated MRR.", toolResults: [{ tool: "update_revenue_stream", input: {}, result: "{}" }] }); });
 
   it("success: records success run, resets failures, recomputes nextRunAt, notifies", async () => {
     await runScheduledJob("job1", "schedule");
@@ -75,6 +75,28 @@ describe("runScheduledJob", () => {
     const patch = h.updateJob.mock.calls[0]![2];
     expect(patch.status).toBe("auto_disabled");
     expect(patch.enabled).toBe(false);
+  });
+
+  it('notifyPolicy "off" suppresses the write-mode read_only notification', async () => {
+    h.job.notifyPolicy = "off";
+    h.aiCheck.mockResolvedValue({ allowed: true, writeMode: "read_only" });
+    await runScheduledJob("job1", "schedule");
+    expect(h.chat).not.toHaveBeenCalled();
+    expect(h.finishRun).toHaveBeenCalledWith("run1", "c1", expect.objectContaining({ status: "failed" }));
+    expect(h.notify).not.toHaveBeenCalled();
+    h.job.notifyPolicy = "smart";
+  });
+
+  it('notifyPolicy "off" suppresses the auto-disable notification', async () => {
+    h.job.notifyPolicy = "off";
+    h.job.consecutiveFailures = 2; // next failure = 3 = threshold
+    h.chat.mockRejectedValue(new Error("boom"));
+    await runScheduledJob("job1", "schedule");
+    const patch = h.updateJob.mock.calls[0]![2];
+    expect(patch.status).toBe("auto_disabled");
+    expect(patch.enabled).toBe(false);
+    expect(h.notify).not.toHaveBeenCalled();
+    h.job.notifyPolicy = "smart";
   });
 
   it("dry_run: does NOT mutate the job or notify; returns run+result", async () => {

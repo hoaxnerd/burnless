@@ -98,6 +98,7 @@ function deriveSummary(result: { response: string }): string {
 /** A write run "changed something" if any mutation tool ran (its result wasn't an error/no-op envelope). */
 function didChange(result: { toolResults: { tool: string; result: string }[] }): boolean {
   return result.toolResults.some((r) => {
+    if (!MUTATION_TOOL_NAMES.has(r.tool)) return false; // a read tool never "changes" data
     try {
       const j = JSON.parse(r.result);
       return !j.error && !j.planned && !j.suppressed;
@@ -178,7 +179,8 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
   if (job.actionKind === "write" && aiCheck.writeMode === "read_only") {
     await finishScheduledJobRun(run.id, job.companyId, { status: "failed", error: "AI write-mode is read_only" });
     await advanceSchedule({});
-    await notify("warning", `${job.name} could not write`, "This automation writes data, but AI write-mode is read-only.");
+    if (shouldNotify(job.notifyPolicy, { kind: "failed", actionKind: job.actionKind, changed: false }))
+      await notify("warning", `${job.name} could not write`, "This automation writes data, but AI write-mode is read-only.");
     return { run, result: null, status: "failed" };
   }
 
@@ -253,11 +255,8 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
           enabled: false,
           lastRunAt: new Date(),
         });
-        await notify(
-          "error",
-          `${job.name} auto-disabled`,
-          `Failed ${nextFailures} times in a row. Re-enable it after fixing the cause.`
-        );
+        if (shouldNotify(job.notifyPolicy, { kind: "auto_disabled", actionKind: job.actionKind, changed: false }))
+          await notify("error", `${job.name} auto-disabled`, `Failed ${nextFailures} times in a row. Re-enable it after fixing the cause.`);
       } else {
         await advanceSchedule({ consecutiveFailures: nextFailures });
         if (shouldNotify(job.notifyPolicy, { kind: "failed", actionKind: job.actionKind, changed: false }))
