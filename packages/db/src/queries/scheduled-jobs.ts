@@ -51,6 +51,20 @@ export async function getScheduledJob(id: string, companyId: string) {
   return row ?? null;
 }
 
+/**
+ * Single job by id ONLY (id-scoped, excluding soft-deleted). For the headless
+ * dispatcher/runner, which has already resolved the company via the due-query
+ * and reads the company off the returned row. API callers must use the
+ * company-scoped `getScheduledJob` instead.
+ */
+export async function getScheduledJobById(id: string) {
+  const [row] = await db
+    .select()
+    .from(scheduledJobs)
+    .where(and(eq(scheduledJobs.id, id), isNull(scheduledJobs.deletedAt)));
+  return row ?? null;
+}
+
 export async function listScheduledJobs(companyId: string) {
   return db
     .select()

@@ -4,6 +4,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { mockExecute } = vi.hoisted(() => ({ mockExecute: vi.fn().mockResolvedValue('{"ok":true}') }));
 vi.mock("@/lib/ai-tools", () => ({ executeToolCall: mockExecute }));
 
+// runner.ts imports orchestration collaborators (Task 7); stub them so this
+// suite, which only exercises the pure assembly/dispatch helpers, doesn't pull
+// NextAuth/DB into the happy-dom import graph.
+vi.mock("@burnless/db", () => ({
+  getScheduledJobById: vi.fn(),
+  startScheduledJobRun: vi.fn(),
+  finishScheduledJobRun: vi.fn(),
+  updateScheduledJob: vi.fn(),
+  createNotification: vi.fn(),
+}));
+vi.mock("@/lib/ai-feature-flags", () => ({ checkAiFeatureAllowed: vi.fn(), getCompanyProviderConfig: vi.fn() }));
+vi.mock("@/lib/ai-usage-tracker", () => ({ setTrackingCompanyId: vi.fn() }));
+vi.mock("@/lib/data", () => ({ getDefaultScenario: vi.fn() }));
+vi.mock("@/lib/build-ai-context", () => ({ buildAiContext: vi.fn() }));
+vi.mock("@/lib/ai-tools/mcp", () => ({ assembleMcpTools: vi.fn() }));
+
 // MUTATION_TOOL_NAMES from @burnless/ai — provide a deterministic set for the test.
 vi.mock("@burnless/ai", async (orig) => {
   const actual = await (orig as () => Promise<Record<string, unknown>>)();
@@ -24,7 +40,7 @@ const baseCtx = { companyId: "c1", userId: "u1", auditSource: "scheduled_job" as
 
 describe("assembleAllowedTools", () => {
   it("includes only allowlisted financial + MCP tools", () => {
-    const mcpTools = [{ name: "mcp__stripe__list_charges", description: "", inputSchema: { type: "object", properties: {} } }];
+    const mcpTools = [{ name: "mcp__stripe__list_charges", description: "", inputSchema: { type: "object" as const, properties: {} } }];
     const tools = assembleAllowedTools(["list_accounts", "mcp__stripe__list_charges"], mcpTools);
     expect(tools.map((t) => t.name).sort()).toEqual(["list_accounts", "mcp__stripe__list_charges"]);
     // delete_account / update_revenue_stream NOT allowlisted → excluded

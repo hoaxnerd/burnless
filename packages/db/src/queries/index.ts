@@ -155,6 +155,7 @@ export {
 export {
   createScheduledJob,
   getScheduledJob,
+  getScheduledJobById,
   listScheduledJobs,
   countScheduledJobs,
   updateScheduledJob,
