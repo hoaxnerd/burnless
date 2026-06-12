@@ -151,3 +151,24 @@ export {
   type RotateResult,
   type OauthGrantSummary,
 } from "./oauth";
+
+export {
+  createScheduledJob,
+  getScheduledJob,
+  listScheduledJobs,
+  countScheduledJobs,
+  updateScheduledJob,
+  softDeleteScheduledJob,
+  listDueScheduledJobs,
+  startScheduledJobRun,
+  finishScheduledJobRun,
+  recordMissedRun,
+  listScheduledJobRuns,
+  type CreateScheduledJobInput,
+  type UpdateScheduledJobPatch,
+  type ScheduledJobActionKind,
+  type ScheduledJobStatus,
+  type ScheduledJobNotifyPolicy,
+  type ScheduledJobRunStatus,
+  type ScheduledJobRunTrigger,
+} from "./scheduled-jobs";
