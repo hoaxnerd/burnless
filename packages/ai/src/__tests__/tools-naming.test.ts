@@ -5,10 +5,16 @@ import { DISPLAY_TOOL_NAMES, INPUT_TOOL_NAMES, PLAN_TOOL_NAMES } from "../genera
 
 const ALLOWED_PREFIXES = ["create_", "get_", "update_", "delete_"];
 const WEB_TOOLS = new Set(["search_web", "read_webpage"]);
-// View-control tools (read-only, not gated) are an intentional family — they
-// change the user's UI view (e.g. active scenario) without mutating data, so
-// they do not fit the CRUD verb prefixes. Allowlisted like WEB_TOOLS.
-const CONTROL_TOOLS = new Set(["activate_scenario", "list_scenarios"]);
+// View-control & read-only list tools (not gated) are an intentional family —
+// they either change the user's UI view (e.g. active scenario) or list entities
+// without mutating data, so they do not fit the CRUD verb prefixes (`list_*` is
+// a read, not a CRUD verb). Allowlisted like WEB_TOOLS.
+const CONTROL_TOOLS = new Set(["activate_scenario", "list_scenarios", "list_accounts"]);
+// Write tools that legitimately use a domain verb instead of a CRUD prefix.
+// `record_transaction` writes the actuals ledger (it is in WRITE_TOOLS / gated as
+// a mutation) but "record" reads more naturally than "create" for booking an
+// actual that occurred. Allowlisted so it isn't forced into a create_* rename.
+const DOMAIN_VERB_WRITE_TOOLS = new Set(["record_transaction"]);
 
 describe("tool naming convention", () => {
   const tools = getFinancialTools();
@@ -26,6 +32,7 @@ describe("tool naming convention", () => {
         isPlan ||
         WEB_TOOLS.has(t.name) ||
         CONTROL_TOOLS.has(t.name) ||
+        DOMAIN_VERB_WRITE_TOOLS.has(t.name) ||
         ALLOWED_PREFIXES.some((p) => t.name.startsWith(p));
       expect(ok, `tool "${t.name}" violates the naming convention`).toBe(true);
     }

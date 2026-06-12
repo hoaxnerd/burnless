@@ -1,8 +1,8 @@
 /**
  * Onboarding research agent.
  *
- * Drives an LLM through a bounded tool-use loop (search_web / read_webpage /
- * read_webpage_rendered) to gather a company profile from public web sources,
+ * Drives an LLM through a bounded tool-use loop (search_web / read_webpage)
+ * to gather a company profile from public web sources,
  * then returns a healed, canonically-typed `OnboardingAgentResult`. Progress is
  * reported through the
  * `onStatus` callback so callers can stream updates to the UI.
@@ -27,8 +27,8 @@ export { healOnboardingResult } from "./heal";
 
 const MAX_LOOPS = 15;
 const SEARCH_BUDGET = 5;
-const CRAWL_BUDGET = 10; // shared between `read_webpage` and `read_webpage_rendered`
-const AGENT_TOOL_NAMES = ["search_web", "read_webpage", "read_webpage_rendered"] as const;
+const CRAWL_BUDGET = 10; // bounds `read_webpage` calls
+const AGENT_TOOL_NAMES = ["search_web", "read_webpage"] as const;
 
 type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
@@ -86,13 +86,13 @@ async function runToolCall(
 ): Promise<{ content: string }> {
   try {
     const result = await executeToolCall(toolName, input, { userId });
-    if ((toolName === "read_webpage" || toolName === "read_webpage_rendered") && isBlocked(result)) {
+    if (toolName === "read_webpage" && isBlocked(result)) {
       return { content: blockedHint(url ?? "the website") };
     }
     return { content: result };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if ((toolName === "read_webpage" || toolName === "read_webpage_rendered") && isBlocked(message)) {
+    if (toolName === "read_webpage" && isBlocked(message)) {
       return { content: blockedHint(url ?? "the website") };
     }
     return { content: `${toolName} error: ${message}` };
@@ -124,14 +124,14 @@ async function dispatchToolCalls(
       continue;
     }
 
-    if (call.name === "read_webpage" || call.name === "read_webpage_rendered") {
+    if (call.name === "read_webpage") {
       if (budget.crawl >= CRAWL_BUDGET) {
         results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("read_webpage") });
         continue;
       }
       budget.crawl++;
       const url = typeof call.input.url === "string" ? call.input.url : "";
-      onStatus(call.name === "read_webpage" ? `Reading: ${url}...` : `Browser Rendering: ${url}...`);
+      onStatus(`Reading: ${url}...`);
       const { content } = await runToolCall(call.name, url, { url }, userId);
       results.push({ type: "tool_result", toolUseId: call.id, content });
       continue;

@@ -32,7 +32,6 @@ export const TOOL_NAME_ALIASES: Record<string, string> = {
   web_search: "search_web",
   search: "search_web",
   crawl: "read_webpage",
-  browser_use: "read_webpage_rendered",
 };
 
 /** Resolve a possibly-retired tool name to its current canonical name. */

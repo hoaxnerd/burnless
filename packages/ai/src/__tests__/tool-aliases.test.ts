@@ -15,7 +15,6 @@ describe("tool name aliases", () => {
     expect(canonicalToolName("search")).toBe("search_web");
     expect(canonicalToolName("web_search")).toBe("search_web");
     expect(canonicalToolName("crawl")).toBe("read_webpage");
-    expect(canonicalToolName("browser_use")).toBe("read_webpage_rendered");
   });
 
   it("returns unknown / already-current names unchanged", () => {
