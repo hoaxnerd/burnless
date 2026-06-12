@@ -26,7 +26,7 @@ vi.mock("@/lib/rate-limit", () => ({
   },
 }));
 
-import { middleware, config } from "../middleware";
+import { proxy, config } from "../proxy";
 
 function createRequest(
   path: string,
@@ -81,7 +81,7 @@ describe("/mcp middleware branch", () => {
   });
 
   it("POST /mcp with a cross-site origin is NOT CSRF-blocked (bearer-authed API)", async () => {
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { origin: "https://claude.ai", authorization: "Bearer bl_pat_abc" },
@@ -91,7 +91,7 @@ describe("/mcp middleware branch", () => {
   });
 
   it("rate-limits /mcp on the mcp tier keyed by a credential hash, not the IP path-group", async () => {
-    await middleware(
+    await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
@@ -103,7 +103,7 @@ describe("/mcp middleware branch", () => {
     expect(key).toMatch(/^mcp:[0-9a-f]+$/);
     expect(cfg).toEqual({ maxRequests: 60, windowMs: 60_000 });
     // two different tokens → two different credential keys
-    await middleware(
+    await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_OTHER", "x-forwarded-for": "1.2.3.4" },
@@ -115,7 +115,7 @@ describe("/mcp middleware branch", () => {
   });
 
   it("authenticated /mcp ALSO enforces an IP-keyed backstop (token rotation cannot mint unlimited buckets)", async () => {
-    await middleware(
+    await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
@@ -135,7 +135,7 @@ describe("/mcp middleware branch", () => {
         ? { allowed: false, remaining: 0, resetAt: Date.now() + 30_000 }
         : { allowed: true, remaining: 59, resetAt: Date.now() + 60_000 }
     );
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_rotated_999", "x-forwarded-for": "1.2.3.4" },
@@ -152,7 +152,7 @@ describe("/mcp middleware branch", () => {
   });
 
   it("unauthenticated /mcp requests fall back to an IP-derived key", async () => {
-    await middleware(
+    await proxy(
       createRequest("/mcp", {
         method: "POST",
         headers: { "x-forwarded-for": "9.9.9.9" },
@@ -164,7 +164,7 @@ describe("/mcp middleware branch", () => {
 
   it("returns 429 with Retry-After when over the limit", async () => {
     mockCheckRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, resetAt: Date.now() + 30_000 });
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/mcp", { method: "POST", headers: { authorization: "Bearer x" } })
     );
     expect(res.status).toBe(429);
@@ -174,7 +174,7 @@ describe("/mcp middleware branch", () => {
 
 describe("OAuth endpoint exemptions (spec §4.1)", () => {
   it("POST /api/oauth/token from a cross-site origin is NOT CSRF-blocked", async () => {
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/api/oauth/token", {
         method: "POST",
         headers: { origin: "https://claude.ai" },
@@ -184,7 +184,7 @@ describe("OAuth endpoint exemptions (spec §4.1)", () => {
   });
 
   it("POST /api/oauth/register is CSRF-exempt and rides the auth tier", async () => {
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/api/oauth/register", {
         method: "POST",
         headers: { origin: "https://claude.ai", "x-forwarded-for": "1.2.3.4" },
@@ -197,7 +197,7 @@ describe("OAuth endpoint exemptions (spec §4.1)", () => {
   });
 
   it("other /api mutations from a foreign origin are still CSRF-blocked", async () => {
-    const res = await middleware(
+    const res = await proxy(
       createRequest("/api/scenarios", {
         method: "POST",
         headers: { origin: "https://evil.com" },

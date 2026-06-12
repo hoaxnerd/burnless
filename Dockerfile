@@ -7,7 +7,7 @@
 # Run:    docker run -p 3000:3000 --env-file .env burnless-web
 
 # ── Stage 1: Dependencies ────────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 WORKDIR /app
 
@@ -23,7 +23,7 @@ COPY packages/ui/package.json ./packages/ui/
 RUN pnpm install --frozen-lockfile
 
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 WORKDIR /app
 
@@ -49,7 +49,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
 # ── Stage 3: Runner ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

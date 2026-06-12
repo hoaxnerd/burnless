@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveCapabilityGuard } from "../middleware";
+import { resolveCapabilityGuard } from "../proxy";
 import type { Capabilities } from "../lib/capabilities";
 
 const selfHost = { marketingSite: false, billing: false } as unknown as Capabilities;

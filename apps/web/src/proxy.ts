@@ -96,7 +96,7 @@ function fnv1a32hex(value: string): string {
  *   mutation   — 30 req/min (POST/PUT/PATCH/DELETE)
  *   read       — 100 req/min (GET)
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const caps = getCapabilities();
 
