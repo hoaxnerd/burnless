@@ -9,6 +9,13 @@ vi.mock("@/lib/swr", () => ({
   KEYS: { twoFactorStatus: "twoFactorStatus" },
 }));
 
+vi.mock("@/components/providers/capability-context", () => ({
+  useCapabilities: () => ({ autoLogin: false }),
+}));
+vi.mock("@/lib/use-account-status", () => ({
+  useAccountStatus: () => ({ status: { email: "test@example.com", isClaimed: true }, refresh: vi.fn(), error: undefined, isLoading: false }),
+}));
+
 import { SecurityTab } from "../security-tab";
 
 describe("SecurityTab — SET-08 change-password card", () => {
