@@ -221,6 +221,7 @@ import { computeDashboardData } from "../../compute-dashboard";
 import { computeCapTableInner } from "../../compute-cap-table";
 import { getFundingRounds } from "../../data";
 import { genuiDisplayHandlers } from "../genui-display";
+import { isDisplayTool } from "@burnless/ai";
 
 const ctx = { companyId: "c1", scenarioId: "s1", userId: "u1" };
 
@@ -785,5 +786,32 @@ describe("show_progress_steps", () => {
       status: "active",
     });
     expect(parsed.modelResult).toMatch(/progress_steps/);
+  });
+});
+
+describe("propose_scheduled_job", () => {
+  it("is a registered display tool", () => {
+    expect(isDisplayTool("propose_scheduled_job")).toBe(true);
+  });
+
+  it("passes the model's tool input through as the card props", async () => {
+    const out = await genuiDisplayHandlers.propose_scheduled_job!(
+      {
+        name: "X",
+        prompt: "Email me the weekly digest",
+        schedule: "0 9 * * 1",
+        scheduleLabel: "Every Monday at 9am",
+        actionKind: "read_only",
+        whatItDoes: "Sends a weekly summary",
+        dryRunPreview: "Would send 1 email",
+        allowedTools: ["show_metric_card"],
+      },
+      { companyId: "c1", userId: "u1" }
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.render.component).toBe("propose_scheduled_job");
+    expect(parsed.render.props.name).toBe("X");
+    expect(parsed.render.props.schedule).toBe("0 9 * * 1");
+    expect(parsed.modelResult).toMatch(/Proposed scheduled job: "X"/);
   });
 });

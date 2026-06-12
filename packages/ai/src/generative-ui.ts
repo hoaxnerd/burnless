@@ -100,6 +100,9 @@ export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   "show_checklist",
   "show_suggested_actions",
   "show_progress_steps",
+  // Scheduling proposal card (MCP-D): renders the AI's draft scheduled job; the
+  // tool input IS the card props (passthrough handler in genui-display.ts).
+  "propose_scheduled_job",
 ]);
 
 /** Input tool names. request_* presets are added in Plan 4. */

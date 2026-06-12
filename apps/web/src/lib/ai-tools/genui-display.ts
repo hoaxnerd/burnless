@@ -994,3 +994,16 @@ genuiDisplayHandlers.show_progress_steps = async (input) => {
     modelResult: `[progress_steps shown: ${steps.length} steps]`,
   });
 };
+
+// ── propose_scheduled_job (passthrough) ───────────────────────────────────────
+// The AI's tool input IS the card props (name/prompt/schedule/scheduleLabel/
+// actionKind/whatItDoes/dryRunPreview/allowedTools — see tools-genui.ts). Pure
+// echo: no DB, no compute. The user confirms/edits/cancels the draft in the card.
+genuiDisplaySchemas.propose_scheduled_job = z.object({}).passthrough();
+
+genuiDisplayHandlers.propose_scheduled_job = async (input) => {
+  return JSON.stringify({
+    render: { component: "propose_scheduled_job", props: input },
+    modelResult: `Proposed scheduled job: "${String(input.name ?? "automation")}". The user will confirm, edit, or cancel.`,
+  });
+};
