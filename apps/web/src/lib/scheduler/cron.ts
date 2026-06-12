@@ -15,7 +15,7 @@ function fieldMatches(field: string, value: number): boolean {
     return field.split(",").some((part) => fieldMatches(part, value));
   }
   if (field.includes("-")) {
-    const [start, end] = field.split("-").map((n) => parseInt(n, 10));
+    const [start, end] = field.split("-").map((n) => parseInt(n, 10)) as [number, number];
     return value >= start && value <= end;
   }
   return parseInt(field, 10) === value;
@@ -24,7 +24,7 @@ function fieldMatches(field: string, value: number): boolean {
 export function cronMatches(expr: string, now: Date): boolean {
   const parts = expr.trim().split(/\s+/);
   if (parts.length !== 5) return false;
-  const [min, hour, dom, month, dow] = parts;
+  const [min, hour, dom, month, dow] = parts as [string, string, string, string, string];
   const dowVal = now.getUTCDay(); // 0 = Sunday
   return (
     fieldMatches(min, now.getUTCMinutes()) &&
