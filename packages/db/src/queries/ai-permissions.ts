@@ -83,6 +83,50 @@ export async function resetSessionGrants(conversationId: string): Promise<void> 
     .where(eq(aiConversations.id, conversationId));
 }
 
+// ── Conversation session-disabled tools (S3b) ────────────────────────────────
+
+/** Read the session-disabled-tool map for a conversation ({} if none). */
+export async function getSessionDisabledTools(
+  conversationId: string
+): Promise<Record<string, boolean>> {
+  const [row] = await db
+    .select({ disabled: aiConversations.sessionDisabledTools })
+    .from(aiConversations)
+    .where(eq(aiConversations.id, conversationId))
+    .limit(1);
+  return row?.disabled ?? {};
+}
+
+/**
+ * Toggle a tool's session-disabled state — merges into the existing map.
+ * `disabled: true` sets `key = true`; `disabled: false` DELETES the key
+ * (re-enabling removes it so the map only holds active disables).
+ */
+export async function setSessionDisabledTool(
+  conversationId: string,
+  key: string,
+  disabled: boolean
+): Promise<void> {
+  const current = await getSessionDisabledTools(conversationId);
+  const next = { ...current };
+  if (disabled) next[key] = true;
+  else delete next[key];
+  await db
+    .update(aiConversations)
+    .set({ sessionDisabledTools: next })
+    .where(eq(aiConversations.id, conversationId));
+}
+
+/** Clear all session-disabled tools for a conversation. */
+export async function resetSessionDisabledTools(
+  conversationId: string
+): Promise<void> {
+  await db
+    .update(aiConversations)
+    .set({ sessionDisabledTools: {} })
+    .where(eq(aiConversations.id, conversationId));
+}
+
 // ── Pending actions (paused turns) ───────────────────────────────────────────
 
 export interface NewPendingAction {

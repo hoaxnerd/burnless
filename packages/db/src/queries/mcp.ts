@@ -242,3 +242,57 @@ export async function getDisabledMcpConnectionIds(
     .limit(1);
   return rows[0]?.disabled ?? [];
 }
+
+/** S3b: built-in tool ids this user has switched off in the Tools pane. */
+export async function getDisabledBuiltinTools(
+  userId: string,
+  companyId: string
+): Promise<string[]> {
+  const rows = await db
+    .select({ disabled: userPreferences.disabledBuiltinTools })
+    .from(userPreferences)
+    .where(
+      and(
+        eq(userPreferences.userId, userId),
+        eq(userPreferences.companyId, companyId)
+      )
+    )
+    .limit(1);
+  return rows[0]?.disabled ?? [];
+}
+
+export interface UserPreferencesPatch {
+  sidebarOrder?: string[] | null;
+  quickActionMode?: "intelligence" | "dynamic" | "custom";
+  quickActionModeOverrides?:
+    | Record<string, "intelligence" | "dynamic" | "custom">
+    | null;
+  customQuickActions?: string[] | null;
+  sidebarCollapsed?: boolean;
+  /** D11: per-user MCP kill-switch — connection ids excluded from AI context. */
+  disabledMcpConnections?: string[];
+  /** S3b: per-user built-in-tool kill-switch — tool names excluded from AI context. */
+  disabledBuiltinTools?: string[];
+}
+
+/**
+ * Atomic upsert of a user's preferences for a company. `set: patch` only updates
+ * provided keys, so partial-patch semantics are preserved (unset columns keep
+ * their stored value). The unique (userId, companyId) index makes this a single
+ * collision-free statement.
+ */
+export async function upsertUserPreferences(
+  userId: string,
+  companyId: string,
+  patch: UserPreferencesPatch
+): Promise<typeof userPreferences.$inferSelect> {
+  const [row] = await db
+    .insert(userPreferences)
+    .values({ userId, companyId, ...patch })
+    .onConflictDoUpdate({
+      target: [userPreferences.userId, userPreferences.companyId],
+      set: patch,
+    })
+    .returning();
+  return row!;
+}
