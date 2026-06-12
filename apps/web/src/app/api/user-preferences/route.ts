@@ -39,6 +39,8 @@ const patchSchema = z.object({
   sidebarCollapsed: z.boolean().optional(),
   // D11: per-user MCP kill-switch — connection ids excluded from AI context.
   disabledMcpConnections: z.array(z.string().max(100)).max(200).optional(),
+  // S3b: per-built-in-tool permanent disable — tool names dropped from the chat loop.
+  disabledBuiltinTools: z.array(z.string().max(100)).max(200).optional(),
 });
 
 export const PATCH = withErrorHandler(async (request: Request) => {

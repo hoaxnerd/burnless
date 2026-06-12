@@ -236,6 +236,35 @@ describe("/api/user-preferences", () => {
       expect(conflictArg.set).toEqual({ disabledMcpConnections: ["c1", "c2"] });
     });
 
+    // S3b: per-built-in-tool permanent disable list rides the same upsert.
+    it("accepts disabledBuiltinTools as array of tool names", async () => {
+      const upserted = { id: "pref-1", disabledBuiltinTools: ["record_transaction", "get_metrics"] };
+      mockReturning.mockResolvedValue([upserted]);
+
+      const req = new Request("http://localhost:3000/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ disabledBuiltinTools: ["record_transaction", "get_metrics"] }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const res = await PATCH(req);
+      const body = await res.json();
+
+      expect(body.disabledBuiltinTools).toEqual(["record_transaction", "get_metrics"]);
+      const conflictArg = mockOnConflict.mock.calls[0]![0];
+      expect(conflictArg.set).toEqual({ disabledBuiltinTools: ["record_transaction", "get_metrics"] });
+    });
+
+    it("rejects a non-array disabledBuiltinTools", async () => {
+      const req = new Request("http://localhost:3000/api/user-preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ disabledBuiltinTools: "record_transaction" }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      await expect(PATCH(req)).rejects.toThrow();
+    });
+
     it("rejects a non-array disabledMcpConnections", async () => {
       const req = new Request("http://localhost:3000/api/user-preferences", {
         method: "PATCH",

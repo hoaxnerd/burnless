@@ -1,7 +1,7 @@
 /** Clear the "allow for session" grants for one conversation. */
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { db, resetSessionGrants } from "@burnless/db";
+import { db, resetSessionGrants, resetSessionDisabledTools } from "@burnless/db";
 import { aiConversations } from "@burnless/db";
 import { and, eq } from "drizzle-orm";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -26,5 +26,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!conv) return errorResponse("Conversation not found", 404);
 
   await resetSessionGrants(body.conversationId);
+  await resetSessionDisabledTools(body.conversationId);
   return NextResponse.json({ ok: true });
 });
