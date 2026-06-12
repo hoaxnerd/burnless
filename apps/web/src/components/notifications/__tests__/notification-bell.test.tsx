@@ -38,6 +38,14 @@ describe("NotificationBell", () => {
     expect(screen.getByText("Job ran")).toBeTruthy();
   });
 
+  it("revalidates (mutate) when the panel is opened", () => {
+    withData(1, [{ id: "n1", category: "c", title: "t", body: null, severity: "info", link: null, readAt: null, createdAt: new Date().toISOString() }]);
+    render(<NotificationBell />);
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Notifications"));
+    expect(mutate).toHaveBeenCalled();
+  });
+
   it("Mark all read PATCHes and revalidates", async () => {
     withData(1, [{ id: "n1", category: "c", title: "t", body: null, severity: "info", link: null, readAt: null, createdAt: new Date().toISOString() }]);
     render(<NotificationBell />);

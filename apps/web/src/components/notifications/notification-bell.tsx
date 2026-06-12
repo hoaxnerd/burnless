@@ -61,7 +61,12 @@ export function NotificationBell({ collapsed = false }: { collapsed?: boolean })
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() =>
+          setOpen((v) => {
+            if (!v) void mutate(); // refetch on open so a fresh run's notification surfaces without a reload
+            return !v;
+          })
+        }
         className="relative rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
       >
         <Bell className="h-4 w-4" />
