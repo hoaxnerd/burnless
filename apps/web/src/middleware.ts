@@ -201,6 +201,10 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith("/api/auth/reset-password") &&
     !pathname.startsWith("/api/auth/send-verification") &&
     !pathname.startsWith("/api/auth/verify-email") &&
+    !pathname.startsWith("/api/auth/claim") &&
+    !pathname.startsWith("/api/auth/change-email") &&
+    !pathname.startsWith("/api/auth/suppress-autologin") &&
+    !pathname.startsWith("/api/auth/account-status") &&
     !pathname.startsWith("/api/auth/redeem-invite")
   ) {
     return next();
@@ -350,6 +354,9 @@ function resolveRateLimitTier(pathname: string, method: string) {
     pathname.startsWith("/api/auth/reset-password") ||
     pathname.startsWith("/api/auth/send-verification") ||
     pathname.startsWith("/api/auth/verify-email") ||
+    pathname.startsWith("/api/auth/claim") ||
+    pathname.startsWith("/api/auth/change-email") ||
+    pathname.startsWith("/api/auth/suppress-autologin") ||
     pathname.startsWith("/api/auth/redeem-invite")
   ) {
     return RATE_LIMITS.auth!;
