@@ -43,6 +43,13 @@
       "when": 1781235349398,
       "tag": "0005_pale_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781275220203,
+      "tag": "0006_bitter_quicksilver",
+      "breakpoints": true
     }
   ]
 }

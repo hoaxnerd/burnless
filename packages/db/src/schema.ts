@@ -1954,6 +1954,102 @@ export const financialAuditLogsRelations = relations(
 
 // ── AI Tool Audit Logs ───────────────────────────────────────────────────────
 
+// ── Scheduled AI jobs (S3a Plan 4) ──────────────────────────────────────────
+
+export const scheduledJobActionKindEnum = pgEnum("scheduled_job_action_kind", ["write", "notify"]);
+export const scheduledJobStatusEnum = pgEnum("scheduled_job_status", [
+  "active",
+  "disabled",
+  "auto_disabled",
+  "error",
+]);
+export const scheduledJobNotifyPolicyEnum = pgEnum("scheduled_job_notify_policy", [
+  "smart",
+  "failures",
+  "every",
+  "off",
+]);
+export const scheduledJobRunStatusEnum = pgEnum("scheduled_job_run_status", [
+  "running",
+  "success",
+  "failed",
+  "missed",
+]);
+export const scheduledJobRunTriggerEnum = pgEnum("scheduled_job_run_trigger", [
+  "schedule",
+  "manual",
+  "dry_run",
+]);
+
+/**
+ * User-defined scheduled AI jobs (S3a Plan 4). A job = a bounded agentic run:
+ * a capped chat tool-loop restricted to `allowedTools` (a frozen allowlist,
+ * scope-minimized at creation), executed headless with no live session.
+ * `nextRunAt` (recomputed from `schedule` after each run) is the authoritative
+ * due signal. System/operational jobs are NOT here — they stay code-registered.
+ */
+export const scheduledJobs = pgTable(
+  "scheduled_jobs",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prompt: text("prompt").notNull(),
+    actionKind: scheduledJobActionKindEnum("action_kind").notNull(),
+    /** Frozen tool-name allowlist (financial tool names + `mcp__*` names). */
+    allowedTools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
+    /** MCP connection ids whose creds the run resolves. */
+    boundConnectionIds: jsonb("bound_connection_ids").$type<string[]>().notNull().default([]),
+    /** 5-field UTC cron expression. */
+    schedule: text("schedule").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    enabled: boolean("enabled").notNull().default(true),
+    status: scheduledJobStatusEnum("status").notNull().default("active"),
+    notifyPolicy: scheduledJobNotifyPolicyEnum("notify_policy").notNull().default("smart"),
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    lastRunAt: timestamp("last_run_at", { mode: "date" }),
+    nextRunAt: timestamp("next_run_at", { mode: "date" }),
+    /** Idempotency context handed to the agent on the next run (last-run cursor/summary). */
+    lastRunCursor: jsonb("last_run_cursor").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull().$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { mode: "date" }),
+  },
+  (table) => [
+    index("scheduled_jobs_company_idx").on(table.companyId),
+    index("scheduled_jobs_due_idx").on(table.enabled, table.nextRunAt),
+  ]
+);
+
+/**
+ * One row per fire of a scheduled job (success/failed/missed). `summary` is the
+ * one-line "what it did" surfaced in run history + notifications; `output` holds
+ * the structured tool-result digest; `trigger` distinguishes scheduled vs manual
+ * "Run now" vs a dry-run preview.
+ */
+export const scheduledJobRuns = pgTable(
+  "scheduled_job_runs",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    scheduledJobId: text("scheduled_job_id").notNull().references(() => scheduledJobs.id, { onDelete: "cascade" }),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    status: scheduledJobRunStatusEnum("status").notNull(),
+    trigger: scheduledJobRunTriggerEnum("trigger").notNull(),
+    startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { mode: "date" }),
+    durationMs: integer("duration_ms"),
+    tokensUsed: integer("tokens_used"),
+    summary: text("summary"),
+    output: jsonb("output").$type<Record<string, unknown>>(),
+    error: text("error"),
+  },
+  (table) => [
+    index("scheduled_job_runs_job_idx").on(table.scheduledJobId, table.startedAt),
+    index("scheduled_job_runs_company_idx").on(table.companyId),
+  ]
+);
+
 export const aiToolAuditLogStatusEnum = pgEnum("ai_tool_audit_log_status", [
   "success",
   "error",
@@ -1977,6 +2073,8 @@ export const aiToolAuditLogs = pgTable(
       .references(() => aiConversations.id, { onDelete: "set null" }),
     /** Set when the tool was an external MCP tool (spec §3.3 audit reuse). */
     mcpConnectionId: text("mcp_connection_id").references(() => mcpConnections.id, { onDelete: "set null" }),
+    /** When set, links every tool call to its scheduled-job run (S3a Plan 4). */
+    scheduledJobRunId: text("scheduled_job_run_id").references(() => scheduledJobRuns.id, { onDelete: "set null" }),
     toolName: text("tool_name").notNull(),
     input: jsonb("input").notNull(),
     status: aiToolAuditLogStatusEnum("status").notNull(),
@@ -2001,6 +2099,7 @@ export const aiToolAuditLogs = pgTable(
     index("ai_tool_audit_tool_idx").on(table.companyId, table.toolName),
     index("ai_tool_audit_conversation_idx").on(table.conversationId),
     index("ai_tool_audit_mcp_connection_idx").on(table.mcpConnectionId),
+    index("ai_tool_audit_scheduled_job_run_idx").on(table.scheduledJobRunId),
   ]
 );
 
