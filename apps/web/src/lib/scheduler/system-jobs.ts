@@ -2,6 +2,7 @@
 import type { SystemJob } from "./types";
 import { cleanupExpiredData } from "@/lib/data-retention";
 import { runWeeklyDigest } from "@/lib/cron/weekly-digest";
+import { runBatchRegenerate } from "@/lib/cron/batch-regenerate";
 
 /**
  * Operational jobs registered in code (NOT in the scheduledJobs table). The
@@ -26,6 +27,14 @@ export const SYSTEM_JOBS: SystemJob[] = [
     run: async () => {
       const r = await runWeeklyDigest();
       return { ok: true, summary: `Weekly digest: ${r.generated}/${r.total} sent` };
+    },
+  },
+  {
+    id: "batch-regenerate",
+    schedule: "*/5 * * * *",
+    run: async () => {
+      const r = await runBatchRegenerate();
+      return { ok: true, summary: `Regenerated ${r.processed} stale insight(s)` };
     },
   },
 ];
