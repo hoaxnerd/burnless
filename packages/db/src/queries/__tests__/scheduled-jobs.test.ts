@@ -25,13 +25,13 @@ describe("scheduledJobs / scheduledJobRuns schema", () => {
         nextRunAt: new Date("2026-06-15T09:00:00Z"),
       })
       .returning();
-    expect(job.id).toBeTruthy();
-    expect(job.enabled).toBe(true);
-    expect(job.status).toBe("active");
-    expect(job.notifyPolicy).toBe("smart");
-    expect(job.consecutiveFailures).toBe(0);
-    expect(job.deletedAt).toBeNull();
-    expect(Array.isArray(job.allowedTools)).toBe(true);
+    expect(job!.id).toBeTruthy();
+    expect(job!.enabled).toBe(true);
+    expect(job!.status).toBe("active");
+    expect(job!.notifyPolicy).toBe("smart");
+    expect(job!.consecutiveFailures).toBe(0);
+    expect(job!.deletedAt).toBeNull();
+    expect(Array.isArray(job!.allowedTools)).toBe(true);
   });
 
   it("inserts a run row linked to the job (cascade)", async () => {
@@ -43,11 +43,11 @@ describe("scheduledJobs / scheduledJobRuns schema", () => {
       nextRunAt: new Date(),
     }).returning();
     const [run] = await db.insert(scheduledJobRuns).values({
-      scheduledJobId: job.id, companyId: ctx.company.id, status: "running", trigger: "schedule",
+      scheduledJobId: job!.id, companyId: ctx.company.id, status: "running", trigger: "schedule",
     }).returning();
-    expect(run.id).toBeTruthy();
-    expect(run.status).toBe("running");
-    const rows = await db.select().from(scheduledJobRuns).where(eq(scheduledJobRuns.scheduledJobId, job.id));
+    expect(run!.id).toBeTruthy();
+    expect(run!.status).toBe("running");
+    const rows = await db.select().from(scheduledJobRuns).where(eq(scheduledJobRuns.scheduledJobId, job!.id));
     expect(rows).toHaveLength(1);
   });
 });
@@ -121,9 +121,9 @@ describe("scheduled-jobs query helpers", () => {
     expect(run.status).toBe("running");
     await finishScheduledJobRun(run.id, a.company.id, { status: "success", summary: "did the thing", tokensUsed: 1234, output: { ok: true } });
     const runs = await listScheduledJobRuns(job.id, a.company.id, 10);
-    expect(runs[0].status).toBe("success");
-    expect(runs[0].summary).toBe("did the thing");
-    expect(runs[0].durationMs).toBeGreaterThanOrEqual(0);
+    expect(runs[0]!.status).toBe("success");
+    expect(runs[0]!.summary).toBe("did the thing");
+    expect(runs[0]!.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   it("countScheduledJobs counts only live (non-deleted) jobs for the company", async () => {

@@ -20,7 +20,7 @@ describe("chat() toolsOverride", () => {
   beforeEach(() => { captured.tools = undefined; fakeProvider.complete.mockClear(); });
 
   it("offers ONLY the override tools when toolsOverride is provided", async () => {
-    const only = [{ name: "list_accounts", description: "x", inputSchema: { type: "object", properties: {} } }];
+    const only = [{ name: "list_accounts", description: "x", inputSchema: { type: "object" as const, properties: {} } }];
     await chat({
       messages: [{ role: "user", content: "hi" }],
       financialContext: "ctx",

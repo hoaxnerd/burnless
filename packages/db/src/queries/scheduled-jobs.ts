@@ -39,6 +39,7 @@ export async function createScheduledJob(input: CreateScheduledJobInput) {
       nextRunAt: input.nextRunAt,
     })
     .returning();
+  if (!row) throw new Error("createScheduledJob: insert returned no row");
   return row;
 }
 
@@ -145,6 +146,7 @@ export async function startScheduledJobRun(input: {
     .insert(scheduledJobRuns)
     .values({ scheduledJobId: input.scheduledJobId, companyId: input.companyId, status: "running", trigger: input.trigger })
     .returning();
+  if (!row) throw new Error("startScheduledJobRun: insert returned no row");
   return row;
 }
 
@@ -181,6 +183,7 @@ export async function finishScheduledJobRun(
     })
     .where(scope)
     .returning();
+  if (!row) throw new Error("finishScheduledJobRun: update returned no row");
   return row;
 }
 
@@ -194,6 +197,7 @@ export async function recordMissedRun(scheduledJobId: string, companyId: string,
       startedAt: now, finishedAt: now, durationMs: 0, summary,
     })
     .returning();
+  if (!row) throw new Error("recordMissedRun: insert returned no row");
   return row;
 }
 
