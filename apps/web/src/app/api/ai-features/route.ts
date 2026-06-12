@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { updateAiFeaturesSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
+import { initialAiMasterEnabled } from "@/lib/ai-default";
 import { getCreditStatus } from "@/lib/ai-feature-flags";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ async function getOrCreateFlags(companyId: string) {
     .insert(aiFeatureFlags)
     .values({
       companyId,
-      masterEnabled: DEFAULT_AI_FLAGS.masterEnabled,
+      masterEnabled: initialAiMasterEnabled(),
       dataMode: DEFAULT_AI_FLAGS.dataMode,
       writeMode: DEFAULT_AI_FLAGS.writeMode,
       features: DEFAULT_AI_FLAGS.features,

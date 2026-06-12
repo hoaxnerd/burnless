@@ -26,6 +26,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAuthUser, getUserCompany, errorResponse, withErrorHandler } from "@/lib/api-helpers";
+import { initialAiMasterEnabled } from "@/lib/ai-default";
 import {
   onboardingSchema,
   parseStage,
@@ -133,11 +134,11 @@ export const POST = withErrorHandler(async (request: Request) => {
         .insert(departments)
         .values(DEFAULT_DEPARTMENTS.map((name) => ({ companyId: company.id, name })));
 
-      // AI features start disabled — user must opt in via Settings > AI Features.
-      // This ensures no AI calls are made without explicit consent.
+      // AI on by default at company creation (#34). Degrades gracefully when no
+      // provider key is set; never persist a false merely for a missing key.
       await tx.insert(aiFeatureFlags).values({
         companyId: company.id,
-        masterEnabled: false,
+        masterEnabled: initialAiMasterEnabled(),
         dataMode: "full",
         features: {
           onboarding: true,
