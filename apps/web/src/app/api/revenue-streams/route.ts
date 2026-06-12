@@ -67,7 +67,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (row) await logAudit(ctx, "revenue_stream", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");
-  revalidateTag("revenue-streams");
-  revalidateTag("scenario-overrides"); // revenue-stream data is merged via scenario-overrides cache
+  revalidateTag("revenue-streams", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // revenue-stream data is merged via scenario-overrides cache
   return NextResponse.json(row, { status: 201 });
 });

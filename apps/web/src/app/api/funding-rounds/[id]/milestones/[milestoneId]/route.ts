@@ -63,9 +63,9 @@ export const PATCH = withErrorHandler(async (
     ctx.companyId,
   );
   await logAudit(ctx, "funding_round", id, "update", { after: { milestoneId, hitDate: parsed.data.hitDate } });
-  revalidateTag("funding-rounds");
-  revalidateTag("scenario-overrides");
-  revalidateTag("cap-table");
+  revalidateTag("funding-rounds", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
+  revalidateTag("cap-table", { expire: 0 });
   await trackDataMutation(ctx.companyId, "funding");
   return NextResponse.json({ milestone: updated.find((m) => m.id === milestoneId) });
 });

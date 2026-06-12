@@ -81,8 +81,8 @@ async function handleFundingImport(
 
   if (toInsert.length > 0) {
     await db.insert(fundingRounds).values(toInsert);
-    revalidateTag("funding-rounds");
-    revalidateTag("cap-table");
+    revalidateTag("funding-rounds", { expire: 0 });
+    revalidateTag("cap-table", { expire: 0 });
   }
   return NextResponse.json({
     target: "funding-rounds",

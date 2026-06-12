@@ -43,8 +43,8 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "revenue");
-  revalidateTag("revenue-streams");
-  revalidateTag("scenario-overrides"); // revenue-stream data is merged via scenario-overrides cache
+  revalidateTag("revenue-streams", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // revenue-stream data is merged via scenario-overrides cache
   return NextResponse.json(row);
 });
 
@@ -64,7 +64,7 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Revenue stream not found", 404);
   await logAudit(ctx, "revenue_stream", id, "delete", {});
   await trackDataMutation(ctx.companyId, "revenue");
-  revalidateTag("revenue-streams");
-  revalidateTag("scenario-overrides"); // revenue-stream data is merged via scenario-overrides cache
+  revalidateTag("revenue-streams", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // revenue-stream data is merged via scenario-overrides cache
   return NextResponse.json({ deleted: true });
 });

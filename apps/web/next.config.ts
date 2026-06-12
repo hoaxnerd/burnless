@@ -84,10 +84,8 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["recharts"],
   },
-  eslint: {
-    // Lint separately via `pnpm lint` — don't block builds on eslint-plugin compat issues
-    ignoreDuringBuilds: true,
-  },
+  // Next 16: the `eslint` config block was removed (`next build` no longer lints).
+  // We lint separately via `pnpm lint`.
   webpack: (config) => {
     // plaid, razorpay, stripe are optional runtime-only SDKs loaded via dynamic import.
     config.externals = [

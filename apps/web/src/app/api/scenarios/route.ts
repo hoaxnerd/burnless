@@ -77,6 +77,6 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (row) await logAudit(ctx, "scenario", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
+  revalidateTag("scenarios", { expire: 0 });
   return NextResponse.json(row, { status: 201 });
 });

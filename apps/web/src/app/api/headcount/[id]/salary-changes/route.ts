@@ -82,7 +82,7 @@ export const POST = withErrorHandler(async (
 
   if (row) await logAudit(ctx, "salary_change", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides");
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   return NextResponse.json(row, { status: 201 });
 });

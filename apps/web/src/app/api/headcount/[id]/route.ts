@@ -37,8 +37,8 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides"); // Phase 4 A §A1 — tag parity with data.ts
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // Phase 4 A §A1 — tag parity with data.ts
   return NextResponse.json(row);
 });
 
@@ -58,7 +58,7 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Headcount plan not found", 404);
   await logAudit(ctx, "headcount_plan", id, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides"); // Phase 4 A §A1 — tag parity with data.ts
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // Phase 4 A §A1 — tag parity with data.ts
   return NextResponse.json({ deleted: true });
 });

@@ -153,7 +153,7 @@ function invalidateCacheForTool(toolName: string): void {
   const tags = MUTATION_CACHE_TAGS[toolName];
   if (tags) {
     for (const tag of tags) {
-      revalidateTag(tag);
+      revalidateTag(tag, { expire: 0 });
     }
   }
 }

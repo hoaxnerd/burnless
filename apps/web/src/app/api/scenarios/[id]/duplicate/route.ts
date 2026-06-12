@@ -84,7 +84,7 @@ export const POST = withErrorHandler(async (
     after: { ...newScenario, clonedFrom: sourceId },
   });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
+  revalidateTag("scenarios", { expire: 0 });
 
   return NextResponse.json(newScenario, { status: 201 });
 });

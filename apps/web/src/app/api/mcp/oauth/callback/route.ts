@@ -67,7 +67,7 @@ export const GET = withErrorHandler(async (request: Request) => {
     lastConnectedAt: probe.status === "connected" ? new Date() : null,
   });
 
-  revalidateTag("mcp-connections");
+  revalidateTag("mcp-connections", { expire: 0 });
   return back(
     probe.status === "connected"
       ? `connected=${row.slug}`

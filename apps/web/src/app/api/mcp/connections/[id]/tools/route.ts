@@ -70,7 +70,7 @@ export const PATCH = withErrorHandler(
       );
 
     await upsertMcpToolPref(id, toolName, patch);
-    revalidateTag("mcp-connections");
+    revalidateTag("mcp-connections", { expire: 0 });
     return NextResponse.json({ ok: true });
   }
 );

@@ -69,7 +69,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     "departments",
     "cap-table",
   ]) {
-    revalidateTag(tag);
+    revalidateTag(tag, { expire: 0 });
   }
 
   return NextResponse.json({

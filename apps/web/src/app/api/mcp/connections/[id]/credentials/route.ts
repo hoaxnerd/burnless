@@ -51,7 +51,7 @@ export const POST = withErrorHandler(
       lastConnectedAt: probe.status === "connected" ? new Date() : null,
     });
 
-    revalidateTag("mcp-connections");
+    revalidateTag("mcp-connections", { expire: 0 });
     return NextResponse.json({
       id: updated?.id,
       status: updated?.status,

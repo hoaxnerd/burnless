@@ -133,6 +133,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     lastConnectedAt: probe.status === "connected" ? new Date() : null,
   });
 
-  revalidateTag("mcp-connections");
+  revalidateTag("mcp-connections", { expire: 0 });
   return NextResponse.json(updated ?? row, { status: 201 });
 });

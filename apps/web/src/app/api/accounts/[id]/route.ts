@@ -39,7 +39,7 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "accounts");
-  revalidateTag("accounts");
+  revalidateTag("accounts", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -59,6 +59,6 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Account not found", 404);
   await logAudit(ctx, "financial_account", id, "delete", {});
   await trackDataMutation(ctx.companyId, "accounts");
-  revalidateTag("accounts");
+  revalidateTag("accounts", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });

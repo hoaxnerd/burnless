@@ -48,7 +48,7 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "departments");
-  revalidateTag("departments");
+  revalidateTag("departments", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -68,6 +68,6 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Department not found", 404);
   await logAudit(ctx, "department", id, "delete", {});
   await trackDataMutation(ctx.companyId, "departments");
-  revalidateTag("departments");
+  revalidateTag("departments", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });

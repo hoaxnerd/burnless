@@ -52,7 +52,7 @@ export const PATCH = withErrorHandler(async (
 
   await logAudit(ctx, "share_class", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
-  revalidateTag("cap-table");
+  revalidateTag("cap-table", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -77,6 +77,6 @@ export const DELETE = withErrorHandler(async (
 
   await logAudit(ctx, "share_class", id, "delete", {});
   await trackDataMutation(ctx.companyId, "funding");
-  revalidateTag("cap-table");
+  revalidateTag("cap-table", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });

@@ -49,7 +49,7 @@ export const PATCH = withErrorHandler(
     if ("error" in parsed) return parsed.error;
 
     const updated = await updateMcpConnection(id, ctx.companyId, parsed.data);
-    revalidateTag("mcp-connections");
+    revalidateTag("mcp-connections", { expire: 0 });
     return NextResponse.json(updated ?? row);
   }
 );
@@ -67,7 +67,7 @@ export const DELETE = withErrorHandler(
 
     await getMcpConnectionManager().invalidate(id);
     await deleteMcpConnection(id, ctx.companyId);
-    revalidateTag("mcp-connections");
+    revalidateTag("mcp-connections", { expire: 0 });
     return NextResponse.json({ deleted: true });
   }
 );

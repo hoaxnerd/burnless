@@ -49,10 +49,10 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "forecast-lines");
-  revalidateTag("forecast-lines");
-  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
-  revalidateTag("expense-details"); // refetch the server-rendered expense table
-  revalidateTag("dashboard"); // KPIs blend forecast lines
+  revalidateTag("forecast-lines", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // Phase 4 A §A1: keep overlay cache in sync
+  revalidateTag("expense-details", { expire: 0 }); // refetch the server-rendered expense table
+  revalidateTag("dashboard", { expire: 0 }); // KPIs blend forecast lines
   return NextResponse.json(row);
 });
 
@@ -72,9 +72,9 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Forecast line not found", 404);
   await logAudit(ctx, "forecast_line", id, "delete", {});
   await trackDataMutation(ctx.companyId, "forecast-lines");
-  revalidateTag("forecast-lines");
-  revalidateTag("scenario-overrides"); // Phase 4 A §A1: keep overlay cache in sync
-  revalidateTag("expense-details"); // refetch the server-rendered expense table
-  revalidateTag("dashboard"); // KPIs blend forecast lines
+  revalidateTag("forecast-lines", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // Phase 4 A §A1: keep overlay cache in sync
+  revalidateTag("expense-details", { expire: 0 }); // refetch the server-rendered expense table
+  revalidateTag("dashboard", { expire: 0 }); // KPIs blend forecast lines
   return NextResponse.json({ deleted: true });
 });

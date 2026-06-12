@@ -63,9 +63,9 @@ export const POST = withErrorHandler(async (
     .returning();
   if (!inserted) return errorResponse("Insert failed", 500);
   await logAudit(ctx, "funding_round_investor", inserted.id, "create", { after: inserted });
-  revalidateTag("funding-rounds");
-  revalidateTag("scenario-overrides");
-  revalidateTag("cap-table");
+  revalidateTag("funding-rounds", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
+  revalidateTag("cap-table", { expire: 0 });
   await trackDataMutation(ctx.companyId, "funding");
   return NextResponse.json({ investor: inserted }, { status: 201 });
 });

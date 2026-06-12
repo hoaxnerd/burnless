@@ -63,7 +63,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   if (row) await logAudit(ctx, "headcount_plan", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides"); // Phase 4 A §A1 — tag parity with data.ts
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 }); // Phase 4 A §A1 — tag parity with data.ts
   return NextResponse.json(row, { status: 201 });
 });

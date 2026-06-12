@@ -60,8 +60,8 @@ export const DELETE = withErrorHandler(async (
     before: { overrideId: id, entityType: override.entityType, entityId: override.entityId },
   });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
-  revalidateTag("scenario-overrides");
+  revalidateTag("scenarios", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   // Invalidate the entity-typed cache so the affected resource's read path
   // reflects the reverted state immediately.
   const tagByEntityType: Record<string, string[]> = {
@@ -70,7 +70,7 @@ export const DELETE = withErrorHandler(async (
     headcount_plan: ["headcount-plans"],
     funding_round: ["funding-rounds", "cap-table"],
   };
-  for (const tag of tagByEntityType[override.entityType] ?? []) revalidateTag(tag);
+  for (const tag of tagByEntityType[override.entityType] ?? []) revalidateTag(tag, { expire: 0 });
 
   return NextResponse.json({ deleted: true });
 });

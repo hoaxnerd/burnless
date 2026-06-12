@@ -30,9 +30,15 @@
     "cron:worker": "npx tsx scripts/cron-worker.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9.0"
   },
   "packageManager": "pnpm@10.26.1",
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.2.17",
+      "@types/react-dom": "19.2.3"
+    }
+  },
   "devDependencies": {
     "turbo": "^2.8.20"
   },

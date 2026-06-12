@@ -55,8 +55,8 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
-  revalidateTag("funding-rounds");
-  revalidateTag("scenario-overrides");
+  revalidateTag("funding-rounds", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -76,7 +76,7 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Funding round not found", 404);
   await logAudit(ctx, "funding_round", id, "delete", {});
   await trackDataMutation(ctx.companyId, "funding");
-  revalidateTag("funding-rounds");
-  revalidateTag("scenario-overrides");
+  revalidateTag("funding-rounds", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });

@@ -52,6 +52,6 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   await logAudit(ctx, "share_class", row.id, "create", { after: row });
   await trackDataMutation(ctx.companyId, "funding");
-  revalidateTag("cap-table");
+  revalidateTag("cap-table", { expire: 0 });
   return NextResponse.json(row, { status: 201 });
 });

@@ -60,8 +60,8 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Equity grant not found", 404);
   await logAudit(ctx, "equity_grant", grantId, "update", { after: row });
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides");
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -83,7 +83,7 @@ export const DELETE = withErrorHandler(async (
   if (!ok) return errorResponse("Equity grant not found", 404);
   await logAudit(ctx, "equity_grant", grantId, "delete", {});
   await trackDataMutation(ctx.companyId, "headcount");
-  revalidateTag("headcount-plans");
-  revalidateTag("scenario-overrides");
+  revalidateTag("headcount-plans", { expire: 0 });
+  revalidateTag("scenario-overrides", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });

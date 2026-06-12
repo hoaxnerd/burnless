@@ -65,7 +65,7 @@ export const PATCH = withErrorHandler(async (
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "update", { after: row });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
+  revalidateTag("scenarios", { expire: 0 });
   return NextResponse.json(row);
 });
 
@@ -88,6 +88,6 @@ export const DELETE = withErrorHandler(async (
   if (!row) return errorResponse("Scenario not found", 404);
   await logAudit(ctx, "scenario", id, "delete", { before: row });
   await trackDataMutation(ctx.companyId, "scenarios");
-  revalidateTag("scenarios");
+  revalidateTag("scenarios", { expire: 0 });
   return NextResponse.json({ deleted: true });
 });
