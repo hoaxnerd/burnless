@@ -1,6 +1,7 @@
 // apps/web/src/lib/scheduler/system-jobs.ts
 import type { SystemJob } from "./types";
 import { cleanupExpiredData } from "@/lib/data-retention";
+import { runWeeklyDigest } from "@/lib/cron/weekly-digest";
 
 /**
  * Operational jobs registered in code (NOT in the scheduledJobs table). The
@@ -17,6 +18,14 @@ export const SYSTEM_JOBS: SystemJob[] = [
         ok: true,
         summary: `Purged ${r.conversationsDeleted} conversations, ${r.cacheDeleted} cache entries`,
       };
+    },
+  },
+  {
+    id: "weekly-digest",
+    schedule: "0 8 * * 1",
+    run: async () => {
+      const r = await runWeeklyDigest();
+      return { ok: true, summary: `Weekly digest: ${r.generated}/${r.total} sent` };
     },
   },
 ];
