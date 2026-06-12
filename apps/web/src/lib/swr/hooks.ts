@@ -373,3 +373,28 @@ export function useUserPreferences(
 ) {
   return useSWR<UserPreferencesDto>(KEYS.userPreferences, { ...config });
 }
+
+export interface NotificationDto {
+  id: string;
+  category: string;
+  title: string;
+  body: string | null;
+  severity: "info" | "success" | "warning" | "error";
+  link: string | null;
+  metadata: Record<string, unknown> | null;
+  readAt: string | null; // ISO (JSON-serialized Date)
+  createdAt: string;
+}
+export interface NotificationsResponse {
+  notifications: NotificationDto[];
+  unreadCount: number;
+}
+
+/** Polls every 60s + on focus so the bell reflects new notifications. */
+export function useNotifications(config?: SWRConfiguration<NotificationsResponse>) {
+  return useSWR<NotificationsResponse>(KEYS.notifications, {
+    refreshInterval: 60_000,
+    revalidateOnFocus: true,
+    ...config,
+  });
+}

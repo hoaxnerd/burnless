@@ -35,6 +35,8 @@ export const KEYS = {
   // Per-user UI preferences (AI sidebar D11 kill-switch reads/writes this)
   userPreferences: "/api/user-preferences",
 
+  notifications: "/api/notifications",
+
   // Parameterized keys — call as functions
   mcpConnection: (id: string) => `/api/mcp/connections/${id}`,
   mcpConnectionTools: (id: string) => `/api/mcp/connections/${id}/tools`,
