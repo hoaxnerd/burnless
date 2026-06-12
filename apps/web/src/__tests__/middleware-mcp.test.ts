@@ -4,7 +4,7 @@
  * /api/oauth/token + /api/oauth/register are CSRF-exempt and ride the
  * auth tier; /api/oauth/* tier resolution.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { NextRequest } from "next/server";
 
 const mockCheckRateLimit = vi.hoisted(() =>
@@ -52,20 +52,36 @@ function createRequest(
         for (const [k, v] of Object.entries(headerMap)) cb(v, k);
       },
     },
+    // S4a: auto-login is disabled for this suite (see beforeEach); stub keeps shape valid.
+    cookies: { get: () => undefined },
   } as unknown as NextRequest;
 }
 
+const savedAutoLogin = process.env.BURNLESS_CAP_AUTO_LOGIN;
 beforeEach(() => {
   mockCheckRateLimit.mockClear();
+  // S4a: this suite tests /mcp + OAuth CSRF/rate-limit, not auto-login. Disable
+  // it so the (self_host-default) auto-login block is inert on these API paths.
+  process.env.BURNLESS_CAP_AUTO_LOGIN = "off";
+});
+afterEach(() => {
+  if (savedAutoLogin === undefined) delete process.env.BURNLESS_CAP_AUTO_LOGIN;
+  else process.env.BURNLESS_CAP_AUTO_LOGIN = savedAutoLogin;
 });
 
 describe("/mcp middleware branch", () => {
-  it("matcher includes /mcp", () => {
-    expect(config.matcher).toContain("/mcp");
+  it("matcher covers /mcp", async () => {
+    // S4a broadened the matcher to a single catch-all (excludes only Next
+    // internals + favicon). Assert it still matches /mcp.
+    expect(config.matcher).toHaveLength(1);
+    const pat = new RegExp(`^${config.matcher[0]}$`);
+    expect(pat.test("/mcp")).toBe(true);
+    expect(pat.test("/_next/static/chunk.js")).toBe(false);
+    expect(pat.test("/favicon.ico")).toBe(false);
   });
 
-  it("POST /mcp with a cross-site origin is NOT CSRF-blocked (bearer-authed API)", () => {
-    const res = middleware(
+  it("POST /mcp with a cross-site origin is NOT CSRF-blocked (bearer-authed API)", async () => {
+    const res = await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { origin: "https://claude.ai", authorization: "Bearer bl_pat_abc" },
@@ -74,8 +90,8 @@ describe("/mcp middleware branch", () => {
     expect(res.status).not.toBe(403);
   });
 
-  it("rate-limits /mcp on the mcp tier keyed by a credential hash, not the IP path-group", () => {
-    middleware(
+  it("rate-limits /mcp on the mcp tier keyed by a credential hash, not the IP path-group", async () => {
+    await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
@@ -87,7 +103,7 @@ describe("/mcp middleware branch", () => {
     expect(key).toMatch(/^mcp:[0-9a-f]+$/);
     expect(cfg).toEqual({ maxRequests: 60, windowMs: 60_000 });
     // two different tokens → two different credential keys
-    middleware(
+    await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_OTHER", "x-forwarded-for": "1.2.3.4" },
@@ -98,8 +114,8 @@ describe("/mcp middleware branch", () => {
     expect(key2).not.toBe(key);
   });
 
-  it("authenticated /mcp ALSO enforces an IP-keyed backstop (token rotation cannot mint unlimited buckets)", () => {
-    middleware(
+  it("authenticated /mcp ALSO enforces an IP-keyed backstop (token rotation cannot mint unlimited buckets)", async () => {
+    await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_abc", "x-forwarded-for": "1.2.3.4" },
@@ -111,7 +127,7 @@ describe("/mcp middleware branch", () => {
     expect(ipCfg).toEqual({ maxRequests: 240, windowMs: 60_000 });
   });
 
-  it("returns 429 when the IP backstop trips, even with a fresh rotated credential", () => {
+  it("returns 429 when the IP backstop trips, even with a fresh rotated credential", async () => {
     // Simulate an attacker rotating random bearer tokens: every credential
     // bucket is fresh (allowed), but the per-IP backstop is exhausted.
     mockCheckRateLimit.mockImplementation((key: string) =>
@@ -119,7 +135,7 @@ describe("/mcp middleware branch", () => {
         ? { allowed: false, remaining: 0, resetAt: Date.now() + 30_000 }
         : { allowed: true, remaining: 59, resetAt: Date.now() + 60_000 }
     );
-    const res = middleware(
+    const res = await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { authorization: "Bearer bl_pat_rotated_999", "x-forwarded-for": "1.2.3.4" },
@@ -135,8 +151,8 @@ describe("/mcp middleware branch", () => {
     }));
   });
 
-  it("unauthenticated /mcp requests fall back to an IP-derived key", () => {
-    middleware(
+  it("unauthenticated /mcp requests fall back to an IP-derived key", async () => {
+    await middleware(
       createRequest("/mcp", {
         method: "POST",
         headers: { "x-forwarded-for": "9.9.9.9" },
@@ -148,7 +164,7 @@ describe("/mcp middleware branch", () => {
 
   it("returns 429 with Retry-After when over the limit", async () => {
     mockCheckRateLimit.mockReturnValueOnce({ allowed: false, remaining: 0, resetAt: Date.now() + 30_000 });
-    const res = middleware(
+    const res = await middleware(
       createRequest("/mcp", { method: "POST", headers: { authorization: "Bearer x" } })
     );
     expect(res.status).toBe(429);
@@ -157,8 +173,8 @@ describe("/mcp middleware branch", () => {
 });
 
 describe("OAuth endpoint exemptions (spec §4.1)", () => {
-  it("POST /api/oauth/token from a cross-site origin is NOT CSRF-blocked", () => {
-    const res = middleware(
+  it("POST /api/oauth/token from a cross-site origin is NOT CSRF-blocked", async () => {
+    const res = await middleware(
       createRequest("/api/oauth/token", {
         method: "POST",
         headers: { origin: "https://claude.ai" },
@@ -167,8 +183,8 @@ describe("OAuth endpoint exemptions (spec §4.1)", () => {
     expect(res.status).not.toBe(403);
   });
 
-  it("POST /api/oauth/register is CSRF-exempt and rides the auth tier", () => {
-    const res = middleware(
+  it("POST /api/oauth/register is CSRF-exempt and rides the auth tier", async () => {
+    const res = await middleware(
       createRequest("/api/oauth/register", {
         method: "POST",
         headers: { origin: "https://claude.ai", "x-forwarded-for": "1.2.3.4" },
@@ -180,8 +196,8 @@ describe("OAuth endpoint exemptions (spec §4.1)", () => {
     expect(cfg).toEqual({ maxRequests: 5, windowMs: 60_000 });
   });
 
-  it("other /api mutations from a foreign origin are still CSRF-blocked", () => {
-    const res = middleware(
+  it("other /api mutations from a foreign origin are still CSRF-blocked", async () => {
+    const res = await middleware(
       createRequest("/api/scenarios", {
         method: "POST",
         headers: { origin: "https://evil.com" },

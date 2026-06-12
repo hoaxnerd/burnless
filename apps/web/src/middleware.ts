@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { checkRateLimit, RATE_LIMITS } from "./lib/rate-limit";
 import { getCapabilities, type Capabilities } from "./lib/capabilities";
+import { decideAutoLogin, isNavigationRequest, NO_AUTOLOGIN_COOKIE } from "./lib/auto-login";
 
 type GuardResult = { action: "redirect"; to: string } | { action: "notFound" } | null;
 
@@ -94,14 +96,15 @@ function fnv1a32hex(value: string): string {
  *   mutation   — 30 req/min (POST/PUT/PATCH/DELETE)
  *   read       — 100 req/min (GET)
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const caps = getCapabilities();
 
   // Capability URL guards (S1 edition spine). Runs before the API-only early
   // return so marketing pages are evaluated too. Health/auth/webhook bypass
   // paths are neither marketing nor billing routes, so the guard returns null
   // for them — placing it here does not wrongly gate them.
-  const guard = resolveCapabilityGuard(pathname, getCapabilities());
+  const guard = resolveCapabilityGuard(pathname, caps);
   if (guard?.action === "redirect") {
     return NextResponse.redirect(new URL(guard.to, request.url));
   }
@@ -111,6 +114,56 @@ export function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.rewrite(new URL("/not-found", request.url), { status: 404 });
+  }
+
+  // S4a — auto-login (self_host only). Only on top-level navigations; never
+  // API/XHR/RSC (decideAutoLogin + isExcludedFromAutoLogin enforce §5).
+  // getToken is called ONLY when caps.autoLogin is on → zero cloud overhead.
+  //
+  // getToken (Auth.js v5 / @auth/core) decrypts the JWE session cookie itself.
+  // Two params matter for THIS app's default cookie config (no custom
+  // `cookies`/`useSecureCookies` in auth.config.ts):
+  //   • secureCookie — Auth.js writes the cookie as `__Secure-authjs.session-token`
+  //     on HTTPS and `authjs.session-token` otherwise (init.js:
+  //     useSecureCookies ?? url.protocol === "https:"). getToken defaults
+  //     secureCookie to false, so we must pass the request-protocol-derived
+  //     value or it would miss the prod (HTTPS) cookie entirely.
+  //   • salt — getToken defaults salt = cookieName, and the encryption key is
+  //     HKDF-derived from (secret, salt=cookieName). Passing the correct
+  //     secureCookie makes BOTH the cookie name lookup and the salt match what
+  //     Auth.js wrote, so no explicit cookieName/salt is needed.
+  // Self-host runs on http://127.0.0.1 (secureCookie=false), so the common
+  // path uses the plain cookie name; the protocol check keeps an HTTPS
+  // self-host deployment correct too.
+  if (caps.autoLogin) {
+    const secureCookie = request.nextUrl.protocol === "https:";
+    const token = await getToken({
+      req: request,
+      secret: process.env.AUTH_SECRET,
+      secureCookie,
+    });
+    const suppressed = request.cookies.get(NO_AUTOLOGIN_COOKIE)?.value === "1";
+    const decision = decideAutoLogin({
+      autoLogin: true,
+      hasToken: !!token,
+      suppressed,
+      isNavigation: isNavigationRequest(
+        request.headers.get("sec-fetch-mode"),
+        request.headers.get("accept"),
+      ),
+      pathname,
+      search: request.nextUrl.search,
+    });
+    if (decision.action === "redirect") {
+      const url = new URL("/api/auth/auto-login", request.url);
+      url.searchParams.set("callbackUrl", decision.callbackUrl);
+      return NextResponse.redirect(url);
+    }
+    if (decision.action === "clearSuppression") {
+      const res = NextResponse.next();
+      res.cookies.delete(NO_AUTOLOGIN_COOKIE);
+      return res;
+    }
   }
 
   // Rate-limit API routes + the MCP endpoint (expose spec §4.1)
@@ -330,17 +383,10 @@ function resolveTierKey(pathname: string, method: string): string {
 }
 
 export const config = {
-  matcher: [
-    "/api/:path*",
-    "/mcp",
-    // Marketing routes — guarded so they redirect/404 when marketingSite is off.
-    "/",
-    "/pricing",
-    "/about",
-    "/contact",
-    "/help",
-    "/security",
-    "/terms",
-    "/privacy",
-  ],
+  // Broadened for S4a auto-login: middleware must see page navigations
+  // (/dashboard, /onboarding, /login, …), not just /api + /mcp + marketing.
+  // Excludes Next internals + the favicon. Static assets with extensions are
+  // additionally short-circuited by isExcludedFromAutoLogin + the non-API
+  // early-return below, so they incur no extra work.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
