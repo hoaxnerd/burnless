@@ -80,8 +80,6 @@ log "All services running:"
 echo "  App:              http://localhost:3000"
 echo "  PostgreSQL:       localhost:5432  (+ pgvector)"
 echo "  Redis:            localhost:6379"
-echo "  SearXNG Search:   http://localhost:8888  (web search for AI)"
-echo "  Crawl4AI:         http://localhost:11235"
 echo "  Mailpit UI:       http://localhost:8025"
 echo "  Mailpit SMTP:     localhost:1025"
 

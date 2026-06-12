@@ -35,7 +35,7 @@ Root scripts (turbo-orchestrated):
 - `pnpm db:seed-test-accounts` — 3 fixed-UUID accounts, password `TestPass1`
 - `pnpm e2e` / `pnpm e2e:ui` — Playwright (apps/web)
 - `pnpm test:web` / `pnpm test:db` — per-package vitest
-- `pnpm docker:up|down|dev|reset` — Postgres+Redis+SearXNG+Crawl4AI+Mailpit
+- `pnpm docker:up|down|dev|reset` — Postgres+Redis+Mailpit
 - `pnpm cron:worker` — replaces Vercel Cron locally
 
 Single test:
@@ -94,7 +94,7 @@ Pure functions, no I/O. **Currency-agnostic** (umbrella §1.6) — no `$`/`€`/
 - Scenarios cmp (`scenarios.ts`): diff two `ScenarioData`.
 - Budget vs actuals (`budget.ts`): revenue (actual>budget=favorable), expense (actual<budget=favorable).
 - Categorization (`categorization.ts`): 100+ regex rules + confidence; merchant memory via `merchantCategoryMappings`.
-- Provider stubs (`payments.ts`, `bank-connectors.ts`, `integrations.ts`, `services/*`): interfaces + noop impls. Stripe + Razorpay payment, Plaid + AA bank, Crawl4AI + SearXNG search.
+- Provider stubs (`payments.ts`, `bank-connectors.ts`, `integrations.ts`, `services/*`): interfaces + noop impls. Stripe + Razorpay payment, Plaid + AA bank. Web search defaults to DuckDuckGo (keyless), crawl to direct-fetch (no service); SearXNG/Crawl4AI/Tavily remain opt-in via `WEB_SEARCH_PROVIDER`/`CRAWL_PROVIDER`.
 
 ### DB (`packages/db`)
 Singleton client (`src/index.ts`): postgres-js, pool max=10, `globalThis.__burnless_db` to survive HMR. Drizzle `postgres-js` dialect.

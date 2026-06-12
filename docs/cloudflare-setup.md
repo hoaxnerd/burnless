@@ -48,8 +48,8 @@ burnless/
 | **Cache** | Redis 7 (ioredis) | Caching, rate limiting, job queues |
 | **Email** | Resend / SMTP (Mailpit local) | Transactional email |
 | **Payments** | Stripe + Razorpay | Provider-agnostic, currency-based selection |
-| **Web Search** | SearXNG (local) / Tavily (prod) | AI chat web search tool |
-| **Web Crawling** | Crawl4AI (local) / Firecrawl (prod) | Content extraction |
+| **Web Search** | DuckDuckGo (keyless, default) / Tavily (prod) | AI chat web search tool |
+| **Web Crawling** | direct-fetch (native, default) / Firecrawl (prod) | Content extraction |
 | **Monitoring** | Sentry + PostHog | Error tracking + product analytics |
 | **Deployment** | Vercel | GitHub Actions CI, Vercel crons |
 
@@ -83,8 +83,8 @@ STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRO_PRICE_ID, STRIPE_TEAM_PRICE
 RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
 
 # Search & Crawl
-WEB_SEARCH_PROVIDER=searxng|tavily
-CRAWL_PROVIDER=crawl4ai|firecrawl|scrapingbee
+WEB_SEARCH_PROVIDER=duckduckgo|tavily   # default: duckduckgo (keyless)
+CRAWL_PROVIDER=direct-fetch|firecrawl|scrapingbee   # default: direct-fetch (no env)
 
 # Monitoring
 NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_POSTHOG_HOST
@@ -126,7 +126,7 @@ CRON_SECRET
 | Sentry (errors) | Keep Sentry | None |
 | Resend (email) | Keep Resend (CF Email sending still beta) | None |
 | Stripe/Razorpay | Keep external | None |
-| SearXNG/Tavily | Keep external | None |
+| DuckDuckGo/Tavily | Keep external | None |
 
 ### Cloudflare Products Used
 

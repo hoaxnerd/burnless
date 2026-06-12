@@ -1,7 +1,7 @@
 # Burnless — Local Development Stack
 # Usage: docker compose up -d
 #
-# Default: starts core infra only (Postgres, Redis, SearXNG, Crawl4AI, Mailpit).
+# Default: starts core infra only (Postgres, Redis, Mailpit).
 # The app connects to your HOST Ollama at localhost:11434 — no Docker Ollama needed
 # if you already have Ollama running locally.
 #
@@ -75,43 +75,6 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
 
-  # ── Web Search (SearXNG) ───────────────────────────────────────────────────
-  # Self-hosted meta search engine — provides web search tool for the AI.
-  # API at http://localhost:8888/search?q=...&format=json
-  # Production: switch to Tavily, Serper, or Brave Search API
-  searxng:
-    image: searxng/searxng:latest
-    restart: unless-stopped
-    ports:
-      - "8888:8080"
-    environment:
-      SEARXNG_BASE_URL: http://localhost:8888
-    volumes:
-      - searxng_data:/etc/searxng
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  # ── Web Crawler (Crawl4AI) ─────────────────────────────────────────────────
-  # REST API at http://localhost:11235
-  # Production: switch to Firecrawl, ScrapingBee, or similar managed service
-  crawl4ai:
-    image: unclecode/crawl4ai:latest
-    restart: unless-stopped
-    ports:
-      - "11235:11235"
-    environment:
-      CRAWL4AI_API_TOKEN: burnless-dev-token
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11235/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   # ── Email (Mailpit) ────────────────────────────────────────────────────────
   # Web UI: http://localhost:8025
   # SMTP: localhost:1025 (no auth required)
@@ -132,4 +95,3 @@ volumes:
   pgdata:
   redisdata:
   ollama_models:
-  searxng_data:
