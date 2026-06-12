@@ -28,10 +28,10 @@ describe("notifications table", () => {
         link: "/automations",
       })
       .returning();
-    expect(row.id).toBeTruthy();
-    expect(row.readAt).toBeNull();
-    expect(row.severity).toBe("success");
-    expect(row.createdAt).toBeInstanceOf(Date);
+    expect(row!.id).toBeTruthy();
+    expect(row!.readAt).toBeNull();
+    expect(row!.severity).toBe("success");
+    expect(row!.createdAt).toBeInstanceOf(Date);
   });
 });
 
@@ -55,7 +55,7 @@ describe("notification query helpers", () => {
     await createNotification({ companyId: a.company.id, userId: a.user.id, category: "c", title: "u2" });
     expect(await countUnreadNotifications(a.user.id, a.company.id)).toBe(2);
 
-    await markNotificationsRead(a.user.id, a.company.id, { ids: [n1.id] });
+    await markNotificationsRead(a.user.id, a.company.id, { ids: [n1!.id] });
     expect(await countUnreadNotifications(a.user.id, a.company.id)).toBe(1);
 
     await markNotificationsRead(a.user.id, a.company.id, { all: true });
