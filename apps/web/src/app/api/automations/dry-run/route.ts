@@ -1,7 +1,7 @@
 // apps/web/src/app/api/automations/dry-run/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, withErrorHandler } from "@/lib/api-helpers";
 import { dryRunJobDraft } from "@/lib/automations/runner";
 
 const schema = z.object({
@@ -14,6 +14,8 @@ const schema = z.object({
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
   const draft = schema.parse(await request.json());
   // companyId/userId come from the session — NEVER from the request body.
   const preview = await dryRunJobDraft({ ...draft, companyId: ctx.companyId, createdByUserId: ctx.userId });

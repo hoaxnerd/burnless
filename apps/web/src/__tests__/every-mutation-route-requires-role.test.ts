@@ -55,6 +55,7 @@ const ALLOWED_EXACT: { match: string; why: string }[] = [
   { match: "tokens/route.ts", why: "PAT mint: any member may mint (expose spec §5.1); write authority enforced per-scope via roleScopeCap (viewer → read-only). Self-scoped credential." },
   { match: "tokens/[id]/route.ts", why: "PAT revoke: userId-scoped — revokes only the caller's own token." },
   { match: "oauth/grants/[grantId]/route.ts", why: "OAuth grant revoke: userId-scoped — revokes only the caller's own grant family." },
+  { match: "notifications/route.ts", why: "Per-user notification mark-read — operates on the caller's own notifications, not company data." },
 ];
 
 const MUTATION_EXPORT = /export\s+(?:const|async\s+function)\s+(POST|PUT|PATCH|DELETE)\b/;

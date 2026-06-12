@@ -7,13 +7,15 @@
  * CSRF + rate-limit (mutation tier) are handled by the global middleware.
  */
 import { NextResponse } from "next/server";
-import { withErrorHandler, requireCompanyAccess } from "@/lib/api-helpers";
+import { withErrorHandler, requireCompanyAccess, requireRole } from "@/lib/api-helpers";
 import { getCapabilities } from "@/lib/capabilities";
 import { installBrowserEngine } from "@/lib/browser-mcp";
 
 export const POST = withErrorHandler(async () => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
 
   if (!getCapabilities().stdioMcp) {
     return NextResponse.json(

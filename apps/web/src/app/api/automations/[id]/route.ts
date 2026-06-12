@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getScheduledJob, updateScheduledJob, softDeleteScheduledJob, listScheduledJobRuns } from "@burnless/db";
-import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, withErrorHandler } from "@/lib/api-helpers";
 import { computeNextRunAt } from "@/lib/automations/safety";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -30,6 +30,8 @@ const patchSchema = z.object({
 export const PATCH = withErrorHandler(async (request: Request, { params }: Ctx) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
   const { id } = await params;
   const job = await getScheduledJob(id, ctx.companyId);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -59,6 +61,8 @@ export const PATCH = withErrorHandler(async (request: Request, { params }: Ctx) 
 export const DELETE = withErrorHandler(async (_request: Request, { params }: Ctx) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
   const { id } = await params;
   const job = await getScheduledJob(id, ctx.companyId);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });

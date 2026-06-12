@@ -1,8 +1,20 @@
 // apps/web/src/app/api/automations/[id]/__tests__/route.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockReq } = vi.hoisted(() => ({ mockReq: vi.fn().mockResolvedValue({ userId: "u1", companyId: "c1" }) }));
-vi.mock("@/lib/api-helpers", () => ({ requireCompanyAccess: mockReq, withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn }));
+const { mockReq } = vi.hoisted(() => ({ mockReq: vi.fn().mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }) }));
+// AUTHZ-01: faithful self-contained requireRole — editor+ passes, viewer 403s.
+const ROLE_LEVEL: Record<string, number> = { viewer: 0, editor: 1, admin: 2, owner: 3 };
+vi.mock("@/lib/api-helpers", async () => {
+  const { NextResponse } = await import("next/server");
+  return {
+    requireCompanyAccess: mockReq,
+    requireRole: (ctx: { role: string }, min: string) =>
+      (ROLE_LEVEL[ctx.role] ?? -1) < (ROLE_LEVEL[min] ?? 99)
+        ? NextResponse.json({ error: `Forbidden: requires ${min} role or higher` }, { status: 403 })
+        : null,
+    withErrorHandler: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
 
 const h = vi.hoisted(() => ({
   get: vi.fn(), update: vi.fn().mockResolvedValue({ id: "j1" }), del: vi.fn().mockResolvedValue(undefined),
@@ -17,7 +29,7 @@ import { GET, PATCH, DELETE } from "../route";
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("/api/automations/[id]", () => {
-  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1" }); h.get.mockResolvedValue({ id: "j1", name: "J", schedule: "0 8 * * *", status: "active" }); });
+  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }); h.get.mockResolvedValue({ id: "j1", name: "J", schedule: "0 8 * * *", status: "active" }); });
 
   it("GET returns the job + recent runs", async () => {
     const res = await GET(new Request("http://x"), params("j1"));
@@ -60,6 +72,16 @@ describe("/api/automations/[id]", () => {
     h.get.mockResolvedValue(null);
     const res = await DELETE(new Request("http://x", { method: "DELETE" }), params("nope"));
     expect(res.status).toBe(404);
+    expect(h.del).not.toHaveBeenCalled();
+  });
+
+  it("PATCH/DELETE reject a viewer (403) — AUTHZ-01 write-role gate", async () => {
+    mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "viewer" });
+    const patchRes = await PATCH(new Request("http://x", { method: "PATCH", body: JSON.stringify({ name: "x" }) }), params("j1"));
+    expect(patchRes.status).toBe(403);
+    const delRes = await DELETE(new Request("http://x", { method: "DELETE" }), params("j1"));
+    expect(delRes.status).toBe(403);
+    expect(h.update).not.toHaveBeenCalled();
     expect(h.del).not.toHaveBeenCalled();
   });
 });

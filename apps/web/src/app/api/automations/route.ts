@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { listScheduledJobs, createScheduledJob, countScheduledJobs } from "@burnless/db";
-import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
+import { requireCompanyAccess, requireRole, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getSafetyLimits, computeNextRunAt } from "@/lib/automations/safety";
 
@@ -27,6 +27,8 @@ const createSchema = z.object({
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
+  const roleErr = requireRole(ctx, "editor");
+  if (roleErr) return roleErr;
   const draft = createSchema.parse(await request.json());
 
   // Validate the cron (also yields the first nextRunAt).
