@@ -20,7 +20,15 @@ describe("categorizeToolName", () => {
     expect(categorizeToolName("delete_scenario")).toBe("delete");
     expect(categorizeToolName("search_web")).toBe("web_search");
     expect(categorizeToolName("read_webpage")).toBe("web_search");
-    expect(categorizeToolName("read_webpage_rendered")).toBe("browser_use");
+  });
+  it("browser_use category is now satisfied only by dynamically-classified MCP tools (C4)", () => {
+    // The built-in read_webpage_rendered tool was removed; BROWSER_TOOLS is empty.
+    // A connected Playwright MCP tool reaches the category via the dynamic map.
+    expect(
+      categorizeToolName("mcp__playwright__browser_navigate", {
+        mcp__playwright__browser_navigate: "browser_use",
+      })
+    ).toBe("browser_use");
   });
   it("defaults unknown tools to read", () => {
     expect(categorizeToolName("totally_unknown")).toBe("read");
@@ -36,7 +44,14 @@ describe("resolvePermission", () => {
   it("writes, deletes, browser ask by default", () => {
     expect(resolvePermission("create_forecast_line", { defaults: def(), sessionGrants: {} })).toBe("ask");
     expect(resolvePermission("delete_scenario", { defaults: def(), sessionGrants: {} })).toBe("ask");
-    expect(resolvePermission("read_webpage_rendered", { defaults: def(), sessionGrants: {} })).toBe("ask");
+    // browser_use category now reached via a dynamically-classified MCP tool.
+    expect(
+      resolvePermission("mcp__playwright__browser_navigate", {
+        defaults: def(),
+        sessionGrants: {},
+        dynamicCategories: { mcp__playwright__browser_navigate: "browser_use" },
+      })
+    ).toBe("ask");
   });
 
   it("a session grant on the category allows", () => {

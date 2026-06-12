@@ -1110,20 +1110,6 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["url"],
     },
   },
-  {
-    name: "read_webpage_rendered",
-    description: "Use Cloudflare Browser Rendering to load a page and extract text. Use this ONLY as a last resort fallback when read_webpage is blocked by Cloudflare/anti-bot protection.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        url: {
-          type: "string",
-          description: "The URL of the webpage to open in the browser.",
-        },
-      },
-      required: ["url"],
-    },
-  },
   ...GENUI_DISPLAY_TOOLS,
   ...GENUI_INPUT_TOOLS,
 ];
@@ -1140,8 +1126,8 @@ export function getFinancialTools(): ToolDefinition[] {
  * Tools NOT exposed over the remote MCP server (expose spec §4.4):
  * - genui show_x/request_x — render only inside our chat UI;
  * - propose_plan — a chat-loop gating construct;
- * - search_web / read_webpage / read_webpage_rendered — agents bring their
- *   own web access; keeps SearXNG/Crawl4AI off the external surface.
+ * - search_web / read_webpage — agents bring their own web access; keeps the
+ *   local DuckDuckGo/direct-fetch backends off the external surface.
  * Genui names are DERIVED from the genui arrays so new genui tools are
  * excluded automatically. Guarded by __tests__/mcp-exposed-tools.test.ts.
  */
@@ -1151,7 +1137,6 @@ export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
   "propose_plan",
   "search_web",
   "read_webpage",
-  "read_webpage_rendered",
 ]);
 
 /** The remote MCP server's tool surface: the full Companion mirror minus the

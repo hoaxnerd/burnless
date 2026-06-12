@@ -16,9 +16,13 @@ describe("MCP_SERVER_EXCLUDED_TOOLS (spec §4.4)", () => {
   });
 
   it("contains the chat-loop + web exclusions", () => {
-    for (const name of ["propose_plan", "search_web", "read_webpage", "read_webpage_rendered"]) {
+    for (const name of ["propose_plan", "search_web", "read_webpage"]) {
       expect(MCP_SERVER_EXCLUDED_TOOLS.has(name)).toBe(true);
     }
+  });
+
+  it("no longer references the removed read_webpage_rendered tool (C4)", () => {
+    expect(MCP_SERVER_EXCLUDED_TOOLS.has("read_webpage_rendered")).toBe(false);
   });
 });
 

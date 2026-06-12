@@ -36,7 +36,11 @@ export const BUILTIN_PERMISSION_DEFAULTS: PermissionDefaults = {
 // ── Tool → category map (single source of truth) ─────────────────────────────
 
 const WEB_SEARCH_TOOLS = new Set<string>(["search_web", "read_webpage"]);
-const BROWSER_TOOLS = new Set<string>(["read_webpage_rendered"]);
+// The `browser_use` category has no built-in member anymore (the Cloudflare-CDP
+// `read_webpage_rendered` tool was removed in S3a #33). Full browser control is
+// now MCP-only — a connected Playwright MCP server's `mcp__*` browser tools
+// classify into `browser_use` via the per-turn dynamicCategories map.
+const BROWSER_TOOLS = new Set<string>([]);
 
 const DELETE_TOOLS = new Set<string>([
   "delete_forecast_line",

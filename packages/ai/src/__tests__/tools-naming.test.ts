@@ -4,7 +4,7 @@ import { TOOL_NAME_ALIASES } from "../tool-aliases";
 import { DISPLAY_TOOL_NAMES, INPUT_TOOL_NAMES, PLAN_TOOL_NAMES } from "../generative-ui";
 
 const ALLOWED_PREFIXES = ["create_", "get_", "update_", "delete_"];
-const WEB_TOOLS = new Set(["search_web", "read_webpage", "read_webpage_rendered"]);
+const WEB_TOOLS = new Set(["search_web", "read_webpage"]);
 // View-control tools (read-only, not gated) are an intentional family — they
 // change the user's UI view (e.g. active scenario) without mutating data, so
 // they do not fit the CRUD verb prefixes. Allowlisted like WEB_TOOLS.
