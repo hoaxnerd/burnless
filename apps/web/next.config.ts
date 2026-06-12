@@ -86,8 +86,17 @@ const nextConfig: NextConfig = {
   },
   // Next 16: the `eslint` config block was removed (`next build` no longer lints).
   // We lint separately via `pnpm lint`.
+  //
+  // Bundler note (Next 16): Turbopack is the default for dev AND build, but a
+  // custom `webpack` config is a hard error under it — so `dev`/`build` scripts
+  // pass `--webpack` to keep using this config. It's load-bearing: `razorpay`
+  // and `plaid` are OPTIONAL payment SDKs that are NOT installed (billing is
+  // cloud-only; they're loaded via dynamic import and fail gracefully at runtime
+  // when absent). webpack `externals` lets the build skip resolving them; under
+  // Turbopack an absent module is a hard build failure. Migrating the build to
+  // Turbopack is a follow-up (needs turbopack.resolveAlias stubs for the absent
+  // SDKs, or making them real optional deps) — tracked, not done in the upgrade.
   webpack: (config) => {
-    // plaid, razorpay, stripe are optional runtime-only SDKs loaded via dynamic import.
     config.externals = [
       ...(Array.isArray(config.externals) ? config.externals : config.externals ? [config.externals] : []),
       "plaid",
