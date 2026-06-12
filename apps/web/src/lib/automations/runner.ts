@@ -309,3 +309,39 @@ export async function dryRunJobDraft(draft: JobDraft): Promise<{ response: strin
   );
   return { response: result.response, toolResults: result.toolResults };
 }
+
+/** Run a NOT-yet-saved draft ONCE for real (writes commit). Persists no job/run row; honors credit + write-mode gates. */
+export async function runJobDraftForReal(draft: JobDraft): Promise<{ response: string; toolResults: unknown[]; error?: string }> {
+  const aiCheck = await checkAiFeatureAllowed(draft.companyId, "chat");
+  if (!aiCheck.allowed) return { response: aiCheck.reason ?? "AI not available.", toolResults: [], error: aiCheck.reason };
+  if (draft.actionKind === "write" && aiCheck.writeMode === "read_only")
+    return { response: "AI write-mode is read-only; this automation can't write.", toolResults: [], error: "read_only" };
+  setTrackingCompanyId(draft.companyId);
+  const scenario = await getDefaultScenario(draft.companyId);
+  const { contextText } = await buildAiContext(
+    draft.companyId,
+    scenario
+      ? { id: scenario.id, name: scenario.name, source: scenario.source }
+      : { id: "base", name: "Base", source: "blank" }
+  );
+  const providerConfig = await getCompanyProviderConfig(draft.companyId);
+  const { tools: mcpTools } = await assembleMcpTools(draft.companyId, draft.createdByUserId);
+  const toolsOverride = assembleAllowedTools(draft.allowedTools, mcpTools);
+  const ctx: ToolContext = {
+    companyId: draft.companyId,
+    userId: draft.createdByUserId,
+    scenarioId: scenario?.id ?? null,
+    auditSource: "scheduled_job",
+  };
+  const result = await withTimeout(
+    chat({
+      messages: [{ role: "user", content: draft.prompt }],
+      financialContext: contextText,
+      toolsOverride,
+      providerConfig,
+      onToolCall: makeOnToolCall(ctx, { dryRun: false, allowedNames: new Set(draft.allowedTools) }),
+    }),
+    getSafetyLimits().runTimeoutMs
+  );
+  return { response: result.response, toolResults: result.toolResults };
+}
