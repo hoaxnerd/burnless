@@ -53,4 +53,13 @@ describe("startInProcessScheduler", () => {
     vi.advanceTimersByTime(120_000);
     expect(mockRunDueJobs).not.toHaveBeenCalled();
   });
+  it("skips an overlapping tick while the previous runDueJobs is still in flight", () => {
+    // First tick never resolves — a second timer fire must NOT start a concurrent run.
+    mockRunDueJobs.mockReturnValueOnce(new Promise<never>(() => {}));
+    startInProcessScheduler();
+    vi.advanceTimersByTime(60_000);
+    expect(mockRunDueJobs).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_000); // second tick — guard should skip it
+    expect(mockRunDueJobs).toHaveBeenCalledTimes(1);
+  });
 });

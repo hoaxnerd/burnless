@@ -11,7 +11,7 @@
  */
 
 import { db, companies, users, weeklyDigests } from "@burnless/db";
-import { eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { computeWeeklyDigest, buildDeterministicSummary } from "@/lib/compute-digest";
 import { generateDigestNarrative } from "@/lib/digest-narrative";
 import { email } from "@/lib/email";
@@ -134,7 +134,7 @@ export async function runWeeklyDigest(): Promise<{
         await db
           .update(weeklyDigests)
           .set({ emailSentAt: new Date() })
-          .where(eq(weeklyDigests.companyId, company.id));
+          .where(and(eq(weeklyDigests.companyId, company.id), eq(weeklyDigests.weekStart, weekStart)));
       }
 
       results.push({ companyId: company.id, status: "sent" });
