@@ -49,6 +49,7 @@ const ALLOWED_EXACT: { match: string; why: string }[] = [
   { match: "chat/route.ts", why: "AI chat — conversation/usage scoped, separate write-mode gating in the AI layer." },
   { match: "chat/resume/route.ts", why: "AI chat resume — conversation scoped." },
   { match: "chat/reset-grants/route.ts", why: "AI chat grant reset — conversation scoped." },
+  { match: "chat/session-tools/route.ts", why: "AI chat session-tool toggle — per-conversation enablement preference, conversation scoped." },
   { match: "onboarding/route.ts", why: "Onboarding bootstrap for the caller's own brand-new company." },
   { match: "onboarding/enrich/route.ts", why: "Onboarding AI enrichment (no persistence of others' data)." },
   { match: "tokens/route.ts", why: "PAT mint: any member may mint (expose spec §5.1); write authority enforced per-scope via roleScopeCap (viewer → read-only). Self-scoped credential." },

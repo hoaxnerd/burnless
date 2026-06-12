@@ -71,7 +71,9 @@ describe("WebCategory (S3b Task 10)", () => {
     // Browser not-ready → exactly one posture radiogroup (web search).
     renderCat(makeCtx(), caps(), { connected: false, chromiumInstalled: false });
     await waitFor(() => screen.getByText("Web search"));
-    expect(screen.getByRole("switch", { name: /web search/i })).toBeTruthy();
+    // The enablement control is now an EnableSwitch (switch + permanence pin).
+    expect(screen.getByRole("switch", { name: /use web search in chat/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /pin permanently/i })).toBeTruthy();
     // posture radiogroup with Always selected (webSearchMode = always)
     const always = screen.getByRole("radio", { name: /always/i });
     expect(always.getAttribute("aria-checked")).toBe("true");
@@ -81,7 +83,7 @@ describe("WebCategory (S3b Task 10)", () => {
     const toggleSession = vi.fn(async () => {});
     renderCat(makeCtx({ toggleSession }), caps());
     await waitFor(() => screen.getByText("Web search"));
-    fireEvent.click(screen.getByRole("switch", { name: /web search/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /use web search in chat/i }));
     await waitFor(() => expect(toggleSession).toHaveBeenCalledWith("builtin:search_web", true));
     expect(toggleSession).toHaveBeenCalledWith("builtin:read_webpage", true);
   });

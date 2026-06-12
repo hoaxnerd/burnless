@@ -9,8 +9,8 @@ import { useCapabilities } from "@/components/providers/capability-context";
 import { SegmentedControl } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/mcp/status-pill";
-import { ToolSwitch } from "@/components/mcp/tool-switch";
 import { CategorySection } from "./category-section";
+import { EnableSwitch } from "./enable-switch";
 import { PostureControl, type PostureMode } from "./posture-control";
 import type { ToolsCtx } from "./tools-ctx";
 
@@ -42,21 +42,13 @@ export function WebCategory({ ctx }: { ctx: ToolsCtx }) {
 
 function WebSearchRow({ ctx }: { ctx: ToolsCtx }) {
   // Web search is enabled unless either web tool name is disabled (permanent or
-  // session). The switch reflects/controls both names as one unit.
+  // session). The EnableSwitch reflects/controls both names as one unit — its
+  // session/permanent callbacks fan out across BOTH keys (§5).
   const permanentDisabled = WEB_TOOL_KEYS.some((k) =>
     ctx.disabledBuiltins.has(k.slice("builtin:".length)),
   );
   const sessionDisabled = WEB_TOOL_KEYS.some((k) => ctx.sessionDisabled[k] === true);
   const enabled = !permanentDisabled && !sessionDisabled;
-
-  async function toggle() {
-    const nextDisabled = enabled; // flipping the effective state
-    if (ctx.conversationId == null) {
-      await Promise.all(WEB_TOOL_KEYS.map((k) => ctx.keepPermanent(k, nextDisabled)));
-    } else {
-      await Promise.all(WEB_TOOL_KEYS.map((k) => ctx.toggleSession(k, nextDisabled)));
-    }
-  }
 
   return (
     <div className="border-t border-surface-100 py-[9px] first:border-t-0">
@@ -68,7 +60,19 @@ function WebSearchRow({ ctx }: { ctx: ToolsCtx }) {
           <div className="text-[12.5px] font-semibold text-surface-800">Web search</div>
           <div className="text-[10.5px] text-surface-500">DuckDuckGo · keyless</div>
         </div>
-        <ToolSwitch checked={enabled} label="Web search" onToggle={() => void toggle()} />
+        <EnableSwitch
+          enabled={enabled}
+          isPermanentlyDisabled={permanentDisabled}
+          conversationId={ctx.conversationId}
+          sessionKey="builtin:search_web"
+          label="Use web search in chat"
+          onToggleSession={(d) =>
+            Promise.all(WEB_TOOL_KEYS.map((k) => ctx.toggleSession(k, d))).then(() => {})
+          }
+          onKeepPermanently={(d) =>
+            Promise.all(WEB_TOOL_KEYS.map((k) => ctx.keepPermanent(k, d))).then(() => {})
+          }
+        />
       </div>
       <PostureRow modeKey="webSearchMode" label="Web search posture" />
     </div>

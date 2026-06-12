@@ -43,6 +43,27 @@ describe("EnableSwitch (S3b Task 8)", () => {
     expect(screen.getByText(/Keep it off in future chats/i)).toBeTruthy();
   });
 
+  it("re-enabling a permanently-disabled tool for the session shows the 'on for this chat only' copy", async () => {
+    // Permanently disabled (enabled=false, isPermanentlyDisabled=true). Toggling
+    // it ON diverges the other way → the prompt offers to keep it ON permanently.
+    const { onToggleSession } = setup({ enabled: false, isPermanentlyDisabled: true });
+    fireEvent.click(screen.getByRole("switch", { name: "Use Stripe in chat" }));
+    await waitFor(() => expect(onToggleSession).toHaveBeenCalledWith(false));
+    expect(screen.getByText(/Keep it on in future chats/i)).toBeTruthy();
+    expect(screen.queryByText(/Keep it off in future chats/i)).toBeNull();
+  });
+
+  it("re-enable prompt [Keep permanently] promotes onKeepPermanently(false)", async () => {
+    const { onKeepPermanently } = setup({ enabled: false, isPermanentlyDisabled: true });
+    fireEvent.click(screen.getByRole("switch", { name: "Use Stripe in chat" }));
+    await waitFor(() => screen.getByText(/Keep it on in future chats/i));
+    fireEvent.click(screen.getByRole("button", { name: /Keep permanently/i }));
+    await waitFor(() => expect(onKeepPermanently).toHaveBeenCalledWith(false));
+    await waitFor(() =>
+      expect(screen.queryByText(/Keep it on in future chats/i)).toBeNull(),
+    );
+  });
+
   it("[Keep permanently] calls onKeepPermanently(true) and hides the prompt", async () => {
     const { onKeepPermanently } = setup();
     fireEvent.click(screen.getByRole("switch", { name: "Use Stripe in chat" }));

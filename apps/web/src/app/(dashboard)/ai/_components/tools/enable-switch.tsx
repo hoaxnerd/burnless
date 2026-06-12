@@ -108,7 +108,15 @@ export function EnableSwitch({
       {promptDisabled != null && (
         <div className="mt-1.5 flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50 px-[9px] py-[7px]">
           <span className="text-[10.5px] leading-[1.35] text-brand-700">
-            Off for <b className="font-bold">this chat</b>. Keep it off in future chats too?
+            {promptDisabled ? (
+              <>
+                Off for <b className="font-bold">this chat</b>. Keep it off in future chats too?
+              </>
+            ) : (
+              <>
+                On for <b className="font-bold">this chat</b> only. Keep it on in future chats too?
+              </>
+            )}
           </span>
           <span className="ml-auto flex flex-none items-center gap-1.5">
             <button
