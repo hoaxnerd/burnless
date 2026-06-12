@@ -15,6 +15,7 @@ import { GenComparisonTable, type GenComparisonTableProps } from "./comparison-t
 import { GenChecklist, type GenChecklistProps } from "./checklist";
 import { GenSuggestedActions, type GenSuggestedActionsProps } from "./suggested-actions";
 import { GenProgressSteps, type GenProgressStepsProps } from "./progress-steps";
+import { GenProposeScheduledJob, type GenProposeScheduledJobProps } from "./propose-scheduled-job";
 import { ConfidenceChip } from "./confidence-chip";
 
 export interface GenerativeBlockProps {
@@ -66,6 +67,13 @@ export function GenerativeBlock({ component, props, onAction }: GenerativeBlockP
     }
     case "progress_steps":
       return <GenProgressSteps {...(props as unknown as GenProgressStepsProps)} />;
+    case "propose_scheduled_job":
+      return (
+        <GenProposeScheduledJob
+          {...(props as unknown as GenProposeScheduledJobProps)}
+          onAction={onAction}
+        />
+      );
     // component cases are added by each component task below.
     default:
       return (
