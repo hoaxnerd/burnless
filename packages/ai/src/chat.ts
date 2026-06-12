@@ -50,6 +50,13 @@ interface ChatOptions {
   feature?: string;
   /** Configured companion name for the system prompt. */
   companionName?: string;
+  /**
+   * Run mode for the system prompt. "interactive" (default) = live chat + UI
+   * (planning/approval, display components, forms). "autonomous" = a headless
+   * scheduled job: no user/UI, frozen minimal allowlist, act without approval,
+   * summarize in plain text. The scheduled-job runner sets "autonomous". (S3a.)
+   */
+  mode?: "interactive" | "autonomous";
   /** Extra per-turn tools (MCP) appended to the financial tool set. */
   extraTools?: ToolDefinition[];
   /**
@@ -102,7 +109,7 @@ export async function chat(options: ChatOptions): Promise<{
     };
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName);
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
   // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
   // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
   // interactive assembly is filtered.
@@ -187,7 +194,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     return;
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName);
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
   // Interactive assembly is filtered by disabledToolNames (S3b §11); a
   // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
   const tools = options.toolsOverride

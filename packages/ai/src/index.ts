@@ -32,7 +32,7 @@ export { generatePageInsights } from "./page-insights";
 export type { InsightPage, PageInsightContext, PageInsight } from "./page-insights";
 
 // Prompts
-export { SYSTEM_PROMPT, buildSystemPrompt, buildSystemMessage } from "./prompts";
+export { SYSTEM_PROMPT, AUTONOMOUS_SYSTEM_PROMPT, buildSystemPrompt, buildSystemMessage, type PromptMode } from "./prompts";
 
 // Input sanitization
 export { sanitizeUserMessage, detectInjectionAttempt } from "./sanitize";

@@ -220,6 +220,7 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
       chat({
         messages,
         financialContext: contextText,
+      mode: "autonomous",
         companionName: undefined,
         toolsOverride,
         providerConfig,
@@ -301,6 +302,7 @@ export async function dryRunJobDraft(draft: JobDraft): Promise<{ response: strin
     chat({
       messages: [{ role: "user", content: draft.prompt }],
       financialContext: contextText,
+      mode: "autonomous",
       toolsOverride,
       providerConfig,
       onToolCall: makeOnToolCall(ctx, { dryRun: true, allowedNames: new Set(draft.allowedTools) }),
@@ -337,6 +339,7 @@ export async function runJobDraftForReal(draft: JobDraft): Promise<{ response: s
     chat({
       messages: [{ role: "user", content: draft.prompt }],
       financialContext: contextText,
+      mode: "autonomous",
       toolsOverride,
       providerConfig,
       onToolCall: makeOnToolCall(ctx, { dryRun: false, allowedNames: new Set(draft.allowedTools) }),
