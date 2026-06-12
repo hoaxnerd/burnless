@@ -122,7 +122,7 @@ describe("POST /api/share-classes", () => {
       expect.objectContaining({ after: created }),
     );
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
   });
 
   it("returns 403 for viewer role", async () => {

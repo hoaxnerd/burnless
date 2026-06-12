@@ -114,7 +114,7 @@ describe("POST /api/option-pools", () => {
       expect.objectContaining({ after: created }),
     );
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
   });
 
   it("returns 409 SINGLE_POOL_ONLY when a pool already exists", async () => {

@@ -87,7 +87,7 @@ describe("PATCH /api/option-pools/[id]", () => {
       "comp-1",
       expect.objectContaining({ totalReserved: "1500000" }),
     );
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
     expect(mockLogAudit).toHaveBeenCalledWith(
       expect.anything(),
@@ -141,7 +141,7 @@ describe("DELETE /api/option-pools/[id]", () => {
     expect(body).toEqual({ deleted: true });
 
     expect(mockSoftDeleteOptionPool).toHaveBeenCalledWith("op-1", "comp-1");
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
     expect(mockLogAudit).toHaveBeenCalledWith(
       expect.anything(),

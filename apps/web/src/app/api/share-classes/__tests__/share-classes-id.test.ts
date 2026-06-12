@@ -84,7 +84,7 @@ describe("PATCH /api/share-classes/[id]", () => {
       "comp-1",
       expect.objectContaining({ totalIssued: "9000000" }),
     );
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
     expect(mockLogAudit).toHaveBeenCalledWith(
       expect.anything(),
@@ -137,7 +137,7 @@ describe("DELETE /api/share-classes/[id]", () => {
     expect(body).toEqual({ deleted: true });
 
     expect(mockSoftDeleteShareClass).toHaveBeenCalledWith("sc-1", "comp-1");
-    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("cap-table", { expire: 0 });
     expect(mockTrackDataMutation).toHaveBeenCalledWith("comp-1", "funding");
     expect(mockLogAudit).toHaveBeenCalledWith(
       expect.anything(),

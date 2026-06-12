@@ -96,7 +96,9 @@ describe("cache invalidation on mutations (BUR-198 regression)", () => {
     '$path should call revalidateTag("$tag")',
     ({ path, tag }) => {
       const source = readRoute(path);
-      expect(source).toContain(`revalidateTag("${tag}")`);
+      // Next 16 form is revalidateTag("tag", { expire: 0 }) — match the tag
+      // without requiring the immediate close-paren.
+      expect(source).toContain(`revalidateTag("${tag}"`);
     }
   );
 
@@ -160,8 +162,8 @@ describe("cache invalidation on mutations (BUR-198 regression)", () => {
 
         // Data layer declares the tag
         expect(dataSource).toContain(`"${tag}"`);
-        // API route invalidates it
-        expect(apiSource).toContain(`revalidateTag("${tag}")`);
+        // API route invalidates it (Next 16 2-arg form — match tag, not the paren)
+        expect(apiSource).toContain(`revalidateTag("${tag}"`);
       }
     );
   });
