@@ -40,6 +40,7 @@ vi.mock("@/lib/data-mutation-tracker", () => ({
 }));
 
 import { transactionHandlers } from "../transactions";
+import { executeToolCall } from "../index";
 
 async function setup() {
   const user = await createUser();
@@ -134,6 +135,39 @@ describe("record_transaction (idempotent upsert)", () => {
     const a = JSON.parse(await transactionHandlers.record_transaction!({ accountId: revenueAccountId, date: "2026-06-08", amount: 1 }, ctx));
     const b = JSON.parse(await transactionHandlers.record_transaction!({ accountId: revenueAccountId, date: "2026-06-08", amount: 2 }, ctx));
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+// REGRESSION (S3a): the real executeToolCall path validates input with the schema
+// (transforming/parsing it) BEFORE handing `data` to the handler, which re-parses
+// the same schema. A `z.string().transform(s => new Date(s))` field is NOT
+// idempotent — the second parse sees a Date where `z.string()` expects a string and
+// throws, breaking record_transaction on EVERY real call. The direct-handler tests
+// above bypass executeToolCall and miss this. Drive the full path here.
+describe("record_transaction via executeToolCall (schema round-trip)", () => {
+  it("succeeds through the real executeToolCall path (idempotent date schema)", async () => {
+    const { ctx, revenueAccountId } = await setup();
+    const commitCtx: ToolContext = { ...ctx, mode: "commit" };
+
+    const created = JSON.parse(
+      await executeToolCall(
+        "record_transaction",
+        { accountId: revenueAccountId, date: "2026-06-08", amount: 100, externalId: "ch_e2e" },
+        commitCtx
+      )
+    );
+    expect(created.error).toBeUndefined();
+    expect(created.action).toBe("created");
+
+    const updated = JSON.parse(
+      await executeToolCall(
+        "record_transaction",
+        { accountId: revenueAccountId, date: "2026-06-08", amount: 250, externalId: "ch_e2e" },
+        commitCtx
+      )
+    );
+    expect(updated.error).toBeUndefined();
+    expect(updated.action).toBe("updated");
   });
 });
 

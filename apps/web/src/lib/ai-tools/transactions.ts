@@ -31,7 +31,7 @@ async function listAccounts(_input: Record<string, unknown>, context: ToolContex
 // ── record_transaction (write) ───────────────────────────────────────────────
 const recordTransactionSchema = z.object({
   accountId: z.string().min(1).max(100),
-  date: z.string().transform((s) => new Date(s)),
+  date: z.string().date(),
   amount: monetaryAmount(),
   description: z.string().max(2000).nullable().optional(),
   vendor: z.string().max(200).nullable().optional(),
@@ -56,7 +56,7 @@ async function recordTransaction(input: Record<string, unknown>, context: ToolCo
   const values = {
     companyId: ctx.companyId,
     accountId: data.accountId,
-    date: data.date,
+    date: new Date(data.date),
     amount: String(data.amount),
     description: data.description ?? null,
     vendor: data.vendor ?? null,
