@@ -119,11 +119,18 @@ describe("scheduled-jobs query helpers", () => {
     });
     const run = await startScheduledJobRun({ scheduledJobId: job.id, companyId: a.company.id, trigger: "manual" });
     expect(run.status).toBe("running");
+    // startedAt is set explicitly from the JS clock (same source as finishedAt) — guards the
+    // duration-always-0 / zone-mismatch bug where the column default DB-clock disagreed.
+    expect(run.startedAt).toBeInstanceOf(Date);
     await finishScheduledJobRun(run.id, a.company.id, { status: "success", summary: "did the thing", tokensUsed: 1234, output: { ok: true } });
     const runs = await listScheduledJobRuns(job.id, a.company.id, 10);
     expect(runs[0]!.status).toBe("success");
     expect(runs[0]!.summary).toBe("did the thing");
+    // duration is a non-negative number and the two clocks agree (startedAt <= finishedAt).
+    expect(typeof runs[0]!.durationMs).toBe("number");
     expect(runs[0]!.durationMs).toBeGreaterThanOrEqual(0);
+    expect(runs[0]!.finishedAt).toBeInstanceOf(Date);
+    expect(runs[0]!.startedAt.getTime()).toBeLessThanOrEqual(runs[0]!.finishedAt!.getTime());
   });
 
   it("countScheduledJobs counts only live (non-deleted) jobs for the company", async () => {

@@ -144,7 +144,11 @@ export async function startScheduledJobRun(input: {
 }) {
   const [row] = await db
     .insert(scheduledJobRuns)
-    .values({ scheduledJobId: input.scheduledJobId, companyId: input.companyId, status: "running", trigger: input.trigger })
+    // startedAt from the JS clock (not the column's defaultNow DB-clock): finishScheduledJobRun
+    // subtracts it from finishedAt = new Date(), so both ends of the duration must share one clock
+    // source — a naive `timestamp` column round-trips DB-clock and JS-clock in different zones,
+    // which made finishedAt - startedAt go negative and durationMs clamp to 0.
+    .values({ scheduledJobId: input.scheduledJobId, companyId: input.companyId, status: "running", trigger: input.trigger, startedAt: new Date() })
     .returning();
   if (!row) throw new Error("startScheduledJobRun: insert returned no row");
   return row;
