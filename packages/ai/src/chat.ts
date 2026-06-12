@@ -52,6 +52,12 @@ interface ChatOptions {
   companionName?: string;
   /** Extra per-turn tools (MCP) appended to the financial tool set. */
   extraTools?: ToolDefinition[];
+  /**
+   * Complete replacement tool list. When set, the provider is offered EXACTLY
+   * these tools (the frozen allowlist for a scheduled job) instead of the full
+   * financial set + extraTools. Scope minimization — S3a Plan 4 §6.
+   */
+  toolsOverride?: ToolDefinition[];
   /** Override provider config (e.g., from per-company DB settings). */
   providerConfig?: {
     provider?: string;
@@ -78,7 +84,7 @@ export async function chat(options: ChatOptions): Promise<{
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName);
-  const tools = [...getFinancialTools(), ...(options.extraTools ?? [])];
+  const tools = options.toolsOverride ?? [...getFinancialTools(), ...(options.extraTools ?? [])];
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
