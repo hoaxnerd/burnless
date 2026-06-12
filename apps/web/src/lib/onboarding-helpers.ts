@@ -6,23 +6,6 @@
 import { z } from "zod";
 
 /**
- * ONB-02 — sane upper bounds for AI-enriched / user-edited financial inputs.
- *
- * The AI research agent (and a fat-fingered user) can emit absurd values
- * (e.g. 9.8B/mo monthly revenue) that ripple into engine runway/burn math and
- * the dashboard headlines. These are deliberately generous — they catch only
- * truly-impossible inputs, never a legitimately-large enterprise figure.
- *
- *   SANE_MAX_AMOUNT — money amounts (revenue/funding/expenses).
- *   SANE_MAX_COUNT  — counts (team_size, usage quantity). Usage-based revenue
- *                     can be high-volume, so this is kept generous.
- *   SANE_MAX_SALARY — a single role's annual salary.
- */
-export const SANE_MAX_AMOUNT = 1e12;
-export const SANE_MAX_COUNT = 1e5;
-export const SANE_MAX_SALARY = 1e10;
-
-/**
  * Slimmed onboarding payload (S4b wizard).
  *
  * The wizard creates the company FIRST via this route, then drives the REAL
@@ -39,54 +22,6 @@ export const onboardingSchema = z.object({
   user_name: z.string().optional(),
   founders: z.array(z.string()).optional().default([]),
 });
-
-export type OnboardingInput = z.infer<typeof onboardingSchema>;
-
-/**
- * Detailed-entity element schemas previously embedded in `onboardingSchema`.
- * Retained as standalone exports for the enrich agent / future callers that
- * validate AI-suggested detailed entities. The SANE_MAX_* bounds still guard
- * any caller that re-uses them.
- */
-export const suggestedFundingRoundSchema = z.object({
-  name: z.string(),
-  type: z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant"]),
-  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-  date: z.string(),
-  preMoneyValuation: z.number().nullable().optional(),
-  dilutionPercent: z.number().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-
-export const suggestedHeadcountSchema = z.object({
-  title: z.string(),
-  department: z.enum(["Engineering", "Sales", "Marketing", "Operations", "General & Admin"]),
-  employeeType: z.enum(["full_time", "part_time", "contractor"]),
-  salary: z.number().nonnegative().max(SANE_MAX_SALARY),
-  startDate: z.string(),
-});
-
-export const suggestedExpenseSchema = z.object({
-  name: z.string(),
-  category: z.enum(["Cloud Infrastructure", "Marketing", "Office & Admin", "Software & Tools"]),
-  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-  startDate: z.string(),
-  isRecurring: z.boolean(),
-});
-
-export const suggestedRevenueStreamSchema = z.object({
-  name: z.string(),
-  type: z.enum(["subscription", "one_time", "usage_based", "services", "marketplace", "ecommerce", "hardware"]),
-  amount: z.number().nonnegative().max(SANE_MAX_AMOUNT),
-  quantity: z.number().nonnegative().max(SANE_MAX_COUNT),
-  startDate: z.string(),
-  notes: z.string().nullable().optional(),
-});
-
-export type SuggestedFundingRound = z.infer<typeof suggestedFundingRoundSchema>;
-export type SuggestedHeadcount = z.infer<typeof suggestedHeadcountSchema>;
-export type SuggestedExpense = z.infer<typeof suggestedExpenseSchema>;
-export type SuggestedRevenueStream = z.infer<typeof suggestedRevenueStreamSchema>;
 
 /** Map user-friendly stage names to enum values */
 export function parseStage(
@@ -113,22 +48,4 @@ export function parseBusinessModel(
     return "services";
   if (lower.includes("hardware") || lower.includes("physical")) return "hardware";
   return "other";
-}
-
-export function parseMoneyAmount(input: string): number {
-  if (!input) return 0;
-  const lower = input.toLowerCase().replace(/[,$\s]/g, "");
-  if (lower === "0") return 0;
-  const match = lower.match(/(\d+\.?\d*)\s*(m|k|million|thousand)?/);
-  if (!match) return 0;
-  let amount = parseFloat(match[1]!);
-  const suffix = match[2];
-  if (suffix === "m" || suffix === "million") amount *= 1_000_000;
-  else if (suffix === "k" || suffix === "thousand") amount *= 1_000;
-  return Math.round(amount);
-}
-
-export function parseTeamSize(input: string): number {
-  const match = input.match(/(\d+)/);
-  return match ? parseInt(match[1]!, 10) : 1;
 }
