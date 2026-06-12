@@ -46,8 +46,18 @@ describe("mutation-set unification", () => {
     expect([...cacheSet].sort()).toEqual([...MUTATION_TOOL_NAMES].sort());
   });
 
+  // Mutation tools whose written data is NOT served through a tagged
+  // unstable_cache, so there is intentionally no tag to invalidate. These must
+  // mirror a base table the dashboard reads via request-scoped React.cache()
+  // (re-read fresh on the next request) rather than a tagged server cache.
+  //   - record_transaction (S3a Plan 3): writes the uncached `transactions`
+  //     ledger — exactly like the api/transactions route, which also issues no
+  //     revalidateTag (it relies on trackDataMutation + React.cache re-read).
+  const UNCACHED_MUTATION_TOOLS = new Set<string>(["record_transaction"]);
+
   it("every mutation tool has a cache-tag mapping (no silent no-op invalidation)", () => {
     for (const name of MUTATION_TOOL_NAMES) {
+      if (UNCACHED_MUTATION_TOOLS.has(name)) continue;
       const tags = __testables.MUTATION_CACHE_TAGS[name];
       expect(Array.isArray(tags) && tags.length > 0, `missing/empty cache tags for ${name}`).toBe(true);
     }
