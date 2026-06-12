@@ -8,6 +8,8 @@
  */
 
 import type { AiWriteMode } from "./feature-flags";
+import { getFinancialTools } from "./tools";
+import { DISPLAY_TOOL_NAMES, INPUT_TOOL_NAMES, PLAN_TOOL_NAMES } from "./generative-ui";
 
 export type PermissionCategory = "read" | "write" | "delete" | "web_search" | "browser_use";
 
@@ -101,6 +103,38 @@ export function categorizeToolName(
   if (DELETE_TOOLS.has(toolName)) return "delete";
   if (WRITE_TOOLS.has(toolName)) return "write";
   return "read";
+}
+
+// ── User-controllable built-in tools (S3b §7) ────────────────────────────────
+
+export interface BuiltinToolControl {
+  name: string;
+  category: PermissionCategory;
+}
+
+/**
+ * Built-in tools a user may individually disable in the Tools pane. Derived from
+ * the live `getFinancialTools()` registry (the single source of truth) so new
+ * tools surface automatically. EXCLUDES:
+ *  - display/genui `show_*` tools and `request_*` input tools (they render UI,
+ *    not data — DISPLAY_TOOL_NAMES ∪ INPUT_TOOL_NAMES);
+ *  - the `propose_plan` plan-control tool (PLAN_TOOL_NAMES);
+ *  - any `mcp__*` tool (those are governed per-connection in the Connectors
+ *    category, not here).
+ * Each surviving name is classified via `categorizeToolName` (read/write/delete/
+ * web_search). No second list to keep in sync — the categorizer is the classifier.
+ */
+export function listBuiltinToolsForControl(): BuiltinToolControl[] {
+  const out: BuiltinToolControl[] = [];
+  for (const tool of getFinancialTools()) {
+    const name = tool.name;
+    if (name.startsWith("mcp__")) continue;
+    if (DISPLAY_TOOL_NAMES.has(name)) continue;
+    if (INPUT_TOOL_NAMES.has(name)) continue;
+    if (PLAN_TOOL_NAMES.has(name)) continue;
+    out.push({ name, category: categorizeToolName(name) });
+  }
+  return out;
 }
 
 // ── Resolver ─────────────────────────────────────────────────────────────────

@@ -43,18 +43,30 @@ interface ConnData {
   prefs: Array<{ toolName: string; enabled: boolean; permClassOverride: McpPermCategory | null }>;
 }
 
-/** Pure core — unit-tested directly. */
-export function assembleMcpToolsFromData(connections: ConnData[], disabledIds: string[]): AssembledMcpTools {
+/** Pure core — unit-tested directly.
+ *  `disabledIds` = PERMANENTLY-disabled connection ids (user prefs, D11).
+ *  `sessionDisabled` = per-conversation overlay (S3b §7): a `conn:<id>` key true
+ *  drops the whole connection for this turn; a `conntool:<id>:<tool>` key true
+ *  drops a single tool. Applied IN ADDITION to `disabledIds`. */
+export function assembleMcpToolsFromData(
+  connections: ConnData[],
+  disabledIds: string[],
+  sessionDisabled?: Record<string, boolean>
+): AssembledMcpTools {
   const disabled = new Set(disabledIds);
+  const session = sessionDisabled ?? {};
   const tools: BridgedToolDefinition[] = [];
   const categories: Record<string, McpPermCategory> = {};
 
   for (const conn of connections) {
     if (conn.status !== "connected") continue;
     if (disabled.has(conn.id)) continue; // D11: contributes nothing — not even stubs
+    if (session[`conn:${conn.id}`]) continue; // S3b §7: session-disabled connection
 
     const prefs = new Map(conn.prefs.map((p) => [p.toolName, p]));
-    const enabled = conn.tools.filter((t) => prefs.get(t.name)?.enabled !== false);
+    const enabled = conn.tools.filter(
+      (t) => prefs.get(t.name)?.enabled !== false && !session[`conntool:${conn.id}:${t.name}`]
+    );
 
     if (enabled.length > DEFER_THRESHOLD) {
       // D6 defer: two meta-tools instead of N schemas.
@@ -108,7 +120,8 @@ export interface McpGateFlags {
 export async function assembleMcpTools(
   companyId: string,
   userId: string,
-  prefetchedFlags?: McpGateFlags
+  prefetchedFlags?: McpGateFlags,
+  sessionDisabled?: Record<string, boolean>
 ): Promise<AssembledMcpTools> {
   const flags = prefetchedFlags ?? (await getAiFlags(companyId));
   if (!flags?.masterEnabled) return { tools: [], categories: {} };
@@ -132,7 +145,7 @@ export async function assembleMcpTools(
       })),
     }))
   );
-  return assembleMcpToolsFromData(data, disabledIds);
+  return assembleMcpToolsFromData(data, disabledIds, sessionDisabled);
 }
 
 // ── Dispatch (Task 13) ───────────────────────────────────────────────────────

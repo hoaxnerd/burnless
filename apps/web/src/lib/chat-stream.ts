@@ -41,6 +41,10 @@ export interface ChatStreamParams {
   writeMode?: AiWriteMode;
   /** MCP tools assembled for this turn (assembleMcpTools) — spec §3.4. */
   mcp?: { tools: ToolDefinition[]; categories: Record<string, PermissionCategory> };
+  /** Built-in tools the user has disabled for this turn (per-built-in disables +
+   *  session-disabled built-ins). Filtered out of the interactive tool set
+   *  before the loop (S3b §11). */
+  disabledToolNames?: ReadonlySet<string>;
   creditWarning?: string;
   /** Worklog timeline accumulated before a pause, seeded so the resumed turn's
    *  `done` persists the FULL run (Plan 5 full-run persistence). */
@@ -157,6 +161,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               dynamicCategories: params.mcp?.categories,
             }),
           extraTools: params.mcp?.tools,
+          disabledToolNames: params.disabledToolNames,
           onToolCall: async (toolName, input) => {
             const raw = await executeToolCall(toolName, input, {
               companyId: params.companyId,

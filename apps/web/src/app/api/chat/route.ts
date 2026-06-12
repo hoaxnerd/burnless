@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
@@ -173,10 +173,23 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   const aiFlags = await getAiFlags(ctx.companyId);
 
+  // Disabled-tools overlay (S3b §11): permanently-disabled built-ins (user prefs)
+  // ∪ session-disabled built-ins (this conversation's `builtin:` keys). The MCP
+  // `conn:`/`conntool:` keys are handled inside assembleMcpTools below.
+  const sessionDisabled = await getSessionDisabledTools(conversationId);
+  const disabledBuiltins = await getDisabledBuiltinTools(ctx.userId, ctx.companyId);
+  const disabledToolNames = new Set<string>([
+    ...disabledBuiltins,
+    ...Object.keys(sessionDisabled)
+      .filter((k) => k.startsWith("builtin:"))
+      .map((k) => k.slice("builtin:".length)),
+  ]);
+
   // MCP tools for this turn (spec §3.4): cached capabilities only — no live
   // server round-trips here. Empty when the feature is off or nothing connected.
   // aiFlags is passed pre-fetched so the aiFeatureFlags row isn't re-queried.
-  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags);
+  // sessionDisabled drops `conn:`/`conntool:` session-disabled connections/tools.
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags, sessionDisabled);
 
   return buildChatSSEResponse({
     companyId: ctx.companyId,
@@ -192,6 +205,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     sessionGrants,
     writeMode: aiCheck.writeMode ?? "confirm",
     mcp,
+    disabledToolNames,
     creditWarning,
   });
 });

@@ -13,6 +13,8 @@ import {
   getSessionGrants,
   getPermissionDefaults,
   getOverrideCount,
+  getSessionDisabledTools,
+  getDisabledBuiltinTools,
 } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
@@ -100,10 +102,12 @@ async function resumeStream(args: {
   /** MCP tools + dynamic category map, assembled ONCE in the POST handler and
    *  shared with the decision loop (spec §3.4). */
   mcp: AssembledMcpTools;
+  /** Built-in tools disabled for this turn (S3b §11); resumes re-offer tools. */
+  disabledToolNames?: ReadonlySet<string>;
   seedTimeline?: TimelineNode[];
   activatedScenarios?: { scenarioId: string; name: string }[];
 }): Promise<Response> {
-  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, companionName, mcp, seedTimeline, activatedScenarios } = args;
+  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, companionName, mcp, disabledToolNames, seedTimeline, activatedScenarios } = args;
 
   const history = await db
     .select()
@@ -154,6 +158,7 @@ async function resumeStream(args: {
     sessionGrants,
     writeMode: writeMode ?? "confirm",
     mcp,
+    disabledToolNames,
     seedTimeline,
     activatedScenarios,
   });
@@ -217,7 +222,20 @@ export const POST = withErrorHandler(async (request: Request) => {
   // — same assembly as POST /api/chat so the model keeps its MCP tool set across a
   // pause — and shared by the decision loop AND the resumed stream (spec §3.4).
   const aiFlags = await getAiFlags(ctx.companyId);
-  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags);
+
+  // Disabled-tools overlay (S3b §11) — resumes re-offer the tool set, so apply the
+  // same filter as POST /api/chat. `builtin:` keys → disabledToolNames (filtered in
+  // the chat loop); `conn:`/`conntool:` keys → assembleMcpTools.
+  const sessionDisabled = await getSessionDisabledTools(body.conversationId);
+  const disabledBuiltins = await getDisabledBuiltinTools(ctx.userId, ctx.companyId);
+  const disabledToolNames = new Set<string>([
+    ...disabledBuiltins,
+    ...Object.keys(sessionDisabled)
+      .filter((k) => k.startsWith("builtin:"))
+      .map((k) => k.slice("builtin:".length)),
+  ]);
+
+  const mcp = await assembleMcpTools(ctx.companyId, ctx.userId, aiFlags, sessionDisabled);
 
   // INPUT pause (genui plan 1): validate the submitted formData against the stored
   // spec, synthesize a single tool_result for the form's tool_use id, and resume
@@ -256,6 +274,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       writeMode: aiCheck.writeMode ?? "confirm",
       companionName: aiFlags.companionName,
       mcp,
+      disabledToolNames,
       seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
@@ -286,6 +305,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       writeMode: aiCheck.writeMode ?? "confirm",
       companionName: aiFlags.companionName,
       mcp,
+      disabledToolNames,
       seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
@@ -394,6 +414,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     writeMode: aiCheck.writeMode ?? "confirm",
     companionName: aiFlags.companionName,
     mcp,
+    disabledToolNames,
     seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     activatedScenarios,
   });

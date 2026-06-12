@@ -156,6 +156,7 @@ export * from "./generative-ui";
 export {
   resolvePermission,
   categorizeToolName,
+  listBuiltinToolsForControl,
   BUILTIN_PERMISSION_DEFAULTS,
   MUTATION_TOOL_NAMES,
 } from "./permissions";
@@ -165,4 +166,5 @@ export type {
   PermissionDecision,
   PermissionDefaults,
   ResolvePermissionContext,
+  BuiltinToolControl,
 } from "./permissions";

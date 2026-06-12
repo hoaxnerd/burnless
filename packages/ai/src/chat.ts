@@ -58,6 +58,14 @@ interface ChatOptions {
    * financial set + extraTools. Scope minimization — S3a Plan 4 §6.
    */
   toolsOverride?: ToolDefinition[];
+  /**
+   * Names of tools the user has disabled for this turn (per-built-in-tool
+   * disables + session-disabled built-ins). Filtered out of the assembled
+   * interactive tool set BEFORE the loop. Has NO effect on the `toolsOverride`
+   * path: a scheduled job's frozen allowlist (S3a Plan 4 §6) is offered exactly
+   * as given — S3b §11.
+   */
+  disabledToolNames?: ReadonlySet<string>;
   /** Override provider config (e.g., from per-company DB settings). */
   providerConfig?: {
     provider?: string;
@@ -65,6 +73,17 @@ interface ChatOptions {
     model?: string;
     baseUrl?: string;
   };
+}
+
+/** Drop user-disabled tools from an assembled interactive tool set (S3b §11).
+ *  No-op when `disabled` is absent/empty. NEVER applied to a `toolsOverride`
+ *  (frozen-allowlist) tool set. */
+function filterTools(
+  tools: ToolDefinition[],
+  disabled: ReadonlySet<string> | undefined
+): ToolDefinition[] {
+  if (!disabled || disabled.size === 0) return tools;
+  return tools.filter((t) => !disabled.has(t.name));
 }
 
 /** Max tool-use round-trips before we force a text response. */
@@ -84,7 +103,12 @@ export async function chat(options: ChatOptions): Promise<{
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName);
-  const tools = options.toolsOverride ?? [...getFinancialTools(), ...(options.extraTools ?? [])];
+  // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
+  // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
+  // interactive assembly is filtered.
+  const tools = options.toolsOverride
+    ? options.toolsOverride
+    : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -164,7 +188,11 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName);
-  const tools = [...getFinancialTools(), ...(options.extraTools ?? [])];
+  // Interactive assembly is filtered by disabledToolNames (S3b §11); a
+  // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
+  const tools = options.toolsOverride
+    ? options.toolsOverride
+    : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
