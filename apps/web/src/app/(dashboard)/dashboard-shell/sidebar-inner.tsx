@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   LogOut,
+  UserCheck,
   Zap,
   Brain,
   Activity,
@@ -16,6 +17,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { useCapabilities } from "@/components/providers/capability-context";
+import { useAccountStatus } from "@/lib/use-account-status";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   DndContext,
   closestCenter,
@@ -81,6 +85,18 @@ export function SidebarInner({
     intelligence: Brain,
     dynamic: Activity,
     custom: Pin,
+  };
+
+  const { autoLogin } = useCapabilities();
+  const { status } = useAccountStatus();
+  const localUnclaimed = autoLogin && status !== undefined && !status.isClaimed;
+
+  const handleSignOut = async () => {
+    if (autoLogin) {
+      // claimed local user: suppress auto-login so the next visit shows /login
+      await apiFetch("/api/auth/suppress-autologin", { method: "POST" }).catch(() => {});
+    }
+    void signOut({ callbackUrl: "/login" });
   };
 
   return (
@@ -224,14 +240,25 @@ export function SidebarInner({
               </div>
               <div className="flex items-center gap-1">
                 <ThemeToggle />
-                <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
-                  title="Sign out"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
+                {localUnclaimed ? (
+                  <Link
+                    href="/settings?tab=security"
+                    className="rounded-lg p-1.5 text-surface-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                    title="Claim account"
+                    aria-label="Claim account"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleSignOut}
+                    className="rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
+                    title="Sign out"
+                    aria-label="Sign out"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -241,14 +268,25 @@ export function SidebarInner({
           // already an icon-only, aria-labeled button, so it works centered here.
           <div className="mt-2 flex flex-col items-center gap-1">
             <ThemeToggle />
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="w-full flex justify-center rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            {localUnclaimed ? (
+              <Link
+                href="/settings?tab=security"
+                className="w-full flex justify-center rounded-lg p-1.5 text-surface-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                title="Claim account"
+                aria-label="Claim account"
+              >
+                <UserCheck className="h-4 w-4" />
+              </Link>
+            ) : (
+              <button
+                onClick={handleSignOut}
+                className="w-full flex justify-center rounded-lg p-1.5 text-surface-400 hover:bg-danger-50 hover:text-danger-600 transition-colors"
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -12,6 +12,16 @@ vi.mock("next-auth/react", () => ({
   signOut: vi.fn(),
 }));
 
+// The sidebar now reads capability + account-status context. Default to a
+// cloud-style claimed user so the Sign out control still renders (these tests
+// assert the ThemeToggle, which sits next to it, is present in both branches).
+vi.mock("@/components/providers/capability-context", () => ({
+  useCapabilities: () => ({ autoLogin: false }),
+}));
+vi.mock("@/lib/use-account-status", () => ({
+  useAccountStatus: () => ({ status: { email: "m@x.com", isClaimed: true } }),
+}));
+
 import { SidebarInner, type SidebarInnerProps } from "../sidebar-inner";
 
 function baseProps(collapsed: boolean): SidebarInnerProps {

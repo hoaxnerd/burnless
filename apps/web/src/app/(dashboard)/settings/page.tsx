@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { apiFetch } from "@/lib/api-fetch";
 import { KEYS, revalidate } from "@/lib/swr";
@@ -24,6 +25,14 @@ export default function SettingsPage() {
   const { flags, updateFlags, loaded: aiLoaded, credits, providerConfig } = useAiFlags();
   // Task 12: hide capability-gated tabs (defense-in-depth; server guards authoritative).
   const caps = useCapabilities();
+
+  // Honor a `?tab=` deep-link (e.g. /settings?tab=security from the sidebar claim link).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    const valid = ["general", "security", "ai", "ai-dashboard", "integrations", "invite-codes", "billing"];
+    if (t && valid.includes(t)) setActiveTab(t as typeof activeTab);
+  }, [searchParams]);
 
   // Company profile state
   const [company, setCompany] = useState<CompanyProfile>({
