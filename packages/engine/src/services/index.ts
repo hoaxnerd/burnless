@@ -28,4 +28,7 @@ export {
   type WebSearchService,
   type WebSearchResult,
   type WebSearchOptions,
+  type WebSearchResponse,
 } from "./web-search";
+
+export { DuckDuckGoProvider } from "./duckduckgo";

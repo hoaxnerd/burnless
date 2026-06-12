@@ -12,6 +12,8 @@
  *   const results = await webSearch.search("SaaS benchmark metrics 2026");
  */
 
+import { DuckDuckGoProvider } from "./duckduckgo";
+
 // ── Interface ────────────────────────────────────────────────────────────────
 
 export interface WebSearchResult {
@@ -191,9 +193,12 @@ let _webSearchService: WebSearchService | null = null;
 export function createWebSearchService(): WebSearchService {
   if (_webSearchService) return _webSearchService;
 
-  const provider = process.env.WEB_SEARCH_PROVIDER ?? "searxng";
+  const provider = process.env.WEB_SEARCH_PROVIDER ?? "duckduckgo";
 
   switch (provider) {
+    case "duckduckgo":
+      _webSearchService = new DuckDuckGoProvider();
+      break;
     case "searxng":
       _webSearchService = new SearXNGProvider();
       break;
