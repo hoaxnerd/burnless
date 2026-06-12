@@ -126,6 +126,15 @@ export {
 } from "./api-tokens";
 
 export {
+  createNotification,
+  listNotificationsForUser,
+  countUnreadNotifications,
+  markNotificationsRead,
+  type CreateNotificationInput,
+  type NotificationSeverity,
+} from "./notifications";
+
+export {
   createOauthClient,
   getOauthClientById,
   createAuthCode,
