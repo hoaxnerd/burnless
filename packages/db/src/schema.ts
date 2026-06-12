@@ -1211,6 +1211,11 @@ export const aiConversations = pgTable(
       .$type<Record<string, boolean>>()
       .notNull()
       .default({}),
+    /** S3b: tool ids disabled "for this session" in this conversation, e.g. { "tool_id": true }. */
+    sessionDisabledTools: jsonb("session_disabled_tools")
+      .$type<Record<string, boolean>>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -2261,6 +2266,8 @@ export const userPreferences = pgTable(
     sidebarCollapsed: boolean("sidebar_collapsed").notNull().default(false),
     /** D11: connection ids this user removed from THEIR AI context (AI-sidebar kill-switch). */
     disabledMcpConnections: jsonb("disabled_mcp_connections").$type<string[]>(),
+    /** S3b: built-in tool ids this user disabled from THEIR AI context (Tools-pane kill-switch). */
+    disabledBuiltinTools: jsonb("disabled_builtin_tools").$type<string[]>(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
