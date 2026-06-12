@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useSecurityStatus, revalidate, KEYS } from "@/lib/swr";
 import {
@@ -15,9 +15,13 @@ import {
   ShieldCheck,
   ShieldOff,
   KeyRound,
+  Mail,
+  UserCheck,
 } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { toUserMessage } from "@/lib/api-error";
+import { useCapabilities } from "@/components/providers/capability-context";
+import { useAccountStatus } from "@/lib/use-account-status";
 
 type Step = "idle" | "loading" | "qr" | "backup" | "disable";
 
@@ -166,8 +170,89 @@ export function SecurityTab() {
     }
   };
 
+  // ── Claim account + Change email (S4a) ──────────────────────────────────────
+  const caps = useCapabilities();
+  const { status, refresh } = useAccountStatus();
+  const isClaimed = status?.isClaimed ?? true; // assume claimed until known (hides claim card by default)
+  const showClaim = caps.autoLogin && status !== undefined && !isClaimed;
+
+  // Claim form
+  const [claimEmail, setClaimEmail] = useState("");
+  const [claimPw, setClaimPw] = useState("");
+  const [claimPw2, setClaimPw2] = useState("");
+  const [claimSaving, setClaimSaving] = useState(false);
+  const [claimErr, setClaimErr] = useState<string | null>(null);
+  useEffect(() => { if (status?.email && !claimEmail) setClaimEmail(status.email); }, [status?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submitClaim = async () => {
+    setClaimErr(null);
+    if (claimPw !== claimPw2) { setClaimErr("Passwords don't match"); return; }
+    setClaimSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/claim", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: claimEmail, password: claimPw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setClaimErr(toUserMessage(data) || "Failed to claim account"); return; }
+      setClaimPw(""); setClaimPw2("");
+      await refresh();
+    } catch { setClaimErr("Failed to claim account"); }
+    finally { setClaimSaving(false); }
+  };
+
+  // Change email
+  const [emailValue, setEmailValue] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ err?: string; ok?: boolean }>({});
+  useEffect(() => { if (status?.email && !emailValue) setEmailValue(status.email); }, [status?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submitEmail = async () => {
+    setEmailMsg({});
+    setEmailSaving(true);
+    try {
+      const res = await apiFetch("/api/auth/change-email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailValue }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setEmailMsg({ err: toUserMessage(data) || "Failed to change email" }); return; }
+      setEmailMsg({ ok: true }); await refresh();
+      setTimeout(() => setEmailMsg({}), 3000);
+    } catch { setEmailMsg({ err: "Failed to change email" }); }
+    finally { setEmailSaving(false); }
+  };
+
   return (
     <div className="space-y-8 max-w-2xl">
+      {showClaim && (
+        <div className="rounded-2xl bg-brand-50 border border-brand-200 p-6 sm:p-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-9 w-9 rounded-lg bg-brand-100 flex items-center justify-center">
+              <UserCheck className="h-[18px] w-[18px] text-brand-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-surface-900">Claim this account</h2>
+              <p className="text-xs text-surface-600 mt-0.5">
+                You&apos;re using a local account. Set an email and password to secure it and enable cloud migration later.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-4 max-w-sm mt-4">
+            <Input label="Email" type="email" autoComplete="email" value={claimEmail} onChange={(e) => setClaimEmail(e.target.value)} />
+            <Input label="Password" type="password" autoComplete="new-password" hint="At least 8 characters with upper, lower, and a number." value={claimPw} onChange={(e) => setClaimPw(e.target.value)} />
+            <Input label="Confirm password" type="password" autoComplete="new-password" value={claimPw2} onChange={(e) => setClaimPw2(e.target.value)} />
+            {claimErr && (
+              <div className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />{claimErr}
+              </div>
+            )}
+            <Button variant="primary" size="sm" state={claimSaving ? "loading" : "idle"} disabled={claimSaving} onClick={submitClaim}>
+              Claim account
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Two-Factor Authentication */}
       <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
         <div className="flex items-center justify-between mb-6">
@@ -447,6 +532,35 @@ export function SecurityTab() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Change Email (S4a) */}
+      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-9 w-9 rounded-lg bg-brand-50 flex items-center justify-center">
+            <Mail className="h-[18px] w-[18px] text-brand-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-surface-900">Email Address</h2>
+            <p className="text-xs text-surface-500 mt-0.5">The email you use to sign in</p>
+          </div>
+        </div>
+        <div className="space-y-4 max-w-sm">
+          <Input label="Email" type="email" autoComplete="email" value={emailValue} onChange={(e) => setEmailValue(e.target.value)} />
+          {emailMsg.err && (
+            <div className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />{emailMsg.err}
+            </div>
+          )}
+          {emailMsg.ok && (
+            <div className="flex items-center gap-2 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-700">
+              <Check className="h-3.5 w-3.5 shrink-0" />Email updated.
+            </div>
+          )}
+          <Button variant="primary" size="sm" state={emailSaving ? "loading" : "idle"} disabled={emailSaving} onClick={submitEmail}>
+            Update email
+          </Button>
+        </div>
       </div>
 
       {/* Change Password (SET-08) */}
