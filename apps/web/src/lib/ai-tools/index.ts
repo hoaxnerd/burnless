@@ -163,8 +163,10 @@ function describeMutation(toolName: string, input: Record<string, unknown>): str
     ? "create"
     : toolName.startsWith("update_")
       ? "update"
-      : "delete";
-  const entity = toolName.replace(/^(create_|add_|update_|delete_)/, "").replace(/_/g, " ");
+      : toolName.startsWith("record_")
+        ? "record"
+        : "delete";
+  const entity = toolName.replace(/^(create_|add_|update_|delete_|record_)/, "").replace(/_/g, " ");
   const id = input.id as string | undefined;
   const name = (input.name ?? input.title) as string | undefined;
   const label = name ? ` "${name}"` : id ? ` (ID: ${id})` : "";
