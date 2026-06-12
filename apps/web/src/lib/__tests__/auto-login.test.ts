@@ -24,6 +24,10 @@ describe("sanitizeCallback", () => {
   it("sends auth pages to /dashboard (don't bounce back to login)", () => {
     expect(sanitizeCallback("/login")).toBe("/dashboard");
     expect(sanitizeCallback("/login?x=1")).toBe("/dashboard");
+    expect(sanitizeCallback("/verify-email")).toBe("/dashboard");
+    expect(sanitizeCallback("/forgot-password")).toBe("/dashboard");
+    expect(sanitizeCallback("/reset-password")).toBe("/dashboard");
+    expect(sanitizeCallback("/reset-password?token=abc")).toBe("/dashboard");
   });
 });
 

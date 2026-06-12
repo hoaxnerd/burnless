@@ -8,6 +8,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { trackEvent, identifyUser } from "@/lib/analytics";
 import { BrandLogo } from "@/components/brand-logo";
+import { useCapabilities } from "@/components/providers/capability-context";
 import type { AuthStep, PasswordStrength } from "./_components/types";
 import { EmailStep } from "./_components/email-step";
 import { SignInStep } from "./_components/signin-step";
@@ -24,6 +25,7 @@ export default function LoginPage() {
 
 function LoginContent() {
   const searchParams = useSearchParams();
+  const caps = useCapabilities();
   const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,6 +67,13 @@ function LoginContent() {
 
       const { exists } = await res.json();
       trackEvent("auth_email_submitted", { account_exists: exists });
+      // Self-host: POST /api/auth/register 403s, so never route to the signup
+      // form. Surface a clear message instead of letting the user hit a dead end.
+      if (!exists && !caps.selfServeSignup) {
+        setError("Sign-up is disabled on this instance. Contact your administrator.");
+        setIsChecking(false);
+        return;
+      }
       setStep(exists ? "signin" : "signup");
     } catch {
       setError("Unable to connect. Please check your internet.");

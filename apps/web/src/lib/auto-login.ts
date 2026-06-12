@@ -4,7 +4,7 @@
  */
 export const NO_AUTOLOGIN_COOKIE = "burnless_no_autologin";
 
-const AUTH_PAGES = new Set(["/login"]);
+const AUTH_PAGES = new Set(["/login", "/verify-email", "/forgot-password", "/reset-password"]);
 
 export function isAuthPage(pathname: string): boolean {
   return AUTH_PAGES.has(pathname);
