@@ -45,3 +45,20 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   await setSessionDisabledTool(body.conversationId, body.key, body.disabled);
   return NextResponse.json(await getSessionDisabledTools(body.conversationId));
 });
+
+export const GET = withErrorHandler(async (request: Request) => {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx.error;
+
+  const conversationId = new URL(request.url).searchParams.get("conversationId");
+  if (!conversationId) return errorResponse("conversationId is required", 400);
+
+  // Ownership: the conversation must belong to the caller's company.
+  const [conv] = await db
+    .select({ id: aiConversations.id })
+    .from(aiConversations)
+    .where(and(eq(aiConversations.id, conversationId), eq(aiConversations.companyId, ctx.companyId)));
+  if (!conv) return errorResponse("Conversation not found", 404);
+
+  return NextResponse.json(await getSessionDisabledTools(conversationId));
+});

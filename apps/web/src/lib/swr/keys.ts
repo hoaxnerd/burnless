@@ -37,6 +37,9 @@ export const KEYS = {
 
   notifications: "/api/notifications",
 
+  // Browser-use availability (AI Tools pane — built-in browser row)
+  browserAvailability: "/api/browser/availability",
+
   // Scheduled automations (Automations page + chat-create proposal card)
   automations: "/api/automations",
 
@@ -55,4 +58,8 @@ export const KEYS = {
     `/api/scenarios/overrides?scenarioId=${scenarioId}`,
   scenarioOverrideCount: (scenarioId: string) =>
     `/api/scenarios/overrides?scenarioId=${scenarioId}&count=true`,
+
+  // Per-conversation session-disabled tool map (AI Tools pane reads on load)
+  sessionDisabledTools: (conversationId: string) =>
+    `/api/chat/session-tools?conversationId=${conversationId}`,
 } as const;

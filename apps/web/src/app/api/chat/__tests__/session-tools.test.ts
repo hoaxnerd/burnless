@@ -33,7 +33,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
 }));
 
-import { PATCH } from "../session-tools/route";
+import { PATCH, GET } from "../session-tools/route";
 
 const CONV = "11111111-1111-1111-1111-111111111111";
 
@@ -43,6 +43,12 @@ function patchReq(body: unknown) {
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function getReq(conversationId?: string) {
+  const url = new URL("http://localhost:3000/api/chat/session-tools");
+  if (conversationId !== undefined) url.searchParams.set("conversationId", conversationId);
+  return new Request(url, { method: "GET" });
 }
 
 describe("PATCH /api/chat/session-tools", () => {
@@ -92,5 +98,40 @@ describe("PATCH /api/chat/session-tools", () => {
 
     const res = await PATCH(patchReq({ conversationId: CONV, key: "x", disabled: true }));
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/chat/session-tools", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequireCompanyAccess.mockResolvedValue({ userId: "u1", companyId: "c1", role: "owner" });
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockResolvedValue([{ id: CONV }]);
+  });
+
+  it("returns the session-disabled map for an owned conversation", async () => {
+    mockGetSessionDisabledTools.mockResolvedValue({ "builtin:get_metrics": true });
+
+    const res = await GET(getReq(CONV));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mockGetSessionDisabledTools).toHaveBeenCalledWith(CONV);
+    expect(body).toEqual({ "builtin:get_metrics": true });
+  });
+
+  it("returns 404 when the conversation is not in the caller's company", async () => {
+    mockWhere.mockResolvedValue([]);
+
+    const res = await GET(getReq(CONV));
+    expect(res.status).toBe(404);
+    expect(mockGetSessionDisabledTools).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when conversationId is missing", async () => {
+    const res = await GET(getReq());
+    expect(res.status).toBe(400);
+    expect(mockGetSessionDisabledTools).not.toHaveBeenCalled();
   });
 });

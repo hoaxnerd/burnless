@@ -356,6 +356,32 @@ export function useOauthGrants(config?: SWRConfiguration<OauthGrantDto[]>) {
   return useSWR<OauthGrantDto[]>(KEYS.oauthGrants, { ...config });
 }
 
+// ── AI Tools pane (S3b) ──────────────────────────────────────────────────────
+
+/** Whether AI browser-use is usable right now (built-in browser row). */
+export function useBrowserAvailability(
+  config?: SWRConfiguration<{ connected: boolean; chromiumInstalled: boolean }>,
+) {
+  return useSWR<{ connected: boolean; chromiumInstalled: boolean }>(
+    KEYS.browserAvailability,
+    { ...config },
+  );
+}
+
+/**
+ * The per-conversation session-disabled tool map. Keyed by conversation, so
+ * it does not fetch until a conversation exists (conditional key on null).
+ */
+export function useSessionDisabledTools(
+  conversationId: string | null,
+  config?: SWRConfiguration<Record<string, boolean>>,
+) {
+  return useSWR<Record<string, boolean>>(
+    conversationId ? KEYS.sessionDisabledTools(conversationId) : null,
+    { ...config },
+  );
+}
+
 // ── User preferences (per-user, per-company UI prefs) ────────────────────────
 
 /**
@@ -365,6 +391,7 @@ export function useOauthGrants(config?: SWRConfiguration<OauthGrantDto[]>) {
  */
 export interface UserPreferencesDto {
   disabledMcpConnections?: string[] | null;
+  disabledBuiltinTools?: string[] | null;
 }
 
 /** Current user's UI preferences for the active company. */
