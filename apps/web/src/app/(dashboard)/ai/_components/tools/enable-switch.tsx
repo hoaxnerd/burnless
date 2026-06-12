@@ -89,7 +89,7 @@ export function EnableSwitch({
   const pinOn = isPermanentlyDisabled;
 
   return (
-    <div data-session-key={sessionKey}>
+    <div data-session-key={sessionKey} className="relative">
       <div className="flex items-center gap-[7px]">
         <button
           type="button"
@@ -106,8 +106,11 @@ export function EnableSwitch({
       </div>
 
       {promptDisabled != null && (
-        <div className="mt-1.5 flex items-center gap-2 rounded-md border border-brand-100 bg-brand-50 px-[9px] py-[7px]">
-          <span className="text-[10.5px] leading-[1.35] text-brand-700">
+        // Right-anchored popover below the switch: the control column is too narrow
+        // to hold the prompt inline (it would wrap one word per line), so float it at
+        // a fixed readable width with text stacked above the actions.
+        <div className="absolute right-0 top-full z-20 mt-1 flex w-[228px] flex-col gap-2 rounded-md border border-brand-100 bg-brand-50 px-[9px] py-2 shadow-md">
+          <span className="text-[10.5px] leading-[1.4] text-brand-700">
             {promptDisabled ? (
               <>
                 Off for <b className="font-bold">this chat</b>. Keep it off in future chats too?
@@ -118,7 +121,7 @@ export function EnableSwitch({
               </>
             )}
           </span>
-          <span className="ml-auto flex flex-none items-center gap-1.5">
+          <span className="flex flex-none items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={() => void handleKeepPermanently()}
