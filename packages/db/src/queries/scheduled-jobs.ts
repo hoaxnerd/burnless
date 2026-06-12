@@ -136,6 +136,7 @@ export async function startScheduledJobRun(input: {
 
 export async function finishScheduledJobRun(
   runId: string,
+  companyId: string,
   result: {
     status: Exclude<ScheduledJobRunStatus, "running">;
     summary?: string | null;
@@ -144,11 +145,13 @@ export async function finishScheduledJobRun(
     error?: string | null;
   }
 ) {
-  // Read startedAt to compute duration without trusting the caller's clock.
+  // company-scoped (project convention — no cross-company write). Read startedAt
+  // to compute duration without trusting the caller's clock.
+  const scope = and(eq(scheduledJobRuns.id, runId), eq(scheduledJobRuns.companyId, companyId));
   const [existing] = await db
     .select({ startedAt: scheduledJobRuns.startedAt })
     .from(scheduledJobRuns)
-    .where(eq(scheduledJobRuns.id, runId));
+    .where(scope);
   const finishedAt = new Date();
   const durationMs = existing ? Math.max(0, finishedAt.getTime() - existing.startedAt.getTime()) : null;
   const [row] = await db
@@ -162,7 +165,7 @@ export async function finishScheduledJobRun(
       finishedAt,
       durationMs,
     })
-    .where(eq(scheduledJobRuns.id, runId))
+    .where(scope)
     .returning();
   return row;
 }

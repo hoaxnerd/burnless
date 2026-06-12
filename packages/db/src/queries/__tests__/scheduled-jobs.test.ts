@@ -100,6 +100,12 @@ describe("scheduled-jobs query helpers", () => {
       nextRunAt: new Date("2020-01-01T00:00:00Z"),
     });
     await updateScheduledJob(disabled.id, a.company.id, { enabled: false });
+    const deleted = await createScheduledJob({
+      companyId: a.company.id, createdByUserId: a.user.id, name: "deleted", prompt: "P",
+      actionKind: "notify", allowedTools: [], boundConnectionIds: [], schedule: "* * * * *",
+      nextRunAt: new Date("2020-01-01T00:00:00Z"),
+    });
+    await softDeleteScheduledJob(deleted.id, a.company.id);
     const due = await listDueScheduledJobs(new Date("2026-06-12T00:00:00Z"));
     expect(due.map((j) => j.id)).toEqual([past.id]);
   });
@@ -113,7 +119,7 @@ describe("scheduled-jobs query helpers", () => {
     });
     const run = await startScheduledJobRun({ scheduledJobId: job.id, companyId: a.company.id, trigger: "manual" });
     expect(run.status).toBe("running");
-    await finishScheduledJobRun(run.id, { status: "success", summary: "did the thing", tokensUsed: 1234, output: { ok: true } });
+    await finishScheduledJobRun(run.id, a.company.id, { status: "success", summary: "did the thing", tokensUsed: 1234, output: { ok: true } });
     const runs = await listScheduledJobRuns(job.id, a.company.id, 10);
     expect(runs[0].status).toBe("success");
     expect(runs[0].summary).toBe("did the thing");
