@@ -32,6 +32,7 @@ import {
 import { useSensors } from "@dnd-kit/core";
 import { BrandLogo } from "@/components/brand-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 import type { NavItem, QuickAction, QuickActionMode, UserInfo } from "./nav-config";
 import { SortableNavItem } from "./sortable-nav-item";
@@ -239,6 +240,7 @@ export function SidebarInner({
                 </p>
               </div>
               <div className="flex items-center gap-1">
+                <NotificationBell />
                 <ThemeToggle />
                 {localUnclaimed ? (
                   <Link
@@ -267,6 +269,7 @@ export function SidebarInner({
           // SHELL-02: keep the theme toggle reachable in the collapsed rail. It's
           // already an icon-only, aria-labeled button, so it works centered here.
           <div className="mt-2 flex flex-col items-center gap-1">
+            <NotificationBell collapsed />
             <ThemeToggle />
             {localUnclaimed ? (
               <Link
