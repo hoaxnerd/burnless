@@ -1,6 +1,9 @@
 // API schemas (Zod) — shared request/response contracts
 export * from "./api";
 
+// Auth — framework-agnostic password hashing (PBKDF2 Web Crypto, no deps)
+export * from "./password";
+
 // Core entity types for Burnless financial planning
 
 // ── Currency & Locale ────────────────────────────────────────────────────────
