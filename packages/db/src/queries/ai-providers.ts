@@ -31,6 +31,12 @@ export async function createAiProvider(data: {
   companyId: string; name: string; kind: ProviderKind; baseUrl?: string | null;
   apiKey?: string | null; apiKeyMode?: ApiKeyMode; headers?: Record<string, string> | null; dropParams?: Record<string, unknown> | null;
 }): Promise<AiProviderPublic> {
+  // First provider for the company becomes the default. This SELECT-then-INSERT is
+  // not transactional: under truly concurrent "add first provider" requests two rows
+  // could both be isDefault. Safe in P2's shipped surface — the config API is
+  // managedAiProvider-gated OFF (self-host single Node process; cloud 403s the API),
+  // and the boot backfill is single-threaded. Harden with a partial unique index
+  // (companyId WHERE is_default) if/when cloud BYO-provider lands (spec §11).
   const existing = await db.select({ id: aiProviders.id }).from(aiProviders).where(eq(aiProviders.companyId, data.companyId)).limit(1);
   const isDefault = existing.length === 0;
   const [row] = await db.insert(aiProviders).values({
@@ -76,6 +82,12 @@ export async function getDecryptedProviderKey(id: string, companyId: string): Pr
   if (!row?.enc) return null;
   return decryptSecret(row.enc);
 }
+// ── Models ──────────────────────────────────────────────────────────────────
+// PRECONDITION: these functions key off providerId only (aiProviderModels has no
+// companyId column — ownership flows through the parent aiProviders row). Callers
+// MUST verify the provider belongs to the company first via getAiProvider(id, companyId)
+// before calling any model function. The provider config API routes do this (404 on
+// a foreign/missing provider) before touching models. Mirrors the mcp.ts tool-pref pattern.
 export async function listAiProviderModels(providerId: string): Promise<AiProviderModelRow[]> {
   return db.select().from(aiProviderModels).where(eq(aiProviderModels.providerId, providerId));
 }
@@ -98,7 +110,7 @@ export async function setDefaultAiProviderModel(modelId: string, providerId: str
   const [target] = await db.select({ id: aiProviderModels.id }).from(aiProviderModels).where(and(eq(aiProviderModels.id, modelId), eq(aiProviderModels.providerId, providerId))).limit(1);
   if (!target) return false;
   await db.update(aiProviderModels).set({ isDefault: false }).where(eq(aiProviderModels.providerId, providerId));
-  await db.update(aiProviderModels).set({ isDefault: true }).where(eq(aiProviderModels.id, modelId));
+  await db.update(aiProviderModels).set({ isDefault: true }).where(and(eq(aiProviderModels.id, modelId), eq(aiProviderModels.providerId, providerId)));
   return true;
 }
 export async function getResolvedDefaultModelId(providerId: string): Promise<string | null> {
