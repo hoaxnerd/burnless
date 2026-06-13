@@ -5,6 +5,7 @@
 
 import { db } from "@burnless/db";
 import { aiFeatureFlags, aiUsageLogs } from "@burnless/db";
+import { getDefaultAiProvider, getDecryptedProviderKey, getResolvedDefaultModelId } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
 import {
   DEFAULT_AI_FLAGS,
@@ -171,12 +172,34 @@ export async function checkAiFeatureAllowed(
 }
 
 /**
- * Get a company's custom AI provider config from DB.
- * Returns undefined fields when no custom config is set (use env-var defaults).
+ * Resolve a company's AI provider config. Precedence (spec §2/§4):
+ *   1. Default ENABLED DB provider (aiProviders) — keys decrypted here.
+ *   2. Legacy aiFeatureFlags BYOK columns (deprecated; dropped in S6).
+ *   3. undefined → caller uses env-var defaults (createProvider).
+ * Decryption failures degrade to the next layer so the chat path never crashes.
  */
 export async function getCompanyProviderConfig(
   companyId: string
 ): Promise<CompanyProviderConfig | undefined> {
+  // 1. DB default provider.
+  const provider = await getDefaultAiProvider(companyId);
+  if (provider) {
+    let apiKey: string | undefined;
+    try {
+      apiKey = (await getDecryptedProviderKey(provider.id, companyId)) ?? undefined;
+    } catch (e) {
+      console.warn(`[ai-providers] key decrypt failed for provider ${provider.id}; falling back`, (e as Error).message);
+      apiKey = undefined;
+    }
+    const keyless = provider.kind === "ollama" || provider.apiKeyMode === "none";
+    if (apiKey || keyless) {
+      const model = (await getResolvedDefaultModelId(provider.id)) ?? undefined;
+      return { provider: provider.kind, apiKey, model, baseUrl: provider.baseUrl ?? undefined };
+    }
+    // provider exists but no usable key → fall through.
+  }
+
+  // 2. Legacy BYOK columns.
   const [row] = await db
     .select({
       byokEnabled: aiFeatureFlags.byokEnabled,
@@ -188,13 +211,10 @@ export async function getCompanyProviderConfig(
     .from(aiFeatureFlags)
     .where(eq(aiFeatureFlags.companyId, companyId))
     .limit(1);
+  if (row?.byokEnabled && row.aiApiKey) {
+    return { provider: row.aiProvider ?? undefined, apiKey: row.aiApiKey, model: row.aiModel ?? undefined, baseUrl: row.aiBaseUrl ?? undefined };
+  }
 
-  if (!row?.byokEnabled || !row?.aiApiKey) return undefined;
-
-  return {
-    provider: row.aiProvider ?? undefined,
-    apiKey: row.aiApiKey,
-    model: row.aiModel ?? undefined,
-    baseUrl: row.aiBaseUrl ?? undefined,
-  };
+  // 3. env path.
+  return undefined;
 }
