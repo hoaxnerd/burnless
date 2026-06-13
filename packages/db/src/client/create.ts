@@ -1,6 +1,8 @@
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { vector } from "@electric-sql/pglite-pgvector";
+import type { Extension } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
@@ -17,6 +19,40 @@ export interface DbHandle {
   close(): Promise<void>;
 }
 
+/**
+ * pgvector loadable-extension for PGLite, with a BUNDLER- and Bun-compile-proof
+ * bundle path.
+ *
+ * We deliberately do NOT `import { vector } from "@electric-sql/pglite-pgvector"`:
+ * its `setup` resolves `vector.tar.gz` via `new URL("./vector.tar.gz", import.meta.url)`,
+ * which Next/webpack rewrites into an unresolvable `/_next/static/media/*` URL in the
+ * standalone artifact (→ "Extension bundle not found", crashing the boot/instrumentation
+ * hook) and which Bun freezes to the build-host path in a compiled binary. Instead we
+ * build our own `{ name, setup }` whose `bundlePath` is a REAL file resolved at runtime:
+ *   1. `BURNLESS_PGLITE_VECTOR_BUNDLE` env (the standalone/binary launcher stages the
+ *      tarball and sets this — same escape-hatch pattern as `BURNLESS_MIGRATIONS_DIR`);
+ *   2. else `createRequire`-resolved from node_modules (dev / unbundled / direct vitest).
+ *
+ * PGLite (self-host) ONLY — the Postgres/cloud branch never calls this.
+ */
+function pgliteVectorExtension(): Extension {
+  const fromEnv = process.env.BURNLESS_PGLITE_VECTOR_BUNDLE?.trim();
+  // The package's `exports` map blocks the `./dist/vector.tar.gz` subpath, so
+  // resolve the package main (allowed) and derive the sibling tarball next to it.
+  const bundlePath = fromEnv
+    ? pathToFileURL(fromEnv)
+    : new URL(
+        "./vector.tar.gz",
+        pathToFileURL(
+          createRequire(import.meta.url).resolve("@electric-sql/pglite-pgvector"),
+        ),
+      );
+  return {
+    name: "vector",
+    setup: async (_pg, emscriptenOpts) => ({ emscriptenOpts, bundlePath }),
+  };
+}
+
 /** Build the Drizzle client for the resolved driver. See spec §4. */
 export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> {
   if (resolved.driver === "postgres") {
@@ -30,7 +66,9 @@ export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> 
   }
 
   mkdirSync(resolved.dataDir, { recursive: true });
-  const pglite = await PGlite.create(resolved.dataDir, { extensions: { vector } });
+  const pglite = await PGlite.create(resolved.dataDir, {
+    extensions: { vector: pgliteVectorExtension() },
+  });
   // PGLite-drizzle is runtime-identical for the query builder; cast to the
   // single public Database type (spec §6) so the 254 importers stay unchanged.
   const db = drizzlePglite(pglite, { schema });

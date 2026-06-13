@@ -80,6 +80,14 @@ const nextConfig: NextConfig = {
     "drizzle-orm",
     "ioredis",
     "qrcode",
+    // PGLite + pgvector MUST be external: they load WASM + a loadable-extension
+    // tarball (`vector.tar.gz`) at runtime via import.meta.url. If webpack bundles
+    // them it rewrites those assets into /_next/static/media/* URLs that don't
+    // resolve at runtime → "Extension bundle not found" crashes the instrumentation
+    // hook in the standalone/self-host artifact. External = assets load from
+    // node_modules via real fs paths. (Caught by the S5 single-binary derisk.)
+    "@electric-sql/pglite",
+    "@electric-sql/pglite-pgvector",
   ],
   experimental: {
     optimizePackageImports: ["recharts"],
