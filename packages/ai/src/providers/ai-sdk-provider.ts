@@ -5,8 +5,8 @@
  * speaks only our neutral types. To add a provider, add a `kind` to the catalog (P2);
  * the OpenAI-compatible escape hatch already covers any OpenAI-shaped endpoint.
  */
-import type { ModelMessage } from "ai";
-import type { LlmMessage, ProviderConfig } from "./types";
+import { tool, jsonSchema, type ModelMessage } from "ai";
+import type { LlmMessage, ProviderConfig, ToolDefinition, ContentBlock, StopReason } from "./types";
 
 export type SdkKind = "anthropic" | "openai" | "openai-compatible";
 
@@ -100,5 +100,42 @@ export function toModelMessages(messages: LlmMessage[]): ModelMessage[] {
     }
   }
 
+  return out;
+}
+
+/** Pure: map our JSON-Schema tool defs to an AI-SDK ToolSet (no execute → manual loop). */
+export function toAiSdkTools(tools: ToolDefinition[]): Record<string, ReturnType<typeof tool>> {
+  const set: Record<string, ReturnType<typeof tool>> = {};
+  for (const t of tools) {
+    set[t.name] = tool({
+      description: t.description,
+      inputSchema: jsonSchema(t.inputSchema as Record<string, unknown>),
+    });
+  }
+  return set;
+}
+
+/** Pure: AI-SDK finishReason → our StopReason. */
+export function mapFinishReason(reason: string): StopReason {
+  switch (reason) {
+    case "stop": return "end_turn";
+    case "tool-calls": return "tool_use";
+    case "length": return "max_tokens";
+    default: return "unknown";
+  }
+}
+
+interface AiContentPart { type: string; text?: string; toolCallId?: string; toolName?: string; input?: unknown }
+
+/** Pure: AI-SDK result.content parts → our ContentBlock[] (text + tool_use only). */
+export function fromContentParts(parts: AiContentPart[]): ContentBlock[] {
+  const out: ContentBlock[] = [];
+  for (const p of parts) {
+    if (p.type === "text" && typeof p.text === "string") {
+      out.push({ type: "text", text: p.text });
+    } else if (p.type === "tool-call" && p.toolCallId && p.toolName) {
+      out.push({ type: "tool_use", id: p.toolCallId, name: p.toolName, input: (p.input ?? {}) as Record<string, unknown> });
+    }
+  }
   return out;
 }

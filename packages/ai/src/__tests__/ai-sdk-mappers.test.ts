@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { resolveProviderSpec } from "../providers/ai-sdk-provider";
 import { toModelMessages } from "../providers/ai-sdk-provider";
-import type { LlmMessage } from "../providers/types";
+import { toAiSdkTools, mapFinishReason, fromContentParts } from "../providers/ai-sdk-provider";
+import type { LlmMessage, ToolDefinition } from "../providers/types";
 
 describe("resolveProviderSpec", () => {
   it("maps anthropic to the anthropic sdk, passing apiKey/baseUrl/model", () => {
@@ -81,6 +82,44 @@ describe("toModelMessages", () => {
       { role: "tool", content: [
         { type: "tool-result", toolCallId: "call_1", toolName: "get_metrics", output: { type: "text", value: "{\"mrr\":1000}" } },
       ] },
+    ]);
+  });
+});
+
+describe("toAiSdkTools", () => {
+  it("wraps each tool's JSON schema and carries description, with no execute fn", () => {
+    const tools: ToolDefinition[] = [
+      { name: "get_metrics", description: "Get metrics", inputSchema: { type: "object", properties: { period: { type: "string" } }, required: ["period"] } },
+    ];
+    const set = toAiSdkTools(tools);
+    expect(Object.keys(set)).toEqual(["get_metrics"]);
+    const t = set.get_metrics;
+    expect(t).toBeDefined();
+    expect(t!.description).toBe("Get metrics");
+    expect(t!.execute).toBeUndefined();
+    expect(t!.inputSchema).toBeDefined();
+  });
+});
+
+describe("mapFinishReason", () => {
+  it("maps AI-SDK finish reasons to our StopReason", () => {
+    expect(mapFinishReason("stop")).toBe("end_turn");
+    expect(mapFinishReason("tool-calls")).toBe("tool_use");
+    expect(mapFinishReason("length")).toBe("max_tokens");
+    expect(mapFinishReason("content-filter")).toBe("unknown");
+  });
+});
+
+describe("fromContentParts", () => {
+  it("maps text + tool-call parts to our ContentBlock[], skipping others", () => {
+    const parts = [
+      { type: "text", text: "here" },
+      { type: "reasoning", text: "thinking" },
+      { type: "tool-call", toolCallId: "c1", toolName: "get_metrics", input: { period: "2026-01" } },
+    ];
+    expect(fromContentParts(parts)).toEqual([
+      { type: "text", text: "here" },
+      { type: "tool_use", id: "c1", name: "get_metrics", input: { period: "2026-01" } },
     ]);
   });
 });
