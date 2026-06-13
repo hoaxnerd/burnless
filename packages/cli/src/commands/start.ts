@@ -27,6 +27,16 @@ export function assertExposureAllowed(host: string, unsafeExpose: boolean): void
   );
 }
 
+/** A loud warning (not a hard block) when exposing a non-loopback host with an unclaimed owner. */
+export function exposeWarning(host: string, ownerClaimed: boolean): string {
+  if (LOOPBACK.has(host) || ownerClaimed) return "";
+  return (
+    `⚠ Exposing ${host} with an UNCLAIMED owner (no password). Auto-login will admit anyone ` +
+    `who can reach this address as the owner. Set a password (\`burnless users passwd\`) and ` +
+    `consider \`config set BURNLESS_CAP_AUTO_LOGIN=off\`.`
+  );
+}
+
 /** `burnless start` — boot the local instance (spec §3/§4). */
 export function registerStart(program: Command): void {
   program
@@ -61,6 +71,19 @@ export function registerStart(program: Command): void {
 
             ensureSecretsKey({ env: process.env });
             if (opts.migrate) await runMigrate();
+
+            // Loud (non-blocking) warning if exposing an unclaimed instance (S5 P2).
+            if (!new Set(["127.0.0.1", "localhost", "::1", "[::1]"]).has(opts.host)) {
+              try {
+                const { initDatabase, isOwnerClaimed } = await import("@burnless/db");
+                await initDatabase();
+                const claimed = await isOwnerClaimed();
+                const warning = exposeWarning(opts.host, claimed);
+                if (warning) process.stderr.write(warning + "\n");
+              } catch {
+                // best-effort; never block start on this check
+              }
+            }
 
             const entry = resolveServerEntry();
             if (!entry) {
