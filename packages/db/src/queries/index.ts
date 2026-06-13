@@ -116,6 +116,8 @@ export type {
 
 export * from "./mcp";
 
+export * from "./ai-providers";
+
 export {
   roleScopeCap,
   mintApiToken,
