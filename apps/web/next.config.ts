@@ -102,8 +102,6 @@ const nextConfig: NextConfig = {
     "plaid",
     "razorpay",
     "stripe",
-    "openai",
-    "@anthropic-ai/sdk",
     "@modelcontextprotocol/sdk",
     "@sentry/nextjs",
     "@sentry/node",

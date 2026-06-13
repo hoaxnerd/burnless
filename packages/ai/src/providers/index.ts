@@ -7,10 +7,9 @@
  *   3. Legacy env vars (ANTHROPIC_API_KEY → Anthropic provider)
  *   4. Defaults (Anthropic + claude-sonnet-4-20250514)
  *
- * To add a new provider:
- *   1. Create providers/<name>.ts implementing LlmProvider
- *   2. Add it to PROVIDER_MAP below
- *   3. Done — users can switch via AI_PROVIDER=<name>
+ * To add a new provider kind: add a `kind` branch in resolveProviderSpec/buildModel
+ * (packages/ai/src/providers/ai-sdk-provider.ts) — the OpenAI-compatible escape hatch
+ * already covers any OpenAI-shaped endpoint — then register it in PROVIDER_MAP below.
  */
 
 import type { LlmProvider } from "./base";
