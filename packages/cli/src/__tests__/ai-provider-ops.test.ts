@@ -3,7 +3,7 @@ import os from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  __resetSecretsKeyCache, closeDatabase, companies, companyMembers, createOwnerUserIfNone, db, getOwnerUser, initDatabase,
+  __resetSecretsKeyCache, closeDatabase, companies, companyMembers, createOwnerCompanyIfNone, createOwnerUserIfNone, db, getOwnerUser, initDatabase, LOCAL_OWNER_COMPANY_ID, LOCAL_OWNER_ID,
 } from "@burnless/db";
 import {
   pAdd, pDisable, pEnable, pList, pRemove, resolveLocalCompanyId, resolveProviderForTest, pSetDefault, pSetKey,
@@ -39,6 +39,28 @@ describe("resolveLocalCompanyId", () => {
     await initDatabase();
     try {
       expect(typeof (await resolveLocalCompanyId())).toBe("string");
+    } finally {
+      await closeDatabase();
+    }
+  });
+
+  it("returns the install company id after the boot primitives ran (post-bootstrap, self-host)", async () => {
+    // Self-host invariant: bootstrap/start boot runs createOwnerUserIfNone + createOwnerCompanyIfNone,
+    // so the install company exists from first boot. `burnless provider add` immediately after
+    // `burnless bootstrap` must therefore resolve a company without ever hitting the "No company yet"
+    // UsageError (which is now cloud-only / defensive). This pins that guarantee.
+    await initDatabase();
+    try {
+      // Clear the beforeEach-seeded random "Test Co" so the single-tenant short-circuit
+      // in createOwnerCompanyIfNone does NOT no-op (membership-exists guard), then run the
+      // real boot primitives to materialize the deterministic install company.
+      await db.delete(companyMembers);
+      await db.delete(companies);
+      await createOwnerUserIfNone();
+      const owner = (await getOwnerUser())!;
+      await createOwnerCompanyIfNone(owner.id);
+      expect(owner.id).toBe(LOCAL_OWNER_ID);
+      await expect(resolveLocalCompanyId()).resolves.toBe(LOCAL_OWNER_COMPANY_ID);
     } finally {
       await closeDatabase();
     }
