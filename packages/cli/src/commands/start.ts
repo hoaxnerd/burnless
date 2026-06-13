@@ -75,11 +75,15 @@ export function registerStart(program: Command): void {
             // Loud (non-blocking) warning if exposing an unclaimed instance (S5 P2).
             if (!new Set(["127.0.0.1", "localhost", "::1", "[::1]"]).has(opts.host)) {
               try {
-                const { initDatabase, isOwnerClaimed } = await import("@burnless/db");
+                const { initDatabase, isOwnerClaimed, closeDatabase } = await import("@burnless/db");
                 await initDatabase();
-                const claimed = await isOwnerClaimed();
-                const warning = exposeWarning(opts.host, claimed);
-                if (warning) process.stderr.write(warning + "\n");
+                try {
+                  const claimed = await isOwnerClaimed();
+                  const warning = exposeWarning(opts.host, claimed);
+                  if (warning) process.stderr.write(warning + "\n");
+                } finally {
+                  await closeDatabase();
+                }
               } catch {
                 // best-effort; never block start on this check
               }

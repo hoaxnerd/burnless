@@ -15,7 +15,8 @@ beforeEach(() => {
   process.env.BURNLESS_DATA_DIR = dataDir;
   delete process.env.DATABASE_URL;
 });
-afterEach(() => {
+afterEach(async () => {
+  await closeDatabase();
   rmSync(home, { recursive: true, force: true });
   rmSync(dataDir, { recursive: true, force: true });
   delete process.env.BURNLESS_DB_DRIVER;

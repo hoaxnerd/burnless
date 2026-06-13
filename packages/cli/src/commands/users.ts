@@ -2,9 +2,9 @@ import type { Command } from "commander";
 import {
   closeDatabase,
   createUser,
-  db,
   getOwnerUser,
   initDatabase,
+  isDatabaseBooted,
   listUsers,
   setUserPassword,
   type UserSummary,
@@ -14,18 +14,6 @@ import { runAction } from "../context";
 import { UsageError } from "../errors";
 import { readSecret } from "../prompt";
 
-/** True iff the DB singleton is already booted (the `db` proxy resolves without throwing). */
-function dbAlreadyBooted(): boolean {
-  try {
-    // The proxy throws synchronously for an un-booted PGLite singleton; a booted
-    // singleton (postgres OR pglite) resolves any property access fine.
-    void (db as { dialect?: unknown }).dialect;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Boot the local DB singleton, run fn, then close ONLY if we opened it. No running
  * server needed (L1). When a caller (or a test harness) already booted the singleton,
@@ -33,7 +21,7 @@ function dbAlreadyBooted(): boolean {
  * handle would break the caller's later reads.
  */
 async function withDb<T>(fn: () => Promise<T>): Promise<T> {
-  const owned = !dbAlreadyBooted();
+  const owned = !isDatabaseBooted();
   await initDatabase();
   try {
     return await fn();

@@ -98,6 +98,11 @@ export async function initDatabase(): Promise<Database> {
   return handle.db;
 }
 
+/** True iff the live DB singleton is already booted (by initDatabase or postgres lazy-sync). */
+export function isDatabaseBooted(): boolean {
+  return Boolean(g.__burnless_db);
+}
+
 /** Close + clear the live DB (graceful shutdown / test teardown). */
 export async function closeDatabase(): Promise<void> {
   const handle = g.__burnless_handle;
