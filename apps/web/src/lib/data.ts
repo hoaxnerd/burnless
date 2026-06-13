@@ -97,6 +97,25 @@ export async function getCompanyForAuthUser(userId: string) {
 }
 
 /**
+ * Whether the install-time placeholder company has been CLAIMED yet.
+ *
+ * Boot (`createOwnerCompanyIfNone`) creates ONLY the company + owner membership
+ * on self-host — never a base scenario. Onboarding's claim path is the first
+ * thing to create a scenario for the company. So a scenario's presence is a
+ * robust claim sentinel (robust even if the user legitimately names their
+ * company "My Company", which a name check would not be). Shared by the
+ * /onboarding layout guard and POST /api/onboarding's create-or-claim branch.
+ */
+export async function isCompanyClaimed(companyId: string): Promise<boolean> {
+  const [scenario] = await db
+    .select({ id: scenarios.id })
+    .from(scenarios)
+    .where(eq(scenarios.companyId, companyId))
+    .limit(1);
+  return scenario != null;
+}
+
+/**
  * Get company for the currently authenticated user.
  * Wrapped with React cache() so multiple server components calling this
  * in the same request only trigger one auth() + DB query.
