@@ -5,7 +5,8 @@
  * speaks only our neutral types. To add a provider, add a `kind` to the catalog (P2);
  * the OpenAI-compatible escape hatch already covers any OpenAI-shaped endpoint.
  */
-import type { ProviderConfig } from "./types";
+import type { ModelMessage } from "ai";
+import type { LlmMessage, ProviderConfig } from "./types";
 
 export type SdkKind = "anthropic" | "openai" | "openai-compatible";
 
@@ -42,4 +43,62 @@ export function resolveProviderSpec(kind: string, config: ProviderConfig): Provi
   // Ollama ignores the key but the SDK requires a non-empty one.
   const apiKey = kind === "ollama" ? config.apiKey || "ollama" : config.apiKey;
   return { sdk: "openai-compatible", apiKey, baseURL, modelId: config.model, headers };
+}
+
+/**
+ * Pure: map our LlmMessage[] to AI-SDK ModelMessage[]. System prompt is passed
+ * separately via generateText's `system` arg, so system-role messages are dropped.
+ * tool_result parts need a toolName (v6 requires it); we recover it from the
+ * matching prior tool-call by toolUseId.
+ */
+export function toModelMessages(messages: LlmMessage[]): ModelMessage[] {
+  const out: ModelMessage[] = [];
+  const toolNameById = new Map<string, string>();
+
+  for (const msg of messages) {
+    if (msg.role === "system") continue;
+
+    if (typeof msg.content === "string") {
+      out.push({ role: msg.role as "user" | "assistant", content: msg.content });
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      const parts = msg.content.map((b) => {
+        if (b.type === "tool_use") {
+          toolNameById.set(b.id, b.name);
+          return { type: "tool-call" as const, toolCallId: b.id, toolName: b.name, input: b.input };
+        }
+        if (b.type === "text") return { type: "text" as const, text: b.text };
+        return null;
+      }).filter((p): p is NonNullable<typeof p> => p !== null);
+      out.push({ role: "assistant", content: parts } as Extract<ModelMessage, { role: "assistant" }>);
+      continue;
+    }
+
+    // user role: tool_result parts become a separate `tool` message; text stays as user text.
+    const toolResults = msg.content.filter((b) => b.type === "tool_result");
+    const textBlocks = msg.content.filter((b) => b.type === "text");
+
+    if (toolResults.length > 0) {
+      out.push({
+        role: "tool",
+        content: toolResults.map((tr) => {
+          const r = tr as { type: "tool_result"; toolUseId: string; content: string };
+          return {
+            type: "tool-result" as const,
+            toolCallId: r.toolUseId,
+            toolName: toolNameById.get(r.toolUseId) ?? "",
+            output: { type: "text" as const, value: r.content },
+          };
+        }),
+      } as Extract<ModelMessage, { role: "tool" }>);
+    }
+    if (textBlocks.length > 0) {
+      const text = textBlocks.map((b) => (b as { type: "text"; text: string }).text).join("");
+      if (text) out.push({ role: "user", content: text });
+    }
+  }
+
+  return out;
 }
