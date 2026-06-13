@@ -36,3 +36,11 @@ export function setInstanceEnvVar(key: string, value: string, home?: string): vo
   mkdirSync(configDir(home), { recursive: true, mode: 0o700 });
   writeFileSync(instanceEnvPath(home), body + "\n", { mode: 0o600 });
 }
+
+/** Source instance.env into an env object (process.env by default). Explicit env wins. */
+export function loadInstanceEnv(opts: { home?: string; env?: NodeJS.ProcessEnv } = {}): void {
+  const env = opts.env ?? process.env;
+  for (const [k, v] of Object.entries(readInstanceEnv(opts.home))) {
+    if (env[k] === undefined) env[k] = v;
+  }
+}

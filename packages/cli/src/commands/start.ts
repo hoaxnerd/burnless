@@ -4,6 +4,7 @@ import { renderBanner } from "../banner";
 import { runAction } from "../context";
 import { UsageError } from "../errors";
 import { runMigrate } from "../local/db";
+import { loadInstanceEnv } from "../local/home";
 import { doctor } from "../local/preflight";
 import { ensureSecretsKey } from "../local/secrets";
 import { resolveServerEntry, startServer } from "../local/server";
@@ -55,6 +56,7 @@ export function registerStart(program: Command): void {
         await runAction(
           cmd,
           async (ctx) => {
+            loadInstanceEnv(); // source ~/.burnless/instance.env into process.env (config set / AI vars)
             assertExposureAllowed(opts.host, opts.unsafeExpose === true);
             const port = Number(opts.port);
             const displayHost = opts.host.includes(":") ? `[${opts.host}]` : opts.host;
