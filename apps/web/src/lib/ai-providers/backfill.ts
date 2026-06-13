@@ -27,23 +27,27 @@ export async function backfillAiProviders(): Promise<number> {
     aiApiKey: aiFeatureFlags.aiApiKey,
     aiModel: aiFeatureFlags.aiModel,
     aiBaseUrl: aiFeatureFlags.aiBaseUrl,
-  }).from(aiFeatureFlags);
+  }).from(aiFeatureFlags).where(eq(aiFeatureFlags.byokEnabled, true));
 
   let migrated = 0;
   for (const row of legacyRows) {
-    if (!row.byokEnabled || !row.aiApiKey) continue;
-    const existing = await db.select({ id: aiProviders.id }).from(aiProviders).where(eq(aiProviders.companyId, row.companyId)).limit(1);
-    if (existing.length > 0) continue;
-    const kind = normalizeKind(row.aiProvider);
-    const provider = await createAiProvider({
-      companyId: row.companyId, name: `${PROVIDER_CATALOG[kind].label} (migrated)`, kind,
-      baseUrl: row.aiBaseUrl ?? null, apiKey: row.aiApiKey, apiKeyMode: "user_provided",
-    });
-    if (row.aiModel) {
-      const model = await addAiProviderModel(provider.id, { modelId: row.aiModel, source: "manual" });
-      await setDefaultAiProviderModel(model.id, provider.id);
+    try {
+      if (!row.byokEnabled || !row.aiApiKey) continue;
+      const existing = await db.select({ id: aiProviders.id }).from(aiProviders).where(eq(aiProviders.companyId, row.companyId)).limit(1);
+      if (existing.length > 0) continue;
+      const kind = normalizeKind(row.aiProvider);
+      const provider = await createAiProvider({
+        companyId: row.companyId, name: `${PROVIDER_CATALOG[kind].label} (migrated)`, kind,
+        baseUrl: row.aiBaseUrl ?? null, apiKey: row.aiApiKey, apiKeyMode: "user_provided",
+      });
+      if (row.aiModel) {
+        const model = await addAiProviderModel(provider.id, { modelId: row.aiModel, source: "manual" });
+        await setDefaultAiProviderModel(model.id, provider.id);
+      }
+      migrated++;
+    } catch (err) {
+      console.warn(`[ai-providers] backfill skipped companyId=${row.companyId}:`, (err as Error).message);
     }
-    migrated++;
   }
   if (migrated > 0) console.log(`[ai-providers] backfilled ${migrated} legacy provider config(s)`);
   return migrated;
