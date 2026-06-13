@@ -10,22 +10,36 @@ import { aiProviders, aiProviderModels } from "../schema";
 import { encryptSecret, decryptSecret } from "../crypto";
 
 export type AiProviderModelRow = typeof aiProviderModels.$inferSelect;
-export type AiProviderPublic = Omit<typeof aiProviders.$inferSelect, "apiKeyEncrypted"> & { apiKeySet: boolean };
+export type AiProviderPublic = Omit<typeof aiProviders.$inferSelect, "apiKeyEncrypted"> & {
+  apiKeySet: boolean;
+  modelCount: number;
+  defaultModelId: string | null;
+};
 type ProviderKind = (typeof aiProviders.$inferSelect)["kind"];
 type ApiKeyMode = (typeof aiProviders.$inferSelect)["apiKeyMode"];
 
-function toPublic(row: typeof aiProviders.$inferSelect): AiProviderPublic {
+type AiProviderMasked = Omit<typeof aiProviders.$inferSelect, "apiKeyEncrypted"> & { apiKeySet: boolean };
+
+function toPublic(row: typeof aiProviders.$inferSelect): AiProviderMasked {
   const { apiKeyEncrypted, ...rest } = row;
   return { ...rest, apiKeySet: apiKeyEncrypted != null };
 }
 
+// Enriches the masked base with a per-provider model summary (count + default model id)
+// so the Settings UI can render provider cards without a follow-up models fetch.
+async function withModelSummary(row: typeof aiProviders.$inferSelect): Promise<AiProviderPublic> {
+  const models = await listAiProviderModels(row.id);
+  const defaultModelId = models.find((m) => m.isDefault)?.modelId ?? null;
+  return { ...toPublic(row), modelCount: models.length, defaultModelId };
+}
+
 export async function listAiProviders(companyId: string): Promise<AiProviderPublic[]> {
   const rows = await db.select().from(aiProviders).where(eq(aiProviders.companyId, companyId));
-  return rows.map(toPublic);
+  return Promise.all(rows.map(withModelSummary));
 }
 export async function getAiProvider(id: string, companyId: string): Promise<AiProviderPublic | null> {
   const [row] = await db.select().from(aiProviders).where(and(eq(aiProviders.id, id), eq(aiProviders.companyId, companyId))).limit(1);
-  return row ? toPublic(row) : null;
+  return row ? withModelSummary(row) : null;
 }
 export async function createAiProvider(data: {
   companyId: string; name: string; kind: ProviderKind; baseUrl?: string | null;
@@ -44,7 +58,7 @@ export async function createAiProvider(data: {
     apiKeyEncrypted: data.apiKey ? encryptSecret(data.apiKey) : null,
     apiKeyMode: data.apiKeyMode ?? "user_provided", headers: data.headers ?? null, dropParams: data.dropParams ?? null, isDefault,
   }).returning();
-  return toPublic(row!);
+  return withModelSummary(row!);
 }
 export async function updateAiProvider(id: string, companyId: string, patch: {
   name?: string; baseUrl?: string | null; apiKey?: string | null; apiKeyMode?: ApiKeyMode;
@@ -60,7 +74,7 @@ export async function updateAiProvider(id: string, companyId: string, patch: {
   if (patch.apiKey !== undefined) values.apiKeyEncrypted = patch.apiKey ? encryptSecret(patch.apiKey) : null;
   if (Object.keys(values).length === 0) return getAiProvider(id, companyId);
   const [row] = await db.update(aiProviders).set(values).where(and(eq(aiProviders.id, id), eq(aiProviders.companyId, companyId))).returning();
-  return row ? toPublic(row) : null;
+  return row ? withModelSummary(row) : null;
 }
 export async function deleteAiProvider(id: string, companyId: string): Promise<boolean> {
   const rows = await db.delete(aiProviders).where(and(eq(aiProviders.id, id), eq(aiProviders.companyId, companyId))).returning({ id: aiProviders.id });

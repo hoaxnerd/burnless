@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
 import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { requireSelfManagedAi } from "@/lib/ai-providers/guard";
-import { getAiProvider, addAiProviderModel, setDefaultAiProviderModel } from "@burnless/db";
+import { getAiProvider, addAiProviderModel, setDefaultAiProviderModel, listAiProviderModels } from "@burnless/db";
 import { addModelSchema } from "@/lib/ai-providers/schemas";
 
 type Params = { params: Promise<{ id: string }> };
+
+export const GET = withErrorHandler(async (_request: Request, { params }: Params) => {
+  const ctx = await requireCompanyAccess();
+  if ("error" in ctx) return ctx.error;
+  const gate = requireSelfManagedAi();
+  if (gate) return gate;
+  const roleErr = requireRole(ctx, "admin");
+  if (roleErr) return roleErr;
+  const { id } = await params;
+  const provider = await getAiProvider(id, ctx.companyId);
+  if (!provider) return errorResponse("Provider not found", 404);
+  const models = await listAiProviderModels(id);
+  return NextResponse.json({ models });
+});
 
 export const POST = withErrorHandler(async (request: Request, { params }: Params) => {
   const ctx = await requireCompanyAccess();

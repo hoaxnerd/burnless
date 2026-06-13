@@ -115,6 +115,17 @@ describe("ai-providers query layer", () => {
     expect(rows[0]!.source).toBe("manual"); // first-seen source preserved
   });
 
+  it("listAiProviders includes modelCount and defaultModelId", async () => {
+    const companyId = await createTestCompany();
+    const p = await createAiProvider({ companyId, name: "A", kind: "openai", apiKey: "k" });
+    await addAiProviderModel(p.id, { modelId: "gpt-4o", source: "manual" });
+    const m2 = await addAiProviderModel(p.id, { modelId: "gpt-4o-mini", source: "manual" });
+    await setDefaultAiProviderModel(m2.id, p.id);
+    const [row] = await listAiProviders(companyId);
+    expect(row!.modelCount).toBe(2);
+    expect(row!.defaultModelId).toBe("gpt-4o-mini");
+  });
+
   it("setDefaultAiProviderModel does not affect another provider's default model", async () => {
     const companyId = await createTestCompany();
     const p1 = await createAiProvider({ companyId, name: "P1", kind: "openai", apiKey: "k1" });
