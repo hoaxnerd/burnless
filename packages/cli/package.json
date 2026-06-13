@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@burnless/db": "workspace:*",
+    "@burnless/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "drizzle-orm": "^0.38.0",
     "commander": "^14.0.0"
