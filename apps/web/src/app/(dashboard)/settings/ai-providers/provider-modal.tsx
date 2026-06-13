@@ -73,6 +73,7 @@ function ModalBody({
   const [key, setKey] = useState("");
   const [defaultModel, setDefaultModel] = useState(provider?.defaultModelId ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [testState, setTestState] = useState<ProviderTestState>("idle");
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -105,13 +106,18 @@ function ModalBody({
     if (!isEdit) return;
     setTestState("testing");
     setTestMsg(null);
-    const res = await testAiProvider(provider.id);
-    if (res.ok) {
-      setTestState("ok");
-      setTestMsg(res.model ?? res.response ?? "Connected");
-    } else {
+    try {
+      const res = await testAiProvider(provider.id);
+      if (res.ok) {
+        setTestState("ok");
+        setTestMsg(res.model ?? res.response ?? "Connected");
+      } else {
+        setTestState("error");
+        setTestMsg(res.error ?? "Test failed");
+      }
+    } catch {
       setTestState("error");
-      setTestMsg(res.error ?? "Test failed");
+      setTestMsg("Connection error — check your network.");
     }
   }
 
@@ -129,6 +135,7 @@ function ModalBody({
   async function handleSave() {
     if (!valid || saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
       if (!isEdit) {
         const res = await createAiProvider({
@@ -154,6 +161,8 @@ function ModalBody({
       }
       onSaved();
       onClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -168,9 +177,13 @@ function ModalBody({
       destructive: true,
     });
     if (!ok) return;
-    await deleteAiProvider(provider.id);
-    onSaved();
-    onClose();
+    try {
+      await deleteAiProvider(provider.id);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Remove failed. Please try again.");
+    }
   }
 
   return (
@@ -231,6 +244,7 @@ function ModalBody({
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder={isEdit && provider.apiKeySet ? "Leave blank to keep the saved key" : ""}
+            aria-describedby="ai-provider-key-hint"
           />
           <Button
             type="button"
@@ -244,7 +258,7 @@ function ModalBody({
             Test
           </Button>
         </div>
-        <p className="mt-1.5 text-xs text-surface-400">
+        <p id="ai-provider-key-hint" className="mt-1.5 text-xs text-surface-400">
           {isEdit
             ? "Stored encrypted (SECRETS_ENCRYPTION_KEY). Never shown again after save. Local providers (Ollama/LM Studio) need no key."
             : "Save the provider first, then test. Stored encrypted (SECRETS_ENCRYPTION_KEY); local providers (Ollama/LM Studio) need no key."}
@@ -281,7 +295,7 @@ function ModalBody({
                   key={m.id}
                   className="flex items-center gap-2.5 border-b border-surface-100 px-3 py-2.5 text-[13px] last:border-b-0"
                 >
-                  <input type="checkbox" className="accent-brand-600" checked={m.enabled} readOnly />
+                  <input type="checkbox" className="accent-brand-600" checked={m.enabled} readOnly aria-readonly="true" />
                   <span className="font-mono text-[12.5px]">{m.modelId}</span>
                   {m.isDefault && <span className="ml-auto text-[10.5px] text-surface-400">★ default</span>}
                 </label>
@@ -307,6 +321,8 @@ function ModalBody({
           hint='Tier routing (fast / standard / deep) can be fine-tuned under "Advanced routing".'
         />
       </div>
+
+      {saveError && <p className="mb-2 text-xs text-danger-600">{saveError}</p>}
 
       {/* ── Footer ── */}
       <div className="-mx-6 mt-4 flex items-center justify-between border-t border-surface-200 bg-surface-50 px-6 py-3.5">

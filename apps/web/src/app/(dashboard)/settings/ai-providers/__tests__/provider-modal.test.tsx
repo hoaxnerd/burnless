@@ -35,6 +35,16 @@ describe("ProviderModal — create", () => {
     await waitFor(() => expect(mut.createAiProvider).toHaveBeenCalled());
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
+  it("surfaces a save error without closing the modal", async () => {
+    mut.createAiProvider.mockRejectedValueOnce(new Error("boom"));
+    const onClose = vi.fn();
+    render(<ProviderModal open onClose={onClose} provider={null} onSaved={vi.fn()} />);
+    fireEvent.click(screen.getByText("OpenAI"));
+    fireEvent.change(screen.getByLabelText(/API key/i), { target: { value: "sk-test" } });
+    fireEvent.click(screen.getByRole("button", { name: /save provider/i }));
+    await waitFor(() => expect(screen.getByText("boom")).toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 describe("ProviderModal — edit", () => {
