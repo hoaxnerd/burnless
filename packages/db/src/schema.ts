@@ -165,6 +165,12 @@ export const aiWriteModeEnum = pgEnum("ai_write_mode", [
   "read_only",
 ]);
 
+export const aiProviderKindEnum = pgEnum("ai_provider_kind", [
+  "anthropic","openai","openrouter","ollama","google","mistral","groq","openai-compatible",
+]);
+export const aiApiKeyModeEnum = pgEnum("ai_api_key_mode", ["managed","user_provided","none"]);
+export const aiProviderModelSourceEnum = pgEnum("ai_provider_model_source", ["fetched","manual","preset"]);
+
 export const aiPermissionModeEnum = pgEnum("ai_permission_mode", [
   "ask",
   "session",
@@ -1191,6 +1197,49 @@ export const aiFeatureFlags = pgTable(
   ]
 );
 
+// ── AI Providers (P2: per-company multi-provider config; keys encrypted at rest) ──
+export const aiProviders = pgTable(
+  "ai_providers",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: aiProviderKindEnum("kind").notNull(),
+    baseUrl: text("base_url"),
+    apiKeyEncrypted: text("api_key_encrypted"),
+    apiKeyMode: aiApiKeyModeEnum("api_key_mode").notNull().default("user_provided"),
+    headers: jsonb("headers"),
+    dropParams: jsonb("drop_params"),
+    enabled: boolean("enabled").notNull().default(true),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (table) => [index("ai_providers_company_idx").on(table.companyId)]
+);
+
+export const aiProviderModels = pgTable(
+  "ai_provider_models",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    providerId: text("provider_id").notNull().references(() => aiProviders.id, { onDelete: "cascade" }),
+    modelId: text("model_id").notNull(),
+    displayName: text("display_name"),
+    contextWindow: integer("context_window"),
+    maxOutputTokens: integer("max_output_tokens"),
+    supportsTools: boolean("supports_tools"),
+    supportsImages: boolean("supports_images"),
+    source: aiProviderModelSourceEnum("source").notNull().default("manual"),
+    enabled: boolean("enabled").notNull().default(true),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("ai_provider_models_provider_idx").on(table.providerId),
+    uniqueIndex("ai_provider_models_provider_model_idx").on(table.providerId, table.modelId),
+  ]
+);
+
 // ── AI Conversations ──────────────────────────────────────────────────────────
 
 export const aiConversations = pgTable(
@@ -1514,6 +1563,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   integrations: many(integrations),
   importBatches: many(importBatches),
   aiFeatureFlags: many(aiFeatureFlags),
+  aiProviders: many(aiProviders),
   aiConversations: many(aiConversations),
   aiInsightCache: many(aiInsightCache),
   weeklyDigests: many(weeklyDigests),
@@ -1728,6 +1778,14 @@ export const aiFeatureFlagsRelations = relations(aiFeatureFlags, ({ one }) => ({
     fields: [aiFeatureFlags.companyId],
     references: [companies.id],
   }),
+}));
+
+export const aiProvidersRelations = relations(aiProviders, ({ one, many }) => ({
+  company: one(companies, { fields: [aiProviders.companyId], references: [companies.id] }),
+  models: many(aiProviderModels),
+}));
+export const aiProviderModelsRelations = relations(aiProviderModels, ({ one }) => ({
+  provider: one(aiProviders, { fields: [aiProviderModels.providerId], references: [aiProviders.id] }),
 }));
 
 export const aiConversationsRelations = relations(

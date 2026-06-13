@@ -57,6 +57,13 @@
       "when": 1781288392811,
       "tag": "0007_busy_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781355491884,
+      "tag": "0008_organic_anita_blake",
+      "breakpoints": true
     }
   ]
 }
