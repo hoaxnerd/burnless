@@ -62,4 +62,9 @@ export const KEYS = {
   // Per-conversation session-disabled tool map (AI Tools pane reads on load)
   sessionDisabledTools: (conversationId: string) =>
     `/api/chat/session-tools?conversationId=${conversationId}`,
+
+  // AI providers manager (Settings → AI Providers, #49 P3)
+  aiProviders: "/api/ai-features/providers",
+  aiProvider: (id: string) => `/api/ai-features/providers/${id}`,
+  aiProviderModels: (id: string) => `/api/ai-features/providers/${id}/models`,
 } as const;

@@ -30,6 +30,9 @@ export {
   useScenarioOverrides,
   useOverrideCount,
   useNotifications,
+  // AI providers manager (#49 P3)
+  useAiProviders,
+  useAiProviderModels,
 } from "./hooks";
 export type {
   Scenario,
@@ -63,4 +66,13 @@ export {
   // Post-mutation revalidation (PMR-1)
   revalidate,
   revalidateOnFinancialMutation,
+  // AI provider mutations (#49 P3)
+  createAiProvider,
+  updateAiProvider,
+  deleteAiProvider,
+  setDefaultAiProvider,
+  testAiProvider,
+  fetchAiProviderModels,
+  addAiProviderModel,
+  setDefaultAiProviderModel,
 } from "./mutations";

@@ -17,6 +17,8 @@ import {
 } from "@/lib/mutation-bus";
 import { KEYS } from "./keys";
 import { FetchError } from "./fetcher";
+import type { AiProviderPublic, AiProviderModelRow } from "@burnless/db";
+import type { ProviderKind } from "@burnless/ai";
 
 // ── Post-mutation revalidation (PMR-1) ───────────────────────────────────────
 
@@ -161,4 +163,88 @@ export async function billingAction(
     await mutate(KEYS.billing);
   }
   return result;
+}
+
+// ── AI provider mutations (Settings → AI Providers, #49 P3) ──────────────────
+
+export async function createAiProvider(data: {
+  name: string;
+  kind: ProviderKind;
+  baseUrl?: string;
+  apiKey?: string;
+  apiKeyMode?: "managed" | "user_provided" | "none";
+  headers?: Record<string, string>;
+  dropParams?: Record<string, unknown>;
+}): Promise<{ provider: AiProviderPublic }> {
+  const r = await apiCall<{ provider: AiProviderPublic }>(KEYS.aiProviders, "POST", data);
+  await mutate(KEYS.aiProviders);
+  return r;
+}
+
+export async function updateAiProvider(
+  id: string,
+  data: Record<string, unknown>,
+): Promise<{ provider: AiProviderPublic }> {
+  const r = await apiCall<{ provider: AiProviderPublic }>(KEYS.aiProvider(id), "PATCH", data);
+  await Promise.all([mutate(KEYS.aiProviders), mutate(KEYS.aiProviderModels(id))]);
+  return r;
+}
+
+export async function deleteAiProvider(id: string): Promise<void> {
+  await apiCall(KEYS.aiProvider(id), "DELETE");
+  await mutate(KEYS.aiProviders);
+}
+
+export async function setDefaultAiProvider(id: string): Promise<void> {
+  await apiCall(`${KEYS.aiProvider(id)}/default`, "POST");
+  await mutate(KEYS.aiProviders);
+}
+
+/**
+ * Test a provider's credentials. Uses `apiFetch` directly (not `apiCall`) so an
+ * `ok: false` 400 from a bad key returns the parsed `{ ok, error }` payload
+ * instead of throwing — the UI surfaces the error inline.
+ */
+export async function testAiProvider(
+  id: string,
+): Promise<{ ok: boolean; model?: string; response?: string; error?: string }> {
+  const res = await apiFetch(`${KEYS.aiProvider(id)}/test`, { method: "POST" });
+  return res.json();
+}
+
+export async function fetchAiProviderModels(
+  id: string,
+): Promise<{ models: AiProviderModelRow[]; fetched: number }> {
+  const r = await apiCall<{ models: AiProviderModelRow[]; fetched: number }>(
+    `${KEYS.aiProviderModels(id)}/fetch`,
+    "POST",
+  );
+  await mutate(KEYS.aiProviderModels(id));
+  return r;
+}
+
+export async function addAiProviderModel(
+  id: string,
+  data: { modelId: string; isDefault?: boolean },
+): Promise<{ model: AiProviderModelRow }> {
+  const r = await apiCall<{ model: AiProviderModelRow }>(KEYS.aiProviderModels(id), "POST", data);
+  await Promise.all([mutate(KEYS.aiProviderModels(id)), mutate(KEYS.aiProviders)]);
+  return r;
+}
+
+/**
+ * No dedicated set-default-model route in P2 — the manual-add route accepts
+ * `isDefault` and upserts (preserving source). Re-POST with `isDefault: true`
+ * to promote an existing model.
+ */
+export async function setDefaultAiProviderModel(
+  id: string,
+  modelId: string,
+): Promise<{ model: AiProviderModelRow }> {
+  const r = await apiCall<{ model: AiProviderModelRow }>(KEYS.aiProviderModels(id), "POST", {
+    modelId,
+    isDefault: true,
+  });
+  await Promise.all([mutate(KEYS.aiProviderModels(id)), mutate(KEYS.aiProviders)]);
+  return r;
 }

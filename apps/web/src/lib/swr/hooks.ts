@@ -12,6 +12,7 @@ import useSWR, { type SWRConfiguration } from "swr";
 import { KEYS } from "./keys";
 import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
 import type { ApiTokenDto, McpConnectionDto, McpToolDto, OauthGrantDto } from "@/components/mcp/types";
+import type { AiProviderPublic, AiProviderModelRow } from "@burnless/db";
 
 // ── Type imports ────────────────────────────────────────────────────────────
 
@@ -467,4 +468,16 @@ export function useAutomation(
     id ? KEYS.automation(id) : null,
     config,
   );
+}
+
+// ── AI providers manager (Settings → AI Providers, #49 P3) ───────────────────
+
+/** All AI providers for the current company. Route wraps as `{ providers }`. */
+export function useAiProviders(config?: SWRConfiguration<{ providers: AiProviderPublic[] }>) {
+  return useSWR<{ providers: AiProviderPublic[] }>(KEYS.aiProviders, { ...config });
+}
+
+/** Models for one provider. Route wraps as `{ models }`. Null id ⇒ no fetch. */
+export function useAiProviderModels(id: string | null, config?: SWRConfiguration<{ models: AiProviderModelRow[] }>) {
+  return useSWR<{ models: AiProviderModelRow[] }>(id ? KEYS.aiProviderModels(id) : null, { ...config });
 }
