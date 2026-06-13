@@ -54,7 +54,7 @@ describe("providers config API", () => {
     caps.managedAiProvider = false;
     const created = await POST(jreq({ name: "OR", kind: "openrouter", apiKey: "sk-secret" }));
     expect(created.status).toBe(201);
-    const listRes = await GET();
+    const listRes = await GET(jreq(undefined));
     const list = await listRes.json();
     expect(list.providers.length).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(list)).not.toContain("sk-secret");
@@ -64,7 +64,7 @@ describe("providers config API", () => {
   it("403s on cloud (managedAiProvider ON)", async () => {
     caps.managedAiProvider = true;
     expect((await POST(jreq({ name: "x", kind: "openai", apiKey: "k" }))).status).toBe(403);
-    expect((await GET()).status).toBe(403);
+    expect((await GET(jreq(undefined))).status).toBe(403);
     caps.managedAiProvider = false;
   });
 

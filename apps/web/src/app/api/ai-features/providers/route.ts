@@ -11,7 +11,7 @@ import { requireSelfManagedAi } from "@/lib/ai-providers/guard";
 import { listAiProviders, createAiProvider } from "@burnless/db";
 import { createProviderSchema } from "@/lib/ai-providers/schemas";
 
-export const GET = withErrorHandler(async (_request?: Request) => {
+export const GET = withErrorHandler(async (_request: Request) => {
   const ctx = await requireCompanyAccess();
   if ("error" in ctx) return ctx.error;
   const gate = requireSelfManagedAi();
