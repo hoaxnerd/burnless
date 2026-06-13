@@ -17,9 +17,9 @@ describe("config-item seam", () => {
     const aiConfig = {
       id: "ai-config",
       kind: "configuration",
-      // Wording does NOT claim same-session autofill: enrichment already ran at
-      // the website step, so a provider configured here powers AI features going
-      // forward (chat, insights, a later session), not the current suggestions.
+      // Two-phase order (self-host): this CONFIGURATION step runs before the DATA
+      // phase and the enrichment is DEFERRED to run after it, so the configured
+      // provider powers the CURRENT session's enrichment (same-session).
       title: "Connect your AI",
       description: "Bring your own provider to power chat, insights and automations.",
       hiddenWhenCapability: "managedAiProvider",
@@ -41,11 +41,9 @@ describe("config-item seam", () => {
       expect(aiConfigDescriptor.skippable).toBe(true);
     });
 
-    it("carries a title + description the wizard reads (no autofill claim)", () => {
+    it("carries a title + description the wizard reads", () => {
       expect(aiConfigDescriptor.title).toBeTruthy();
       expect(aiConfigDescriptor.description).toBeTruthy();
-      // Must NOT claim same-session autofill (enrichment already ran upfront).
-      expect(aiConfigDescriptor.description.toLowerCase()).not.toContain("autofill");
     });
 
     it("render returns a node (descriptor drives the panel)", () => {

@@ -59,6 +59,12 @@ export default function OnboardingPage() {
   // manager, gated the same way: ai-features-tab.tsx `!caps.managedAiProvider`).
   const showAiConfig = !caps[aiConfigDescriptor.hiddenWhenCapability!];
 
+  // Whether the AI enrich is DEFERRED to run after the ai-config step (two-phase
+  // order). Self-host shows ai-config → enrich runs after provider config; cloud
+  // has no ai-config step → enrich runs upfront at the website step (legacy). The
+  // gate is the same boolean that gates the step's existence.
+  const deferEnrich = showAiConfig;
+
   // The wizard's ordered step list (ids + stepper labels), derived per-edition.
   // The "ai-config" step sits AFTER Company (company-first: the company row must
   // exist before a provider can be saved) and BEFORE Revenue (the first
@@ -66,12 +72,14 @@ export default function OnboardingPage() {
   // editions stay correct without special-casing. The ai-config label is read
   // from the descriptor title (not an inline literal).
   //
-  // Same-session autofill caveat: AI enrichment that produces the revenue/funding/
-  // expenses/team suggestions runs UPFRONT at the website step (`runEnrich`),
-  // before the company exists and before this step. A provider configured here
-  // powers AI features going forward (chat, insights, a later session / re-run) —
-  // it does NOT retroactively re-feed the CURRENT session's already-streamed
-  // suggestions. See ai-config-descriptor.tsx for the full note.
+  // TWO-PHASE order (founder directive): on self-host the CONFIGURATION phase
+  // (this ai-config step) runs BEFORE the DATA phase, and the AI enrich is
+  // DEFERRED to run AFTER the provider is configured — see `deferEnrich` and the
+  // `handleContinue` ai-config branch below. So on self-host the autofill caveat
+  // FLIPS: enrichment runs AFTER provider config, so the suggestions CAN be
+  // AI-enriched same-session with the just-configured provider. On cloud
+  // (managed AI, no ai-config step) enrich still runs UPFRONT at the website
+  // step. See ai-config-descriptor.tsx for the matching note.
   const WIZARD_STEP_META = useMemo<{ id: WizardStepId; label: string }[]>(
     () => [
       { id: "company", label: "Company" },
@@ -121,6 +129,9 @@ export default function OnboardingPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
   const movedOnRef = useRef(false);
+  // Guards the DEFERRED self-host enrich so Back→Continue on the ai-config step
+  // does not re-fire it. Set once the post-ai-config enrich has been triggered.
+  const enrichedRef = useRef(false);
   // Ref to the active wizard step panel; the global Continue calls its submit().
   const stepRef = useRef<WizardStepHandle>(null);
 
@@ -132,7 +143,11 @@ export default function OnboardingPage() {
 
   // ── Website entry / enrichment ────────────────────────────────────────────
 
-  const runEnrich = async () => {
+  // `destination` is the wizard step to land on once enrichment finishes (or
+  // falls back). Cloud's upfront enrich lands on "company" (the first step);
+  // the deferred self-host enrich lands on "revenue" (the step after ai-config),
+  // because Company + ai-config are already behind the user.
+  const runEnrich = async (destination: WizardStepId = "company") => {
     setStep("enriching");
     setGreeting("Analyzing...");
     setAgentError(null);
@@ -150,13 +165,13 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         // AI not available — drop into the wizard manually (no error card).
-        enterWizard(true);
+        enterWizard(true, destination);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        enterWizard(true);
+        enterWizard(true, destination);
         return;
       }
 
@@ -210,7 +225,7 @@ export default function OnboardingPage() {
               setGreeting(statusText);
             } else if (event.type === "done") {
               movedOnRef.current = true;
-              enterWizard(true);
+              enterWizard(true, destination);
             } else if (event.type === "agent_failed") {
               // Explicit failure screen — no silent timeout fallback.
               movedOnRef.current = true;
@@ -225,11 +240,11 @@ export default function OnboardingPage() {
 
       // Stream ended without an explicit done/agent_failed — enter the wizard.
       if (!movedOnRef.current) {
-        enterWizard(true);
+        enterWizard(true, destination);
       }
     } catch {
       // Network error — fall back to the wizard manually.
-      enterWizard(true);
+      enterWizard(true, destination);
     }
   };
 
@@ -237,15 +252,26 @@ export default function OnboardingPage() {
     e.preventDefault();
     if (!websiteUrl.trim()) return;
     trackEvent("onboarding_website_submitted", { url: websiteUrl.trim() });
-    await runEnrich();
+    // Two-phase order: on self-host the enrich is DEFERRED until after the
+    // ai-config step (so it uses the just-configured provider) — submitting the
+    // website here goes straight to the Company step. On cloud (no ai-config
+    // step, managed AI) the enrich runs UPFRONT as before.
+    if (deferEnrich) {
+      enterWizard(true, "company");
+      return;
+    }
+    await runEnrich("company");
   };
 
   // ── Wizard entry / navigation ─────────────────────────────────────────────
 
-  const enterWizard = (withSuggestions: boolean) => {
+  const enterWizard = (
+    withSuggestions: boolean,
+    destination: WizardStepId = "company",
+  ) => {
     movedOnRef.current = true;
     setUseSuggestions(withSuggestions);
-    setStep("company");
+    setStep(destination);
   };
 
   // Manual entry from the website screen (skips enrichment entirely).
@@ -337,9 +363,30 @@ export default function OnboardingPage() {
   // The global Continue: persist the active step's pending work via its
   // imperative submit(), then advance only if it allows. Skip (onSkip) advances
   // WITHOUT calling submit() — it discards that step's pending work.
+  //
+  // Two-phase seam: when leaving the ai-config step on self-host, the DEFERRED
+  // enrich fires ONCE (using the just-configured provider) before advancing to
+  // Revenue. `runEnrich("revenue")` shows the transient enriching screen and
+  // lands on Revenue itself, so we do NOT also call advance() here. Guarded by
+  // `enrichedRef` so Back→Continue does not re-fire the (paid) enrich; a second
+  // Continue just advances normally.
   const handleContinue = async () => {
     const ok = await stepRef.current?.submit();
-    if (ok) advance();
+    if (!ok) return;
+    if (
+      deferEnrich &&
+      step === "ai-config" &&
+      !enrichedRef.current &&
+      // Only enrich when the user gave a website AND opted into suggestions
+      // (manual-entry escapes set useSuggestions=false). Otherwise just advance.
+      useSuggestions &&
+      websiteUrl.trim()
+    ) {
+      enrichedRef.current = true;
+      await runEnrich("revenue");
+      return;
+    }
+    advance();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
