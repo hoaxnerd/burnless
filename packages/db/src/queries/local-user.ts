@@ -5,7 +5,7 @@
  */
 import { asc, eq } from "drizzle-orm";
 import { db } from "../index";
-import { users } from "../schema";
+import { companies, companyMembers, users } from "../schema";
 
 /** The placeholder identity for the single local self-host user (pre-claim). */
 export const LOCAL_OWNER_EMAIL = "owner@localhost";
@@ -16,6 +16,15 @@ export const LOCAL_OWNER_EMAIL = "owner@localhost";
  * (claim mutates email + passwordHash, never the id).
  */
 export const LOCAL_OWNER_ID = "00000000-0000-4000-a000-000000000000";
+
+/**
+ * Deterministic id for the install-time placeholder company (self-host). Parallels
+ * the claimable owner USER (LOCAL_OWNER_ID): a genuine per-company `companies` row
+ * exists from first boot so the encrypted per-company `aiProviders` path works
+ * everywhere (CLI/wizard/settings) without a company-creation chicken-and-egg.
+ * The onboarding wizard's company step CLAIMS/EDITS this row (non-destructive).
+ */
+export const LOCAL_OWNER_COMPANY_ID = "00000000-0000-4000-a000-000000000001";
 
 export interface UserSummary {
   id: string;
@@ -38,6 +47,37 @@ export async function createOwnerUserIfNone(): Promise<void> {
       passwordHash: null,
     })
     .onConflictDoNothing({ target: users.email });
+}
+
+/**
+ * Insert the install-time placeholder company + owner membership iff NO company
+ * membership exists anywhere (single-tenant invariant). Idempotent + race-safe via
+ * a triple-lock: deterministic id + onConflictDoNothing(id) + the company_member_unique
+ * index + this any-membership short-circuit. Both inserts run in one transaction so a
+ * crash never leaves a company without a membership. NO capability gate here — the web
+ * wrapper / CLI bootstrap apply the self-host (autoLogin) gate.
+ */
+export async function createOwnerCompanyIfNone(ownerId: string): Promise<void> {
+  const [existing] = await db.select({ id: companyMembers.id }).from(companyMembers).limit(1);
+  if (existing) return;
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(companies)
+      .values({
+        id: LOCAL_OWNER_COMPANY_ID,
+        name: "My Company",
+        ownerId,
+      })
+      .onConflictDoNothing({ target: companies.id });
+    await tx
+      .insert(companyMembers)
+      .values({
+        companyId: LOCAL_OWNER_COMPANY_ID,
+        userId: ownerId,
+        role: "owner",
+      })
+      .onConflictDoNothing();
+  });
 }
 
 /** The auto-login target — deterministically the first-run owner (oldest user). */

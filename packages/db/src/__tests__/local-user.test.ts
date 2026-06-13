@@ -13,20 +13,25 @@ vi.mock("../index", () => ({
   },
 }));
 
-import { users } from "../schema";
+import { companies, companyMembers, users } from "../schema";
 import {
+  createOwnerCompanyIfNone,
   createOwnerUserIfNone,
   createUser,
   getOwnerUser,
   isOwnerClaimed,
   listUsers,
   setUserPassword,
+  LOCAL_OWNER_COMPANY_ID,
   LOCAL_OWNER_EMAIL,
   LOCAL_OWNER_ID,
 } from "../queries/local-user";
 
 beforeEach(async () => {
-  // Single-user invariants under test require a clean users table per test.
+  // Single-tenant invariants under test require clean tables per test.
+  // company_members + companies first (FK to users.id), then users.
+  await getTestDb().delete(companyMembers);
+  await getTestDb().delete(companies);
   await getTestDb().delete(users);
 });
 
@@ -39,6 +44,36 @@ describe("createOwnerUserIfNone", () => {
     expect(all[0]!.email).toBe(LOCAL_OWNER_EMAIL);
     expect(all[0]!.id).toBe(LOCAL_OWNER_ID);
     expect(all[0]!.claimed).toBe(false);
+  });
+});
+
+describe("createOwnerCompanyIfNone", () => {
+  it("inserts the install company + owner membership once, idempotently", async () => {
+    await createOwnerUserIfNone();
+    await createOwnerCompanyIfNone(LOCAL_OWNER_ID);
+    await createOwnerCompanyIfNone(LOCAL_OWNER_ID);
+
+    const db = getTestDb();
+    const companyRows = await db.select().from(companies);
+    expect(companyRows.length).toBe(1);
+    expect(companyRows[0]!.id).toBe(LOCAL_OWNER_COMPANY_ID);
+    expect(companyRows[0]!.name).toBe("My Company");
+    expect(companyRows[0]!.ownerId).toBe(LOCAL_OWNER_ID);
+
+    const memberRows = await db.select().from(companyMembers);
+    expect(memberRows.length).toBe(1);
+    expect(memberRows[0]!.companyId).toBe(LOCAL_OWNER_COMPANY_ID);
+    expect(memberRows[0]!.userId).toBe(LOCAL_OWNER_ID);
+    expect(memberRows[0]!.role).toBe("owner");
+  });
+
+  it("short-circuits when any membership already exists", async () => {
+    await createOwnerUserIfNone();
+    await createOwnerCompanyIfNone(LOCAL_OWNER_ID);
+    // A second invocation must not create a second company even with a fresh id.
+    await createOwnerCompanyIfNone(LOCAL_OWNER_ID);
+    const companyRows = await getTestDb().select().from(companies);
+    expect(companyRows.length).toBe(1);
   });
 });
 
