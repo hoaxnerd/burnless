@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { resolveProviderSpec } from "../providers/ai-sdk-provider";
 import { toModelMessages } from "../providers/ai-sdk-provider";
 import { toAiSdkTools, mapFinishReason, fromContentParts } from "../providers/ai-sdk-provider";
+import { streamPartToEvent } from "../providers/ai-sdk-provider";
 import type { LlmMessage, ToolDefinition } from "../providers/types";
 
 describe("resolveProviderSpec", () => {
@@ -121,5 +122,22 @@ describe("fromContentParts", () => {
       { type: "text", text: "here" },
       { type: "tool_use", id: "c1", name: "get_metrics", input: { period: "2026-01" } },
     ]);
+  });
+});
+
+describe("streamPartToEvent", () => {
+  it("maps text-delta to text_delta", () => {
+    expect(streamPartToEvent({ type: "text-delta", text: "hi" })).toEqual({ type: "text_delta", text: "hi" });
+  });
+  it("maps reasoning-delta to thinking_delta", () => {
+    expect(streamPartToEvent({ type: "reasoning-delta", text: "hmm" })).toEqual({ type: "thinking_delta", text: "hmm" });
+  });
+  it("maps tool-call to tool_use", () => {
+    expect(streamPartToEvent({ type: "tool-call", toolCallId: "c1", toolName: "get_metrics", input: { a: 1 } }))
+      .toEqual({ type: "tool_use", id: "c1", name: "get_metrics", input: { a: 1 } });
+  });
+  it("returns null for parts we do not surface (finish/start/etc.)", () => {
+    expect(streamPartToEvent({ type: "finish", finishReason: "stop" })).toBeNull();
+    expect(streamPartToEvent({ type: "text-start" })).toBeNull();
   });
 });

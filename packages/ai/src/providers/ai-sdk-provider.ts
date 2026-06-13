@@ -5,8 +5,21 @@
  * speaks only our neutral types. To add a provider, add a `kind` to the catalog (P2);
  * the OpenAI-compatible escape hatch already covers any OpenAI-shaped endpoint.
  */
-import { tool, jsonSchema, type ModelMessage } from "ai";
-import type { LlmMessage, ProviderConfig, ToolDefinition, ContentBlock, StopReason } from "./types";
+import { tool, jsonSchema, generateText, streamText, type ModelMessage, type LanguageModel } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { LlmProvider } from "./base";
+import type {
+  CompletionRequest,
+  LlmResponse,
+  StreamEvent,
+  LlmMessage,
+  ProviderConfig,
+  ToolDefinition,
+  ContentBlock,
+  StopReason,
+} from "./types";
 
 export type SdkKind = "anthropic" | "openai" | "openai-compatible";
 
@@ -138,4 +151,108 @@ export function fromContentParts(parts: AiContentPart[]): ContentBlock[] {
     }
   }
   return out;
+}
+
+interface AiStreamPart {
+  type: string;
+  text?: string;
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  finishReason?: string;
+  error?: unknown;
+}
+
+/** Pure: a single fullStream part → our StreamEvent, or null if we don't surface it. */
+export function streamPartToEvent(part: AiStreamPart): StreamEvent | null {
+  switch (part.type) {
+    case "text-delta":
+      return { type: "text_delta", text: part.text ?? "" };
+    case "reasoning-delta":
+      return { type: "thinking_delta", text: part.text ?? "" };
+    case "tool-call":
+      return { type: "tool_use", id: part.toolCallId ?? "", name: part.toolName ?? "", input: (part.input ?? {}) as Record<string, unknown> };
+    case "error":
+      return { type: "error", error: part.error instanceof Error ? part.error : new Error(String(part.error)) };
+    default:
+      return null;
+  }
+}
+
+/** Build an AI-SDK LanguageModel for a provider kind + config. */
+export function buildModel(kind: string, config: ProviderConfig): LanguageModel {
+  const spec = resolveProviderSpec(kind, config);
+  if (spec.sdk === "anthropic") {
+    return createAnthropic({ apiKey: spec.apiKey || undefined, baseURL: spec.baseURL || undefined, headers: spec.headers })(spec.modelId);
+  }
+  if (spec.sdk === "openai") {
+    return createOpenAI({ apiKey: spec.apiKey || undefined, baseURL: spec.baseURL || undefined, headers: spec.headers })(spec.modelId);
+  }
+  return createOpenAICompatible({
+    name: kind,
+    apiKey: spec.apiKey || undefined,
+    baseURL: spec.baseURL ?? "",
+    headers: spec.headers,
+  })(spec.modelId);
+}
+
+/** The single LlmProvider implementation, backed by the Vercel AI SDK. */
+export class AiSdkProvider extends LlmProvider {
+  private model: LanguageModel;
+
+  constructor(model: LanguageModel, config: ProviderConfig) {
+    super(config);
+    this.model = model;
+  }
+
+  async complete(request: CompletionRequest): Promise<LlmResponse> {
+    const result = await generateText({
+      model: this.model,
+      system: request.system,
+      messages: toModelMessages(request.messages),
+      tools: request.tools?.length ? toAiSdkTools(request.tools) : undefined,
+      maxOutputTokens: request.maxTokens ?? this.config.maxTokens ?? 4096,
+    });
+    return {
+      content: fromContentParts(result.content as AiContentPart[]),
+      stopReason: mapFinishReason(result.finishReason),
+      usage: result.usage
+        ? { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+        : undefined,
+    };
+  }
+
+  async *stream(request: CompletionRequest): AsyncGenerator<StreamEvent> {
+    const result = streamText({
+      model: this.model,
+      system: request.system,
+      messages: toModelMessages(request.messages),
+      tools: request.tools?.length ? toAiSdkTools(request.tools) : undefined,
+      maxOutputTokens: request.maxTokens ?? this.config.maxTokens ?? 4096,
+    });
+
+    let fullText = "";
+    const toolBlocks: ContentBlock[] = [];
+    let finishReason: StopReason = "unknown";
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
+
+    for await (const part of result.fullStream as AsyncIterable<AiStreamPart>) {
+      if (part.type === "text-delta") fullText += part.text ?? "";
+      if (part.type === "tool-call") {
+        toolBlocks.push({ type: "tool_use", id: part.toolCallId ?? "", name: part.toolName ?? "", input: (part.input ?? {}) as Record<string, unknown> });
+      }
+      if (part.type === "finish") {
+        finishReason = mapFinishReason(part.finishReason ?? "unknown");
+        const u = (part as { totalUsage?: { inputTokens?: number; outputTokens?: number } }).totalUsage;
+        if (u) usage = { inputTokens: u.inputTokens ?? 0, outputTokens: u.outputTokens ?? 0 };
+      }
+      const event = streamPartToEvent(part);
+      if (event) yield event;
+    }
+
+    const content: ContentBlock[] = [];
+    if (fullText) content.push({ type: "text", text: fullText });
+    content.push(...toolBlocks);
+    yield { type: "done", response: { content, stopReason: finishReason, usage } };
+  }
 }
