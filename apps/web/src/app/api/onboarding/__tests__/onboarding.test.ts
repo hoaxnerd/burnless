@@ -49,16 +49,18 @@ vi.mock("@burnless/db", () => ({
     insert: mockInsert,
     transaction: mockTransaction,
   },
+  // Deterministic install-company id (self-host). Must match the real export.
+  LOCAL_OWNER_COMPANY_ID: "00000000-0000-4000-a000-000000000001",
   companies: { __table: "companies", id: "id", name: "name" },
   companyMembers: { __table: "companyMembers" },
   scenarios: { __table: "scenarios", id: "id", companyId: "companyId", deletedAt: "deletedAt" },
-  financialAccounts: { __table: "financialAccounts" },
-  departments: { __table: "departments" },
+  financialAccounts: { __table: "financialAccounts", id: "id", companyId: "companyId" },
+  departments: { __table: "departments", id: "id", companyId: "companyId" },
   forecastLines: { __table: "forecastLines" },
   revenueStreams: { __table: "revenueStreams" },
   fundingRounds: { __table: "fundingRounds" },
   headcountPlans: { __table: "headcountPlans" },
-  aiFeatureFlags: { __table: "aiFeatureFlags" },
+  aiFeatureFlags: { __table: "aiFeatureFlags", companyId: "companyId" },
   users: { __table: "users", id: "id" },
 }));
 
@@ -91,6 +93,9 @@ const validBody = {
   user_name: "Jane Founder",
 };
 
+// Must mirror the real LOCAL_OWNER_COMPANY_ID export (also stubbed in the mock).
+const INSTALL_COMPANY_ID = "00000000-0000-4000-a000-000000000001";
+
 /**
  * Drive the REAL transaction callback against a recording fake `tx`, capturing
  * the rows inserted per table. Lets us assert what the slim route actually
@@ -120,6 +125,71 @@ function recordTransactionInserts() {
   const rowsFor = (table: string) =>
     inserts.filter((i) => i.table === table).flatMap((i) => i.rows);
   return { inserts, rowsFor };
+}
+
+/**
+ * Records the CLAIM-path transaction: captures inserts AND updates (the claim
+ * UPDATEs the company row), and serves `tx.select(...).from(...).where(...).limit()`
+ * for the create-if-absent existence checks. By default every existence check
+ * resolves EMPTY → scaffolding gets created (fresh claim). Pass `existing` to
+ * mark specific tables as already-present (idempotent re-claim).
+ */
+function recordClaimTransaction(existing: Set<string> = new Set()) {
+  const inserts: { table: string; rows: unknown[] }[] = [];
+  const updates: { table: string; set: unknown }[] = [];
+
+  const txSelect = vi.fn().mockImplementation(() => ({
+    from: vi.fn().mockImplementation((table: { __table?: string }) => ({
+      where: vi.fn().mockReturnValue({
+        limit: vi
+          .fn()
+          .mockResolvedValue(existing.has(table?.__table ?? "") ? [{ id: "pre-existing" }] : []),
+      }),
+    })),
+  }));
+  const txInsert = vi.fn().mockImplementation((table: { __table?: string }) => ({
+    values: vi.fn().mockImplementation((rows: unknown) => {
+      const arr = Array.isArray(rows) ? rows : [rows];
+      inserts.push({ table: table?.__table ?? "unknown", rows: arr });
+      return {
+        returning: vi
+          .fn()
+          .mockResolvedValue(arr.map((_, i) => ({ id: `${table?.__table}-${i}` }))),
+      };
+    }),
+  }));
+  const txUpdate = vi.fn().mockImplementation((table: { __table?: string }) => ({
+    set: vi.fn().mockImplementation((s: unknown) => {
+      updates.push({ table: table?.__table ?? "unknown", set: s });
+      return { where: vi.fn().mockResolvedValue(undefined) };
+    }),
+  }));
+
+  mockTransaction.mockImplementation(
+    async (
+      fn: (tx: {
+        select: typeof txSelect;
+        insert: typeof txInsert;
+        update: typeof txUpdate;
+      }) => Promise<unknown>,
+    ) => fn({ select: txSelect, insert: txInsert, update: txUpdate }),
+  );
+
+  const rowsFor = (table: string) =>
+    inserts.filter((i) => i.table === table).flatMap((i) => i.rows);
+  const updateFor = (table: string) => updates.find((u) => u.table === table);
+  return { inserts, updates, rowsFor, updateFor };
+}
+
+/**
+ * Stub the top-level `isCompanyClaimed` select (db.select → from → where → limit).
+ * `claimed=false` → unclaimed install company (claim path); `true` → already claimed.
+ */
+function stubIsClaimed(claimed: boolean) {
+  mockSelect.mockReturnValue({ from: mockFrom });
+  mockFrom.mockReturnValue({ where: mockWhere });
+  mockWhere.mockReturnValue({ limit: mockLimit });
+  mockLimit.mockResolvedValue(claimed ? [{ id: "base-scenario" }] : []);
 }
 
 /* ── Tests ──────────────────────────────────────────────────────────── */
@@ -362,5 +432,124 @@ describe("POST /api/onboarding", () => {
 
     expect(res.status).toBe(500);
     expect(body.error).toBeTruthy();
+  });
+
+  /* ── CREATE-OR-CLAIM: self-host install company ───────────────────── */
+
+  // Self-host boot auto-creates an install placeholder company
+  // (id = LOCAL_OWNER_COMPANY_ID, name "My Company") + owner membership, with NO
+  // scaffolding. The wizard's company step CLAIMS it: the row is UPDATED (name
+  // set, id unchanged) and scaffolding is created-if-absent. 201, no duplicate
+  // company insert.
+  it("CLAIMS the unclaimed install company: updates the row + creates scaffolding, 201", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(false);
+
+    const { rowsFor, updateFor } = recordClaimTransaction();
+
+    const res = await POST(
+      makeRequest({
+        company_name: "Acme Corp",
+        stage: "Seed",
+        business_model: "SaaS",
+        industry: "Fintech",
+        user_name: "Jane Founder",
+      }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.companyId).toBe(INSTALL_COMPANY_ID);
+    expect(body.scenarioId).toBeTruthy();
+
+    // The company row is UPDATED (claimed), not inserted — no duplicate company.
+    expect(rowsFor("companies")).toHaveLength(0);
+    const companyUpdate = updateFor("companies");
+    expect(companyUpdate).toBeTruthy();
+    expect((companyUpdate?.set as { name: string }).name).toBe("Acme Corp");
+
+    // Scaffolding created-if-absent: scenario, accounts, departments, flags.
+    expect(rowsFor("scenarios")).toHaveLength(1);
+    expect((rowsFor("financialAccounts") as unknown[]).length).toBeGreaterThanOrEqual(6);
+    expect(rowsFor("departments")).toHaveLength(5);
+    expect(rowsFor("aiFeatureFlags")).toHaveLength(1);
+  });
+
+  // Claim is NON-DESTRUCTIVE: an omitted optional field (industry/user_name)
+  // must NOT appear in the SET payload, so it never nulls an existing value.
+  it("claim is non-destructive: omitted optional fields are not in the UPDATE set", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(false);
+
+    const { updateFor } = recordClaimTransaction();
+
+    // No industry, no user_name in the body.
+    const res = await POST(makeRequest({ company_name: "Acme Corp" }));
+    expect(res.status).toBe(201);
+
+    const companyUpdate = updateFor("companies");
+    const setPayload = companyUpdate?.set as Record<string, unknown>;
+    expect(setPayload.name).toBe("Acme Corp");
+    // industry omitted → must NOT be present (would otherwise null the column).
+    expect("industry" in setPayload).toBe(false);
+    // user_name omitted → the users table must not be updated at all.
+    expect(updateFor("users")).toBeUndefined();
+  });
+
+  // Re-claim is idempotent: when scaffolding already exists for the install
+  // company, the claim does NOT duplicate it (create-if-absent guards).
+  it("re-claim is idempotent: existing scaffolding is not duplicated", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    // Top-level claimed check returns false (no scenario yet — the claim sentinel
+    // is created later in the same tx), but the per-table existence checks report
+    // accounts + departments already present from a prior partial claim.
+    stubIsClaimed(false);
+
+    const { rowsFor } = recordClaimTransaction(
+      new Set(["financialAccounts", "departments"]),
+    );
+
+    const res = await POST(makeRequest({ company_name: "Acme Corp" }));
+    expect(res.status).toBe(201);
+
+    expect(rowsFor("financialAccounts")).toHaveLength(0);
+    expect(rowsFor("departments")).toHaveLength(0);
+    // Scenario + flags absent → still created.
+    expect(rowsFor("scenarios")).toHaveLength(1);
+    expect(rowsFor("aiFeatureFlags")).toHaveLength(1);
+  });
+
+  // A self-host install company that is ALREADY claimed (base scenario exists)
+  // re-submitting → 409 ONBOARDING_ALREADY_COMPLETE, no claim transaction.
+  it("returns 409 when the install company is already claimed", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(true);
+
+    const res = await POST(makeRequest(validBody));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("ONBOARDING_ALREADY_COMPLETE");
+    expect(body.companyId).toBe(INSTALL_COMPANY_ID);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  // CLOUD path: membership exists but it is NOT the install company → that is a
+  // real, already-created company → 409 (unchanged behavior).
+  it("returns 409 for an existing non-install company (cloud re-submit)", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: "cloud-co", role: "owner" });
+
+    const res = await POST(makeRequest(validBody));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("ONBOARDING_ALREADY_COMPLETE");
+    expect(body.companyId).toBe("cloud-co");
+    expect(mockTransaction).not.toHaveBeenCalled();
   });
 });
