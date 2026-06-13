@@ -2,17 +2,22 @@
  * S4b Task 14b — onboarding wizard orchestration flow.
  *
  * The page keeps the website + enriching steps (and the enrich SSE read), then
- * hands off to the wizard (Company → [ai-config] → Revenue → Funding → Expenses →
- * Team).
+ * hands off to the wizard. The ordered steps differ per edition:
+ *  - SELF-HOST: [ai-config] → Company → Revenue → Funding → Expenses → Team
+ *  - CLOUD:     Company → Revenue → Funding → Expenses → Team  (no ai-config)
  *
- * TWO-PHASE order (founder directive): the CONFIGURATION phase (the self-host-only
- * ai-config step) runs BEFORE the DATA phase, and the AI enrich (which produces the
- * revenue/funding/expenses/team suggestions) must run AFTER the provider has been
- * configured so it uses the just-configured provider.
+ * TWO-PHASE order (founder directive — the canonical TARGET WIZARD ORDER): on
+ * self-host the CONFIGURATION phase (the ai-config step) runs FIRST, BEFORE the
+ * DATA phase. The install-company feature makes this valid: a real per-company
+ * row exists from boot, so the provider can be saved before the Company-claim
+ * step. The AI enrich (which produces the company/revenue/funding/expenses/team
+ * suggestions) is DEFERRED to run AFTER the provider is configured, so it uses
+ * the just-configured provider:
  *
- *  - SELF-HOST: website (collect URL, NO enrich yet) → Company → ai-config →
- *    [enrich SSE fires here, once] → Revenue → … . The enrich is deferred until
- *    after the ai-config step's Continue and guarded so Back→Continue does not
+ *  - SELF-HOST: website (collect URL, NO enrich yet) → ai-config →
+ *    [enrich SSE fires here, once] → Company → Revenue → … . The enrich is
+ *    deferred until after the ai-config step's Continue, lands on the Company
+ *    step (config → enrich → company), and is guarded so Back→Continue does not
  *    re-fire it.
  *  - CLOUD: providers are managed, the ai-config step is absent, so enrich keeps
  *    running UPFRONT at the website step exactly as before: website → [enrich] →
@@ -122,6 +127,20 @@ async function fillCompanyAndContinue(name = "Acme Inc.") {
 }
 
 /**
+ * Self-host helper: advance from the ai-config step (the FIRST wizard step) past
+ * the deferred enrich and onto the Company step. Queues an enrich SSE response
+ * (defaults to a bare `done`), clicks the shell Continue, and waits for Company.
+ */
+async function continueFromAiConfigToCompany(events: unknown[] = [{ type: "done" }]) {
+  await screen.findByText("AI Providers");
+  mockApiFetch.mockResolvedValueOnce(sseResponse(events));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+  });
+  await screen.findByRole("heading", { name: /your company/i });
+}
+
+/**
  * A company-POST success Response then the /api/departments fetch Response —
  * the two apiFetch calls CompanyStep + handleCompanyCreated make, in order.
  */
@@ -160,12 +179,13 @@ describe("S4b onboarding wizard flow", () => {
   });
 
   it("C0: there is exactly ONE Continue control (the global shell button) on the Company step", async () => {
-    // Self-host: website submit goes straight to Company (enrich is deferred to
-    // after ai-config), so no enrich mock is needed at the website step.
+    // Self-host: website submit goes to the ai-config step first; advance past it
+    // (deferred enrich fires) to reach the Company step. No company POST is
+    // queued — this test never claims the company.
     renderOnboarding("self_host");
     await submitWebsite();
+    await continueFromAiConfigToCompany();
 
-    await screen.findByRole("heading", { name: /your company/i });
     // No step-owned Continue (#3): only the shell's "Continue →" button exists.
     expect(screen.queryByTestId("company-continue")).not.toBeInTheDocument();
     const continueButtons = screen.getAllByRole("button", { name: /continue/i });
@@ -175,36 +195,35 @@ describe("S4b onboarding wizard flow", () => {
   it("C1: the Company step does NOT render the shell's 'Skip this step' control", async () => {
     renderOnboarding("self_host");
     await submitWebsite();
+    await continueFromAiConfigToCompany();
 
     // Company step is mandatory (it claims/creates the company) — skipping it
     // would jump onward with no company. The shell hides Skip on this step.
-    await screen.findByRole("heading", { name: /your company/i });
     expect(
       screen.queryByRole("button", { name: /skip this step/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("C2: filling the name + clicking the shell Continue creates the company and advances to AI-config then Revenue", async () => {
-    queueCompanyCreate();
-
+  it("C2: filling the name + clicking the shell Continue creates the company and advances to Revenue", async () => {
     renderOnboarding("self_host");
     await submitWebsite();
+    // ai-config → (enrich) → Company.
+    await continueFromAiConfigToCompany();
+    // Now on Company — queue the company POST + departments for the claim.
+    queueCompanyCreate();
     await fillCompanyAndContinue();
 
-    // Self-host: Company → AI-config. Skipping the step bypasses submit() (and
-    // therefore the deferred enrich) and advances straight to Revenue.
-    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /skip this step/i }));
-    });
-
-    // Advanced to Revenue (the Revenue heading is now shown).
+    // Company → Revenue (the step after Company on self-host).
     expect(
       await screen.findByRole("heading", { name: /revenue/i }),
     ).toBeInTheDocument();
   });
 
   it("C3: a 409 ONBOARDING_ALREADY_COMPLETE on company POST advances (onCreated path), not an error", async () => {
+    renderOnboarding("self_host");
+    await submitWebsite();
+    await continueFromAiConfigToCompany();
+
     // company POST → 409 already-complete with companyId.
     mockApiFetch.mockResolvedValueOnce({
       ok: false,
@@ -223,16 +242,7 @@ describe("S4b onboarding wizard flow", () => {
       json: async () => [],
     } as unknown as Response);
 
-    renderOnboarding("self_host");
-    await submitWebsite();
     await fillCompanyAndContinue();
-
-    // Self-host: Company → AI-config. Skip it (bypasses submit/enrich) to reach
-    // Revenue.
-    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /skip this step/i }));
-    });
 
     // Advanced to Revenue — no "Company already exists" error shown.
     expect(
@@ -259,29 +269,22 @@ describe("S4b onboarding wizard flow", () => {
     ).toBeInTheDocument();
   });
 
-  it("S1: self_host — website submit goes straight to Company (no enrich yet); after Company Continue the wizard advances to the AI-config step BEFORE Revenue", async () => {
-    queueCompanyCreate();
-
+  it("S1: self_host — website submit goes straight to the AI-config step (the FIRST wizard step, BEFORE Company); no enrich has fired yet", async () => {
     renderOnboarding("self_host");
     await submitWebsite();
 
-    // No enrich at the website step on self-host — Company renders directly, and
-    // the only apiFetch calls so far are the company POST + departments (made on
-    // Continue), NOT an enrich POST.
-    await screen.findByRole("heading", { name: /your company/i });
+    // No enrich at the website step on self-host (it is deferred to after the
+    // ai-config step) — the AI-config step (AiProvidersManager content) renders
+    // first, BEFORE Company, and no enrich POST has fired.
+    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /your company/i }),
+    ).not.toBeInTheDocument();
     expect(
       mockApiFetch.mock.calls.some((c) =>
         String(c[0]).includes("/api/onboarding/enrich"),
       ),
     ).toBe(false);
-
-    await fillCompanyAndContinue();
-
-    // Lands on the AI-config step (AiProvidersManager content), NOT Revenue yet.
-    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", { name: /revenue/i }),
-    ).not.toBeInTheDocument();
   });
 
   it("S2: cloud — providers are managed, so the AI-config step is absent; enrich runs upfront and Company Continue advances straight to Revenue", async () => {
@@ -319,14 +322,11 @@ describe("S4b onboarding wizard flow", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("E1: self_host — the deferred enrich fires AFTER the AI-config Continue (using the configured provider), and its suggestions reach the Revenue step", async () => {
-    queueCompanyCreate();
-
+  it("E1: self_host — the deferred enrich fires AFTER the AI-config Continue (using the configured provider), lands on the Company step, and its suggestions reach Revenue", async () => {
     renderOnboarding("self_host");
     await submitWebsite();
-    await fillCompanyAndContinue();
 
-    // On the AI-config step. The enrich has NOT fired yet (no enrich POST so far).
+    // On the AI-config step (the first wizard step). The enrich has NOT fired yet.
     expect(await screen.findByText("AI Providers")).toBeInTheDocument();
     expect(
       mockApiFetch.mock.calls.some((c) =>
@@ -335,26 +335,17 @@ describe("S4b onboarding wizard flow", () => {
     ).toBe(false);
 
     // Continue from the AI-config step → the deferred enrich SSE fires once,
-    // streaming a revenue suggestion, then the wizard advances to Revenue.
-    mockApiFetch.mockResolvedValueOnce(
-      sseResponse([
-        {
-          type: "revenue_streams",
-          value: [
-            {
-              name: "Pro Plan",
-              type: "subscription",
-              mrr: 5000,
-              customers: 10,
-            },
-          ],
-        },
-        { type: "done" },
-      ]),
-    );
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    });
+    // streaming a revenue suggestion, then the wizard advances to the Company
+    // step (config → enrich → company).
+    await continueFromAiConfigToCompany([
+      {
+        type: "revenue_streams",
+        value: [
+          { name: "Pro Plan", type: "subscription", mrr: 5000, customers: 10 },
+        ],
+      },
+      { type: "done" },
+    ]);
 
     // The enrich POST fired exactly once.
     const enrichCalls = mockApiFetch.mock.calls.filter((c) =>
@@ -362,28 +353,26 @@ describe("S4b onboarding wizard flow", () => {
     );
     expect(enrichCalls).toHaveLength(1);
 
-    // Reached Revenue, and the AI-enriched suggestion is present there.
+    // Claim the company → advance to Revenue, where the AI-enriched suggestion
+    // (carried through the deferred enrich) is present.
+    queueCompanyCreate();
+    await fillCompanyAndContinue();
     expect(
       await screen.findByRole("heading", { name: /revenue/i }),
     ).toBeInTheDocument();
     expect(await screen.findByText(/pro plan/i)).toBeInTheDocument();
   });
 
-  it("E2: self_host — Back from Revenue to AI-config then Continue does NOT re-fire the enrich (enrichedRef guard)", async () => {
-    queueCompanyCreate();
-
+  it("E2: self_host — Back from Company to AI-config then Continue does NOT re-fire the enrich (enrichedRef guard)", async () => {
     renderOnboarding("self_host");
     await submitWebsite();
-    await fillCompanyAndContinue();
 
     await screen.findByText("AI Providers");
 
-    // First AI-config Continue → enrich fires, advance to Revenue.
-    mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    });
-    await screen.findByRole("heading", { name: /revenue/i });
+    // First AI-config Continue → enrich fires, advance to Company. (No company
+    // POST is queued — this test never claims the company; it only checks the
+    // enrich-guard on returning to ai-config.)
+    await continueFromAiConfigToCompany();
     const firstEnrichCount = mockApiFetch.mock.calls.filter((c) =>
       String(c[0]).includes("/api/onboarding/enrich"),
     ).length;
@@ -395,14 +384,44 @@ describe("S4b onboarding wizard flow", () => {
     });
     await screen.findByText("AI Providers");
 
-    // Continue again → must NOT re-fire enrich (guarded by enrichedRef).
+    // Continue again → must NOT re-fire enrich (guarded by enrichedRef); it just
+    // advances back to Company.
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     });
-    await screen.findByRole("heading", { name: /revenue/i });
+    await screen.findByRole("heading", { name: /your company/i });
     const secondEnrichCount = mockApiFetch.mock.calls.filter((c) =>
       String(c[0]).includes("/api/onboarding/enrich"),
     ).length;
     expect(secondEnrichCount).toBe(1);
+  });
+
+  it("E3: self_host — when the deferred enrich emits agent_failed, retry/manual recovery lands back on the Company step (NOT a stale default), avoiding a re-claim round-trip", async () => {
+    renderOnboarding("self_host");
+    await submitWebsite();
+    await screen.findByText("AI Providers");
+
+    // Continue from ai-config → deferred enrich fires and FAILS. (No company
+    // POST is queued: the failed enrich never reaches the Company-claim step.)
+    mockApiFetch.mockResolvedValueOnce(
+      sseResponse([{ type: "agent_failed", message: "boom", recoverable: true }]),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // The explicit AI-error screen renders.
+    await screen.findByRole("button", { name: /try again/i });
+
+    // "Enter details manually" → recovery lands on the Company step (the
+    // enrich's remembered destination), NOT bounced anywhere else.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /enter details manually/i }),
+      );
+    });
+    expect(
+      await screen.findByRole("heading", { name: /your company/i }),
+    ).toBeInTheDocument();
   });
 });

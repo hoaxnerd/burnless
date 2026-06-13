@@ -13,14 +13,16 @@ import { AiConfigStep } from "./steps/ai-config-step";
  * capability is OFF (self-host, BYO key); on cloud (providers managed) it is
  * hidden, mirroring the Settings → AI manager.
  *
- * NOTE on autofill (two-phase order): on self-host this CONFIGURATION step runs
- * BEFORE the DATA phase, and the AI enrichment that produces the revenue/funding/
+ * NOTE on autofill (two-phase order): on self-host this CONFIGURATION step is the
+ * FIRST wizard step — it runs BEFORE the DATA phase (config → enrich → company →
+ * revenue → …). The AI enrichment that produces the company/revenue/funding/
  * expenses/team suggestions is DEFERRED to run AFTER this step's Continue (page.tsx
- * `handleContinue` → `runEnrich("revenue")`). So the provider configured here is
- * the one that powers the CURRENT session's enrichment — the suggestions ARE
- * AI-enriched same-session with the just-configured provider, not only future
- * sessions. (On cloud there is no ai-config step and enrich runs upfront.) The
- * description below is worded accordingly.
+ * `handleContinue` → `runEnrich("company")`, landing on the Company-claim step). So
+ * the provider configured here is the one that powers the CURRENT session's
+ * enrichment — the suggestions ARE AI-enriched same-session with the just-configured
+ * provider, not only future sessions. (On cloud there is no ai-config step and
+ * enrich runs upfront before the Company step.) The description below is worded
+ * accordingly.
  */
 const TITLE = "Connect your AI";
 const DESCRIPTION =
