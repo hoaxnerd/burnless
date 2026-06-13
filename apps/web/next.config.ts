@@ -9,6 +9,25 @@ const analyze = withBundleAnalyzer({
 const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
+  // [S5 single-binary spike] next-bun-compile adapter, opt-in via BUN_COMPILE=true
+  // so normal dev/prod builds are unaffected. Compiles `next build` output to a
+  // single Bun executable. next-bun-compile requires Turbopack, which (unlike the
+  // webpack `externals` below) cannot resolve the ABSENT optional payment SDKs —
+  // so for this build only we alias them to a runtime-throwing stub. Self-host =
+  // no billing, so these code paths never run; cloud uses the normal webpack build
+  // with the real SDKs, untouched.
+  ...(process.env.BUN_COMPILE === "true"
+    ? {
+        adapterPath: import.meta.resolve("next-bun-compile"),
+        turbopack: {
+          resolveAlias: {
+            razorpay: "./src/lib/payment-sdk-stub.ts",
+            "razorpay/dist/utils/razorpay-utils.js": "./src/lib/payment-sdk-stub.ts",
+            plaid: "./src/lib/payment-sdk-stub.ts",
+          },
+        },
+      }
+    : {}),
   // Standalone output for Docker — bundles server + dependencies into .next/standalone
   output: process.env.NEXT_STANDALONE === "true" ? "standalone" : undefined,
   images: {

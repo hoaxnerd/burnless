@@ -179,6 +179,9 @@ importers:
       happy-dom:
         specifier: ^20.8.4
         version: 20.8.4
+      next-bun-compile:
+        specifier: 0.6.12
+        version: 0.6.12(next@16.2.9(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
@@ -4486,6 +4489,12 @@ packages:
         optional: true
       nodemailer:
         optional: true
+
+  next-bun-compile@0.6.12:
+    resolution: {integrity: sha512-cF4jge2BNsEoAvWhb0FfNPRVrGzDuO81XebzdmGQKyCULqewFjvgn6/d9RJCeOQKtyEc0RT2I9RA5EfPC792Cw==}
+    hasBin: true
+    peerDependencies:
+      next: '>=16.0.0'
 
   next@16.2.9:
     resolution: {integrity: sha512-MEOJiq/UvuezAdqVSceHbqDgZt1kDw2tpGVOlsdIoJsQdbN2JY2hpVG4xnXGkbdJUOEWhnRfiu/O4Hpc9Juwww==}
@@ -10227,6 +10236,10 @@ snapshots:
       '@auth/core': 0.41.0
       next: 16.2.9(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
+
+  next-bun-compile@0.6.12(next@16.2.9(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)):
+    dependencies:
+      next: 16.2.9(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
 
   next@16.2.9(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
