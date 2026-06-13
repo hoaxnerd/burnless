@@ -27,7 +27,9 @@
     "docker:down": "docker compose down",
     "docker:dev": "./scripts/docker-dev.sh",
     "docker:reset": "./scripts/docker-dev.sh --reset",
-    "cron:worker": "npx tsx scripts/cron-worker.ts"
+    "cron:worker": "npx tsx scripts/cron-worker.ts",
+    "build:artifact": "npx tsx scripts/build-artifact.ts",
+    "test:artifact": "bash scripts/artifact/acceptance-matrix.sh"
   },
   "engines": {
     "node": ">=20.9.0"
