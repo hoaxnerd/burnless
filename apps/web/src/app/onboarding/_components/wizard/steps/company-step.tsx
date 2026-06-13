@@ -31,13 +31,20 @@ const DEFAULTS: CompanyValues = {
 };
 
 /**
- * Wizard step 1 — the only step that creates the company. Its `submit()` POSTs
- * the slim `/api/onboarding` (company + base scenario + default accounts +
- * departments) and calls `onCreated(companyId)` so the orchestrator can advance
- * to Revenue. Company name is required: `submit()` returns false (with an inline
- * error) when empty or when the POST errors, and true on success / 409
- * already-complete. The global shell Continue drives `submit()` via a ref — this
- * step renders ONLY the fields, no Continue of its own.
+ * Wizard step 1 — the step that claims/finalizes the company. Its `submit()`
+ * POSTs the slim `/api/onboarding`, which is CREATE-OR-CLAIM: on self-host it
+ * CLAIMS the install-time placeholder company (boot creates a real
+ * companies/company_members row from first boot) by UPDATEing the user-provided
+ * fields + creating the scaffolding boot did not (base scenario + default
+ * accounts + departments + AI flags); on cloud (no install company) it CREATEs
+ * the company from scratch. Either way it calls `onCreated(companyId)` so the
+ * orchestrator can advance. The client contract is identical for both paths —
+ * the endpoint is smart, so this step is unchanged: same body, 201 = success,
+ * 409 ONBOARDING_ALREADY_COMPLETE = success-with-existing-id. Company name is
+ * required: `submit()` returns false (with an inline error) when empty or when
+ * the POST errors, and true on success / 409 already-complete. The global shell
+ * Continue drives `submit()` via a ref — this step renders ONLY the fields, no
+ * Continue of its own.
  * Spec: docs/superpowers/specs/2026-06-12-s4b-onboarding-wizard-design.md §5 (step 1).
  */
 export const CompanyStep = forwardRef<WizardStepHandle, CompanyStepProps>(

@@ -513,8 +513,10 @@ export default function OnboardingPage() {
 
     // The single global Continue drives every step via its submit() (see
     // handleContinue). The company step can't be skipped or gone-back-from (it
-    // creates the company), so hide Back/Skip there — but Continue is always
-    // enabled; the step's submit() gates advancement.
+    // claims/finalizes the company — on self-host it claims the install-time
+    // placeholder company, on cloud it creates one; either way the company must
+    // be finalized before the rest of the wizard), so hide Back/Skip there —
+    // but Continue is always enabled; the step's submit() gates advancement.
     const onCompanyStep = step === "company";
 
     return (
