@@ -14,7 +14,7 @@ export function registerDb(program: Command): void {
         const { driver } = await runMigrate();
         if (ctx.json) process.stdout.write(JSON.stringify({ ok: true, driver }) + "\n");
         else process.stderr.write(`Migrations applied (${driver}).\n`);
-      });
+      }, { allowMissingProfile: true });
     });
 
   db.command("status")
@@ -24,7 +24,7 @@ export function registerDb(program: Command): void {
         const status = await dbStatus();
         if (ctx.json) process.stdout.write(JSON.stringify(status) + "\n");
         else process.stderr.write(`Driver: ${status.driver} — connected: ${status.connected}\n`);
-      });
+      }, { allowMissingProfile: true });
     });
 
   db.command("push")
@@ -35,6 +35,6 @@ export function registerDb(program: Command): void {
           "`db push` is a dev-only convenience (no migration files). " +
             "Use `burnless db migrate` for the shipped artifact, or `pnpm db:push` in the repo.",
         );
-      });
+      }, { allowMissingProfile: true });
     });
 }

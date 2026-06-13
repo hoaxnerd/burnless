@@ -39,8 +39,8 @@ export function createProxyServer(remote: ProxyRemote): Server {
   return server;
 }
 
-export function registerServe(program: Command): void {
-  program
+export function attachServe(parent: Command): void {
+  parent
     .command("serve")
     .description("Run a stdio MCP server proxying the active profile's instance (for stdio-only agents)")
     .action(async (_opts: Record<string, never>, cmd: Command) => {

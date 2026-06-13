@@ -70,11 +70,27 @@ describe("whoami", () => {
   });
 });
 
-describe("admin (reserved, spec C3)", () => {
-  it("errors with coming soon and exits 2", async () => {
-    const { stderr } = await run("admin", "migrate");
-    expect(process.exitCode).toBe(2);
-    expect(stderr).toContain("coming soon");
-    expect(stderr).toContain("pnpm");
+describe("buildProgram", () => {
+  it("registers the P1 local-instance verbs", () => {
+    const program = buildProgram();
+    const names = program.commands.map((c) => c.name());
+    for (const v of ["start", "db", "health", "doctor", "bootstrap", "mcp", "completion"]) {
+      expect(names).toContain(v);
+    }
+  });
+
+  it("nests serve under mcp (not top-level)", () => {
+    const program = buildProgram();
+    const names = program.commands.map((c) => c.name());
+    expect(names).not.toContain("serve");
+    const mcp = program.commands.find((c) => c.name() === "mcp");
+    expect(mcp?.commands.map((c) => c.name())).toEqual(
+      expect.arrayContaining(["serve", "add", "list"]),
+    );
+  });
+
+  it("no longer registers the reserved admin stub", () => {
+    const program = buildProgram();
+    expect(program.commands.map((c) => c.name())).not.toContain("admin");
   });
 });
