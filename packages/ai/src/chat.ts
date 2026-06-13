@@ -23,13 +23,19 @@ import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputR
 
 /** Resolve the provider: use explicit config override if present, else routing. */
 function resolveProvider(options: ChatOptions): LlmProvider | null {
-  if (options.providerConfig?.apiKey) {
-    return createProvider({
-      provider: options.providerConfig.provider,
-      apiKey: options.providerConfig.apiKey,
-      model: options.providerConfig.model,
-      baseUrl: options.providerConfig.baseUrl,
+  const cfg = options.providerConfig;
+  // A resolved providerConfig is only returned by getCompanyProviderConfig when
+  // it is meant to be used — including keyless providers (ollama) where apiKey
+  // is undefined. Use it whenever a usable config is present (apiKey OR provider),
+  // falling back to env-config only if it can't build a provider.
+  if (cfg && (cfg.apiKey || cfg.provider)) {
+    const p = createProvider({
+      provider: cfg.provider,
+      apiKey: cfg.apiKey,
+      model: cfg.model,
+      baseUrl: cfg.baseUrl,
     });
+    if (p) return p;
   }
   return getProviderForFeature(options.feature ?? "chat") ?? getProvider();
 }

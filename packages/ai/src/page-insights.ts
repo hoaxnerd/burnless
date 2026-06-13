@@ -345,9 +345,14 @@ Return ONLY the JSON array, no markdown fences.`;
 export async function generatePageInsights(
   context: PageInsightContext
 ): Promise<PageInsight[]> {
-  const provider = context.providerConfig?.apiKey
-    ? createProvider(context.providerConfig)
-    : getProviderForFeature(FEATURE_KEY);
+  // A resolved providerConfig is only present when it is meant to be used —
+  // including keyless providers (ollama) where apiKey is undefined. Use it
+  // whenever a usable config is present (apiKey OR provider), falling back to
+  // env-config only if it can't build a provider.
+  const cfg = context.providerConfig;
+  const provider =
+    (cfg && (cfg.apiKey || cfg.provider) ? createProvider(cfg) : null) ??
+    getProviderForFeature(FEATURE_KEY);
   if (!provider) {
     return [];
   }

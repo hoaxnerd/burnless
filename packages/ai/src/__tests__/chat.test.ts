@@ -45,6 +45,7 @@ vi.mock("../prompts", () => ({
 
 // Access the mock functions
 const providers = await import("../providers");
+const routing = await import("../routing");
 const mockComplete = (providers as unknown as { __mockComplete: ReturnType<typeof vi.fn> }).__mockComplete;
 const mockStream = (providers as unknown as { __mockStream: ReturnType<typeof vi.fn> }).__mockStream;
 
@@ -174,6 +175,36 @@ describe("chat (non-streaming)", () => {
       model: "gpt-4o",
       baseUrl: undefined,
     });
+  });
+
+  it("uses a keyless (ollama) provider config instead of the env fallback", async () => {
+    // Regression: resolveProvider used to guard on `providerConfig?.apiKey`, so
+    // a keyless ollama config (apiKey undefined) was silently discarded and the
+    // env fallback was used. A resolved config must be honoured whenever present.
+    mockComplete.mockResolvedValueOnce({
+      content: [{ type: "text", text: "ok" }],
+      stopReason: "end_turn",
+    });
+
+    await chat({
+      messages: [{ role: "user", content: "test" }],
+      financialContext: "",
+      providerConfig: {
+        provider: "ollama",
+        baseUrl: "http://localhost:11434/v1",
+        model: "llama3",
+      },
+    });
+
+    expect(providers.createProvider).toHaveBeenCalledWith({
+      provider: "ollama",
+      apiKey: undefined,
+      model: "llama3",
+      baseUrl: "http://localhost:11434/v1",
+    });
+    // The env fallback must NOT have been consulted.
+    expect(routing.getProviderForFeature).not.toHaveBeenCalled();
+    expect(providers.getProvider).not.toHaveBeenCalled();
   });
 });
 

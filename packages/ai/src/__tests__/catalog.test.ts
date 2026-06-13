@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PROVIDER_CATALOG, listCatalogKinds, getCatalogEntry } from "../catalog";
+import { createProvider } from "../providers";
 
 describe("PROVIDER_CATALOG", () => {
   it("has an entry for every supported kind incl. the escape hatch", () => {
@@ -21,5 +22,23 @@ describe("PROVIDER_CATALOG", () => {
     const e = getCatalogEntry("openai-compatible");
     expect(e?.defaultBaseUrl).toBeUndefined();
     expect(e?.custom).toBe(true);
+  });
+});
+
+describe("createProvider × PROVIDER_CATALOG", () => {
+  // Regression: PROVIDER_MAP previously only registered 4 of the 8 catalog
+  // kinds, so a validly-configured google/mistral/groq/openai-compatible
+  // provider hit `PROVIDER_MAP[kind] === undefined` → "Unknown provider" → null
+  // → AI silently degraded. Every catalog kind must build a non-null provider.
+  it("builds a non-null provider for every catalog kind", () => {
+    for (const kind of listCatalogKinds()) {
+      const p = createProvider({
+        provider: kind,
+        apiKey: kind === "ollama" ? undefined : "test-key",
+        model: "test-model",
+        baseUrl: kind === "openai-compatible" ? "https://x/v1" : undefined,
+      });
+      expect(p, `kind ${kind} should build`).not.toBeNull();
+    }
   });
 });

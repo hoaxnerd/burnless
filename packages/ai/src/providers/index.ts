@@ -25,6 +25,10 @@ const PROVIDER_MAP: Record<string, ProviderFactory> = {
   openai: (config) => new AiSdkProvider(buildModel("openai", config), config),
   openrouter: (config) => new AiSdkProvider(buildModel("openrouter", config), config),
   ollama: (config) => new AiSdkProvider(buildModel("ollama", config), config),
+  google: (config) => new AiSdkProvider(buildModel("google", config), config),
+  mistral: (config) => new AiSdkProvider(buildModel("mistral", config), config),
+  groq: (config) => new AiSdkProvider(buildModel("groq", config), config),
+  "openai-compatible": (config) => new AiSdkProvider(buildModel("openai-compatible", config), config),
 };
 
 // ── Default models per provider ─────────────────────────────────────────────
