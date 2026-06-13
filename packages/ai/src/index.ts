@@ -152,6 +152,9 @@ export * from "./schemas/funding";
 // Generative UI (display/input tool sets + form-spec builder + types)
 export * from "./generative-ui";
 
+// Provider catalog (P2 — preset knowledge: base URLs, auth style, discovery, known models)
+export * from "./catalog";
+
 // Permissions (tool categorization + pure resolver)
 export {
   resolvePermission,
