@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -49,6 +50,11 @@ function copyDir(from: string, to: string): void {
   cpSync(from, to, { recursive: true });
 }
 
+function copyFile(from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+}
+
 /**
  * Source dir of an installed package (the dir holding its package.json).
  *
@@ -81,7 +87,8 @@ function pkgDir(name: string): string {
 /** Copy a complete `dist/` from source over every staged copy of that package
  *  (Next's nft copies the JS but not the runtime-URL-loaded WASM/tarball assets). */
 function ensurePgliteAssets(pkgName: string, sentinels: string[]): void {
-  const srcDist = join(pkgDir(pkgName), "dist");
+  const srcRoot = pkgDir(pkgName);
+  const srcDist = join(srcRoot, "dist");
   // Verify the source actually carries the runtime assets before staging.
   for (const sentinel of sentinels) {
     const abs = join(srcDist, sentinel);
@@ -90,8 +97,13 @@ function ensurePgliteAssets(pkgName: string, sentinels: string[]): void {
     }
   }
   // 1. canonical copy for the CLI (resolves by walking up from <root>/cli/).
-  const canonical = join(stageDir, "node_modules", ...pkgName.split("/"), "dist");
+  const canonicalRoot = join(stageDir, "node_modules", ...pkgName.split("/"));
+  const canonical = join(canonicalRoot, "dist");
   copyDir(srcDist, canonical);
+  // The package's package.json carries the `exports`/`main` map — without it Node ESM
+  // resolution of a bare `import "@electric-sql/pglite"` falls back to legacy index.js and
+  // fails (the CLI bundle keeps PGLite external, so it resolves THIS staged package at boot).
+  copyFile(join(srcRoot, "package.json"), join(canonicalRoot, "package.json"));
   // 2. overwrite every traced copy under web/ so the server resolves complete assets.
   const webRoot = join(stageDir, "web");
   for (const dir of findPackageDistDirs(webRoot, pkgName)) copyDir(srcDist, dir);
