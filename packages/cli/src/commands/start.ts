@@ -72,6 +72,38 @@ export function registerStart(program: Command): void {
             }
 
             ensureSecretsKey({ env: process.env });
+
+            // First-run AI setup (spec §4) — interactive, skippable; feeds onboarding's AI.
+            try {
+              const { shouldOfferAiSetup, runFirstRunAiSetup } = await import("../local/first-run-ai");
+              if (!ctx.json && shouldOfferAiSetup({ isTTY: process.stdin.isTTY === true, env: process.env })) {
+                const { createInterface } = await import("node:readline");
+                const { PROVIDER_KINDS } = await import("../local/ai-catalog");
+                const { verifyConnection } = await import("../local/ai-provider-ops");
+                const { readSecret } = await import("../prompt");
+                process.stderr.write("\nConfigure an AI provider for autofill during onboarding? (Enter a number, or blank to skip)\n");
+                PROVIDER_KINDS.forEach((k, i) => process.stderr.write(`  ${i + 1}) ${k}\n`));
+                const chooseKind = async () => {
+                  const rl = createInterface({ input: process.stdin, output: process.stderr });
+                  const answer: string = await new Promise((res) => rl.question("> ", (a) => { rl.close(); res(a.trim()); }));
+                  const idx = Number(answer) - 1;
+                  return Number.isInteger(idx) && idx >= 0 && idx < PROVIDER_KINDS.length ? PROVIDER_KINDS[idx]! : null;
+                };
+                const result = await runFirstRunAiSetup({
+                  chooseKind,
+                  readApiKey: () => readSecret({ label: "API key (input hidden): " }),
+                  verify: verifyConnection,
+                });
+                process.stderr.write(
+                  result.configured
+                    ? "AI provider configured — onboarding will use it.\n\n"
+                    : `Skipped AI setup${result.detail ? ` (${result.detail})` : ""} — onboarding will use manual entry.\n\n`,
+                );
+              }
+            } catch {
+              // best-effort; never block start on the optional AI step
+            }
+
             if (opts.migrate) await runMigrate();
 
             // Loud (non-blocking) warning if exposing an unclaimed instance (S5 P2).
