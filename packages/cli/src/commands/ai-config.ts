@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { runAction } from "../context";
 import { UsageError } from "../errors";
+import { prepareArtifactEnv } from "../local/artifact";
 import { isKnownKind, PROVIDER_KINDS, type ProviderKind } from "../local/ai-catalog";
 import { mAdd, mDefault, mList } from "../local/ai-model-ops";
 import {
@@ -34,6 +35,7 @@ export function registerProvider(program: Command): void {
   provider.command("list").action(async (_opts, cmd: Command) => {
     await runAction(cmd, async (ctx) => {
       assertLocalProfile(ctx.profile.baseUrl);
+      prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
       const rows = await pList();
       if (ctx.json) process.stdout.write(JSON.stringify({ providers: rows }) + "\n");
       else
@@ -55,6 +57,7 @@ export function registerProvider(program: Command): void {
     .action(async (name: string, opts: { kind: string; baseUrl?: string; keyStdin?: boolean; key?: boolean }, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         if (!isKnownKind(opts.kind)) throw new UsageError(`Unknown kind "${opts.kind}" (expected ${PROVIDER_KINDS.join("|")}).`);
         const kind = opts.kind as ProviderKind;
         let apiKey: string | undefined;
@@ -74,6 +77,7 @@ export function registerProvider(program: Command): void {
     .action(async (name: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         const { baseUrl, apiKey } = await resolveProviderForTest(name);
         if (!baseUrl) throw new UsageError(`Provider "${name}" has no base URL to test (vendor providers test from the UI).`);
         const r = await verifyConnection({ baseUrl, apiKey });
@@ -94,6 +98,7 @@ export function registerProvider(program: Command): void {
       .action(async (name: string, _opts, cmd: Command) => {
         await runAction(cmd, async (ctx) => {
           assertLocalProfile(ctx.profile.baseUrl);
+          prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
           await fn(name);
           process.stderr.write(`Provider ${name} ${msg}.\n`);
         }, { allowMissingProfile: true });
@@ -106,6 +111,7 @@ export function registerProvider(program: Command): void {
     .action(async (name: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         const ok = await pRemove(name);
         process.stderr.write(ok ? `Removed provider ${name}.\n` : `No provider named ${name}.\n`);
       }, { allowMissingProfile: true });
@@ -122,6 +128,7 @@ export function registerKey(program: Command): void {
     .action(async (providerName: string, opts: { stdin?: boolean }, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         const apiKey = await readSecret({ stdin: opts.stdin, label: "API key: " });
         if (!apiKey) throw new UsageError("Empty key — aborted.");
         await pSetKey(providerName, apiKey);
@@ -140,6 +147,7 @@ export function registerModel(program: Command): void {
     .action(async (providerName: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         const rows = await mList(providerName);
         if (ctx.json) process.stdout.write(JSON.stringify({ models: rows }) + "\n");
         else for (const m of rows) process.stderr.write(`${m.modelId}${m.isDefault ? " *default" : ""} [${m.source}]\n`);
@@ -153,6 +161,7 @@ export function registerModel(program: Command): void {
     .action(async (providerName: string, modelId: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         await mAdd(providerName, modelId);
         process.stderr.write(`Added model ${modelId} to ${providerName}.\n`);
       }, { allowMissingProfile: true });
@@ -165,6 +174,7 @@ export function registerModel(program: Command): void {
     .action(async (providerName: string, modelId: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
+        prepareArtifactEnv(); // local branch only: inject staged migrations dir for the @burnless/db query — no-op in dev
         await mDefault(providerName, modelId);
         process.stderr.write(`Default model for ${providerName} set to ${modelId}.\n`);
       }, { allowMissingProfile: true });

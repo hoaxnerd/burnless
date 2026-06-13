@@ -1,7 +1,9 @@
 import type { Command } from "commander";
 import { runAction } from "../context";
+import { prepareArtifactEnv } from "../local/artifact";
 import { runMigrate } from "../local/db";
 import { readInstanceEnv } from "../local/home";
+import { assertNodeVersion } from "../local/preflight";
 import { ensureSecretsKey } from "../local/secrets";
 
 export interface BootstrapResult {
@@ -21,6 +23,8 @@ export interface BootstrapResult {
  * Triple-lock idempotency in the primitives makes the repeated boot safe.
  */
 export async function runBootstrap(opts: { home?: string } = {}): Promise<BootstrapResult> {
+  prepareArtifactEnv(); // inject staged artifact paths (migrations dir) — no-op in dev
+  assertNodeVersion(); // hard Node>=20.9.0 gate (installer provisions; this is the backstop)
   const hadKey =
     (process.env.SECRETS_ENCRYPTION_KEY?.trim().length ?? 0) > 0 ||
     (readInstanceEnv(opts.home).SECRETS_ENCRYPTION_KEY?.length ?? 0) > 0;

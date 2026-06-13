@@ -15,12 +15,15 @@ export interface StartServerOptions {
   host: string;
   port: number;
   env: NodeJS.ProcessEnv;
+  /** Node binary to exec the server with (artifact-managed runtime); defaults to this process's Node. */
+  nodeBin?: string;
   spawnFn?: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess;
 }
 
 export function startServer(opts: StartServerOptions): ChildProcess {
   const doSpawn = opts.spawnFn ?? spawn;
-  return doSpawn(process.execPath, [opts.entry], {
+  const nodeBin = opts.nodeBin ?? process.execPath;
+  return doSpawn(nodeBin, [opts.entry], {
     stdio: "inherit",
     env: { ...opts.env, PORT: String(opts.port), HOSTNAME: opts.host },
   });

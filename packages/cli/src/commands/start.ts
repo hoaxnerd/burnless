@@ -3,9 +3,10 @@ import { dim } from "../ansi";
 import { renderBanner } from "../banner";
 import { runAction } from "../context";
 import { UsageError } from "../errors";
+import { prepareArtifactEnv, resolveNodeBinary } from "../local/artifact";
 import { runMigrate } from "../local/db";
 import { loadInstanceEnv } from "../local/home";
-import { doctor } from "../local/preflight";
+import { assertNodeVersion, doctor } from "../local/preflight";
 import { ensureSecretsKey } from "../local/secrets";
 import { resolveServerEntry, startServer } from "../local/server";
 import { versionString } from "../version";
@@ -56,6 +57,8 @@ export function registerStart(program: Command): void {
         await runAction(
           cmd,
           async (ctx) => {
+            prepareArtifactEnv(); // inject staged artifact paths (BURNLESS_SERVER_ENTRY/migrations/vector) — no-op in dev
+            assertNodeVersion(); // hard Node>=20.9.0 gate (installer provisions; this is the backstop)
             loadInstanceEnv(); // source ~/.burnless/instance.env into process.env (config set / AI vars)
             assertExposureAllowed(opts.host, opts.unsafeExpose === true);
             const port = Number(opts.port);
@@ -133,7 +136,13 @@ export function registerStart(program: Command): void {
             }
 
             process.stderr.write(dim(`Starting on http://${displayHost}:${port} …`) + "\n");
-            const child = startServer({ entry, host: opts.host, port, env: process.env });
+            const child = startServer({
+              entry,
+              host: opts.host,
+              port,
+              env: process.env,
+              nodeBin: resolveNodeBinary(),
+            });
             if (opts.open) {
               void import("node:child_process").then(({ exec }) => {
                 const url = `http://${displayHost}:${port}`;
