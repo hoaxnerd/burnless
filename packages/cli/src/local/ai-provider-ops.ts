@@ -36,6 +36,9 @@ export async function resolveLocalCompanyId(): Promise<string> {
   if (!owner) throw new UsageError("No local user yet — run `burnless bootstrap` / `burnless start` first.");
   const membership = await getCompanyForUser(owner.id);
   if (!membership) {
+    // cloud-only / defensive post-install: on self-host the install company is created
+    // at `bootstrap`/`start` boot (createOwnerCompanyIfNone), so this is unreachable
+    // unless the owner manually deleted the company row. Still the normal cloud path.
     throw new UsageError(
       "No company yet — finish onboarding (open the app via `burnless start`) before configuring AI providers.",
     );
