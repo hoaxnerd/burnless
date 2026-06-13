@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createProvider, resetProvider, OpenAIProvider } from "../providers";
+import { createProvider, resetProvider, AiSdkProvider } from "../providers";
 import { chat, chatStream } from "../chat";
 import { generatePageInsights, type PageInsightContext } from "../page-insights";
 import type { StreamChunk } from "../types";
@@ -155,7 +155,8 @@ describe("Ollama Integration Tests", () => {
       });
 
       expect(provider).not.toBeNull();
-      expect(provider).toBeInstanceOf(OpenAIProvider);
+      expect(provider).toBeInstanceOf(AiSdkProvider);
+      expect(provider?.modelId).toBe(MODEL);
     });
 
     it("creates provider without explicit API key", () => {

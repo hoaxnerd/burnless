@@ -15,30 +15,17 @@
 
 import type { LlmProvider } from "./base";
 import type { ProviderConfig, ModelTier } from "./types";
-import { AnthropicProvider } from "./anthropic";
-import { OpenAIProvider } from "./openai";
+import { AiSdkProvider, buildModel } from "./ai-sdk-provider";
 
 // ── Provider registry ───────────────────────────────────────────────────────
 
 type ProviderFactory = (config: ProviderConfig) => LlmProvider;
 
 const PROVIDER_MAP: Record<string, ProviderFactory> = {
-  anthropic: (config) => new AnthropicProvider(config),
-  openai: (config) => new OpenAIProvider(config),
-  // OpenRouter uses the OpenAI-compatible API with a different base URL
-  openrouter: (config) =>
-    new OpenAIProvider({
-      ...config,
-      baseUrl: config.baseUrl ?? "https://openrouter.ai/api/v1",
-    }),
-  // Ollama — local LLM via OpenAI-compatible API (no API key needed)
-  // Default: http://localhost:11434/v1 (Docker: http://ollama:11434/v1)
-  ollama: (config) =>
-    new OpenAIProvider({
-      ...config,
-      apiKey: config.apiKey || "ollama", // Ollama doesn't validate keys
-      baseUrl: config.baseUrl ?? (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1"),
-    }),
+  anthropic: (config) => new AiSdkProvider(buildModel("anthropic", config), config),
+  openai: (config) => new AiSdkProvider(buildModel("openai", config), config),
+  openrouter: (config) => new AiSdkProvider(buildModel("openrouter", config), config),
+  ollama: (config) => new AiSdkProvider(buildModel("ollama", config), config),
 };
 
 // ── Default models per provider ─────────────────────────────────────────────
@@ -218,8 +205,7 @@ export function resetProvider(): void {
 }
 
 // Re-export provider classes for direct use when needed
-export { AnthropicProvider } from "./anthropic";
-export { OpenAIProvider } from "./openai";
+export { AiSdkProvider, buildModel } from "./ai-sdk-provider";
 export { LlmProvider } from "./base";
 export {
   ResilientProvider,

@@ -46,7 +46,7 @@ export {
   resolveModelForTier,
   getFallbackTiers,
   LlmProvider,
-  AnthropicProvider,
+  AiSdkProvider,
 } from "./providers";
 export type {
   ProviderConfig,
