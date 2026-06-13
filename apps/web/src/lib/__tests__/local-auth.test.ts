@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { db, users } from "@burnless/db";
-import { LOCAL_OWNER_EMAIL, ensureLocalUser, getLocalOwner } from "../local-auth";
+import { db, users, companies, companyMembers, LOCAL_OWNER_COMPANY_ID } from "@burnless/db";
+import { LOCAL_OWNER_EMAIL, ensureLocalUser, ensureLocalCompany, getLocalOwner } from "../local-auth";
 
 const ENV = { ...process.env };
 function setEdition(deployment: "self_host" | "cloud") {
@@ -9,6 +9,9 @@ function setEdition(deployment: "self_host" | "cloud") {
 }
 
 beforeEach(async () => {
+  // FK order: members → companies → users.
+  await db.delete(companyMembers);
+  await db.delete(companies);
   await db.delete(users);
   setEdition("self_host");
 });
@@ -44,6 +47,48 @@ describe("ensureLocalUser", () => {
     setEdition("cloud");
     await ensureLocalUser();
     expect(await db.select().from(users)).toHaveLength(0);
+  });
+});
+
+describe("ensureLocalCompany", () => {
+  it("creates the install company + owner membership when autoLogin on + owner exists", async () => {
+    await ensureLocalUser();
+    const owner = await getLocalOwner();
+    await ensureLocalCompany();
+
+    const allCompanies = await db.select().from(companies);
+    expect(allCompanies).toHaveLength(1);
+    expect(allCompanies[0]!.id).toBe(LOCAL_OWNER_COMPANY_ID);
+    expect(allCompanies[0]!.name).toBe("My Company");
+    expect(allCompanies[0]!.ownerId).toBe(owner!.id);
+
+    const members = await db.select().from(companyMembers);
+    expect(members).toHaveLength(1);
+    expect(members[0]!.companyId).toBe(LOCAL_OWNER_COMPANY_ID);
+    expect(members[0]!.userId).toBe(owner!.id);
+    expect(members[0]!.role).toBe("owner");
+  });
+
+  it("is idempotent (second call no-op)", async () => {
+    await ensureLocalUser();
+    await ensureLocalCompany();
+    await ensureLocalCompany();
+    expect(await db.select().from(companies)).toHaveLength(1);
+    expect(await db.select().from(companyMembers)).toHaveLength(1);
+  });
+
+  it("no-ops on cloud (autoLogin off) — never auto-creates a company", async () => {
+    await ensureLocalUser(); // no-op on cloud anyway, but be explicit
+    setEdition("cloud");
+    await ensureLocalCompany();
+    expect(await db.select().from(companies)).toHaveLength(0);
+    expect(await db.select().from(companyMembers)).toHaveLength(0);
+  });
+
+  it("no-ops when no owner user exists (defensive null-owner guard)", async () => {
+    // autoLogin on, but no user — should not throw, should not create a company.
+    await ensureLocalCompany();
+    expect(await db.select().from(companies)).toHaveLength(0);
   });
 });
 

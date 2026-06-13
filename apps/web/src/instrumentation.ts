@@ -14,6 +14,17 @@ export async function register() {
       console.warn("[s4a] ensureLocalUser at boot skipped:", (e as Error).message);
     }
 
+    // First-run: create the claimable install company + owner membership (no-op on
+    // cloud / when any membership already exists). A real per-company row must exist
+    // from boot so the onboarding AI-config step can write encrypted per-company
+    // provider rows. NON-fatal + idempotent — a missed boot self-heals next start.
+    try {
+      const { ensureLocalCompany } = await import("@/lib/local-auth");
+      await ensureLocalCompany();
+    } catch (e) {
+      console.warn("[install-company] ensureLocalCompany at boot skipped:", (e as Error).message);
+    }
+
     // S3a — start the in-process scheduler driver (self_host). No-op under the
     // external driver (cloud / Docker+sidecar). Non-fatal.
     try {
