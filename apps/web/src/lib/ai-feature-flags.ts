@@ -5,7 +5,7 @@
 
 import { db } from "@burnless/db";
 import { aiFeatureFlags, aiUsageLogs } from "@burnless/db";
-import { getDefaultAiProvider, getDecryptedProviderKey, getResolvedDefaultModelId } from "@burnless/db";
+import { getDefaultAiProvider, getResolvedDefaultModelId, decryptSecret } from "@burnless/db";
 import { eq, and, gte, sql } from "drizzle-orm";
 import {
   DEFAULT_AI_FLAGS,
@@ -186,7 +186,7 @@ export async function getCompanyProviderConfig(
   if (provider) {
     let apiKey: string | undefined;
     try {
-      apiKey = (await getDecryptedProviderKey(provider.id, companyId)) ?? undefined;
+      apiKey = provider.apiKeyEncrypted ? decryptSecret(provider.apiKeyEncrypted) : undefined;
     } catch (e) {
       console.warn(`[ai-providers] key decrypt failed for provider ${provider.id}; falling back`, (e as Error).message);
       apiKey = undefined;
@@ -194,6 +194,9 @@ export async function getCompanyProviderConfig(
     const keyless = provider.kind === "ollama" || provider.apiKeyMode === "none";
     if (apiKey || keyless) {
       const model = (await getResolvedDefaultModelId(provider.id)) ?? undefined;
+      if (!model && !keyless) {
+        console.warn(`[ai-providers] provider ${provider.id} (${provider.kind}) has no default model set; falling back to env/default model resolution`);
+      }
       return { provider: provider.kind, apiKey, model, baseUrl: provider.baseUrl ?? undefined };
     }
     // provider exists but no usable key → fall through.
