@@ -114,6 +114,8 @@ export type {
   NewPendingAction,
 } from "./ai-permissions";
 
+export * from "./local-user";
+
 export * from "./mcp";
 
 export * from "./ai-providers";
