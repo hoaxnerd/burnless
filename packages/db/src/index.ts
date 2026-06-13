@@ -10,7 +10,7 @@ import { applyMigrations, shouldAutoMigrate } from "./client/migrate";
 export * from "./schema";
 export { schema };
 export * from "./queries";
-export { encryptSecret, decryptSecret, encryptJson, decryptJson } from "./crypto";
+export { encryptSecret, decryptSecret, encryptJson, decryptJson, __resetSecretsKeyCache } from "./crypto";
 export {
   sha256hex,
   generateSecretToken,
