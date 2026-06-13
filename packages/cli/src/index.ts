@@ -5,6 +5,7 @@ import { renderBanner } from "./banner";
 import { registerBootstrap } from "./commands/bootstrap";
 import { registerCall } from "./commands/call";
 import { registerCompletion } from "./commands/completion";
+import { registerConfig } from "./commands/config";
 import { registerDb } from "./commands/db";
 import { registerDoctor } from "./commands/doctor";
 import { registerHealth } from "./commands/health";
@@ -17,6 +18,7 @@ import { registerStatus } from "./commands/status";
 import { COMMAND_TABLE } from "./commands/table";
 import { registerTableCommands } from "./commands/register-table";
 import { registerTools } from "./commands/tools";
+import { registerUsers } from "./commands/users";
 import { registerWhoami } from "./commands/whoami";
 import { delegateToArtifact, LOCAL_VERBS, resolveRuntimeMode, topVerb } from "./runtime";
 import { versionString } from "./version";
@@ -57,6 +59,8 @@ export function buildProgram(): Command {
   registerHealth(program);
   registerDoctor(program);
   registerBootstrap(program);
+  registerUsers(program);
+  registerConfig(program);
 
   return program;
 }

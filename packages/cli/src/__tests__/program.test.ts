@@ -98,4 +98,19 @@ describe("buildProgram", () => {
     const program = buildProgram();
     expect(program.helpInformation()).toContain("the founder platform");
   });
+
+  it("registers the P2 verbs (users, config)", () => {
+    const program = buildProgram();
+    const names = program.commands.map((c) => c.name());
+    expect(names).toContain("users");
+    expect(names).toContain("config");
+    const users = program.commands.find((c) => c.name() === "users");
+    expect(users?.commands.map((c) => c.name())).toEqual(
+      expect.arrayContaining(["list", "passwd", "create"]),
+    );
+    const config = program.commands.find((c) => c.name() === "config");
+    expect(config?.commands.map((c) => c.name())).toEqual(
+      expect.arrayContaining(["get", "set", "list", "unset"]),
+    );
+  });
 });

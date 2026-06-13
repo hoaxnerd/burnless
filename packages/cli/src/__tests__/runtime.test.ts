@@ -37,4 +37,8 @@ describe("LOCAL_VERBS", () => {
       expect(LOCAL_VERBS.has(v)).toBe(false);
     }
   });
+  it("includes the P2 local-instance verbs", () => {
+    expect(LOCAL_VERBS.has("users")).toBe(true);
+    expect(LOCAL_VERBS.has("config")).toBe(true);
+  });
 });

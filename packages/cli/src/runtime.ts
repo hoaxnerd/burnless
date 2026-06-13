@@ -27,6 +27,8 @@ export const LOCAL_VERBS: ReadonlySet<string> = new Set([
   "health",
   "doctor",
   "bootstrap",
+  "users",
+  "config",
 ]);
 
 /** The first positional token (the verb), skipping node + script + leading flags. */
