@@ -40,6 +40,6 @@ export function resolveProviderSpec(kind: string, config: ProviderConfig): Provi
     config.baseUrl ??
     (kind === "ollama" ? process.env.OLLAMA_BASE_URL ?? OPENAI_COMPAT_BASE_URLS.ollama : OPENAI_COMPAT_BASE_URLS[kind]);
   // Ollama ignores the key but the SDK requires a non-empty one.
-  const apiKey = config.apiKey || (kind === "ollama" ? "ollama" : config.apiKey);
+  const apiKey = kind === "ollama" ? config.apiKey || "ollama" : config.apiKey;
   return { sdk: "openai-compatible", apiKey, baseURL, modelId: config.model, headers };
 }

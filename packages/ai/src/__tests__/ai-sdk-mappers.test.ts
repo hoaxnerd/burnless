@@ -28,4 +28,9 @@ describe("resolveProviderSpec", () => {
     const spec = resolveProviderSpec("openai-compatible", { apiKey: "k", model: "mymodel", baseUrl: "http://localhost:1234/v1", maxTokens: 4096 });
     expect(spec).toMatchObject({ sdk: "openai-compatible", apiKey: "k", baseURL: "http://localhost:1234/v1", modelId: "mymodel" });
   });
+
+  it("yields an openai-compatible spec with undefined baseURL for a truly unknown kind with no baseUrl", () => {
+    const spec = resolveProviderSpec("acme-llm", { apiKey: "k", model: "acme-1", maxTokens: 4096 });
+    expect(spec).toMatchObject({ sdk: "openai-compatible", apiKey: "k", baseURL: undefined, modelId: "acme-1" });
+  });
 });
