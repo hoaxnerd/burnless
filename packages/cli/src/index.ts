@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { setColorOverride } from "./ansi";
 import { renderBanner } from "./banner";
+import { registerKey, registerModel, registerProvider } from "./commands/ai-config";
 import { registerBootstrap } from "./commands/bootstrap";
 import { registerCall } from "./commands/call";
 import { registerCompletion } from "./commands/completion";
@@ -61,6 +62,9 @@ export function buildProgram(): Command {
   registerBootstrap(program);
   registerUsers(program);
   registerConfig(program);
+  registerProvider(program);
+  registerKey(program);
+  registerModel(program);
 
   return program;
 }

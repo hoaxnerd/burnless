@@ -113,4 +113,18 @@ describe("buildProgram", () => {
       expect.arrayContaining(["get", "set", "list", "unset"]),
     );
   });
+
+  it("registers the P3 verbs (provider, key, model)", () => {
+    const program = buildProgram();
+    const names = program.commands.map((c) => c.name());
+    expect(names).toContain("provider");
+    expect(names).toContain("key");
+    expect(names).toContain("model");
+    const provider = program.commands.find((c) => c.name() === "provider");
+    expect(provider?.commands.map((c) => c.name())).toEqual(
+      expect.arrayContaining(["list", "add", "test", "enable", "disable", "remove", "default"]),
+    );
+    const model = program.commands.find((c) => c.name() === "model");
+    expect(model?.commands.map((c) => c.name())).toEqual(expect.arrayContaining(["list", "add", "default"]));
+  });
 });

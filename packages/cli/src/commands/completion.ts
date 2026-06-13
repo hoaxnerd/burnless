@@ -3,7 +3,7 @@ import { runAction } from "../context";
 import { UsageError } from "../errors";
 
 const VERBS = [
-  "start", "db", "health", "doctor", "bootstrap", "users", "config", "login", "logout", "whoami",
+  "start", "db", "health", "doctor", "bootstrap", "users", "config", "provider", "key", "model", "login", "logout", "whoami",
   "status", "tools", "profiles", "call", "mcp", "completion",
 ];
 

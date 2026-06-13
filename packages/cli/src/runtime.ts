@@ -29,6 +29,9 @@ export const LOCAL_VERBS: ReadonlySet<string> = new Set([
   "bootstrap",
   "users",
   "config",
+  "provider",
+  "key",
+  "model",
 ]);
 
 /** The first positional token (the verb), skipping node + script + leading flags. */

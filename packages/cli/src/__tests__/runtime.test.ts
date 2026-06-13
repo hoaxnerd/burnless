@@ -41,4 +41,9 @@ describe("LOCAL_VERBS", () => {
     expect(LOCAL_VERBS.has("users")).toBe(true);
     expect(LOCAL_VERBS.has("config")).toBe(true);
   });
+  it("includes the P3 provider verbs", () => {
+    expect(LOCAL_VERBS.has("provider")).toBe(true);
+    expect(LOCAL_VERBS.has("key")).toBe(true);
+    expect(LOCAL_VERBS.has("model")).toBe(true);
+  });
 });
