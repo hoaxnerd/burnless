@@ -69,8 +69,10 @@ export async function deleteAiProvider(id: string, companyId: string): Promise<b
 export async function setDefaultAiProvider(id: string, companyId: string): Promise<boolean> {
   const target = await getAiProvider(id, companyId);
   if (!target) return false;
-  await db.update(aiProviders).set({ isDefault: false }).where(eq(aiProviders.companyId, companyId));
-  await db.update(aiProviders).set({ isDefault: true }).where(and(eq(aiProviders.id, id), eq(aiProviders.companyId, companyId)));
+  await db.transaction(async (tx) => {
+    await tx.update(aiProviders).set({ isDefault: false }).where(eq(aiProviders.companyId, companyId));
+    await tx.update(aiProviders).set({ isDefault: true }).where(and(eq(aiProviders.id, id), eq(aiProviders.companyId, companyId)));
+  });
   return true;
 }
 export async function getDefaultAiProvider(companyId: string): Promise<typeof aiProviders.$inferSelect | null> {
@@ -109,8 +111,10 @@ export async function addAiProviderModel(providerId: string, data: {
 export async function setDefaultAiProviderModel(modelId: string, providerId: string): Promise<boolean> {
   const [target] = await db.select({ id: aiProviderModels.id }).from(aiProviderModels).where(and(eq(aiProviderModels.id, modelId), eq(aiProviderModels.providerId, providerId))).limit(1);
   if (!target) return false;
-  await db.update(aiProviderModels).set({ isDefault: false }).where(eq(aiProviderModels.providerId, providerId));
-  await db.update(aiProviderModels).set({ isDefault: true }).where(and(eq(aiProviderModels.id, modelId), eq(aiProviderModels.providerId, providerId)));
+  await db.transaction(async (tx) => {
+    await tx.update(aiProviderModels).set({ isDefault: false }).where(eq(aiProviderModels.providerId, providerId));
+    await tx.update(aiProviderModels).set({ isDefault: true }).where(and(eq(aiProviderModels.id, modelId), eq(aiProviderModels.providerId, providerId)));
+  });
   return true;
 }
 export async function getResolvedDefaultModelId(providerId: string): Promise<string | null> {
