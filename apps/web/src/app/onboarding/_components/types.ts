@@ -3,6 +3,7 @@ export type OnboardingStep =
   | "enriching"
   | "ai-error"
   | "company"
+  | "ai-config"
   | "revenue"
   | "funding"
   | "expenses"
