@@ -234,6 +234,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@burnless/db':
+        specifier: workspace:*
+        version: link:../db
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
