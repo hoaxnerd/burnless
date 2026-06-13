@@ -47,6 +47,7 @@ export function registerStart(program: Command): void {
           async (ctx) => {
             assertExposureAllowed(opts.host, opts.unsafeExpose === true);
             const port = Number(opts.port);
+            const displayHost = opts.host.includes(":") ? `[${opts.host}]` : opts.host;
 
             if (!ctx.json) process.stderr.write(renderBanner(versionString()) + "\n");
 
@@ -70,11 +71,11 @@ export function registerStart(program: Command): void {
               );
             }
 
-            process.stderr.write(dim(`Starting on http://${opts.host}:${port} …`) + "\n");
+            process.stderr.write(dim(`Starting on http://${displayHost}:${port} …`) + "\n");
             const child = startServer({ entry, host: opts.host, port, env: process.env });
             if (opts.open) {
               void import("node:child_process").then(({ exec }) => {
-                const url = `http://${opts.host}:${port}`;
+                const url = `http://${displayHost}:${port}`;
                 const opener =
                   process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
                 exec(`${opener} ${url}`);

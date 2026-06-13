@@ -4,6 +4,12 @@
  * fat-artifact. The fat-artifact runs everything natively. Mode is decided per
  * invocation from env (the thin npm entry sets BURNLESS_RUNTIME=thin at build).
  */
+import { existsSync } from "node:fs";
+import os from "node:os";
+import { join } from "node:path";
+import { spawn, type SpawnOptions } from "node:child_process";
+import { UsageError } from "./errors";
+
 export type RuntimeMode = "fat" | "thin";
 
 /** Fat unless explicitly thin — dev + the artifact both run local verbs in-process. */
@@ -30,12 +36,6 @@ export function topVerb(argv: string[]): string | undefined {
   }
   return undefined;
 }
-
-import { existsSync } from "node:fs";
-import os from "node:os";
-import { join } from "node:path";
-import { spawn, type SpawnOptions } from "node:child_process";
-import { UsageError } from "./errors";
 
 /** Where the downloaded fat-artifact binary lives (download lands in P5). */
 export function resolveArtifactPath(

@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { setColorOverride } from "./ansi";
+import { renderBanner } from "./banner";
 import { registerBootstrap } from "./commands/bootstrap";
 import { registerCall } from "./commands/call";
 import { registerCompletion } from "./commands/completion";
@@ -35,6 +36,8 @@ export function buildProgram(): Command {
       const opts = thisCommand.optsWithGlobals<{ color?: boolean }>();
       if (opts.color === false) setColorOverride(false);
     });
+
+  program.addHelpText("beforeAll", () => renderBanner(versionString()));
 
   // Remote-client + simple verbs (thin-npm native)
   registerLogin(program);
@@ -77,6 +80,12 @@ if (isMain) {
     program.exitOverride((err) => {
       process.exit(err.exitCode === 0 ? 0 : 2);
     });
+    const verbForBare = topVerb(process.argv);
+    const wantsVersion = process.argv.includes("-V") || process.argv.includes("--version");
+    if (verbForBare === undefined && !wantsVersion) {
+      program.outputHelp();
+      process.exit(0);
+    }
     await program.parseAsync(process.argv);
   }
 }

@@ -93,4 +93,9 @@ describe("buildProgram", () => {
     const program = buildProgram();
     expect(program.commands.map((c) => c.name())).not.toContain("admin");
   });
+
+  it("includes the banner tagline in help output", () => {
+    const program = buildProgram();
+    expect(program.helpInformation()).toContain("the founder platform");
+  });
 });
