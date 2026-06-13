@@ -7,7 +7,7 @@ import { prepareArtifactEnv, resolveNodeBinary } from "../local/artifact";
 import { runMigrate } from "../local/db";
 import { loadInstanceEnv } from "../local/home";
 import { assertNodeVersion, doctor } from "../local/preflight";
-import { ensureSecretsKey } from "../local/secrets";
+import { ensureAuthSecret, ensureSecretsKey } from "../local/secrets";
 import { resolveServerEntry, startServer } from "../local/server";
 import { versionString } from "../version";
 
@@ -75,6 +75,7 @@ export function registerStart(program: Command): void {
             }
 
             ensureSecretsKey({ env: process.env });
+            ensureAuthSecret({ env: process.env });
 
             // First-run AI setup (spec §4) — interactive, skippable; feeds onboarding's AI.
             try {

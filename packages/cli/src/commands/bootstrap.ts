@@ -4,7 +4,7 @@ import { prepareArtifactEnv } from "../local/artifact";
 import { runMigrate } from "../local/db";
 import { readInstanceEnv } from "../local/home";
 import { assertNodeVersion } from "../local/preflight";
-import { ensureSecretsKey } from "../local/secrets";
+import { ensureAuthSecret, ensureSecretsKey } from "../local/secrets";
 
 export interface BootstrapResult {
   driver: "postgres" | "pglite";
@@ -29,6 +29,7 @@ export async function runBootstrap(opts: { home?: string } = {}): Promise<Bootst
     (process.env.SECRETS_ENCRYPTION_KEY?.trim().length ?? 0) > 0 ||
     (readInstanceEnv(opts.home).SECRETS_ENCRYPTION_KEY?.length ?? 0) > 0;
   ensureSecretsKey({ home: opts.home, env: process.env });
+  ensureAuthSecret({ home: opts.home, env: process.env });
   const { driver } = await runMigrate();
 
   // Self-host only: create the claimable owner user + install company (boot-parity).
