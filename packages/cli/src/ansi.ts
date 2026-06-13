@@ -1,14 +1,25 @@
 /**
- * Inline ANSI helpers — deliberately no chalk/ora dependency (spec C1: deps kept minimal).
- * Colors auto-disable when stdout is not a TTY or NO_COLOR is set, so piped/JSON
- * output and test assertions always see plain strings.
+ * Inline ANSI helpers — no chalk/ora dependency (spec C1). Color is decided PER CALL so
+ * a `--no-color` flag (or NO_COLOR env) parsed after import still takes effect:
+ *   override (set by the --no-color global) > NO_COLOR env off > TTY auto.
  */
-const enabled = process.stdout.isTTY === true && process.env.NO_COLOR === undefined;
+let override: boolean | undefined;
+
+/** Force color on/off; undefined restores auto-detect. Set by the --no-color global. */
+export function setColorOverride(value: boolean | undefined): void {
+  override = value;
+}
+
+function colorEnabled(): boolean {
+  if (override !== undefined) return override;
+  if (process.env.NO_COLOR !== undefined) return false;
+  return process.stdout.isTTY === true;
+}
 
 const wrap =
   (open: string, close: string) =>
   (s: string): string =>
-    enabled ? `[${open}m${s}[${close}m` : s;
+    colorEnabled() ? `\x1b[${open}m${s}\x1b[${close}m` : s;
 
 export const bold = wrap("1", "22");
 export const dim = wrap("2", "22");
