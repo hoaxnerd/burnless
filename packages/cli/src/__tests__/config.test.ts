@@ -7,6 +7,7 @@ import {
   configPath,
   getProfile,
   loadConfig,
+  isProfileExplicit,
   resolveProfileName,
   saveConfig,
   type Profile,
@@ -62,6 +63,12 @@ describe("config store", () => {
     expect(resolveProfileName(config, "flagged", { BURNLESS_PROFILE: "from-env" })).toBe("flagged");
     expect(resolveProfileName(config, undefined, { BURNLESS_PROFILE: "from-env" })).toBe("from-env");
     expect(resolveProfileName(config, undefined, {})).toBe("local");
+  });
+
+  it("isProfileExplicit: true for a --profile flag or BURNLESS_PROFILE env, false otherwise", () => {
+    expect(isProfileExplicit("flagged", {})).toBe(true);
+    expect(isProfileExplicit(undefined, { BURNLESS_PROFILE: "from-env" })).toBe(true);
+    expect(isProfileExplicit(undefined, {})).toBe(false);
   });
 
   it("getProfile throws UsageError (exit 2) for an unknown profile", () => {

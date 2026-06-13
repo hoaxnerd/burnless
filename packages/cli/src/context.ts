@@ -7,6 +7,7 @@
 import type { Command } from "commander";
 import {
   getProfile,
+  isProfileExplicit,
   loadConfig,
   resolveProfileName,
   saveConfig,
@@ -33,15 +34,33 @@ export interface CliContext {
 }
 
 export interface BuildContextOptions {
-  /** `login --url` may target a brand-new profile name — allow it to not exist yet. */
+  /**
+   * Local-instance verbs run against the localhost instance before any profile is
+   * persisted. This lets the IMPLICIT default profile fall back to a localhost stub
+   * when it isn't in config yet. It does NOT cover an EXPLICIT `--profile X` /
+   * `BURNLESS_PROFILE=X` that names an unknown profile — that is a user error and
+   * surfaces "Unknown profile" (Bug B). For login's create-a-new-named-profile flow,
+   * use `allowNewProfile` instead.
+   */
   allowMissingProfile?: boolean;
+  /**
+   * `login --url` may target a brand-new profile name (including an explicit
+   * `--profile X` that does not exist yet) — allow ANY profile to be missing and
+   * substitute the localhost stub so login can create it.
+   */
+  allowNewProfile?: boolean;
   homeDir?: string;
 }
 
 export function buildContext(globalOpts: GlobalOpts, opts: BuildContextOptions = {}): CliContext {
   const config = loadConfig(opts.homeDir);
   const profileName = resolveProfileName(config, globalOpts.profile);
-  const profile = opts.allowMissingProfile
+  // The localhost fallback applies when (a) login is creating a new named profile, or
+  // (b) a local verb resolved to the IMPLICIT default. An EXPLICIT `--profile X` that
+  // names an unknown profile is never substituted — it surfaces "Unknown profile" (Bug B).
+  const explicit = isProfileExplicit(globalOpts.profile);
+  const mayFallBack = opts.allowNewProfile === true || (opts.allowMissingProfile === true && !explicit);
+  const profile = mayFallBack
     ? (config.profiles[profileName] ?? { baseUrl: "http://localhost:3000", authMode: "pat" as const })
     : getProfile(config, profileName);
   return {

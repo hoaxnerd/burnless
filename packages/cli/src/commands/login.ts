@@ -87,7 +87,7 @@ export function registerLogin(program: Command): void {
             `Logged in to ${baseUrl} as profile "${ctx.profileName}" (${toolCount} tools available).\n`
           );
         },
-        { allowMissingProfile: true } // login may create a brand-new profile
+        { allowNewProfile: true } // login may create a brand-new (explicitly named) profile
       );
     });
 }

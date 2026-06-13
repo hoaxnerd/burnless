@@ -109,6 +109,19 @@ export function resolveProfileName(
   return flagProfile ?? env.BURNLESS_PROFILE ?? config.defaultProfile;
 }
 
+/**
+ * Was the profile name picked explicitly (a `--profile` flag or `BURNLESS_PROFILE`
+ * env), or did it fall through to the configured default? Drives whether a missing
+ * profile may be silently substituted with the localhost fallback (only the
+ * IMPLICIT default may — an explicit unknown name is a user error). See buildContext.
+ */
+export function isProfileExplicit(
+  flagProfile?: string,
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return flagProfile !== undefined || env.BURNLESS_PROFILE !== undefined;
+}
+
 export function getProfile(config: CliConfig, name: string): Profile {
   const profile = config.profiles[name];
   if (!profile) {

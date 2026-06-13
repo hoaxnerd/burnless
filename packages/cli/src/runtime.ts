@@ -34,10 +34,23 @@ export const LOCAL_VERBS: ReadonlySet<string> = new Set([
   "model",
 ]);
 
+/**
+ * Global flags that CONSUME the next argv token as their value. A value placed
+ * before the verb (e.g. `--profile work provider list`) must NOT be mistaken for
+ * the verb. The `--flag=value` form is self-contained, so it never reaches here.
+ * `--json` and `--no-color` are booleans and consume nothing.
+ */
+const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set(["--profile"]);
+
 /** The first positional token (the verb), skipping node + script + leading flags. */
 export function topVerb(argv: string[]): string | undefined {
-  for (const tok of argv.slice(2)) {
+  const tokens = argv.slice(2);
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok === undefined) continue;
     if (!tok.startsWith("-")) return tok;
+    // A value-taking flag in its split `--profile name` form swallows the next token.
+    if (VALUE_TAKING_GLOBALS.has(tok)) i++;
   }
   return undefined;
 }

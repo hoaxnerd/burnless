@@ -24,6 +24,18 @@ describe("topVerb", () => {
   it("is undefined for a bare invocation", () => {
     expect(topVerb(["node", "burnless"])).toBeUndefined();
   });
+  it("skips the value of --profile <name> before the verb", () => {
+    expect(topVerb(["node", "burnless", "--profile", "work", "provider", "list"])).toBe("provider");
+  });
+  it("handles the self-contained --profile=name form", () => {
+    expect(topVerb(["node", "burnless", "--profile=work", "db", "migrate"])).toBe("db");
+  });
+  it("preserves boolean-flag behavior (--json / --no-color)", () => {
+    expect(topVerb(["node", "burnless", "--json", "--no-color", "start"])).toBe("start");
+  });
+  it("skips --profile value even amid other booleans", () => {
+    expect(topVerb(["node", "burnless", "--json", "--profile", "work", "health"])).toBe("health");
+  });
 });
 
 describe("LOCAL_VERBS", () => {
