@@ -104,7 +104,7 @@ export async function addAiProviderModel(providerId: string, data: {
   }).onConflictDoUpdate({
     target: [aiProviderModels.providerId, aiProviderModels.modelId],
     set: { displayName: data.displayName ?? null, contextWindow: data.contextWindow ?? null, maxOutputTokens: data.maxOutputTokens ?? null,
-      supportsTools: data.supportsTools ?? null, supportsImages: data.supportsImages ?? null, source: data.source },
+      supportsTools: data.supportsTools ?? null, supportsImages: data.supportsImages ?? null },
   }).returning();
   return row!;
 }
