@@ -4,9 +4,10 @@ import { pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { Extension } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
-import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+// NOTE: the two drivers (drizzle-orm/postgres-js + `postgres`, and drizzle-orm/pglite)
+// are LAZY-loaded per branch below — never both. This keeps the unused driver out of
+// the boot path: the self-host single binary in PGLite mode must not require the `postgres`
+// pg driver (it isn't embedded), and cloud need not load PGLite's WASM. (S5 derisk.)
 import * as schema from "../schema";
 import type { ResolvedDriver } from "./resolve";
 import type { Dialect } from "./migrate";
@@ -56,6 +57,8 @@ function pgliteVectorExtension(): Extension {
 /** Build the Drizzle client for the resolved driver. See spec §4. */
 export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> {
   if (resolved.driver === "postgres") {
+    const { drizzle: drizzlePostgres } = await import("drizzle-orm/postgres-js");
+    const { default: postgres } = await import("postgres");
     const client = postgres(resolved.connectionString, { max: 10 });
     return {
       db: drizzlePostgres(client, { schema }),
@@ -66,6 +69,7 @@ export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> 
   }
 
   mkdirSync(resolved.dataDir, { recursive: true });
+  const { drizzle: drizzlePglite } = await import("drizzle-orm/pglite");
   const pglite = await PGlite.create(resolved.dataDir, {
     extensions: { vector: pgliteVectorExtension() },
   });

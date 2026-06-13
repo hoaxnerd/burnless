@@ -24,6 +24,20 @@ const nextConfig: NextConfig = {
             razorpay: "./src/lib/payment-sdk-stub.ts",
             "razorpay/dist/utils/razorpay-utils.js": "./src/lib/payment-sdk-stub.ts",
             plaid: "./src/lib/payment-sdk-stub.ts",
+            // Sentry/OpenTelemetry = cloud-ops telemetry; excluded from the self-host
+            // binary (next-bun-compile eagerly evals @opentelemetry/api which crashes
+            // under bun-compile, and it's the biggest reducible chunk). Cloud keeps
+            // Sentry via the normal webpack build. See telemetry-stub.ts.
+            "@sentry/nextjs": "./src/lib/telemetry-stub.cjs",
+            "@sentry/node": "./src/lib/telemetry-stub.cjs",
+            "@opentelemetry/api": "./src/lib/telemetry-stub.cjs",
+            // next-bun-compile EAGER-EVALUATES every embedded external at boot, so
+            // drizzle-orm/postgres-js's internal `require("postgres")` fires even in
+            // PGLite mode. The single binary is the PGLite-primary self-host artifact;
+            // stub the pg driver so boot doesn't require it. (Real BYO-Postgres on the
+            // binary = embed `postgres` — separate follow-up; cloud uses postgres via
+            // the normal build, untouched.) Universal no-op Proxy reused.
+            postgres: "./src/lib/telemetry-stub.cjs",
           },
         },
       }
