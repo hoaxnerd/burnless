@@ -11,10 +11,12 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
+    "@ai-sdk/anthropic": "^3.0.0",
+    "@ai-sdk/openai": "^3.0.0",
+    "@ai-sdk/openai-compatible": "^2.0.0",
+    "ai": "^6.0.0",
     "@burnless/engine": "workspace:*",
     "@burnless/types": "workspace:*",
-    "openai": "^4.104.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
