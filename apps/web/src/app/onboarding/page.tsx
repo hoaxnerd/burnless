@@ -25,7 +25,7 @@ import { RevenueStep } from "./_components/wizard/steps/revenue-step";
 import { FundingStep } from "./_components/wizard/steps/funding-step";
 import { ExpensesStep } from "./_components/wizard/steps/expenses-step";
 import { TeamStep } from "./_components/wizard/steps/team-step";
-import { AiConfigStep } from "./_components/wizard/steps/ai-config-step";
+import { aiConfigDescriptor } from "./_components/wizard/ai-config-descriptor";
 import type { WizardStepHandle } from "./_components/wizard/types";
 import {
   toRevenueSuggestions,
@@ -49,21 +49,37 @@ type WizardStepId =
 export default function OnboardingPage() {
   const router = useRouter();
   const caps = useCapabilities();
-  // AI-provider config is self-host only — on cloud, providers are MANAGED, so
-  // the configuration step is hidden/skipped (mirrors the Settings → AI manager,
-  // gated the same way: ai-features-tab.tsx line ~77 `!caps.managedAiProvider`).
-  const showAiConfig = !caps.managedAiProvider;
+  // The ai-config step is the single `kind: "configuration"` item, sourced from
+  // ONE declarative descriptor (ai-config-descriptor.tsx). The wizard READS the
+  // descriptor — its gate, stepper label and render all derive from it, so the
+  // config-item seam is load-bearing (a future unified config engine lifts this
+  // instance). Gate: the step is shown only when its `hiddenWhenCapability` is
+  // OFF. For AI config that cap is "managedAiProvider" — OFF on self-host (BYO
+  // key), ON on cloud (providers managed → step hidden, mirroring Settings → AI
+  // manager, gated the same way: ai-features-tab.tsx `!caps.managedAiProvider`).
+  const showAiConfig = !caps[aiConfigDescriptor.hiddenWhenCapability!];
 
   // The wizard's ordered step list (ids + stepper labels), derived per-edition.
   // The "ai-config" step sits AFTER Company (company-first: the company row must
   // exist before a provider can be saved) and BEFORE Revenue (the first
   // AI-enriched data step). advance()/goBack() index off this list, so both
-  // editions stay correct without special-casing.
+  // editions stay correct without special-casing. The ai-config label is read
+  // from the descriptor title (not an inline literal).
+  //
+  // Same-session autofill caveat: AI enrichment that produces the revenue/funding/
+  // expenses/team suggestions runs UPFRONT at the website step (`runEnrich`),
+  // before the company exists and before this step. A provider configured here
+  // powers AI features going forward (chat, insights, a later session / re-run) —
+  // it does NOT retroactively re-feed the CURRENT session's already-streamed
+  // suggestions. See ai-config-descriptor.tsx for the full note.
   const WIZARD_STEP_META = useMemo<{ id: WizardStepId; label: string }[]>(
     () => [
       { id: "company", label: "Company" },
       ...(showAiConfig
-        ? ([{ id: "ai-config", label: "AI" }] as { id: WizardStepId; label: string }[])
+        ? ([{ id: aiConfigDescriptor.id, label: aiConfigDescriptor.title }] as {
+            id: WizardStepId;
+            label: string;
+          }[])
         : []),
       { id: "revenue", label: "Revenue" },
       { id: "funding", label: "Funding" },
@@ -398,10 +414,12 @@ export default function OnboardingPage() {
             />
           );
         case "ai-config":
-          // Self-host only (page gates inclusion on !caps.managedAiProvider).
-          // Optional config step — reuses the P3 AiProvidersManager verbatim;
-          // its submit() is a pass-through (modal Save already POSTed).
-          return <AiConfigStep ref={stepRef} />;
+          // Dispatch render through the descriptor (single source — the gate,
+          // stepper label and panel all read from aiConfigDescriptor). The step
+          // is included only when showAiConfig is true (self-host), so this case
+          // is unreachable on cloud. Optional config step — reuses the P3
+          // AiProvidersManager verbatim; its submit() is a pass-through.
+          return aiConfigDescriptor.render(stepRef);
         case "revenue":
           return (
             <RevenueStep

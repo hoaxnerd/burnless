@@ -17,20 +17,24 @@ import type { WizardStepHandle } from "../../types";
 describe("AiConfigStep", () => {
   it("renders the AiProvidersManager content + empty state", () => {
     const ref = createRef<WizardStepHandle>();
-    const { queryByText } = render(<AiConfigStep ref={ref} />);
+    const { queryByText } = render(
+      <AiConfigStep ref={ref} title="Connect your AI" description="d" />,
+    );
     expect(queryByText("AI Providers")).toBeInTheDocument();
     expect(queryByText("No AI provider connected")).toBeInTheDocument();
   });
 
   it("renders the step heading", () => {
     const ref = createRef<WizardStepHandle>();
-    const { queryByText } = render(<AiConfigStep ref={ref} />);
+    const { queryByText } = render(
+      <AiConfigStep ref={ref} title="Connect your AI" description="d" />,
+    );
     expect(queryByText(/connect your ai/i)).toBeInTheDocument();
   });
 
   it("submit() resolves true even with zero providers (optional step)", async () => {
     const ref = createRef<WizardStepHandle>();
-    render(<AiConfigStep ref={ref} />);
+    render(<AiConfigStep ref={ref} title="Connect your AI" description="d" />);
     expect(ref.current).not.toBeNull();
     const ok = await ref.current!.submit();
     expect(ok).toBe(true);
