@@ -1,11 +1,10 @@
 import type { Command } from "commander";
-import { getDecryptedProviderKey } from "@burnless/db";
 import { runAction } from "../context";
 import { UsageError } from "../errors";
 import { isKnownKind, PROVIDER_KINDS, type ProviderKind } from "../local/ai-catalog";
 import { mAdd, mDefault, mList } from "../local/ai-model-ops";
 import {
-  pAdd, pDisable, pEnable, pList, pRemove, pSetDefault, pSetKey, resolveProviderId, verifyConnection,
+  pAdd, pDisable, pEnable, pList, pRemove, pSetDefault, pSetKey, resolveProviderForTest, verifyConnection,
 } from "../local/ai-provider-ops";
 import { readSecret } from "../prompt";
 
@@ -75,9 +74,8 @@ export function registerProvider(program: Command): void {
     .action(async (name: string, _opts, cmd: Command) => {
       await runAction(cmd, async (ctx) => {
         assertLocalProfile(ctx.profile.baseUrl);
-        const { id, companyId, baseUrl } = await resolveProviderId(name);
+        const { baseUrl, apiKey } = await resolveProviderForTest(name);
         if (!baseUrl) throw new UsageError(`Provider "${name}" has no base URL to test (vendor providers test from the UI).`);
-        const apiKey = await getDecryptedProviderKey(id, companyId);
         const r = await verifyConnection({ baseUrl, apiKey });
         if (ctx.json) process.stdout.write(JSON.stringify(r) + "\n");
         else process.stderr.write(`${r.ok ? "OK" : "FAILED"}: ${r.detail}\n`);

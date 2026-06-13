@@ -6,7 +6,7 @@ import {
   __resetSecretsKeyCache, closeDatabase, companies, companyMembers, createOwnerUserIfNone, db, getOwnerUser, initDatabase,
 } from "@burnless/db";
 import {
-  pAdd, pDisable, pEnable, pList, pRemove, pSetDefault, pSetKey, resolveLocalCompanyId,
+  pAdd, pDisable, pEnable, pList, pRemove, resolveLocalCompanyId, resolveProviderForTest, pSetDefault, pSetKey,
 } from "../local/ai-provider-ops";
 
 let dataDir: string;
@@ -65,5 +65,14 @@ describe("provider CRUD (local, direct)", () => {
 
   it("throws a clear error for an unknown provider name", async () => {
     await expect(pSetKey("ghost", "k")).rejects.toThrow(/ghost/i);
+  });
+});
+
+describe("resolveProviderForTest", () => {
+  it("returns the provider's baseUrl + decrypted key in one session (no closed-DB crash)", async () => {
+    await pAdd({ name: "OR", kind: "openrouter", baseUrl: "https://openrouter.ai/api/v1", apiKey: "sk-secret" });
+    const r = await resolveProviderForTest("OR");
+    expect(r.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(r.apiKey).toBe("sk-secret"); // decrypted, same session — would throw if DB were closed mid-way
   });
 });

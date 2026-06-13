@@ -9,6 +9,7 @@ import {
   createAiProvider,
   deleteAiProvider,
   getCompanyForUser,
+  getDecryptedProviderKey,
   getOwnerUser,
   initDatabase,
   isDatabaseBooted,
@@ -103,6 +104,15 @@ export async function resolveProviderId(name: string): Promise<{ id: string; com
   return withCompany(async (companyId) => {
     const p = await findByName(companyId, name);
     return { id: p.id, companyId, baseUrl: p.baseUrl };
+  });
+}
+
+/** Resolve a provider name → its baseUrl + DECRYPTED key, all in ONE db session (for `provider test`). */
+export async function resolveProviderForTest(name: string): Promise<{ id: string; companyId: string; baseUrl: string | null; apiKey: string | null }> {
+  return withCompany(async (companyId) => {
+    const p = await findByName(companyId, name);
+    const apiKey = await getDecryptedProviderKey(p.id, companyId);
+    return { id: p.id, companyId, baseUrl: p.baseUrl, apiKey };
   });
 }
 
