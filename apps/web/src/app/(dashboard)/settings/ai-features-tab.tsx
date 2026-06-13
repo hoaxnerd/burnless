@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Power, Database, Sparkles, Pencil, Key } from "lucide-react";
+import { Power, Database, Sparkles, Pencil } from "lucide-react";
 import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
 import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
-import { ProviderSection } from "./ai-provider-section";
+import { AiProvidersManager } from "./ai-providers/ai-providers-manager";
 import { Input } from "@/components/ui";
 import { useCapabilities } from "@/components/providers/capability-context";
 
@@ -21,7 +21,7 @@ const DATA_MODES: { value: AiDataMode; label: string; desc: string }[] = [
   { value: "hide_all", label: "Hide All", desc: "Hide all AI-generated content entirely" },
 ];
 
-export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: AiFeaturesTabProps) {
+export function AiFeaturesTab({ flags, updateFlags, credits }: AiFeaturesTabProps) {
   // Task 12: credits are a billing concept — hide the block when billing is off.
   const caps = useCapabilities();
   return (
@@ -73,53 +73,8 @@ export function AiFeaturesTab({ flags, updateFlags, credits, providerConfig }: A
         />
       )}
 
-      {/* BYOK Toggle + AI Provider Selector */}
-      {flags.masterEnabled && (
-        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6 sm:p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-9 w-9 rounded-lg bg-surface-100 flex items-center justify-center">
-                <Key className="h-[18px] w-[18px] text-surface-600" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-surface-900">
-                  Bring Your Own Key
-                </h2>
-                <p className="text-sm text-surface-500 mt-0.5">
-                  {providerConfig.byokEnabled
-                    ? "Using your own AI provider credentials"
-                    : "Using platform-provided AI — no setup needed"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() =>
-                updateFlags({ byokEnabled: !providerConfig.byokEnabled })
-              }
-              className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
-                providerConfig.byokEnabled
-                  ? "bg-brand-600"
-                  : "bg-surface-300"
-              }`}
-              role="switch"
-              aria-checked={providerConfig.byokEnabled}
-            >
-              <span
-                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  providerConfig.byokEnabled ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-
-          {providerConfig.byokEnabled && (
-            <ProviderSection
-              providerConfig={providerConfig}
-              updateFlags={updateFlags}
-            />
-          )}
-        </div>
-      )}
+      {/* AI Providers manager (#49 P3) — self-host only; cloud uses managed keys. */}
+      {flags.masterEnabled && !caps.managedAiProvider && <AiProvidersManager />}
 
       {/* Level 3: Data Retention Mode */}
       {flags.masterEnabled && (
