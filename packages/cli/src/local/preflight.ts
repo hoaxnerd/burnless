@@ -4,7 +4,26 @@
  */
 import { createServer } from "node:net";
 import { resolveDriver } from "@burnless/db";
+import { UsageError } from "../errors";
 import { readInstanceEnv } from "./home";
+
+const MIN_NODE = [20, 9, 0] as const;
+
+/** Hard-fail if the running Node is below the engines floor (20.9.0). The installer
+ *  (P5) provisions/guides a suitable Node; this is the artifact-side backstop. */
+export function assertNodeVersion(version: string = process.versions.node): void {
+  const parts = version.split(".").map((n) => Number.parseInt(n, 10));
+  const [maj = 0, min = 0, pat = 0] = parts;
+  const ok =
+    maj > MIN_NODE[0] ||
+    (maj === MIN_NODE[0] && (min > MIN_NODE[1] || (min === MIN_NODE[1] && pat >= MIN_NODE[2])));
+  if (!ok) {
+    throw new UsageError(
+      `burnless needs Node >= ${MIN_NODE.join(".")} but found ${version}.\n` +
+        `Upgrade Node (e.g. via your version manager) and re-run.`,
+    );
+  }
+}
 
 export interface CheckResult {
   name: string;
