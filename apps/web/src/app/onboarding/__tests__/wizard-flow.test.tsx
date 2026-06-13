@@ -14,6 +14,7 @@
  * `body.getReader()` yields `data: {...}\n\n` chunks then closes.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ReactElement } from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
 const { mockApiFetch, mockPush } = vi.hoisted(() => ({
@@ -35,8 +36,31 @@ vi.mock("@/components/locale/locale-context", () => ({
     fmtCompact: (n: number) => `$${n}`,
   }),
 }));
+// The self-host AI-config step renders AiProvidersManager, which self-fetches via
+// SWR. Mock the hooks so the empty state renders without network — same pattern
+// as ai-config-step.test.tsx / ai-providers-gating.test.tsx.
+vi.mock("@/lib/swr", async (o) => ({
+  ...(await o<typeof import("@/lib/swr")>()),
+  useAiProviders: () => ({ data: { providers: [] }, isLoading: false }),
+  useAiProviderModels: () => ({ data: { models: [] }, isLoading: false }),
+}));
 
 import OnboardingPage from "../page";
+import { CapabilityProvider } from "@/components/providers/capability-context";
+import { EDITION_PRESETS } from "@/lib/capabilities";
+
+/**
+ * OnboardingPage reads useCapabilities() to decide whether the self-host-only
+ * AI-config step is in the wizard, so every render must be wrapped in a
+ * CapabilityProvider. Default is self_host (the edition that shows the step).
+ */
+function renderOnboarding(edition: "self_host" | "cloud" = "self_host") {
+  return render(
+    <CapabilityProvider value={EDITION_PRESETS[edition]}>
+      <OnboardingPage />
+    </CapabilityProvider> as ReactElement,
+  );
+}
 
 /**
  * Build a Response-like object whose body streams the given SSE events
@@ -80,7 +104,7 @@ describe("S4b onboarding wizard flow", () => {
   it("(a) enrich `done` → renders the wizard Company step (fields), not the review surface", async () => {
     mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     // The company step renders its fields under the shell; navigation is driven
@@ -96,7 +120,7 @@ describe("S4b onboarding wizard flow", () => {
   it("C0: there is exactly ONE Continue control (the global shell button) on the Company step", async () => {
     mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     await screen.findByRole("heading", { name: /your company/i });
@@ -109,7 +133,7 @@ describe("S4b onboarding wizard flow", () => {
   it("C1: the Company step does NOT render the shell's 'Skip this step' control", async () => {
     mockApiFetch.mockResolvedValue(sseResponse([{ type: "done" }]));
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     // Company step is mandatory (it creates the company) — skipping it would
@@ -136,7 +160,7 @@ describe("S4b onboarding wizard flow", () => {
       json: async () => [],
     } as unknown as Response);
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     await screen.findByRole("heading", { name: /your company/i });
@@ -146,6 +170,14 @@ describe("S4b onboarding wizard flow", () => {
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // Self-host: Company → AI-config (optional). Skip it to reach Revenue. The
+    // AI step's submit() does NOT POST, so the apiFetch sequence is unchanged
+    // (company POST then departments fetch).
+    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this step/i }));
     });
 
     // Advanced to Revenue (the Revenue heading is now shown).
@@ -175,7 +207,7 @@ describe("S4b onboarding wizard flow", () => {
       json: async () => [],
     } as unknown as Response);
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     await screen.findByRole("heading", { name: /your company/i });
@@ -185,6 +217,12 @@ describe("S4b onboarding wizard flow", () => {
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // Self-host: Company → AI-config (optional). Skip it to reach Revenue.
+    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this step/i }));
     });
 
     // Advanced to Revenue (stepper highlights Revenue) — no "Company already exists" error shown.
@@ -201,7 +239,7 @@ describe("S4b onboarding wizard flow", () => {
       sseResponse([{ type: "agent_failed", message: "boom", recoverable: true }]),
     );
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     expect(
@@ -212,6 +250,82 @@ describe("S4b onboarding wizard flow", () => {
     ).toBeInTheDocument();
   });
 
+  it("S1: self_host — after Company Continue the wizard advances to the AI-config step BEFORE Revenue; Skip on AI advances to Revenue", async () => {
+    // enrich stream → Company.
+    mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
+    // company POST → success.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ companyId: "company-xyz" }),
+    } as unknown as Response);
+    // departments fetch.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as unknown as Response);
+
+    renderOnboarding("self_host");
+    await submitWebsite();
+
+    await screen.findByRole("heading", { name: /your company/i });
+    fireEvent.change(screen.getByLabelText(/company name/i), {
+      target: { value: "Acme Inc." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // Lands on the AI-config step (AiProvidersManager content), NOT Revenue yet.
+    expect(await screen.findByText("AI Providers")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /revenue/i }),
+    ).not.toBeInTheDocument();
+
+    // Skip the optional AI step → Revenue.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this step/i }));
+    });
+    expect(
+      await screen.findByRole("heading", { name: /revenue/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("S2: cloud — providers are managed, so the AI-config step is absent; Company Continue advances straight to Revenue", async () => {
+    // enrich stream → Company.
+    mockApiFetch.mockResolvedValueOnce(sseResponse([{ type: "done" }]));
+    // company POST → success.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ companyId: "company-xyz" }),
+    } as unknown as Response);
+    // departments fetch.
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as unknown as Response);
+
+    renderOnboarding("cloud");
+    await submitWebsite();
+
+    await screen.findByRole("heading", { name: /your company/i });
+    fireEvent.change(screen.getByLabelText(/company name/i), {
+      target: { value: "Acme Inc." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    });
+
+    // Straight to Revenue — no AI-config step on cloud.
+    expect(
+      await screen.findByRole("heading", { name: /revenue/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("AI Providers")).not.toBeInTheDocument();
+  });
+
   it("(c) enrich `!ok` (no provider) → renders the wizard Company step, no error card", async () => {
     mockApiFetch.mockResolvedValue({
       ok: false,
@@ -219,7 +333,7 @@ describe("S4b onboarding wizard flow", () => {
       json: async () => ({ error: "AI onboarding is disabled" }),
     } as unknown as Response);
 
-    render(<OnboardingPage />);
+    renderOnboarding();
     await submitWebsite();
 
     expect(

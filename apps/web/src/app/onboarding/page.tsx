@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
+import { useCapabilities } from "@/components/providers/capability-context";
 
 import type {
   OnboardingStep,
@@ -24,6 +25,7 @@ import { RevenueStep } from "./_components/wizard/steps/revenue-step";
 import { FundingStep } from "./_components/wizard/steps/funding-step";
 import { ExpensesStep } from "./_components/wizard/steps/expenses-step";
 import { TeamStep } from "./_components/wizard/steps/team-step";
+import { AiConfigStep } from "./_components/wizard/steps/ai-config-step";
 import type { WizardStepHandle } from "./_components/wizard/types";
 import {
   toRevenueSuggestions,
@@ -32,26 +34,52 @@ import {
   toHeadcountSuggestions,
 } from "./_components/wizard/suggestion-mappers";
 
-// The wizard's ordered step ids (the steps the WizardShell renders).
-const WIZARD_STEPS = ["company", "revenue", "funding", "expenses", "team"] as const;
-type WizardStepId = (typeof WIZARD_STEPS)[number];
-
-const WIZARD_STEP_META: { id: WizardStepId; label: string }[] = [
-  { id: "company", label: "Company" },
-  { id: "revenue", label: "Revenue" },
-  { id: "funding", label: "Funding" },
-  { id: "expenses", label: "Expenses" },
-  { id: "team", label: "Team" },
-];
-
-function isWizardStep(step: OnboardingStep): step is WizardStepId {
-  return (WIZARD_STEPS as readonly string[]).includes(step);
-}
+// The wizard's possible step ids. The actual ordered list is built per-edition
+// in the component (the "ai-config" step is self-host only) — see WIZARD_STEP_META.
+type WizardStepId =
+  | "company"
+  | "ai-config"
+  | "revenue"
+  | "funding"
+  | "expenses"
+  | "team";
 
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const caps = useCapabilities();
+  // AI-provider config is self-host only — on cloud, providers are MANAGED, so
+  // the configuration step is hidden/skipped (mirrors the Settings → AI manager,
+  // gated the same way: ai-features-tab.tsx line ~77 `!caps.managedAiProvider`).
+  const showAiConfig = !caps.managedAiProvider;
+
+  // The wizard's ordered step list (ids + stepper labels), derived per-edition.
+  // The "ai-config" step sits AFTER Company (company-first: the company row must
+  // exist before a provider can be saved) and BEFORE Revenue (the first
+  // AI-enriched data step). advance()/goBack() index off this list, so both
+  // editions stay correct without special-casing.
+  const WIZARD_STEP_META = useMemo<{ id: WizardStepId; label: string }[]>(
+    () => [
+      { id: "company", label: "Company" },
+      ...(showAiConfig
+        ? ([{ id: "ai-config", label: "AI" }] as { id: WizardStepId; label: string }[])
+        : []),
+      { id: "revenue", label: "Revenue" },
+      { id: "funding", label: "Funding" },
+      { id: "expenses", label: "Expenses" },
+      { id: "team", label: "Team" },
+    ],
+    [showAiConfig],
+  );
+  const WIZARD_STEPS = useMemo(
+    () => WIZARD_STEP_META.map((s) => s.id),
+    [WIZARD_STEP_META],
+  );
+  const lastStepId = WIZARD_STEPS[WIZARD_STEPS.length - 1];
+  const isWizardStep = (s: OnboardingStep): s is WizardStepId =>
+    (WIZARD_STEPS as string[]).includes(s);
+
   const [step, setStep] = useState<OnboardingStep>("website");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [greeting, setGreeting] = useState("");
@@ -369,6 +397,11 @@ export default function OnboardingPage() {
               onCreated={(id) => void handleCompanyCreated(id)}
             />
           );
+        case "ai-config":
+          // Self-host only (page gates inclusion on !caps.managedAiProvider).
+          // Optional config step — reuses the P3 AiProvidersManager verbatim;
+          // its submit() is a pass-through (modal Save already POSTed).
+          return <AiConfigStep ref={stepRef} />;
         case "revenue":
           return (
             <RevenueStep
@@ -424,7 +457,7 @@ export default function OnboardingPage() {
         steps={WIZARD_STEP_META}
         activeId={step}
         canContinue={true}
-        isLast={step === "team"}
+        isLast={step === lastStepId}
         onBack={goBack}
         onSkip={advance}
         onContinue={handleContinue}
