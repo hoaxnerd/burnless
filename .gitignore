@@ -46,8 +46,9 @@ agents/*/screenshots/
 agents/*/lighthouse-results/
 agents/*/smoke-test/
 
-# Claude Code
-.claude/
+# Claude Code — ignore per-user state, but TRACK shared project skills
+.claude/*
+!.claude/skills/
 
 # Playwright MCP
 .playwright-mcp/
