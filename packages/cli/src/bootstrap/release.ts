@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configDir } from "../config";
 
-// TODO(S6 Phase B): confirm the public <org>/burnless repo when the public repo is created.
+// TODO: confirm the public <org>/burnless repo once the public repo is created.
 export const PUBLIC_RELEASE_REPO = "burnless/burnless";
 
 /**

@@ -1,8 +1,8 @@
-# Triggered only when a maintainer pushes a `v*` tag (S6 R6 — publish is founder-gated).
+# Triggered only when a maintainer pushes a `v*` tag. Publishing is a deliberate manual step.
 # Does nothing otherwise. Builds the fat-artifact, attests build provenance, and creates a
-# DRAFT GitHub Release with the tarball + checksums attached. A human reviews and publishes
+# DRAFT GitHub Release with the tarball + checksums attached. A maintainer reviews and publishes
 # the draft — that published release is what `burnless.ai/latest` and install.sh read from.
-# TODO(S6 Phase B): confirm the public <org>/burnless repo when the public repo is created.
+# NOTE: set the public <org>/burnless repo references below once the repository exists.
 name: release
 
 on:

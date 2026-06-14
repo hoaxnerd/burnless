@@ -12,7 +12,7 @@
 #   BURNLESS_VERSION           pin a specific version (skips latest-resolution).
 #   BURNLESS_HOME              install root override (default ~/.burnless via $HOME)
 #   --with-node                provision a pinned Node into ~/.burnless/runtime if system Node is inadequate
-# TODO(S6 Phase B): confirm the public <org>/burnless repo + burnless.ai routes once live.
+# NOTE: set the public <org>/burnless repo + burnless.ai routes once the repository is live.
 set -eu
 
 MIN_NODE_MAJOR=20; MIN_NODE_MINOR=9

@@ -22,9 +22,9 @@ because the fat-artifact is far too large to stream through a Worker.
 The installer verifies the tarball's sha256 **before** unpacking, so direct-from-GitHub download
 is safe.
 
-## Deploy (founder, Phase B)
+## Deploy
 
-This Worker is **committed here but deployed by the founder** once the public repo + `burnless.ai`
+This Worker is **committed here but deployed by a maintainer** once the public repo + `burnless.ai`
 DNS are live.
 
 ```sh
@@ -39,7 +39,7 @@ Then map the routes to the Worker in the Cloudflare dashboard (or `wrangler.toml
 - `burnless.ai/latest`
 
 Before deploying, set the `ORG`/`REPO` constants at the top of `worker.js` to the final public
-GitHub org/repo (see the `TODO(S6 Phase B)` comment). The default is `burnless/burnless`.
+GitHub org/repo (see the `TODO` comment). The default is `burnless/burnless`.
 
 ## Not in scope here
 

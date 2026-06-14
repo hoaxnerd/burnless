@@ -13,11 +13,12 @@
  * (https://github.com/<org>/burnless/releases/download/v<ver>/burnless-<ver>.tar.gz),
  * because they are too large to stream through the Worker.
  *
- * Deployed by the founder in Phase B (see README.md). The landing page is hosted separately
- * on Cloudflare Pages (task #25) — this Worker only owns the /install + /latest routes.
+ * Deployed by a maintainer once the public repo + burnless.ai DNS are live (see README.md).
+ * The landing page is hosted separately on Cloudflare Pages — this Worker only owns the
+ * /install + /latest routes.
  */
 
-// TODO(S6 Phase B): set ORG to the final public GitHub org when the public repo is created.
+// TODO: set ORG to the final public GitHub org once the public repo is created.
 const ORG = "burnless";
 const REPO = "burnless";
 const INSTALL_RAW = `https://raw.githubusercontent.com/${ORG}/${REPO}/main/scripts/install.sh`;
