@@ -11,6 +11,7 @@ export function requiredArtifactPaths(): string[] {
   return [
     ARTIFACT_MARKER,
     "manifest.json",
+    ARTIFACT_LAYOUT.launcher,
     ARTIFACT_LAYOUT.cliEntry,
     ARTIFACT_LAYOUT.serverEntry,
     `${ARTIFACT_LAYOUT.migrationsDir}/meta/_journal.json`,

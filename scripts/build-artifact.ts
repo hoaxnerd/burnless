@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   copyFileSync,
   cpSync,
   existsSync,
@@ -27,6 +28,7 @@ import {
   ARTIFACT_MARKER,
 } from "../packages/cli/src/local/artifact-layout";
 import { buildManifest } from "../packages/cli/src/build/manifest";
+import { renderLauncherScript } from "../packages/cli/src/build/launcher";
 import { verifyArtifact } from "../packages/cli/src/build/required-files";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,7 +184,12 @@ async function main(): Promise<void> {
   ensurePgliteAssets("@electric-sql/pglite", ["pglite.wasm", "pglite.data"]);
   ensurePgliteAssets("@electric-sql/pglite-pgvector", ["vector.tar.gz"]);
 
-  // 6. Marker + manifest.
+  // 6. Launcher at the artifact root → what bin/burnless + versions/current exec (S5 P5).
+  const launcherPath = join(stageDir, ARTIFACT_LAYOUT.launcher);
+  writeFileSync(launcherPath, renderLauncherScript(), { mode: 0o755 });
+  chmodSync(launcherPath, 0o755); // explicit chmod so the mode sticks across umask.
+
+  // 7. Marker + manifest.
   const builtAt = new Date().toISOString();
   writeFileSync(
     join(stageDir, ARTIFACT_MARKER),

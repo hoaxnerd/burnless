@@ -19,6 +19,8 @@ export const ARTIFACT_LAYOUT = {
   vectorBundle: "node_modules/@electric-sql/pglite-pgvector/dist/vector.tar.gz",
   /** Optional launcher-managed Node the installer (P5) may stage; else system Node. */
   managedNode: "runtime/bin/node",
+  /** POSIX launcher at the artifact root → what bin/burnless + delegateToArtifact exec. */
+  launcher: "burnless",
 } as const;
 
 export type ArtifactLayout = typeof ARTIFACT_LAYOUT;
