@@ -104,6 +104,14 @@ up_host() {
   export BURNLESS_DATA_DIR="$RUN/data"
   export BURNLESS_CONFIG_DIR="$RUN/config"
   export BURNLESS_DEPLOYMENT="self_host"
+  # The standalone artifact runs NODE_ENV=production, where the CSRF origin allowlist
+  # (apps/web/src/proxy.ts getAllowedOrigins) is NOT relaxed for loopback — with no
+  # allowlist configured every browser mutation (e.g. POST /api/ai-features/providers
+  # in the UI cred-path) is 403'd. Point the allowlist at the served origin so the
+  # browser E2E can mutate. (Real self-host operators set NEXT_PUBLIC_APP_URL; here the
+  # served origin IS the loopback BASE_URL.)
+  export NEXT_PUBLIC_APP_URL="$BASE_URL"
+  export ALLOWED_ORIGINS="$BASE_URL"
 
   echo "== bootstrap + 2a read-check =="
   node "$CLI" bootstrap
@@ -162,6 +170,7 @@ up_docker() {
   docker run -d --name "$CONTAINER" --platform "$platform" \
     -p "127.0.0.1:$HOSTPORT:$HOSTPORT" \
     -e BURNLESS_DEPLOYMENT=self_host -e "BURNLESS_CRED_PATH=$CRED_PATH" -e "PORTV=$HOSTPORT" \
+    -e "NEXT_PUBLIC_APP_URL=$BASE_URL" -e "ALLOWED_ORIGINS=$BASE_URL" \
     ${KEYENV[@]+"${KEYENV[@]}"} \
     -v "$REPO/$TARBALL:/burnless.tgz:ro" \
     node:22-slim bash -c '
