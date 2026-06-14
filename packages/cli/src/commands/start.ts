@@ -29,6 +29,41 @@ export function assertExposureAllowed(host: string, unsafeExpose: boolean): void
   );
 }
 
+/**
+ * Default the CSRF origin allowlist to the bind origin on a loopback start (S5 P4 11a).
+ *
+ * The standalone artifact runs NODE_ENV=production, where the CSRF origin allowlist
+ * (`apps/web/src/proxy.ts` getAllowedOrigins) is built ONLY from NEXT_PUBLIC_APP_URL +
+ * ALLOWED_ORIGINS and is NOT relaxed for loopback. With neither var set, the allowlist is
+ * empty → every browser mutation 403s. So a real `burnless start` on http://127.0.0.1:2876
+ * with no env would be broken out-of-the-box.
+ *
+ * CRITICAL: `NEXT_PUBLIC_APP_URL` is a `NEXT_PUBLIC_*` var — Next INLINES it at BUILD time,
+ * so setting it at runtime does NOT reach the compiled middleware (verified: the built
+ * `middleware.js` contains no `process.env.NEXT_PUBLIC_APP_URL` reference). The
+ * runtime-effective allowlist var is `ALLOWED_ORIGINS` (read live in the bundle). So the
+ * load-bearing default is ALLOWED_ORIGINS; we also set NEXT_PUBLIC_APP_URL for the routes
+ * that DO read it at runtime (OAuth AS issuer / PRM resource derive from it).
+ *
+ * Only fires for loopback binds. Non-loopback binds are NOT auto-set — the operator must
+ * supply their real public origin (exposure already requires --unsafe-expose). Each var is
+ * set only when unset/empty (explicit values always win).
+ *
+ * Returns the bind origin to use, or null to leave env untouched.
+ */
+export function defaultAppUrlForLoopback(
+  host: string,
+  port: number,
+  env: NodeJS.ProcessEnv,
+): string | null {
+  // Only meaningful for loopback (non-loopback operators set their own origin).
+  if (!LOOPBACK.has(host)) return null;
+  // If either allowlist source is already set, the operator has configured CSRF — defer.
+  if (env.NEXT_PUBLIC_APP_URL?.trim() || env.ALLOWED_ORIGINS?.trim()) return null;
+  const displayHost = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  return `http://${displayHost}:${port}`;
+}
+
 /** A loud warning (not a hard block) when exposing a non-loopback host with an unclaimed owner. */
 export function exposeWarning(host: string, ownerClaimed: boolean): string {
   if (LOOPBACK.has(host) || ownerClaimed) return "";
@@ -76,6 +111,18 @@ export function registerStart(program: Command): void {
 
             ensureSecretsKey({ env: process.env });
             ensureAuthSecret({ env: process.env });
+
+            // OOTB CSRF correctness (S5 P4 11a): on a loopback bind with no allowlist set,
+            // default the bind origin BEFORE spawning so the server inherits a non-empty CSRF
+            // origin allowlist (else every browser mutation 403s). ALLOWED_ORIGINS is the
+            // runtime-effective var (NEXT_PUBLIC_APP_URL is build-time-inlined → no runtime
+            // effect on middleware); we set both — ALLOWED_ORIGINS for CSRF, the public-app-url
+            // for the runtime OAuth issuer/PRM routes that read it live.
+            const appUrl = defaultAppUrlForLoopback(opts.host, port, process.env);
+            if (appUrl) {
+              process.env.ALLOWED_ORIGINS = appUrl;
+              process.env.NEXT_PUBLIC_APP_URL = appUrl;
+            }
 
             // First-run AI setup (spec §4) — interactive, skippable; feeds onboarding's AI.
             try {
