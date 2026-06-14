@@ -24,6 +24,7 @@ LATEST_URL="https://burnless.ai/latest"
 
 BASE="${BURNLESS_INSTALL_BASE_URL:-}"
 VER="${BURNLESS_VERSION:-}"
+VER="${VER#v}"   # accept a leading-v tag form (v0.1.0) — asset names use the bare semver
 HOME_DIR="${BURNLESS_HOME:-$HOME/.burnless}"
 
 say() { printf '%s\n' "$*"; }
