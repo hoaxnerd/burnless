@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "burnless": "./dist/index.js"
+    "burnless": "./dist/index.thin.js"
   },
   "files": [
     "dist"
