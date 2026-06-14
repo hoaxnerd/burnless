@@ -122,6 +122,12 @@ const ALLOWED = [
   // Same rationale as the AI-prompt-template / page-context allowlist entries.
   "packages/ai/src/tools-genui.ts",
 
+  // ── CLI launcher: POSIX shell, not currency ──────────────────────────────
+  // launcher.ts renders a POSIX sh launcher script as string literals; `$0` and
+  // `"$0"` are the shell positional parameter (the script's own path), not a
+  // currency amount. The `$<value>` guard regex matches them as false positives.
+  "packages/cli/src/build/launcher.ts",
+
   // ── DB schema / seed: comments only ─────────────────────────────────────
   // schema.ts: "// $50 default" comments on integer columns.
   "packages/db/src/schema.ts",
