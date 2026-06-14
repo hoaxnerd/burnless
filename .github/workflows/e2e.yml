@@ -1,0 +1,86 @@
+name: E2E (manual)
+
+# E2E is NOT part of CI — the full Playwright suite runs ~1 hour. Trigger this
+# manually from the Actions tab (or `gh workflow run e2e.yml --ref <branch>`); it
+# runs against whatever branch/ref you select. Optionally pass a --grep filter to
+# run a subset.
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: "Optional Playwright --grep filter (blank = full suite, ~1h)"
+        required: false
+        default: ""
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10.26.1"
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/burnless_test"
+      NEXTAUTH_SECRET: "ci-e2e-stub-secret-not-real"
+      NEXTAUTH_URL: "http://localhost:3000"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: burnless_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @burnless/web exec playwright install --with-deps chromium
+
+      - name: Push database schema
+        run: pnpm db:push
+
+      # Playwright's default webServer (pnpm build && pnpm start) builds + serves
+      # the app; do NOT set BASE_URL so it manages the server itself.
+      - name: Run E2E tests
+        env:
+          CI: "true"
+        run: |
+          if [ -n "${{ inputs.grep }}" ]; then
+            pnpm --filter @burnless/web test:e2e -- --grep "${{ inputs.grep }}"
+          else
+            pnpm --filter @burnless/web test:e2e
+          fi
+
+      - name: Upload E2E results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            apps/web/e2e/test-results
+            apps/web/playwright-report
+          retention-days: 7
