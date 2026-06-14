@@ -55,12 +55,42 @@ describe("resolveNodeBinary", () => {
     const env: NodeJS.ProcessEnv = { BURNLESS_NODE: "/opt/node/bin/node" };
     expect(resolveNodeBinary({ env, entryUrl: entryUrlFor(root) })).toBe("/opt/node/bin/node");
   });
-  it("uses a launcher-managed Node when staged", () => {
+  it("uses an in-artifact launcher-managed Node when staged", () => {
     writeFileSync(join(root, ARTIFACT_MARKER), "{}");
     mkdirSync(join(root, "runtime", "bin"), { recursive: true });
     writeFileSync(join(root, "runtime", "bin", "node"), "#!/bin/sh\n");
     const env: NodeJS.ProcessEnv = {};
     expect(resolveNodeBinary({ env, entryUrl: entryUrlFor(root) })).toBe(join(root, "runtime", "bin", "node"));
+  });
+  it("uses the HOME-level managed Node (install.sh --with-node, sibling of versions/) when there is no in-artifact one", () => {
+    // Real installed layout: <home>/.burnless/versions/<ver> is the artifact root,
+    // and the managed Node lives at <home>/.burnless/runtime/bin/node.
+    const homeRoot = mkdtempSync(join(tmpdir(), "burnless-home-"));
+    const artifactRoot = join(homeRoot, ".burnless", "versions", "0.1.0");
+    mkdirSync(join(artifactRoot, "cli"), { recursive: true });
+    writeFileSync(join(artifactRoot, ARTIFACT_MARKER), "{}");
+    const homeNode = join(homeRoot, ".burnless", "runtime", "bin", "node");
+    mkdirSync(join(homeRoot, ".burnless", "runtime", "bin"), { recursive: true });
+    writeFileSync(homeNode, "#!/bin/sh\n");
+    // NO in-artifact runtime/bin/node staged.
+    const env: NodeJS.ProcessEnv = {};
+    expect(resolveNodeBinary({ env, entryUrl: entryUrlFor(artifactRoot) })).toBe(homeNode);
+    rmSync(homeRoot, { recursive: true, force: true });
+  });
+  it("prefers the HOME-level managed Node over an in-artifact one (mirrors launcher order)", () => {
+    const homeRoot = mkdtempSync(join(tmpdir(), "burnless-home-"));
+    const artifactRoot = join(homeRoot, ".burnless", "versions", "0.1.0");
+    mkdirSync(join(artifactRoot, "cli"), { recursive: true });
+    writeFileSync(join(artifactRoot, ARTIFACT_MARKER), "{}");
+    const homeNode = join(homeRoot, ".burnless", "runtime", "bin", "node");
+    mkdirSync(join(homeRoot, ".burnless", "runtime", "bin"), { recursive: true });
+    writeFileSync(homeNode, "#!/bin/sh\n");
+    // ALSO stage an in-artifact Node — the home-level one must win.
+    mkdirSync(join(artifactRoot, "runtime", "bin"), { recursive: true });
+    writeFileSync(join(artifactRoot, "runtime", "bin", "node"), "#!/bin/sh\n");
+    const env: NodeJS.ProcessEnv = {};
+    expect(resolveNodeBinary({ env, entryUrl: entryUrlFor(artifactRoot) })).toBe(homeNode);
+    rmSync(homeRoot, { recursive: true, force: true });
   });
   it("falls back to the current process Node (system-Node v1)", () => {
     writeFileSync(join(root, ARTIFACT_MARKER), "{}");

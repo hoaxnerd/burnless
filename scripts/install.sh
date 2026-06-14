@@ -19,8 +19,10 @@ HOME_DIR="${BURNLESS_HOME:-$HOME/.burnless}"
 say() { printf '%s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 dl() { # dl <url> <dest> — http(s) via curl/wget; file:// (or bare path) via cp
+  # For local testing BURNLESS_INSTALL_BASE_URL must be the file:///abs (or file://localhost/abs)
+  # form — strip the optional empty/localhost authority so both yield the absolute path.
   case "$1" in
-    file://*) cp "$(printf '%s' "$1" | sed 's,^file://,,')" "$2" ;;
+    file://*) cp "$(printf '%s' "$1" | sed -e 's,^file://localhost/,/,' -e 's,^file://,,')" "$2" ;;
     http://*|https://*)
       if have curl; then curl -fsSL "$1" -o "$2"
       elif have wget; then wget -qO "$2" "$1"

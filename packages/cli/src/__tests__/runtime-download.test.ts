@@ -27,6 +27,38 @@ describe("delegateToArtifact download-on-demand", () => {
     expect(code).toBe(0);
   });
 
+  it("rejects (does NOT resolve 0) when the spawn emits an 'error' (launcher not executable / noexec fs)", async () => {
+    const spawnFn = (_c: string, _a: string[], _o: unknown) => ({
+      on: (ev: string, cb: (arg: number | Error | null) => void) => {
+        if (ev === "error") cb(new Error("EACCES: launcher not executable"));
+        // no "exit" ever fires
+      },
+    });
+    await expect(
+      delegateToArtifact(["node", "burnless", "start"], {
+        env: {} as NodeJS.ProcessEnv,
+        home: "/tmp/x",
+        existsFn: () => true, // artifact present
+        spawnFn: spawnFn as never,
+      }),
+    ).rejects.toThrow(/not executable/);
+  });
+
+  it("resolves 1 (not 0) when the child exits with a null code (killed by signal)", async () => {
+    const spawnFn = (_c: string, _a: string[], _o: unknown) => ({
+      on: (ev: string, cb: (arg: number | Error | null) => void) => {
+        if (ev === "exit") cb(null);
+      },
+    });
+    const code = await delegateToArtifact(["node", "burnless", "start"], {
+      env: {} as NodeJS.ProcessEnv,
+      home: "/tmp/x",
+      existsFn: () => true,
+      spawnFn: spawnFn as never,
+    });
+    expect(code).toBe(1);
+  });
+
   it("still throws a clear error if the artifact is STILL absent after ensure (download failed)", async () => {
     const ensureFn = vi.fn(async () => {}); // ensure ran but produced nothing
     await expect(

@@ -74,7 +74,7 @@ export interface DelegateOptions {
     cmd: string,
     args: string[],
     opts: SpawnOptions,
-  ) => { on: (ev: string, cb: (code: number) => void) => void };
+  ) => { on: (ev: string, cb: (arg: number | Error | null) => void) => void };
   existsFn?: (p: string) => boolean;
   ensureFn?: (opts: { version: string; home: string; env: NodeJS.ProcessEnv }) => Promise<void>;
 }
@@ -123,7 +123,11 @@ export async function delegateToArtifact(
   }
 
   const child = doSpawn(artifact, argv.slice(2), { stdio: "inherit", env });
-  return new Promise<number>((resolve) => {
-    child.on("exit", (code) => resolve(typeof code === "number" ? code : 0));
+  // "error" fires when the exec itself fails (launcher not executable, noexec fs, ENOENT) —
+  // no "exit" follows, so without this the promise would silently resolve. A null/undefined
+  // exit code (e.g. killed by signal) resolves to 1, never a masking 0.
+  return new Promise<number>((resolve, reject) => {
+    child.on("error", (err) => reject(err));
+    child.on("exit", (code) => resolve(typeof code === "number" ? code : 1));
   });
 }

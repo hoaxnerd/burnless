@@ -24,6 +24,14 @@ export interface UpdateResult {
   to: string;
   rolledBack: boolean;
   noop?: boolean;
+  /** Why the post-swap check failed (default doctor path only). Undefined for injected checkFn. */
+  error?: string;
+}
+
+/** Result of a post-swap check: ok, plus an optional short failure reason. */
+export interface CheckResult {
+  ok: boolean;
+  error?: string;
 }
 
 /** Read the version currently pointed at by versions/current (basename of the link target). */
@@ -32,14 +40,31 @@ function currentVersion(home?: string): string {
   return basename(link);
 }
 
-/** Default post-swap check: exec the NEW version's launcher `doctor --json`. Any throw → false. */
-async function defaultCheck(opts: { version: string; home?: string }): Promise<boolean> {
+/** Trim + collapse an error/stderr blob into a short single-line reason for messaging. */
+function shortReason(raw: unknown): string {
+  let msg = "";
+  if (raw && typeof raw === "object") {
+    const e = raw as { stderr?: unknown; message?: unknown };
+    if (typeof e.stderr === "string" && e.stderr.trim()) msg = e.stderr;
+    else if (typeof e.message === "string") msg = e.message;
+  } else if (typeof raw === "string") {
+    msg = raw;
+  }
+  msg = msg.replace(/\s+/g, " ").trim();
+  return msg.length > 200 ? `${msg.slice(0, 197)}...` : msg;
+}
+
+/**
+ * Default post-swap check: exec the NEW version's launcher `doctor --json`. Any throw → not ok,
+ * with the thrown error's message/stderr captured as a short reason for the rollback message.
+ */
+async function defaultCheck(opts: { version: string; home?: string }): Promise<CheckResult> {
   try {
     const launcher = join(versionsDir(opts.home), opts.version, "burnless");
     await execFileAsync(launcher, ["doctor", "--json"]);
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: shortReason(err) || "post-swap doctor check failed" };
   }
 }
 
@@ -65,15 +90,18 @@ export async function runUpdate(opts: {
   const from = cur;
   flipCurrent(opts.targetVersion, opts.home);
 
-  const check = opts.checkFn ?? defaultCheck;
-  const ok = await check({ version: opts.targetVersion, home: opts.home });
-  if (ok) {
+  // Injected checkFn keeps the simple boolean contract (no error string); the default
+  // doctor path returns a richer { ok, error } so the rollback message can say WHY.
+  const check: CheckResult = opts.checkFn
+    ? { ok: await opts.checkFn({ version: opts.targetVersion, home: opts.home }) }
+    : await defaultCheck({ version: opts.targetVersion, home: opts.home });
+  if (check.ok) {
     return { from, to: opts.targetVersion, rolledBack: false };
   }
 
   // Post-swap check failed — roll the symlink back to the prior version.
   flipCurrent(from, opts.home);
-  return { from, to: opts.targetVersion, rolledBack: true };
+  return { from, to: opts.targetVersion, rolledBack: true, error: check.error };
 }
 
 /** `burnless update [version]` (spec §2). */
@@ -102,8 +130,9 @@ export function registerUpdate(program: Command): void {
           } else if (result.noop) {
             process.stderr.write(`${green("✓")} already at ${result.to}\n`);
           } else if (result.rolledBack) {
+            const reason = result.error ? ` (reason: ${result.error})` : "";
             process.stderr.write(
-              `${red("✗")} update to ${result.to} failed post-swap check — rolled back to ${result.from}\n`,
+              `${red("✗")} update to ${result.to} failed post-swap check — rolled back to ${result.from}${reason}\n`,
             );
           } else {
             process.stderr.write(`${green("✓")} updated ${result.from} → ${result.to}\n`);

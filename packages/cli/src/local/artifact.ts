@@ -41,12 +41,25 @@ export function prepareArtifactEnv(opts: ArtifactEnvOptions = {}): void {
   setIfUnset("BURNLESS_SERVER_ENTRY", join(root, ARTIFACT_LAYOUT.serverEntry));
 }
 
+/**
+ * Pick the Node to exec the server with. Precedence MIRRORS the POSIX launcher
+ * (`build/launcher.ts`) exactly so a delegated exec and an in-process resolve agree:
+ *   1. `BURNLESS_NODE`               — explicit override (always wins).
+ *   2. `<home>/runtime/bin/node`     — installer `--with-node` managed Node at the HOME root
+ *                                      (sibling of `versions/`, decoupled so it survives `update`).
+ *                                      The artifact root is `<home>/.burnless/versions/<ver>`, so
+ *                                      this is `<root>/../../runtime/bin/node`.
+ *   3. `<artifact>/runtime/bin/node` — a Node bundled INSIDE the artifact (future variant).
+ *   4. this process's Node (system-Node v1).
+ */
 export function resolveNodeBinary(opts: ArtifactEnvOptions = {}): string {
   const env = opts.env ?? process.env;
   const override = env.BURNLESS_NODE?.trim();
   if (override) return override;
   const root = detectArtifactRoot(opts.entryUrl);
   if (root) {
+    const homeManaged = resolve(root, "..", "..", ARTIFACT_LAYOUT.managedNode);
+    if (existsSync(homeManaged)) return homeManaged;
     const managed = join(root, ARTIFACT_LAYOUT.managedNode);
     if (existsSync(managed)) return managed;
   }

@@ -39,4 +39,25 @@ describe("runUpdate", () => {
     const r = await runUpdate({ home, targetVersion: "0.1.0", ensureFn: async () => {}, checkFn: async () => true });
     expect(r.noop).toBe(true);
   });
+  it("captures a failure reason when the default doctor check rolls back", async () => {
+    // No checkFn injected → the default doctor path runs; the fake version dir has no
+    // real `burnless` launcher, so execFile throws and the reason is captured.
+    const r = await runUpdate({
+      home, targetVersion: "0.2.0",
+      ensureFn: async () => { fakeVersion("0.2.0"); },
+    });
+    expect(r.rolledBack).toBe(true);
+    expect(typeof r.error).toBe("string");
+    expect(r.error && r.error.length).toBeGreaterThan(0);
+    expect(readlinkSync(join(vdir, "current"))).toContain("0.1.0");
+  });
+  it("leaves error undefined when an injected checkFn returns false", async () => {
+    const r = await runUpdate({
+      home, targetVersion: "0.2.0",
+      ensureFn: async () => { fakeVersion("0.2.0"); },
+      checkFn: async () => false,
+    });
+    expect(r.rolledBack).toBe(true);
+    expect(r.error).toBeUndefined();
+  });
 });
