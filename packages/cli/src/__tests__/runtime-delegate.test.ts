@@ -16,14 +16,18 @@ describe("resolveArtifactPath", () => {
 });
 
 describe("delegateToArtifact", () => {
-  it("throws a clear UsageError when the artifact is absent", async () => {
+  it("throws a clear UsageError when the artifact is still absent after ensure", async () => {
     const spawnFn = vi.fn();
+    const ensureFn = vi.fn(async () => {}); // download-on-demand ran but produced nothing
     await expect(
       delegateToArtifact(["node", "burnless", "start"], {
         env: { BURNLESS_ARTIFACT: "/definitely/missing/burnless" },
         spawnFn,
+        existsFn: () => false,
+        ensureFn,
       }),
     ).rejects.toBeInstanceOf(UsageError);
+    expect(ensureFn).toHaveBeenCalledOnce();
     expect(spawnFn).not.toHaveBeenCalled();
   });
 
