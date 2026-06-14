@@ -24,8 +24,10 @@ export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Self-serve signup gates real auth CTAs. When off (marketing/holding mode —
-  // cloud not yet open), every sign-in/up CTA becomes a "Star on GitHub" button.
+  // cloud not yet open), every sign-in/up CTA becomes a "Star on GitHub" button
+  // and the Pricing link is hidden (the /pricing route 404s too — see proxy.ts).
   const { selfServeSignup } = useCapabilities();
+  const links = selfServeSignup ? navLinks : navLinks.filter((l) => l.href !== "/pricing");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -50,7 +52,7 @@ export function LandingNav() {
 
         {/* Desktop links */}
         <div className="ml-2 hidden items-center gap-1 sm:flex">
-          {navLinks.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.label}
               href={link.href}
@@ -118,7 +120,7 @@ export function LandingNav() {
         {/* Mobile sheet */}
         {menuOpen && (
           <div className="absolute inset-x-0 top-full mt-2 rounded-2xl border border-surface-200 bg-surface-0/95 p-2 shadow-lg backdrop-blur-xl sm:hidden">
-            {navLinks.map((link) => (
+            {links.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}

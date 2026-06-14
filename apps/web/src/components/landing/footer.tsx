@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CookieSettingsButton } from "@/components/cookie-consent";
 import { BrandLogo } from "@/components/brand-logo";
+import { getCapabilities } from "@/lib/capabilities";
 
 const footerGroups = [
   {
@@ -30,6 +31,12 @@ const footerGroups = [
 ];
 
 export function LandingFooter() {
+  // Hide Pricing in holding mode (signup off) — matches the nav + the /pricing
+  // route 404 (proxy.ts).
+  const { selfServeSignup } = getCapabilities();
+  const groups = selfServeSignup
+    ? footerGroups
+    : footerGroups.map((g) => ({ ...g, links: g.links.filter((l) => l.href !== "/pricing") }));
   return (
     <footer className="border-t border-surface-200 bg-surface-50/60">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -43,6 +50,8 @@ export function LandingFooter() {
             <p className="mt-4 text-sm leading-relaxed text-surface-600">
               Financial intelligence for startups. Your numbers, always thinking ahead.
             </p>
+            {/* Social links hidden until real accounts exist. Re-enable when
+                the X / LinkedIn (etc.) handles are live.
             <div className="mt-6 flex gap-2">
               <a
                 href="https://twitter.com/burnless"
@@ -67,11 +76,12 @@ export function LandingFooter() {
                 </svg>
               </a>
             </div>
+            */}
           </div>
 
           {/* Link groups */}
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:gap-16">
-            {footerGroups.map((group) => (
+            {groups.map((group) => (
               <div key={group.heading}>
                 <h3 className="text-sm font-semibold text-surface-900">{group.heading}</h3>
                 <ul className="mt-4 space-y-3">

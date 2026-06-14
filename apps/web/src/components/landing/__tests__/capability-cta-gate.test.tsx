@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { render, within } from "@testing-library/react";
 import { LandingNav } from "../nav";
 import { CTASection } from "../cta";
 import { HeroSection } from "../hero";
+import { LandingFooter } from "../footer";
 import { CapabilityProvider } from "@/components/providers/capability-context";
 import { EDITION_PRESETS } from "@/lib/capabilities";
 import { GITHUB_REPO_URL } from "@/lib/public-repo";
@@ -58,5 +59,37 @@ describe("landing CTA capability gate (selfServeSignup)", () => {
       "href",
       GITHUB_REPO_URL,
     );
+  });
+
+  it("nav hides the Pricing link when signup is OFF, shows it when ON", () => {
+    const off = wrap("self_host", <LandingNav />);
+    expect(off.queryByText("Pricing")).not.toBeInTheDocument();
+    off.unmount();
+    const on = wrap("cloud", <LandingNav />);
+    expect(on.getAllByText("Pricing")[0]!.closest("a")).toHaveAttribute("href", "/pricing");
+  });
+});
+
+/**
+ * The footer is a server component that reads getCapabilities() (process.env),
+ * not the provider — so drive it via BURNLESS_CAP_SELF_SERVE_SIGNUP.
+ */
+describe("landing footer Pricing gate", () => {
+  const orig = process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP;
+    else process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP = orig;
+  });
+
+  it("hides Pricing when signup is OFF", () => {
+    process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP = "off";
+    const { queryByText } = render(<LandingFooter />);
+    expect(queryByText("Pricing")).not.toBeInTheDocument();
+  });
+
+  it("shows Pricing → /pricing when signup is ON", () => {
+    process.env.BURNLESS_CAP_SELF_SERVE_SIGNUP = "on";
+    const { getByText } = render(<LandingFooter />);
+    expect(getByText("Pricing").closest("a")).toHaveAttribute("href", "/pricing");
   });
 });

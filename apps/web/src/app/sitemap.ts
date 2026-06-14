@@ -1,9 +1,11 @@
 import type { MetadataRoute } from "next";
+import { getCapabilities } from "@/lib/capabilities";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://burnless.app";
+  const { selfServeSignup } = getCapabilities();
 
-  return [
+  const entries: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
       lastModified: new Date(),
@@ -59,4 +61,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.4,
     },
   ];
+
+  // /pricing is gated behind self-serve signup; drop it in holding mode.
+  return selfServeSignup ? entries : entries.filter((e) => !e.url.endsWith("/pricing"));
 }

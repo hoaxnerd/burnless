@@ -30,6 +30,12 @@ export function resolveCapabilityGuard(pathname: string, caps: Capabilities): Gu
   if (!caps.marketingSite && MARKETING_EXACT.has(pathname)) {
     return pathname === "/" ? { action: "redirect", to: "/dashboard" } : { action: "notFound" };
   }
+  // Pricing is only meaningful when self-serve signup is open. In holding mode
+  // (marketingSite on but signup off) the /pricing page 404s; the nav/footer
+  // links are hidden alongside this (see landing nav + footer).
+  if (!caps.selfServeSignup && pathname === "/pricing") {
+    return { action: "notFound" };
+  }
   for (const { prefix, cap } of PREFIX_CAP) {
     if (pathname.startsWith(prefix) && !caps[cap]) return { action: "notFound" };
   }
