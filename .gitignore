@@ -46,9 +46,8 @@ agents/*/screenshots/
 agents/*/lighthouse-results/
 agents/*/smoke-test/
 
-# Claude Code — ignore per-user state, but TRACK shared project skills
-.claude/*
-!.claude/skills/
+# Claude Code — local AI-assistant state + skills (internal; kept in the private repo)
+.claude/
 
 # Playwright MCP
 .playwright-mcp/
@@ -66,3 +65,7 @@ qa-result/
 # Brainstorm visual-companion sessions + verification scratch
 .superpowers/
 .verify-scratch/
+
+# Internal tooling artifacts (kept in the private repo, not public)
+.understand-anything/
+settings-free-initial.yml
