@@ -1,4 +1,3 @@
-export { MetricCard } from "./metric-card";
 export { SwappableMetricCard } from "./swappable-metric-card";
 export { WidgetCard, type WidgetCardProps } from "./widget-card";
 export { CardSettings, type CardSettingsProps, type CatalogProps } from "./card-settings";
@@ -12,7 +11,7 @@ export { DataLoadError, classifyError } from "./data-load-error";
 export { FormField, CurrencyInput } from "./form-field";
 export { ThemeProvider, ThemeToggle, useTheme } from "./theme-toggle";
 export { KeyboardShortcutsProvider } from "./keyboard-shortcuts";
-export { PageGrid, type PageGridProps, type PageWidgetLayout, type DefaultLayoutItem } from "./page-grid";
+export { PageGrid, type PageGridProps, type DefaultLayoutItem } from "./page-grid";
 export { HeroKpiCard, type HeroKpiCardProps } from "./hero-kpi-card";
 export { ConnectedPageGrid } from "./connected-page-grid";
 

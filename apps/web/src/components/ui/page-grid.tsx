@@ -44,19 +44,6 @@ import { resolveOrder } from "@/lib/widget-order";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-/**
- * @deprecated Legacy coordinate layout shape. The grid no longer stores
- * positions/sizes — only widget order. Kept exported for backward-compatible
- * reads of older persisted data (see lib/widget-order.ts).
- */
-export interface PageWidgetLayout {
-  widgetId: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  autoH?: boolean;
-}
 
 export interface DefaultLayoutItem {
   /** Widget id */

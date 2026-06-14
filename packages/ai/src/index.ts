@@ -9,7 +9,7 @@ export { chat, chatStream } from "./chat";
 export { buildFinancialSnapshot, formatContextForPrompt } from "./context";
 
 // Tool definitions
-export { getFinancialTools, financialTools, getMcpExposedTools, MCP_SERVER_EXCLUDED_TOOLS } from "./tools";
+export { getFinancialTools, getMcpExposedTools, MCP_SERVER_EXCLUDED_TOOLS } from "./tools";
 
 // Tool-name alias map (forward-compat for retired names in stored audit logs / history)
 export { TOOL_NAME_ALIASES, canonicalToolName } from "./tool-aliases";

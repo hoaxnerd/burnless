@@ -69,10 +69,6 @@ export interface MetricsContextState {
   isLoading: boolean;
   /** Whether preferences are being saved */
   isSaving: boolean;
-  /**
-   * @deprecated Use `mode` instead. Alias kept for backward compatibility.
-   */
-  globalMode: CardMode;
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -349,7 +345,6 @@ export function MetricsProvider({
     () => ({
       mode,
       setMode,
-      globalMode: mode, // backward compat alias
       getCardMode,
       setCardMode,
       hasOverride,

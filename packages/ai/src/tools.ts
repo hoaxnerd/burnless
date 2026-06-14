@@ -1144,9 +1144,3 @@ export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
 export function getMcpExposedTools(): ToolDefinition[] {
   return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name));
 }
-
-/**
- * @deprecated Use getFinancialTools() instead. Kept for backward compatibility.
- * Will be removed in the next major version.
- */
-export const financialTools = FINANCIAL_TOOLS;
