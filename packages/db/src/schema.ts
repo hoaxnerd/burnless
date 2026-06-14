@@ -1179,13 +1179,6 @@ export const aiFeatureFlags = pgTable(
     writeMode: aiWriteModeEnum("write_mode").notNull().default("confirm"),
     // Configurable companion name (default: "Companion")
     companionName: text("companion_name").notNull().default("Companion"),
-    // BYOK (Bring Your Own Key) — when false, platform LLM is used; when true, company's own provider config is used
-    byokEnabled: boolean("byok_enabled").notNull().default(false),
-    // AI Provider config — per-company provider override (null = use env vars)
-    aiProvider: text("ai_provider"), // "anthropic" | "openai" | "openrouter"
-    aiApiKey: text("ai_api_key"), // user's own API key (masked in API responses)
-    aiModel: text("ai_model"), // custom model override
-    aiBaseUrl: text("ai_base_url"), // custom base URL (e.g., OpenRouter endpoint)
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
