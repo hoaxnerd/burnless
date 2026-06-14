@@ -38,8 +38,7 @@ Then map the routes to the Worker in the Cloudflare dashboard (or `wrangler.toml
 - `burnless.ai/install`
 - `burnless.ai/latest`
 
-Before deploying, set the `ORG`/`REPO` constants at the top of `worker.js` to the final public
-GitHub org/repo (see the `TODO` comment). The default is `burnless/burnless`.
+The `ORG`/`REPO` constants at the top of `worker.js` are set to `hoaxnerd/burnless`.
 
 ## Not in scope here
 

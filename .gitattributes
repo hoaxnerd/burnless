@@ -1,0 +1,28 @@
+# Normalize line endings: store text as LF in the repo AND check it out as LF
+# on every platform (overrides a contributor's core.autocrlf=true). This keeps
+# the repo byte-stable across macOS/Linux/Windows.
+* text=auto eol=lf
+
+# Shell scripts MUST be LF — CRLF makes them fail to execute (`\r` breaks the
+# shebang/tokens). The public installer (install.sh) + provision-node.sh ship to
+# users, so this is load-bearing.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Binary assets — never normalize.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.svg   text
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.wasm  binary
+*.gz    binary
+*.tgz   binary
+*.data  binary
+*.pdf   binary

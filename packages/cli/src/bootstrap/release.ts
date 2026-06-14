@@ -14,8 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configDir } from "../config";
 
-// TODO: confirm the public <org>/burnless repo once the public repo is created.
-export const PUBLIC_RELEASE_REPO = "burnless/burnless";
+export const PUBLIC_RELEASE_REPO = "hoaxnerd/burnless";
 
 /**
  * Public default download base for a SPECIFIC version. Assets live on GitHub Releases under

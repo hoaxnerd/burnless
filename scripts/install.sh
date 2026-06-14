@@ -19,7 +19,7 @@ MIN_NODE_MAJOR=20; MIN_NODE_MINOR=9
 WITH_NODE=0
 for a in "$@"; do [ "$a" = "--with-node" ] && WITH_NODE=1; done
 
-RELEASE_REPO="burnless/burnless"
+RELEASE_REPO="hoaxnerd/burnless"
 LATEST_URL="https://burnless.ai/latest"
 
 BASE="${BURNLESS_INSTALL_BASE_URL:-}"

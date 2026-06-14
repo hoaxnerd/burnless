@@ -35,7 +35,7 @@ describe("resolveReleaseSource", () => {
   });
   it("defaults to the versioned GitHub-Releases download base for the target version", () => {
     expect(resolveReleaseSource("0.1.0", {})).toBe(
-      "https://github.com/burnless/burnless/releases/download/v0.1.0/",
+      "https://github.com/hoaxnerd/burnless/releases/download/v0.1.0/",
     );
   });
 });

@@ -18,8 +18,7 @@
  * /install + /latest routes.
  */
 
-// TODO: set ORG to the final public GitHub org once the public repo is created.
-const ORG = "burnless";
+const ORG = "hoaxnerd";
 const REPO = "burnless";
 const INSTALL_RAW = `https://raw.githubusercontent.com/${ORG}/${REPO}/main/scripts/install.sh`;
 const RELEASES_API = `https://api.github.com/repos/${ORG}/${REPO}/releases/latest`;

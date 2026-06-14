@@ -6,14 +6,11 @@
 
 ### Open-source, AI-native FP&A for founders — self-host in one command.
 
-<!-- <ORG> is a literal placeholder. The public org/owner is finalized when the
-     public repo is created; a later release step resolves every <ORG> below. -->
-
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/<ORG>/burnless?label=release)](https://github.com/<ORG>/burnless/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/<ORG>/burnless/ci.yml?label=CI)](https://github.com/<ORG>/burnless/actions)
-[![GitHub stars](https://img.shields.io/github/stars/<ORG>/burnless?style=flat)](https://github.com/<ORG>/burnless/stargazers)
-[![Discussions](https://img.shields.io/github/discussions/<ORG>/burnless)](https://github.com/<ORG>/burnless/discussions)
+[![Latest release](https://img.shields.io/github/v/release/hoaxnerd/burnless?label=release)](https://github.com/hoaxnerd/burnless/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/hoaxnerd/burnless/ci.yml?label=CI)](https://github.com/hoaxnerd/burnless/actions)
+[![GitHub stars](https://img.shields.io/github/stars/hoaxnerd/burnless?style=flat)](https://github.com/hoaxnerd/burnless/stargazers)
+[![Discussions](https://img.shields.io/github/discussions/hoaxnerd/burnless)](https://github.com/hoaxnerd/burnless/discussions)
 
 </div>
 
@@ -128,8 +125,8 @@ Start with [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and conven
 
 ## Community & support
 
-- **Questions, ideas, show-and-tell:** [GitHub Discussions](https://github.com/<ORG>/burnless/discussions)
-- **Bugs & feature requests:** [GitHub Issues](https://github.com/<ORG>/burnless/issues)
+- **Questions, ideas, show-and-tell:** [GitHub Discussions](https://github.com/hoaxnerd/burnless/discussions)
+- **Bugs & feature requests:** [GitHub Issues](https://github.com/hoaxnerd/burnless/issues)
 
 ## Contributing
 
