@@ -7,6 +7,7 @@ import { registerDb } from "./commands/db";
 import { registerDoctor } from "./commands/doctor";
 import { registerHealth } from "./commands/health";
 import { registerStart } from "./commands/start";
+import { registerUpdate } from "./commands/update";
 import { registerUsers } from "./commands/users";
 import { buildRemoteProgram } from "./program-remote";
 import { topVerb } from "./runtime";
@@ -31,6 +32,7 @@ export function buildProgram(): Command {
   registerProvider(program);
   registerKey(program);
   registerModel(program);
+  registerUpdate(program);
 
   return program;
 }
