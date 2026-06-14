@@ -116,7 +116,8 @@ export function registerUpdate(program: Command): void {
         async (ctx) => {
           if (version === undefined || version.trim() === "") {
             throw new UsageError(
-              "specify a version to update to; automatic 'latest' resolution ships in S6",
+              "specify a version to update to (e.g. `burnless update 0.2.0`); " +
+                "to grab the newest, resolve it first: `burnless update \"$(curl -fsSL https://burnless.ai/latest)\"`",
             );
           }
           const result = await runUpdate({

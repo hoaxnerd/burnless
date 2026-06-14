@@ -14,12 +14,32 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configDir } from "../config";
 
-export const PUBLIC_RELEASE_BASE_URL =
-  "https://github.com/burnless/burnless/releases/latest/download/"; // wired in S6; overridable now
+// TODO(S6 Phase B): confirm the public <org>/burnless repo when the public repo is created.
+export const PUBLIC_RELEASE_REPO = "burnless/burnless";
 
-export function resolveReleaseSource(env: NodeJS.ProcessEnv = process.env): string {
+/**
+ * Public default download base for a SPECIFIC version. Assets live on GitHub Releases under
+ * tag `v<ver>`: https://github.com/<org>/burnless/releases/download/v<ver>/burnless-<ver>.tar.gz
+ * (+ .sha256). Tarballs are served DIRECT from GitHub Releases (not proxied through
+ * burnless.ai — too large); `burnless.ai/latest` resolves the version string, install.sh
+ * builds this base from it.
+ */
+export function publicReleaseBaseFor(version: string): string {
+  return `https://github.com/${PUBLIC_RELEASE_REPO}/releases/download/v${version}/`;
+}
+
+/**
+ * Resolve the release download base. Honors the `BURNLESS_RELEASE_BASE_URL` env override
+ * (used by the install-acceptance harness with `file://`); otherwise falls back to the
+ * versioned GitHub-Releases default for `version`. `version` is required for the default
+ * because each release's assets live under its own `v<ver>` tag directory.
+ */
+export function resolveReleaseSource(
+  version: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const base = env.BURNLESS_RELEASE_BASE_URL?.trim();
-  return base && base.length > 0 ? base : PUBLIC_RELEASE_BASE_URL;
+  return base && base.length > 0 ? base : publicReleaseBaseFor(version);
 }
 
 export function versionsDir(home?: string): string {
@@ -102,7 +122,7 @@ export async function ensureArtifact(opts: {
   home?: string;
   flip?: boolean; // default true
 }): Promise<string> {
-  const base = opts.base ?? resolveReleaseSource();
+  const base = opts.base ?? resolveReleaseSource(opts.version);
   const vdir = versionsDir(opts.home);
   const target = join(vdir, opts.version);
   if (!existsSync(join(target, ".burnless-artifact"))) {

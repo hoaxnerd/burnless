@@ -1,0 +1,49 @@
+# Triggered only when a maintainer pushes a `v*` tag (S6 R6 — publish is founder-gated).
+# Does nothing otherwise. Builds the fat-artifact, attests build provenance, and creates a
+# DRAFT GitHub Release with the tarball + checksums attached. A human reviews and publishes
+# the draft — that published release is what `burnless.ai/latest` and install.sh read from.
+# TODO(S6 Phase B): confirm the public <org>/burnless repo when the public repo is created.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create release + upload assets
+  id-token: write # provenance attestation
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:artifact
+
+      # build-artifact.ts emits dist-artifact/burnless-<ver>.tar.gz + <tarball>.sha256 (per-file,
+      # shasum-line format). Generate an aggregate SHASUMS256.txt across all tarballs so consumers
+      # can verify with a single `shasum -c SHASUMS256.txt`.
+      - name: Generate SHASUMS256.txt
+        working-directory: dist-artifact
+        run: shasum -a 256 *.tar.gz > SHASUMS256.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "dist-artifact/*.tar.gz"
+
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            dist-artifact/*.tar.gz
+            dist-artifact/*.sha256
+            dist-artifact/SHASUMS256.txt

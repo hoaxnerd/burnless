@@ -28,8 +28,15 @@ beforeEach(() => {
 afterEach(() => rmSync(work, { recursive: true, force: true }));
 
 describe("resolveReleaseSource", () => {
-  it("uses BURNLESS_RELEASE_BASE_URL when set", () => {
-    expect(resolveReleaseSource({ BURNLESS_RELEASE_BASE_URL: "file:///x" })).toBe("file:///x");
+  it("uses BURNLESS_RELEASE_BASE_URL when set (env override unchanged)", () => {
+    expect(resolveReleaseSource("0.1.0", { BURNLESS_RELEASE_BASE_URL: "file:///x" })).toBe(
+      "file:///x",
+    );
+  });
+  it("defaults to the versioned GitHub-Releases download base for the target version", () => {
+    expect(resolveReleaseSource("0.1.0", {})).toBe(
+      "https://github.com/burnless/burnless/releases/download/v0.1.0/",
+    );
   });
 });
 describe("downloadAndVerify", () => {

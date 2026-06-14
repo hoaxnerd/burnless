@@ -1,23 +1,53 @@
 #!/bin/sh
-# burnless installer (S5 P5). curl|sh. Verifies checksum BEFORE unpack. Idempotent.
-#   BURNLESS_INSTALL_BASE_URL  base for burnless-<ver>.tar.gz(+.sha256)  (S6 sets a default hosted URL)
-#   BURNLESS_VERSION           version to install (required until S6 wires "latest")
+# burnless installer. curl -fsSL https://burnless.ai/install | sh — ZERO env vars needed.
+# Verifies checksum BEFORE unpack. Idempotent.
+#
+# Zero-env default: resolves the latest version from https://burnless.ai/latest and downloads
+# the tarball + .sha256 DIRECT from GitHub Releases
+# (https://github.com/<org>/burnless/releases/download/v<ver>/burnless-<ver>.tar.gz).
+#
+# Overrides (all optional; explicit values win over the hosted defaults):
+#   BURNLESS_INSTALL_BASE_URL  base for burnless-<ver>.tar.gz(+.sha256). When set, BURNLESS_VERSION
+#                              is REQUIRED (no latest-resolution). Supports file:// for tests.
+#   BURNLESS_VERSION           pin a specific version (skips latest-resolution).
 #   BURNLESS_HOME              install root override (default ~/.burnless via $HOME)
 #   --with-node                provision a pinned Node into ~/.burnless/runtime if system Node is inadequate
+# TODO(S6 Phase B): confirm the public <org>/burnless repo + burnless.ai routes once live.
 set -eu
 
 MIN_NODE_MAJOR=20; MIN_NODE_MINOR=9
 WITH_NODE=0
 for a in "$@"; do [ "$a" = "--with-node" ] && WITH_NODE=1; done
 
+RELEASE_REPO="burnless/burnless"
+LATEST_URL="https://burnless.ai/latest"
+
 BASE="${BURNLESS_INSTALL_BASE_URL:-}"
 VER="${BURNLESS_VERSION:-}"
 HOME_DIR="${BURNLESS_HOME:-$HOME/.burnless}"
-[ -n "$BASE" ] || { echo "error: set BURNLESS_INSTALL_BASE_URL (the hosted URL ships in S6)"; exit 1; }
-[ -n "$VER" ]  || { echo "error: set BURNLESS_VERSION (latest-resolution ships in S6)"; exit 1; }
 
 say() { printf '%s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+fetch_text() { # fetch_text <url> — print body to stdout (http(s) only)
+  if have curl; then curl -fsSL "$1"
+  elif have wget; then wget -qO- "$1"
+  else echo "need curl or wget" >&2; return 1; fi
+}
+
+# --- resolve version + base (zero-env default) ---
+# If BURNLESS_INSTALL_BASE_URL is explicitly set we honor it verbatim and REQUIRE
+# BURNLESS_VERSION (the file:// acceptance flow stays unchanged). Otherwise we default to
+# the hosted path: resolve VER from burnless.ai/latest, then build the GitHub-Releases base.
+if [ -n "$BASE" ]; then
+  [ -n "$VER" ] || { echo "error: BURNLESS_INSTALL_BASE_URL is set, so BURNLESS_VERSION is required"; exit 1; }
+else
+  if [ -z "$VER" ]; then
+    VER="$(fetch_text "$LATEST_URL" | tr -d '[:space:]')" || true
+    [ -n "$VER" ] || { echo "error: could not resolve the latest version from $LATEST_URL (set BURNLESS_VERSION to pin one)"; exit 1; }
+  fi
+  BASE="https://github.com/${RELEASE_REPO}/releases/download/v${VER}"
+fi
 dl() { # dl <url> <dest> — http(s) via curl/wget; file:// (or bare path) via cp
   # For local testing BURNLESS_INSTALL_BASE_URL must be the file:///abs (or file://localhost/abs)
   # form — strip the optional empty/localhost authority so both yield the absolute path.
