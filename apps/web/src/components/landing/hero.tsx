@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
+  Github,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -15,6 +16,8 @@ import {
 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { BrandLogo } from "@/components/brand-logo";
+import { useCapabilities } from "@/components/providers/capability-context";
+import { GITHUB_REPO_URL } from "@/lib/public-repo";
 
 /* Workbench hero — the product is the proof. Left-biased type column + a
    faithful snapshot of the real dashboard (floating sidebar + KPI cards + AI
@@ -210,6 +213,9 @@ function ProductPanel() {
 }
 
 export function HeroSection() {
+  // Marketing/holding mode (selfServeSignup off): the primary CTA becomes a
+  // "Star on GitHub" link instead of a sign-up that goes nowhere.
+  const { selfServeSignup } = useCapabilities();
   return (
     <section className="relative overflow-hidden pb-20 pt-28 sm:pb-24 sm:pt-32">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-12 lg:gap-10 lg:px-8">
@@ -248,14 +254,27 @@ export function HeroSection() {
             className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
             style={{ animation: "slideUp 0.6s var(--ease-smooth) 0.28s both" }}
           >
-            <Link
-              href="/login"
-              onClick={() => trackEvent("landing_hero_cta_clicked")}
-              className="press-effect group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-brand-600 px-7 py-3.5 text-base font-semibold text-white shadow-md transition-colors hover:bg-brand-700"
-            >
-              Start free
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            {selfServeSignup ? (
+              <Link
+                href="/login"
+                onClick={() => trackEvent("landing_hero_cta_clicked")}
+                className="press-effect group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-brand-600 px-7 py-3.5 text-base font-semibold text-white shadow-md transition-colors hover:bg-brand-700"
+              >
+                Start free
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            ) : (
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => trackEvent("landing_hero_github_cta_clicked")}
+                className="press-effect group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-brand-600 px-7 py-3.5 text-base font-semibold text-white shadow-md transition-colors hover:bg-brand-700"
+              >
+                <Github className="h-4 w-4" />
+                Star on GitHub
+              </a>
+            )}
             <Link
               href="#companion"
               className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-surface-300 px-7 py-3.5 text-base font-medium text-surface-700 transition-colors hover:border-surface-400 hover:bg-surface-50"

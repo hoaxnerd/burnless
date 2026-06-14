@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Github, Menu, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { BrandLogo } from "@/components/brand-logo";
+import { useCapabilities } from "@/components/providers/capability-context";
+import { GITHUB_REPO_URL } from "@/lib/public-repo";
 import { ThemeToggle } from "./theme-toggle";
 
 /* N5 — Floating pill nav (modern-minimal). Content-sized, detached from the
@@ -21,6 +23,9 @@ const navLinks = [
 export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Self-serve signup gates real auth CTAs. When off (marketing/holding mode —
+  // cloud not yet open), every sign-in/up CTA becomes a "Star on GitHub" button.
+  const { selfServeSignup } = useCapabilities();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -58,20 +63,46 @@ export function LandingNav() {
 
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
-          <Link
-            href="/login"
-            onClick={() => trackEvent("landing_nav_login_clicked")}
-            className="hidden whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 sm:inline-flex"
+          {/* View-source icon — always present (burnless is open source). */}
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="burnless on GitHub"
+            onClick={() => trackEvent("landing_nav_github_clicked")}
+            className="hidden h-9 w-9 items-center justify-center rounded-full text-surface-600 transition-colors hover:bg-surface-100/70 hover:text-surface-900 sm:inline-flex"
           >
-            Log in
-          </Link>
-          <Link
-            href="/login"
-            onClick={() => trackEvent("landing_nav_signup_clicked")}
-            className="press-effect whitespace-nowrap rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-          >
-            Start free
-          </Link>
+            <Github className="h-[18px] w-[18px]" />
+          </a>
+          {selfServeSignup ? (
+            <>
+              <Link
+                href="/login"
+                onClick={() => trackEvent("landing_nav_login_clicked")}
+                className="hidden whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium text-surface-600 transition-colors hover:text-surface-900 sm:inline-flex"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => trackEvent("landing_nav_signup_clicked")}
+                className="press-effect whitespace-nowrap rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+              >
+                Start free
+              </Link>
+            </>
+          ) : (
+            <a
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => trackEvent("landing_nav_github_cta_clicked")}
+              className="press-effect inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+            >
+              <Github className="h-4 w-4" />
+              Star on GitHub
+            </a>
+          )}
           {/* Mobile menu button */}
           <button
             type="button"
@@ -97,16 +128,32 @@ export function LandingNav() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              href="/login"
-              onClick={() => {
-                trackEvent("landing_nav_login_clicked");
-                setMenuOpen(false);
-              }}
-              className="block rounded-xl px-4 py-3 text-sm font-medium text-surface-700 transition-colors hover:bg-surface-100"
-            >
-              Log in
-            </Link>
+            {selfServeSignup ? (
+              <Link
+                href="/login"
+                onClick={() => {
+                  trackEvent("landing_nav_login_clicked");
+                  setMenuOpen(false);
+                }}
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-surface-700 transition-colors hover:bg-surface-100"
+              >
+                Log in
+              </Link>
+            ) : (
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  trackEvent("landing_nav_github_cta_clicked");
+                  setMenuOpen(false);
+                }}
+                className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-surface-700 transition-colors hover:bg-surface-100"
+              >
+                <Github className="h-4 w-4" />
+                Star on GitHub
+              </a>
+            )}
           </div>
         )}
       </nav>
