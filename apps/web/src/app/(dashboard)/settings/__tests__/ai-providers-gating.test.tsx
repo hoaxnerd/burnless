@@ -15,11 +15,10 @@ import { EDITION_PRESETS } from "@/lib/capabilities";
 import { DEFAULT_AI_FLAGS } from "@burnless/ai";
 
 const flags = { ...DEFAULT_AI_FLAGS, masterEnabled: true };
-const pc = { byokEnabled: false, aiProvider: null, aiApiKey: null, aiModel: null, aiBaseUrl: null };
 
 const tab = (edition: "self_host" | "cloud") => (
   <CapabilityProvider value={EDITION_PRESETS[edition]}>
-    <AiFeaturesTab flags={flags as never} updateFlags={vi.fn()} credits={null} providerConfig={pc as never} />
+    <AiFeaturesTab flags={flags as never} updateFlags={vi.fn()} credits={null} />
   </CapabilityProvider>
 );
 

@@ -127,10 +127,6 @@ describe("GET /api/ai-features", () => {
         dataMode: "full",
         features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
         monthlyBudgetCents: 5000,
-        aiProvider: "anthropic",
-        aiApiKey: "sk-ant-1234567890abcdef",
-        aiModel: null,
-        aiBaseUrl: null,
       },
     ]);
     mockGetCreditStatus.mockResolvedValue({
@@ -147,9 +143,9 @@ describe("GET /api/ai-features", () => {
     expect(body.masterEnabled).toBe(true);
     expect(body.dataMode).toBe("full");
     expect(body.credits).toBeDefined();
-    // API key should be masked
-    expect(body.aiApiKey).toContain("••••••••");
-    expect(body.aiApiKey).not.toBe("sk-ant-1234567890abcdef");
+    // S6 W1.1: legacy single-provider BYOK fields are no longer surfaced.
+    expect(body).not.toHaveProperty("aiApiKey");
+    expect(body).not.toHaveProperty("aiProvider");
   });
 
   it("creates default flags when none exist", async () => {
@@ -241,10 +237,6 @@ describe("PATCH /api/ai-features", () => {
         dataMode: "full",
         features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
         monthlyBudgetCents: 5000,
-        aiProvider: null,
-        aiApiKey: null,
-        aiModel: null,
-        aiBaseUrl: null,
       },
     ]);
     // update().set().where().returning()
@@ -254,10 +246,6 @@ describe("PATCH /api/ai-features", () => {
         dataMode: "full",
         features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
         monthlyBudgetCents: 5000,
-        aiProvider: null,
-        aiApiKey: null,
-        aiModel: null,
-        aiBaseUrl: null,
       },
     ]);
     mockGetCreditStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
@@ -275,18 +263,32 @@ describe("PATCH /api/ai-features", () => {
     expect(body.masterEnabled).toBe(false);
   });
 
-  it("validates provider must be one of anthropic/openai/openrouter", async () => {
+  it("ignores legacy single-provider fields (S6 W1.1) — no longer accepted or surfaced", async () => {
     mockRequireCompanyAccess.mockResolvedValue(CTX);
     mockRequireRole.mockReturnValue(null);
+    // getOrCreateFlags finds existing; the PATCH body carries ONLY legacy fields,
+    // so after schema-strip there are no updates → route returns existing flags.
+    mockLimit.mockResolvedValue([
+      {
+        masterEnabled: true,
+        dataMode: "full",
+        features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
+        monthlyBudgetCents: 5000,
+      },
+    ]);
 
     const { PATCH } = await import("../route");
     const res = await PATCH(
       new Request("http://localhost/api/ai-features", {
         method: "PATCH",
-        body: JSON.stringify({ aiProvider: "invalid_provider" }),
+        body: JSON.stringify({ aiProvider: "openai", aiApiKey: "sk-x", byokEnabled: true }),
       })
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).not.toHaveProperty("aiProvider");
+    expect(body).not.toHaveProperty("aiApiKey");
+    expect(body).not.toHaveProperty("byokEnabled");
   });
 
   it("validates data mode enum", async () => {

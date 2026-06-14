@@ -22,7 +22,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "general" | "security" | "ai" | "ai-dashboard" | "integrations" | "invite-codes" | "billing"
   >("general");
-  const { flags, updateFlags, loaded: aiLoaded, credits, providerConfig } = useAiFlags();
+  const { flags, updateFlags, loaded: aiLoaded, credits } = useAiFlags();
   // Task 12: hide capability-gated tabs (defense-in-depth; server guards authoritative).
   const caps = useCapabilities();
 
@@ -196,7 +196,7 @@ export default function SettingsPage() {
           context. writeMode is not surfaced here — per-user AI tool permissions
           govern (two-gates); company default stays `confirm`. */}
       {activeTab === "ai" && aiLoaded && (
-        <AiFeaturesTab flags={flags} updateFlags={updateFlags} credits={credits} providerConfig={providerConfig} />
+        <AiFeaturesTab flags={flags} updateFlags={updateFlags} credits={credits} />
       )}
 
       {/* AI Dashboard Tab (SET-07 Path B — shipped) */}

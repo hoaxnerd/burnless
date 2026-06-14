@@ -417,11 +417,8 @@ export const updateAiFeaturesSchema = z.object({
     })
     .optional(),
   companionName: z.string().min(1).max(50).optional(),
-  byokEnabled: z.boolean().optional(),
-  aiProvider: aiProviderEnum.nullable().optional(),
-  aiApiKey: z.string().max(256).nullable().optional(),
-  aiModel: z.string().max(128).nullable().optional(),
-  aiBaseUrl: z.string().url().max(512).nullable().optional(),
+  // S6 W1.1: legacy single-provider BYOK fields removed — AI provider config
+  // lives in the aiProviders model (managed via /api/ai-providers).
 });
 
 export type UpdateAiFeaturesInput = z.infer<typeof updateAiFeaturesSchema>;

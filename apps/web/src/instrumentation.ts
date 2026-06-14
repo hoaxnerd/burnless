@@ -34,15 +34,8 @@ export async function register() {
       console.warn("[s3a] scheduler boot skipped:", (e as Error).message);
     }
 
-    // #49 P2 — backfill legacy BYOK config into the encrypted aiProviders model.
-    // Idempotent + non-fatal: a missed/failed run is re-attempted next boot, and
-    // resolution falls back to the legacy columns meanwhile.
-    try {
-      const { backfillAiProviders } = await import("@/lib/ai-providers/backfill");
-      await backfillAiProviders();
-    } catch (e) {
-      console.warn("[ai-providers] backfill at boot skipped:", (e as Error).message);
-    }
+    // S6 W1.1: the legacy-BYOK → aiProviders backfill was removed along with the
+    // legacy aiFeatureFlags provider columns (resolution is now DB default → env).
   }
 
   const dsn = process.env.SENTRY_DSN;

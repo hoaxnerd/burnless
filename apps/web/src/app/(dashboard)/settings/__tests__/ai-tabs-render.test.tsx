@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { DEFAULT_AI_FLAGS } from "@burnless/ai";
-import type { AiProviderConfig } from "@/components/ai/ai-feature-context";
 
 vi.mock("@/lib/api-fetch", () => ({ apiFetch: vi.fn() }));
 
@@ -26,14 +25,6 @@ import { EDITION_PRESETS } from "@/lib/capabilities";
 const renderWithCaps = (ui: React.ReactElement) =>
   render(<CapabilityProvider value={EDITION_PRESETS.cloud}>{ui}</CapabilityProvider>);
 
-const providerConfig: AiProviderConfig = {
-  byokEnabled: false,
-  aiProvider: null,
-  aiApiKey: null,
-  aiModel: null,
-  aiBaseUrl: null,
-};
-
 describe("SET-07 — AI settings tabs are shipped", () => {
   it("settings tabs list includes the AI Features + AI Dashboard entries", () => {
     const keys = tabs.map((t) => t.key);
@@ -48,7 +39,6 @@ describe("SET-07 — AI settings tabs are shipped", () => {
           flags={DEFAULT_AI_FLAGS}
           updateFlags={vi.fn()}
           credits={null}
-          providerConfig={providerConfig}
         />
       )
     ).not.toThrow();
@@ -61,7 +51,6 @@ describe("SET-07 — AI settings tabs are shipped", () => {
           flags={{ ...DEFAULT_AI_FLAGS, masterEnabled: true }}
           updateFlags={vi.fn()}
           credits={null}
-          providerConfig={{ ...providerConfig, byokEnabled: true }}
         />
       )
     ).not.toThrow();

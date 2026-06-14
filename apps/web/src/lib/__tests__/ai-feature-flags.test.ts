@@ -65,7 +65,7 @@ vi.mock("@burnless/ai", () => ({
 
 import { checkAiFeatureAllowed } from "../ai-feature-flags";
 
-// An aiFeatureFlags row: AI on, feature on, BYOK off → falls through to credits.
+// An aiFeatureFlags row: AI on, feature on → falls through to credits.
 function flagsRow() {
   return {
     masterEnabled: true,
@@ -73,8 +73,6 @@ function flagsRow() {
     writeMode: "confirm",
     features: { chat: true },
     companionName: "Companion",
-    byokEnabled: false,
-    aiApiKey: null,
   };
 }
 

@@ -56,7 +56,6 @@ vi.mock("@/components/ai/ai-feature-context", () => ({
     updateFlags: vi.fn(),
     loaded: true,
     credits: null,
-    providerConfig: null,
     getFeature: () => ({ enabled: false }),
   }),
 }));

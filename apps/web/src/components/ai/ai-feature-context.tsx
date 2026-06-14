@@ -29,14 +29,6 @@ export interface CreditStatus {
   exceeded: boolean;
 }
 
-export interface AiProviderConfig {
-  byokEnabled: boolean;
-  aiProvider: string | null;
-  aiApiKey: string | null; // masked
-  aiModel: string | null;
-  aiBaseUrl: string | null;
-}
-
 // ── Context types ───────────────────────────────────────────────────────────
 
 interface AiFeatureContextValue {
@@ -47,13 +39,11 @@ interface AiFeatureContextValue {
   /** Check a specific feature's status */
   getFeature: (feature: AiFeatureName) => AiFeatureStatus;
   /** Update flags (calls PATCH /api/ai-features) */
-  updateFlags: (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => Promise<void>;
+  updateFlags: (patch: Partial<AiFeatureFlagsState>) => Promise<void>;
   /** Convenience: is the master switch on? */
   masterEnabled: boolean;
   /** Current credit status (used, remaining, warning, exceeded) */
   credits: CreditStatus | null;
-  /** AI provider configuration (masked API key) */
-  providerConfig: AiProviderConfig;
   /** Configurable companion name */
   companionName: string;
 }
@@ -65,13 +55,6 @@ const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
 export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [flags, setFlags] = useState<AiFeatureFlagsState>(DEFAULT_AI_FLAGS);
   const [credits, setCredits] = useState<CreditStatus | null>(null);
-  const [providerConfig, setProviderConfig] = useState<AiProviderConfig>({
-    byokEnabled: false,
-    aiProvider: null,
-    aiApiKey: null,
-    aiModel: null,
-    aiBaseUrl: null,
-  });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -87,13 +70,6 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             features: data.features,
           });
           if (data.credits) setCredits(data.credits);
-          setProviderConfig({
-            byokEnabled: data.byokEnabled ?? false,
-            aiProvider: data.aiProvider ?? null,
-            aiApiKey: data.aiApiKey ?? null,
-            aiModel: data.aiModel ?? null,
-            aiBaseUrl: data.aiBaseUrl ?? null,
-          });
         }
       })
       .catch(() => {})
@@ -108,10 +84,9 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   );
 
   const updateFlags = useCallback(
-    async (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => {
+    async (patch: Partial<AiFeatureFlagsState>) => {
       // Optimistic update for immediate UI feedback
       const prevFlags = flags;
-      const prevProvider = providerConfig;
 
       // NOTE: company-level writeMode is no longer enforced or surfaced (spec §3.5);
       // per-user AI tool permissions govern instead. The DB column + API field remain
@@ -142,25 +117,16 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             features: updated.features,
           });
           if (updated.credits) setCredits(updated.credits);
-          setProviderConfig({
-            byokEnabled: updated.byokEnabled ?? false,
-            aiProvider: updated.aiProvider ?? null,
-            aiApiKey: updated.aiApiKey ?? null,
-            aiModel: updated.aiModel ?? null,
-            aiBaseUrl: updated.aiBaseUrl ?? null,
-          });
         } else {
           // Revert optimistic update on failure
           setFlags(prevFlags);
-          setProviderConfig(prevProvider);
         }
       } catch {
         // Revert optimistic update on network error
         setFlags(prevFlags);
-        setProviderConfig(prevProvider);
       }
     },
-    [flags, providerConfig]
+    [flags]
   );
 
   return (
@@ -172,7 +138,6 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         updateFlags,
         masterEnabled: flags.masterEnabled,
         credits,
-        providerConfig,
         companionName: flags.companionName ?? DEFAULT_COMPANION_NAME,
       }}
     >

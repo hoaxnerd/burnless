@@ -38,26 +38,19 @@ export interface CreditStatus {
   exceeded: boolean;
 }
 
-/** Internal type — extends flags with BYOK fields for single-query loading. */
-interface AiFlagsInternal extends AiFeatureFlagsState {
-  byokEnabled: boolean;
-  aiApiKey: string | null;
-}
-
 /**
  * Load AI feature flags for a company. Returns defaults if none exist.
- * Includes BYOK fields to avoid a second query in checkAiFeatureAllowed.
  */
 export async function getAiFlags(
   companyId: string
-): Promise<AiFlagsInternal> {
+): Promise<AiFeatureFlagsState> {
   const [row] = await db
     .select()
     .from(aiFeatureFlags)
     .where(eq(aiFeatureFlags.companyId, companyId))
     .limit(1);
 
-  if (!row) return { ...DEFAULT_AI_FLAGS, byokEnabled: false, aiApiKey: null };
+  if (!row) return { ...DEFAULT_AI_FLAGS };
 
   return {
     masterEnabled: row.masterEnabled,
@@ -65,8 +58,6 @@ export async function getAiFlags(
     writeMode: (row.writeMode ?? "confirm") as AiWriteMode,
     features: row.features as AiFeatureConfig,
     companionName: row.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    byokEnabled: row.byokEnabled,
-    aiApiKey: row.aiApiKey,
   };
 }
 
@@ -143,11 +134,6 @@ export async function checkAiFeatureAllowed(
     };
   }
 
-  // BYOK users skip credit enforcement — they pay their own LLM provider
-  if (flags.byokEnabled && flags.aiApiKey) {
-    return { allowed: true, writeMode: flags.writeMode };
-  }
-
   // Spec S1 §5: credits are a billing concept. When billing is off (self_host,
   // or no payment provider configured), there is no credit ledger to enforce —
   // a self-host operator who brings their own AI provider via env must not be
@@ -174,9 +160,11 @@ export async function checkAiFeatureAllowed(
 /**
  * Resolve a company's AI provider config. Precedence (spec §2/§4):
  *   1. Default ENABLED DB provider (aiProviders) — keys decrypted here.
- *   2. Legacy aiFeatureFlags BYOK columns (deprecated; dropped in S6).
- *   3. undefined → caller uses env-var defaults (createProvider).
- * Decryption failures degrade to the next layer so the chat path never crashes.
+ *   2. undefined → caller uses env-var defaults (createProvider).
+ * The legacy aiFeatureFlags BYOK columns were removed as a resolution leg in
+ * S6 W1.1 (columns dropped separately). Decryption failures degrade to the env
+ * path so the chat path never crashes. Edition-agnostic — same logic on
+ * self_host and cloud (env fallback applies to both).
  */
 export async function getCompanyProviderConfig(
   companyId: string
@@ -202,22 +190,6 @@ export async function getCompanyProviderConfig(
     // provider exists but no usable key → fall through.
   }
 
-  // 2. Legacy BYOK columns.
-  const [row] = await db
-    .select({
-      byokEnabled: aiFeatureFlags.byokEnabled,
-      aiProvider: aiFeatureFlags.aiProvider,
-      aiApiKey: aiFeatureFlags.aiApiKey,
-      aiModel: aiFeatureFlags.aiModel,
-      aiBaseUrl: aiFeatureFlags.aiBaseUrl,
-    })
-    .from(aiFeatureFlags)
-    .where(eq(aiFeatureFlags.companyId, companyId))
-    .limit(1);
-  if (row?.byokEnabled && row.aiApiKey) {
-    return { provider: row.aiProvider ?? undefined, apiKey: row.aiApiKey, model: row.aiModel ?? undefined, baseUrl: row.aiBaseUrl ?? undefined };
-  }
-
-  // 3. env path.
+  // 2. env path.
   return undefined;
 }

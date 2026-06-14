@@ -411,91 +411,10 @@ test.describe("Settings wiring — AI budget", () => {
 });
 
 // ── AI Features Tab: Provider Selection ────────────────────────────────────
-
-test.describe("Settings wiring — AI provider", () => {
-  test.skip(!dbAvailable, "Requires DATABASE_URL");
-  test.use({ storageState: "e2e/.auth/user.json" });
-
-  test("provider radio change fires PATCH", async ({ page }) => {
-    await goToSettingsTab(page, "AI Features");
-    await expect(page.getByText("AI Master Switch")).toBeVisible({ timeout: 10_000 });
-
-    // Ensure AI is ON
-    const isOn = await page.getByText("AI features are active").isVisible({ timeout: 3_000 }).catch(() => false);
-    if (!isOn) {
-      await toggleMasterSwitch(page);
-      await expect(page.getByText("AI features are active")).toBeVisible({ timeout: 5_000 });
-    }
-
-    // Select OpenAI
-    const openaiLabel = page.locator("label").filter({ hasText: "OpenAI" }).first();
-    await expect(openaiLabel).toBeVisible({ timeout: 5_000 });
-
-    const responsePromise = page.waitForResponse(
-      (r) => r.url().includes("/api/ai-features") && r.request().method() === "PATCH"
-    );
-    await openaiLabel.click();
-    const response = await responsePromise;
-    expect(response.status()).toBe(200);
-    const body = await response.json();
-    expect(body.aiProvider).toBe("openai");
-
-    // Verify the radio is checked
-    const openaiRadio = page.locator("input[type='radio'][name='aiProvider'][value='openai']");
-    await expect(openaiRadio).toBeChecked();
-
-    // Restore to Anthropic
-    const anthropicLabel = page.locator("label").filter({ hasText: "Anthropic" }).first();
-    const restorePromise = page.waitForResponse(
-      (r) => r.url().includes("/api/ai-features") && r.request().method() === "PATCH"
-    );
-    await anthropicLabel.click();
-    await restorePromise;
-  });
-
-  test("selecting Ollama hides API key section and shows hint", async ({ page }) => {
-    await goToSettingsTab(page, "AI Features");
-    await expect(page.getByText("AI Master Switch")).toBeVisible({ timeout: 10_000 });
-
-    // Ensure AI is ON
-    const isOn = await page.getByText("AI features are active").isVisible({ timeout: 3_000 }).catch(() => false);
-    if (!isOn) {
-      await toggleMasterSwitch(page);
-      await expect(page.getByText("AI features are active")).toBeVisible({ timeout: 5_000 });
-    }
-
-    // Select Ollama
-    const ollamaLabel = page.locator("label").filter({ hasText: "Ollama" }).first();
-    const responsePromise = page.waitForResponse(
-      (r) => r.url().includes("/api/ai-features") && r.request().method() === "PATCH"
-    );
-    await ollamaLabel.click();
-    await responsePromise;
-
-    // Ollama hint should be visible
-    await expect(
-      page.getByText("Ollama runs locally")
-    ).toBeVisible({ timeout: 5_000 });
-
-    // API Key label should NOT be visible (Ollama doesn't need one)
-    await expect(
-      page.locator("label").filter({ hasText: /^API Key$/ })
-    ).not.toBeVisible();
-
-    // Base URL field should be visible for Ollama
-    await expect(
-      page.locator("label").filter({ hasText: "Base URL" }).first()
-    ).toBeVisible();
-
-    // Restore to Anthropic
-    const anthropicLabel = page.locator("label").filter({ hasText: "Anthropic" }).first();
-    const restorePromise = page.waitForResponse(
-      (r) => r.url().includes("/api/ai-features") && r.request().method() === "PATCH"
-    );
-    await anthropicLabel.click();
-    await restorePromise;
-  });
-});
+// S6 W1.1: the legacy single-provider radio UI (and its aiProvider PATCH fields)
+// were removed. AI providers are now managed via the AiProvidersManager (its own
+// CRUD against /api/ai-providers), so the old radio-change / Ollama-hint specs no
+// longer apply and have been deleted.
 
 // ── AI Features Tab: Feature Toggles ───────────────────────────────────────
 

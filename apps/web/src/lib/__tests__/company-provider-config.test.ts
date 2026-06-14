@@ -1,6 +1,7 @@
 /**
- * Resolution-precedence tests for getCompanyProviderConfig (S2/S4 task 5):
- *   DB default provider -> legacy aiFeatureFlags BYOK columns -> env (undefined).
+ * Resolution-precedence tests for getCompanyProviderConfig.
+ * S6 W1.1: the legacy aiFeatureFlags BYOK middle leg was removed — resolution is
+ * now DB default provider -> env (undefined). Legacy columns are IGNORED.
  *
  * HARNESS: real PGLite via @db-test. The module's import graph pulls
  * @/lib/api-helpers -> @/lib/auth -> next-auth, which can't resolve in vitest, so
@@ -42,12 +43,15 @@ describe("getCompanyProviderConfig resolution precedence", () => {
       provider: "openrouter", apiKey: "sk-db", model: "anthropic/claude-sonnet-4-20250514", baseUrl: "https://openrouter.ai/api/v1",
     });
   });
-  it("falls back to legacy BYOK columns when no DB provider exists", async () => {
+  it("IGNORES legacy BYOK columns when no DB provider exists (falls through to env)", async () => {
+    // S6 W1.1: legacy aiFeatureFlags BYOK columns are no longer a resolution leg.
+    // A company with ONLY the legacy key must resolve to undefined (env path),
+    // regardless of edition (the resolver is edition-agnostic — see note below).
     const companyId = await freshCompany();
     await db.insert(aiFeatureFlags).values({ companyId, byokEnabled: true, aiProvider: "openai", aiApiKey: "sk-legacy", aiModel: "gpt-4o" });
-    expect(await getCompanyProviderConfig(companyId)).toEqual({ provider: "openai", apiKey: "sk-legacy", model: "gpt-4o", baseUrl: undefined });
+    expect(await getCompanyProviderConfig(companyId)).toBeUndefined();
   });
-  it("DB provider takes precedence over legacy columns", async () => {
+  it("DB provider resolves; legacy columns are irrelevant", async () => {
     const companyId = await freshCompany();
     await db.insert(aiFeatureFlags).values({ companyId, byokEnabled: true, aiProvider: "openai", aiApiKey: "sk-legacy" });
     await createAiProvider({ companyId, name: "OR", kind: "openrouter", apiKey: "sk-db" });
@@ -62,11 +66,12 @@ describe("getCompanyProviderConfig resolution precedence", () => {
     expect(cfg?.provider).toBe("ollama");
     expect(cfg?.baseUrl).toBe("http://localhost:11434/v1");
   });
-  it("a disabled DB provider falls through to legacy (getDefaultAiProvider ignores disabled)", async () => {
+  it("a disabled DB provider + legacy columns both yield env path (undefined)", async () => {
     const companyId = await freshCompany();
     const p = await createAiProvider({ companyId, name: "OR", kind: "openrouter", apiKey: "sk-db" });
     await updateAiProvider(p.id, companyId, { enabled: false });
     await db.insert(aiFeatureFlags).values({ companyId, byokEnabled: true, aiProvider: "openai", aiApiKey: "sk-legacy" });
-    expect((await getCompanyProviderConfig(companyId))?.apiKey).toBe("sk-legacy");
+    // getDefaultAiProvider ignores the disabled provider; legacy is no longer a leg → undefined.
+    expect(await getCompanyProviderConfig(companyId)).toBeUndefined();
   });
 });

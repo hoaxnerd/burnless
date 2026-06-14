@@ -65,13 +65,9 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   if (body.companionName !== undefined) {
     updates.companionName = body.companionName;
   }
-  // BYOK toggle
-  if (body.byokEnabled !== undefined) updates.byokEnabled = body.byokEnabled;
-  // Provider config — null clears to env-var fallback
-  if (body.aiProvider !== undefined) updates.aiProvider = body.aiProvider;
-  if (body.aiApiKey !== undefined) updates.aiApiKey = body.aiApiKey;
-  if (body.aiModel !== undefined) updates.aiModel = body.aiModel;
-  if (body.aiBaseUrl !== undefined) updates.aiBaseUrl = body.aiBaseUrl;
+  // S6 W1.1: legacy single-provider BYOK fields (byokEnabled / aiProvider /
+  // aiApiKey / aiModel / aiBaseUrl) are no longer accepted — AI provider config
+  // lives in the aiProviders model (managed under /api/ai-providers).
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(existing);
@@ -95,11 +91,6 @@ export const PATCH = withErrorHandler(async (request: Request) => {
     writeMode: updated.writeMode,
     features: updated.features,
     companionName: updated.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    byokEnabled: updated.byokEnabled,
-    aiProvider: updated.aiProvider,
-    aiApiKey: maskApiKey(updated.aiApiKey),
-    aiModel: updated.aiModel,
-    aiBaseUrl: updated.aiBaseUrl,
     credits,
   });
 });
@@ -120,11 +111,6 @@ async function getOrCreateFlags(companyId: string) {
       writeMode: (existing.writeMode ?? "confirm") as "full" | "confirm" | "read_only",
       features: existing.features as AiFeatureConfig,
       companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
-      byokEnabled: existing.byokEnabled,
-      aiProvider: existing.aiProvider,
-      aiApiKey: maskApiKey(existing.aiApiKey),
-      aiModel: existing.aiModel,
-      aiBaseUrl: existing.aiBaseUrl,
     };
   }
 
@@ -146,17 +132,5 @@ async function getOrCreateFlags(companyId: string) {
     writeMode: (created?.writeMode ?? DEFAULT_AI_FLAGS.writeMode) as "full" | "confirm" | "read_only",
     features: (created?.features ?? DEFAULT_AI_FLAGS.features) as AiFeatureConfig,
     companionName: created?.companionName ?? DEFAULT_AI_FLAGS.companionName,
-    byokEnabled: created?.byokEnabled ?? false,
-    aiProvider: null,
-    aiApiKey: null,
-    aiModel: null,
-    aiBaseUrl: null,
   };
-}
-
-/** Mask an API key for safe display — show first 4 + last 4 chars. */
-function maskApiKey(key: string | null): string | null {
-  if (!key) return null;
-  if (key.length <= 12) return "••••••••";
-  return key.slice(0, 4) + "••••••••" + key.slice(-4);
 }

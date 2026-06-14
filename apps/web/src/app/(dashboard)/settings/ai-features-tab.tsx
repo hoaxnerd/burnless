@@ -3,16 +3,15 @@
 import { useState } from "react";
 import { Power, Database, Sparkles, Pencil } from "lucide-react";
 import { AI_FEATURE_LIST, DEFAULT_COMPANION_NAME, type AiFeatureFlagsState, type AiDataMode } from "@burnless/ai";
-import type { CreditStatus, AiProviderConfig } from "@/components/ai/ai-feature-context";
+import type { CreditStatus } from "@/components/ai/ai-feature-context";
 import { AiProvidersManager } from "./ai-providers/ai-providers-manager";
 import { Input } from "@/components/ui";
 import { useCapabilities } from "@/components/providers/capability-context";
 
 interface AiFeaturesTabProps {
   flags: AiFeatureFlagsState;
-  updateFlags: (patch: Partial<AiFeatureFlagsState & AiProviderConfig>) => void;
+  updateFlags: (patch: Partial<AiFeatureFlagsState>) => void;
   credits: CreditStatus | null;
-  providerConfig: AiProviderConfig;
 }
 
 const DATA_MODES: { value: AiDataMode; label: string; desc: string }[] = [
