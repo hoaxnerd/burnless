@@ -1,6 +1,6 @@
 {
   "name": "burnless",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The Burnless CLI — drive your Burnless instance from the terminal over MCP",
   "license": "Apache-2.0",
   "type": "module",
@@ -22,16 +22,15 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit"
   },
-  "dependencies": {
+  "comment": "No runtime dependencies: tsup bundles everything into dist/ (the thin bin imports only Node built-ins). The packages below are build-time only, hence devDependencies — keeping them out of the published runtime deps (workspace:* refs are unresolvable on npm).",
+  "devDependencies": {
+    "@burnless/ai": "workspace:*",
     "@burnless/db": "workspace:*",
     "@burnless/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "drizzle-orm": "^0.38.0",
-    "commander": "^14.0.0"
-  },
-  "devDependencies": {
-    "@burnless/ai": "workspace:*",
     "@types/node": "^22.19.15",
+    "commander": "^14.0.0",
+    "drizzle-orm": "^0.38.0",
     "tsup": "^8.5.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
