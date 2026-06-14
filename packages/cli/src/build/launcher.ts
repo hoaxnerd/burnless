@@ -1,9 +1,23 @@
 /**
  * The `burnless` launcher staged at the artifact root (spec §2: `versions/current/burnless`).
  * `delegateToArtifact`/`bin/burnless` exec THIS; it resolves a Node (mirroring
- * `resolveNodeBinary`: BURNLESS_NODE → the launcher-managed runtime/bin/node → system node)
- * and execs the bundled CLI entry, passing argv through. Resolves its own dir from `$0` so it
- * works when invoked via the `versions/current` symlink or the `bin/burnless` symlink.
+ * `resolveNodeBinary`) and execs the bundled CLI entry, passing argv through. Resolves its
+ * own dir from `$0` so it works when invoked via the `versions/current` symlink or the
+ * `bin/burnless` symlink.
+ *
+ * Node precedence:
+ *   1. `BURNLESS_NODE`                — explicit override (always wins).
+ *   2. `<home>/runtime/bin/node`      — the installer's `--with-node` managed Node. This lives
+ *                                       at the HOME root (`$DIR/../../runtime`, sibling to
+ *                                       `versions/`) so it is DECOUPLED from versions/ and
+ *                                       survives `update` — exactly where `install.sh
+ *                                       --with-node` / `provision-node.sh` place it.
+ *   3. `<artifact>/runtime/bin/node`  — a Node bundled INSIDE the artifact (future per-platform
+ *                                       artifact variant; not used by the system-Node v1 build).
+ *   4. system `node`.
+ * Both managed-Node checks must be present: the installed layout puts the provisioned Node at
+ * the home root (decoupled), but a self-contained artifact could carry its own — the launcher
+ * honors whichever exists.
  */
 export function renderLauncherScript(): string {
   return [
@@ -17,7 +31,10 @@ export function renderLauncherScript(): string {
     '  case "$LINK" in /*) SELF="$LINK" ;; *) SELF="$(dirname "$SELF")/$LINK" ;; esac',
     "done",
     'DIR="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd -P)"',
+    "# The home root is two levels up from the artifact dir (<home>/versions/<ver>).",
+    'HOME_RUNTIME="$DIR/../../runtime/bin/node"',
     'NODE="${BURNLESS_NODE:-}"',
+    '[ -z "$NODE" ] && [ -x "$HOME_RUNTIME" ] && NODE="$HOME_RUNTIME"',
     '[ -z "$NODE" ] && [ -x "$DIR/runtime/bin/node" ] && NODE="$DIR/runtime/bin/node"',
     '[ -z "$NODE" ] && NODE=node',
     'exec "$NODE" "$DIR/cli/index.js" "$@"',
