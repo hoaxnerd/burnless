@@ -104,14 +104,12 @@ up_host() {
   export BURNLESS_DATA_DIR="$RUN/data"
   export BURNLESS_CONFIG_DIR="$RUN/config"
   export BURNLESS_DEPLOYMENT="self_host"
-  # The standalone artifact runs NODE_ENV=production, where the CSRF origin allowlist
-  # (apps/web/src/proxy.ts getAllowedOrigins) is NOT relaxed for loopback — with no
-  # allowlist configured every browser mutation (e.g. POST /api/ai-features/providers
-  # in the UI cred-path) is 403'd. Point the allowlist at the served origin so the
-  # browser E2E can mutate. (Real self-host operators set NEXT_PUBLIC_APP_URL; here the
-  # served origin IS the loopback BASE_URL.)
-  export NEXT_PUBLIC_APP_URL="$BASE_URL"
-  export ALLOWED_ORIGINS="$BASE_URL"
+  # CSRF origin allowlist: on the host path the server binds loopback DIRECTLY, so the
+  # bind origin == the accessed BASE_URL. As of S5 P4 11a, `burnless start` auto-defaults
+  # NEXT_PUBLIC_APP_URL to the loopback bind origin when unset — so the allowlist is
+  # non-empty out-of-the-box and no explicit export is needed here (real first-run parity).
+  # (The Docker path below DOES set it explicitly: there the server binds 0.0.0.0 but is
+  # accessed via the 127.0.0.1 port-forward, so the accessed origin differs from the bind.)
 
   echo "== bootstrap + 2a read-check =="
   node "$CLI" bootstrap
