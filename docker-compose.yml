@@ -1,13 +1,16 @@
 # Burnless — Local Development Stack
 # Usage: docker compose up -d
 #
-# Default: starts core infra only (Postgres, Redis, Mailpit).
-# The app connects to your HOST Ollama at localhost:11434 — no Docker Ollama needed
-# if you already have Ollama running locally.
+# Starts Postgres only (the monorepo dev database).
+# AI: the app uses your HOST Ollama at localhost:11434, or set a cloud provider key.
+# Email: dev defaults to the console provider (emails logged to stdout) — no SMTP needed.
 #
-# For devs without local Ollama:
-#   docker compose --profile ollama up -d
-# This starts a containerized Ollama + auto-pulls models.
+# Redis is OPTIONAL and only used by the hosted/cloud rate-limiter; self-host falls
+# back to an in-memory limiter when REDIS_URL is unset. Start it with the cloud profile:
+#   docker compose --profile cloud up -d
+#
+# NOTE: standalone self-host needs NO Docker at all (embedded PGLite). This stack is
+# for monorepo development and the cloud/heavy deployment path.
 
 services:
   # ── Database (PostgreSQL + pgvector) ────────────────────────────────────────
@@ -30,10 +33,13 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Cache / Job Queue ───────────────────────────────────────────────────────
+  # ── Cache / Rate-limit backend (cloud-only; OPTIONAL) ───────────────────────
+  # Self-host uses an in-memory limiter; Redis is only for the hosted/cloud path.
+  # Start with: docker compose --profile cloud up -d
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    profiles: ["cloud"]
     ports:
       - "6380:6379"
     volumes:
@@ -44,54 +50,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Local LLM (Ollama) — OPTIONAL ──────────────────────────────────────────
-  # Only needed if you don't have Ollama running on your host machine.
-  # Start with: docker compose --profile ollama up -d
-  # The app defaults to localhost:11434 which hits your host Ollama.
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    profiles: ["ollama"]
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  # Auto-pull the chat + embedding models on first boot
-  ollama-init:
-    image: ollama/ollama:latest
-    profiles: ["ollama"]
-    depends_on:
-      ollama:
-        condition: service_healthy
-    restart: "no"
-    entrypoint: ["/bin/sh", "-c", "ollama pull gemma3:12b && ollama pull nomic-embed-text"]
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-
-  # ── Email (Mailpit) ────────────────────────────────────────────────────────
-  # Web UI: http://localhost:8025
-  # SMTP: localhost:1025 (no auth required)
-  # Production: switch to Resend, SendGrid, or SES
-  mailpit:
-    image: axllent/mailpit:latest
-    restart: unless-stopped
-    ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # Web UI
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8025/api/v1/info || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
 volumes:
   pgdata:
   redisdata:
-  ollama_models:
