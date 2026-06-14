@@ -25,6 +25,13 @@ jobs:
           node-version: "22"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+
+      # Gate the release on the npm package being installable (zero runtime deps). The
+      # founder publishes `burnless` to npm manually after this release builds, so failing
+      # here is a red X before that publish — not after, like burnless@0.1.0.
+      - name: Verify npm package installs cleanly
+        run: bash scripts/verify-npm-package.sh
+
       - run: pnpm build:artifact
 
       # build-artifact.ts emits dist-artifact/burnless-<ver>.tar.gz + <tarball>.sha256 (per-file,

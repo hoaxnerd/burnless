@@ -75,6 +75,31 @@ jobs:
       - name: Run web tests
         run: pnpm --filter @burnless/web test
 
+  npm-package:
+    name: NPM Package Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `burnless` is the only public npm package and is fully tsup-bundled, so it must
+      # ship with zero runtime deps. This packs it and clean-installs the tarball outside
+      # the workspace — catching any reintroduced workspace:/file: dep before publish.
+      # (burnless@0.1.0 shipped broken this way; verify-fat-artifact covers only the
+      # curl|sh / GitHub-Releases path, not the npm-package path.)
+      - name: Verify burnless npm package installs cleanly
+        run: bash scripts/verify-npm-package.sh
+
   build:
     name: Build
     runs-on: ubuntu-latest
