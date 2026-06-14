@@ -47,7 +47,13 @@ function run(cmd: string, args: string[], env: NodeJS.ProcessEnv = {}): void {
 
 function copyDir(from: string, to: string): void {
   mkdirSync(dirname(to), { recursive: true });
-  cpSync(from, to, { recursive: true });
+  // verbatimSymlinks: keep symlinks AS-IS. Next's standalone output uses RELATIVE symlinks
+  // (e.g. apps/web/node_modules/next -> ../../../node_modules/.pnpm/next.../node_modules/next).
+  // cpSync's default (verbatimSymlinks:false) realpath-resolves them to ABSOLUTE build-tree
+  // paths (/Users/.../apps/web/.next/standalone/...), which only resolve on the build host —
+  // the artifact then fails "Cannot find module 'next'" on any other machine (e.g. Linux
+  // Docker). Preserving the relative links keeps the artifact portable.
+  cpSync(from, to, { recursive: true, verbatimSymlinks: true });
 }
 
 function copyFile(from: string, to: string): void {
@@ -151,6 +157,15 @@ async function main(): Promise<void> {
   copyDir(join(webBuild, "static"), join(stageDir, "web/apps/web/.next/static"));
   const publicDir = join(repoRoot, "apps/web/public");
   if (existsSync(publicDir)) copyDir(publicDir, join(stageDir, "web/apps/web/public"));
+
+  // 2b. Strip the build machine's `.env` that Next copies into standalone. It carries the
+  // dev DATABASE_URL (postgresql://…@localhost:5432) + dev secrets; shipping it (a) leaks
+  // build-host secrets and (b) forces the server onto a Postgres that does not exist on the
+  // target — the artifact must default to PGLite (resolveDriver: no DATABASE_URL → pglite).
+  // The CLI provisions the real instance.env per install; the bundled .env must not exist.
+  for (const envRel of ["web/.env", "web/apps/web/.env"]) {
+    rmSync(join(stageDir, envRel), { force: true });
+  }
 
   // 3. CLI bundle (pglite external — Task 1).
   run("pnpm", ["--filter", "burnless", "build"]);
