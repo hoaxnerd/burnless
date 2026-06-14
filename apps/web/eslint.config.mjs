@@ -1,11 +1,16 @@
 import coreWebVitals from "eslint-config-next/core-web-vitals";
 import typescript from "eslint-config-next/typescript";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /** @type {import("eslint").Linter.Config[]} */
 const config = [
   ...coreWebVitals,
   ...typescript,
   {
+    // ESLint flat config scopes plugins per-object: the react-hooks/* rules below
+    // require the plugin registered in THIS object (it does not cascade from the
+    // eslint-config-next spreads above).
+    plugins: { "react-hooks": reactHooks },
     rules: {
       "@typescript-eslint/no-unused-vars": [
         "warn",
