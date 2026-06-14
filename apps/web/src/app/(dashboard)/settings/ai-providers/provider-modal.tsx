@@ -8,6 +8,7 @@ import {
   type ProviderKind,
 } from "@burnless/ai";
 import { Button, Input, Modal, useConfirm } from "@/components/ui";
+import { toUserMessage } from "@/lib/api-error";
 import {
   addAiProviderModel,
   createAiProvider,
@@ -113,7 +114,7 @@ function ModalBody({
         setTestMsg(res.model ?? res.response ?? "Connected");
       } else {
         setTestState("error");
-        setTestMsg(res.error ?? "Test failed");
+        setTestMsg(res.error ? toUserMessage(res.error) : "Test failed");
       }
     } catch {
       setTestState("error");
@@ -162,7 +163,7 @@ function ModalBody({
       onSaved();
       onClose();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed. Please try again.");
+      setSaveError(err instanceof Error ? toUserMessage(err) : "Save failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -182,7 +183,7 @@ function ModalBody({
       onSaved();
       onClose();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Remove failed. Please try again.");
+      setSaveError(err instanceof Error ? toUserMessage(err) : "Remove failed. Please try again.");
     }
   }
 
