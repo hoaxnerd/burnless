@@ -59,7 +59,11 @@ export async function createClient(resolved: ResolvedDriver): Promise<DbHandle> 
   if (resolved.driver === "postgres") {
     const { drizzle: drizzlePostgres } = await import("drizzle-orm/postgres-js");
     const { default: postgres } = await import("postgres");
-    const client = postgres(resolved.connectionString, { max: 10 });
+    // prepare:false → use the simple query protocol so we work through a
+    // transaction-mode connection pooler (Neon/Supabase PgBouncer, the standard
+    // serverless setup), which rejects prepared/named statements. Harmless on a
+    // direct connection. max:10 caps per-instance connections.
+    const client = postgres(resolved.connectionString, { max: 10, prepare: false });
     return {
       db: drizzlePostgres(client, { schema }),
       dialect: "postgres",
