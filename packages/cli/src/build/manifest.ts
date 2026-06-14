@@ -4,7 +4,7 @@
  * `.sha256`) and to verify an extracted artifact wasn't corrupted.
  */
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { ARTIFACT_LAYOUT_VERSION } from "../local/artifact-layout";
 
@@ -27,12 +27,21 @@ function walk(dir: string, root: string, out: string[]): void {
       walk(abs, root, out);
     } else if (entry.isFile()) {
       out.push(relative(root, abs));
+    } else if (entry.isSymbolicLink()) {
+      // Record the symlink itself (hashed by its link TARGET STRING below), but do NOT
+      // recurse INTO it — following links risks node_modules symlink cycles/explosion.
+      out.push(relative(root, abs));
     }
   }
 }
 
+/**
+ * Hash a manifest entry. For a symlink, hash its link TARGET STRING (not the resolved
+ * content) — cycle-safe and detects retargeting. For a regular file, hash its content.
+ */
 function sha256(abs: string): string {
-  return createHash("sha256").update(readFileSync(abs)).digest("hex");
+  const content = lstatSync(abs).isSymbolicLink() ? Buffer.from(readlinkSync(abs)) : readFileSync(abs);
+  return createHash("sha256").update(content).digest("hex");
 }
 
 export interface ManifestMeta {
@@ -50,7 +59,8 @@ export function buildManifest(root: string, meta: ManifestMeta): Manifest {
     .sort()
     .map<ManifestFile>((rel) => {
       const abs = join(root, ...rel.split("/"));
-      return { path: rel, sha256: sha256(abs), bytes: statSync(abs).size };
+      const bytes = lstatSync(abs).isSymbolicLink() ? readlinkSync(abs).length : statSync(abs).size;
+      return { path: rel, sha256: sha256(abs), bytes };
     });
   return { version: meta.version, layoutVersion: ARTIFACT_LAYOUT_VERSION, builtAt: meta.builtAt, files };
 }

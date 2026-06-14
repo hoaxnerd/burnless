@@ -8,6 +8,8 @@ import {
 import {
   pAdd, pDisable, pEnable, pList, pRemove, resolveLocalCompanyId, resolveProviderForTest, pSetDefault, pSetKey,
 } from "../local/ai-provider-ops";
+import { prepLocal } from "../commands/ai-config";
+import { ensureSecretsKey } from "../local/secrets";
 
 let dataDir: string;
 beforeEach(async () => {
@@ -87,6 +89,38 @@ describe("provider CRUD (local, direct)", () => {
 
   it("throws a clear error for an unknown provider name", async () => {
     await expect(pSetKey("ghost", "k")).rejects.toThrow(/ghost/i);
+  });
+});
+
+describe("prepLocal sources SECRETS_ENCRYPTION_KEY from instance.env (bare-CLI flow)", () => {
+  let configDir: string;
+  beforeEach(() => {
+    configDir = mkdtempSync(join(os.tmpdir(), "bl-aiprov-cfg-"));
+    process.env.BURNLESS_CONFIG_DIR = configDir;
+  });
+  afterEach(() => {
+    rmSync(configDir, { recursive: true, force: true });
+    delete process.env.BURNLESS_CONFIG_DIR;
+  });
+
+  it("provider add succeeds in a fresh process whose env lacks the key but instance.env has it", async () => {
+    // 1) Bootstrap-equivalent: generate + persist SECRETS_ENCRYPTION_KEY to instance.env.
+    delete process.env.SECRETS_ENCRYPTION_KEY;
+    __resetSecretsKeyCache();
+    ensureSecretsKey({}); // writes to instance.env (BURNLESS_CONFIG_DIR) AND sets process.env
+
+    // 2) Simulate a SEPARATE `burnless provider add` process: the key is only on disk now.
+    delete process.env.SECRETS_ENCRYPTION_KEY;
+    __resetSecretsKeyCache();
+    expect(process.env.SECRETS_ENCRYPTION_KEY).toBeUndefined();
+
+    // 3) The handler's prep step must source the key from instance.env, so encryption works.
+    prepLocal();
+    expect(process.env.SECRETS_ENCRYPTION_KEY).toBeDefined();
+    __resetSecretsKeyCache();
+    const created = await pAdd({ name: "OAI", kind: "openai-compatible", baseUrl: "https://example.test/v1", apiKey: "sk-test" });
+    expect(created.apiKeySet).toBe(true);
+    expect((await pList()).find((p) => p.name === "OAI")!.apiKeySet).toBe(true);
   });
 });
 

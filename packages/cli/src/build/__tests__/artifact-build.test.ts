@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -62,5 +62,19 @@ describe("manifest", () => {
     expect(verifyManifest(root, m)).toEqual([]);
     writeFileSync(join(root, "cli/index.js"), "TAMPERED");
     expect(verifyManifest(root, m)).toContain("cli/index.js");
+  });
+  it("indexes symlinks (by link target) and flags a retargeted symlink", () => {
+    touch("real/target.js", "real-body");
+    touch("real/other.js", "other-body");
+    symlinkSync("target.js", join(root, "real/link.js")); // relative symlink → real/target.js
+    const m = buildManifest(root, { version: "0.1.0", builtAt: "2026-06-14T00:00:00.000Z" });
+    const link = m.files.find((f) => f.path === "real/link.js");
+    expect(link).toBeDefined();
+    expect(link!.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(verifyManifest(root, m)).toEqual([]);
+    // Retarget the symlink: its link string changes even though pointee content didn't.
+    unlinkSync(join(root, "real/link.js"));
+    symlinkSync("other.js", join(root, "real/link.js"));
+    expect(verifyManifest(root, m)).toContain("real/link.js");
   });
 });
