@@ -1,0 +1,5 @@
+Burnless
+Copyright (C) 2026 Hariom Tiwari
+
+The server and @burnless/* packages are licensed under AGPL-3.0-or-later (see ./LICENSE).
+The `burnless` CLI is licensed under Apache-2.0 (see ./packages/cli/LICENSE).

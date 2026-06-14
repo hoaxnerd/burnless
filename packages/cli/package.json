@@ -2,7 +2,7 @@
   "name": "burnless",
   "version": "0.1.0",
   "description": "The Burnless CLI — drive your Burnless instance from the terminal over MCP",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "burnless": "./dist/index.thin.js"
