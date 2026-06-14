@@ -9,7 +9,6 @@ coverage
 .env.local
 .env.*.local
 *.log
-
 agents/*/HEARTBEAT.md
 agents/*/screenshots
 *.png

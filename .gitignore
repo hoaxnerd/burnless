@@ -55,8 +55,6 @@ agents/*/smoke-test/
 # Root-level screenshots (ad-hoc agent artifacts)
 /*.png
 
-
-
 .gstack/
 
 # Local pre-launch QA artifacts (screenshots, journal copy) — report is committed separately

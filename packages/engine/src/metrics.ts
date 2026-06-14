@@ -4,7 +4,7 @@
  * Takes aggregated financial data and subscription details as input,
  * returns computed metric values over time.
  *
- * Covers the 62+ metrics standard FP&A and SaaS finance metrics:
+ * Covers 62+ standard FP&A / SaaS finance metrics:
  * - Revenue: ARR, MRR, ARPA, ARPU, Revenue Run Rate, TTM
  * - Cash: Burn Rate, Runway, Cash Position
  * - SaaS: Churn, LTV, CAC, LTV:CAC, CAC Payback, Magic Number, Quick Ratio, Rule of 40
