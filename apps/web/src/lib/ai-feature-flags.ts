@@ -110,7 +110,7 @@ export async function getCreditStatus(companyId: string, planKey?: string): Prom
  * Check if a specific AI feature is allowed to make LLM calls.
  * Returns { allowed, reason, creditStatus } for use in API routes.
  *
- * Single DB query for flags (including BYOK fields) via getAiFlags.
+ * Single DB query for flags (master, features, dataMode, writeMode) via getAiFlags.
  * Single getCompanyPlan call shared with getCreditStatus.
  */
 export async function checkAiFeatureAllowed(

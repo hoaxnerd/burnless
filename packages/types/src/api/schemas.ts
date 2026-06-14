@@ -23,7 +23,6 @@ export const revenueStreamTypeEnum = z.enum([
 // FUND-03: set-equal to the DB pgEnum (`funding_round_type`) and engine `FundingRoundType` union — both already include safe + convertible. Guarded by funding-round-schema-parity.test.ts.
 export const fundingRoundTypeEnum = z.enum(["pre_seed", "seed", "series_a", "series_b", "series_c_plus", "debt", "grant", "safe", "convertible"]);
 export const integrationTypeEnum = z.enum(["quickbooks", "xero", "freshbooks", "plaid", "mercury", "gusto", "stripe"]);
-export const aiProviderEnum = z.enum(["anthropic", "openai", "openrouter", "ollama"]);
 export const aiDataModeEnum = z.enum(["full", "show_cached", "hide_all"]);
 export const aiWriteModeEnum = z.enum(["full", "confirm", "read_only"]);
 
