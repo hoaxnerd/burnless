@@ -7,7 +7,22 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**"],
+      "env": [
+        "NODE_ENV",
+        "NEXT_PUBLIC_*",
+        "BURNLESS_DEPLOYMENT",
+        "BURNLESS_CAP_*"
+      ],
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "AUTH_SECRET",
+        "NEXTAUTH_SECRET",
+        "NEXTAUTH_URL",
+        "SECRETS_ENCRYPTION_KEY",
+        "CRON_SECRET",
+        "ALLOWED_ORIGINS"
+      ]
     },
     "lint": {
       "dependsOn": ["^build"]
