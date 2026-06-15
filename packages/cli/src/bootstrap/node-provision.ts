@@ -5,6 +5,11 @@
  */
 import { configDir } from "../config";
 import { join } from "node:path";
+import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { fetchBytes } from "./release";
 
 export const PINNED_NODE_VERSION = "v22.14.0";
 
@@ -38,12 +43,6 @@ export function runtimeDir(home?: string): string {
 export function vendoredNodePath(home?: string): string {
   return join(runtimeDir(home), "bin", "node");
 }
-
-import { existsSync, mkdtempSync, mkdirSync, cpSync, rmSync, readdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { fetchBytes } from "./release";
 
 const MUSL_LOADERS = ["/lib/ld-musl-x86_64.so.1", "/lib/ld-musl-aarch64.so.1"];
 
