@@ -5,7 +5,12 @@
  * including revenue-streams, metrics, and other endpoints.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { logInfoMock, logErrorMock } = vi.hoisted(() => ({
+  logInfoMock: vi.fn(),
+  logErrorMock: vi.fn(),
+}));
 
 // Mock auth and db before importing api-helpers
 vi.mock("../auth", () => ({
@@ -20,8 +25,11 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
 }));
+vi.mock("../logger", () => ({
+  logger: () => ({ info: logInfoMock, error: logErrorMock, warn: vi.fn(), debug: vi.fn() }),
+}));
 
-import { requireRole, errorResponse, parseBody } from "../api-helpers";
+import { requireRole, errorResponse, parseBody, withErrorHandler } from "../api-helpers";
 
 describe("errorResponse", () => {
   it("returns JSON error with correct status", async () => {
@@ -97,6 +105,67 @@ describe("requireRole", () => {
     const res = requireRole({ role: "unknown" }, "viewer");
     expect(res).not.toBeNull();
     expect(res!.status).toBe(403);
+  });
+});
+
+describe("withErrorHandler — logging (E2)", () => {
+  beforeEach(() => {
+    logInfoMock.mockReset();
+    logErrorMock.mockReset();
+  });
+
+  it("logs a concise info completion line on success (method, path, status, duration)", async () => {
+    const handler = withErrorHandler(async (_request: Request) =>
+      errorResponse("ok", 200)
+    );
+    const req = new Request("http://localhost/api/metrics?secret=should-not-log", {
+      method: "GET",
+      headers: { "x-request-id": "req-123" },
+    });
+    await handler(req);
+
+    expect(logInfoMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logInfoMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({
+      requestId: "req-123",
+      method: "GET",
+      pathname: "/api/metrics",
+      status: 200,
+    });
+    expect(typeof (ctx as { durationMs: number }).durationMs).toBe("number");
+    expect(msg).toBe("GET /api/metrics 200");
+    // Never logs query strings / bodies.
+    expect(JSON.stringify({ ctx, msg })).not.toContain("secret");
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("logs an error line and returns a safe 500 when the handler throws", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new Error("boom: connection refused at 10.0.0.1:5432");
+    });
+    const req = new Request("http://localhost/api/transactions", { method: "POST" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Internal server error");
+
+    expect(logErrorMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logErrorMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "POST", pathname: "/api/transactions" });
+    expect((ctx as { err: Error }).err).toBeInstanceOf(Error);
+    expect(msg).toBe("POST /api/transactions failed");
+    // The thrown 500 path must NOT also emit a success info line.
+    expect(logInfoMock).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the handler takes no Request arg (declared () => …)", async () => {
+    const handler = withErrorHandler(async () => errorResponse("ok", 204));
+    const res = await (handler as () => Promise<Response>)();
+    expect(res.status).toBe(204);
+    expect(logInfoMock).toHaveBeenCalledTimes(1);
+    const [ctx] = logInfoMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "UNKNOWN", pathname: "unknown", status: 204 });
   });
 });
 
