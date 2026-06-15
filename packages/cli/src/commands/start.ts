@@ -3,6 +3,7 @@ import { dim } from "../ansi";
 import { renderBanner } from "../banner";
 import { runAction } from "../context";
 import { UsageError } from "../errors";
+import { confirm, withSpinner } from "../interactive";
 import { prepareArtifactEnv, resolveNodeBinary } from "../local/artifact";
 import { runMigrate } from "../local/db";
 import { loadInstanceEnv } from "../local/home";
@@ -74,6 +75,20 @@ export function exposeWarning(host: string, ownerClaimed: boolean): string {
   );
 }
 
+/**
+ * Decide whether to open a browser: explicit --open / --no-open win over the prompt;
+ * with neither flag, fall back to the interactive confirm (TTY-graceful, default yes).
+ */
+export async function resolveOpenBrowser(o: {
+  open?: boolean;
+  noOpen?: boolean;
+  confirmFn: () => Promise<boolean>;
+}): Promise<boolean> {
+  if (o.open) return true;
+  if (o.noOpen) return false;
+  return o.confirmFn();
+}
+
 /** `burnless start` — boot the local instance (spec §3/§4). */
 export function registerStart(program: Command): void {
   program
@@ -83,10 +98,11 @@ export function registerStart(program: Command): void {
     .option("--port <port>", "port to listen on", "2876")
     .option("--no-migrate", "skip applying migrations before boot")
     .option("--open", "open the app in a browser after start")
+    .option("--no-open", "do not open the browser (skip the prompt)")
     .option("--unsafe-expose", "allow binding a non-loopback host (see the warning)")
     .action(
       async (
-        opts: { host: string; port: string; migrate: boolean; open?: boolean; unsafeExpose?: boolean },
+        opts: { host: string; port: string; migrate: boolean; open?: boolean; noOpen?: boolean; unsafeExpose?: boolean },
         cmd: Command,
       ) => {
         await runAction(
@@ -155,7 +171,7 @@ export function registerStart(program: Command): void {
               // best-effort; never block start on the optional AI step
             }
 
-            if (opts.migrate) await runMigrate();
+            if (opts.migrate) await withSpinner("Applying migrations", () => runMigrate());
 
             // Loud (non-blocking) warning if exposing an unclaimed instance (S5 P2).
             if (!new Set(["127.0.0.1", "localhost", "::1", "[::1]"]).has(opts.host)) {
@@ -183,6 +199,18 @@ export function registerStart(program: Command): void {
               );
             }
 
+            // Decide browser-open BEFORE spawning so we don't prompt after the server is
+            // already running silently. commander's --open/--no-open pair collapses to a
+            // single `opts.open` (true | false | undefined). JSON mode is non-interactive:
+            // never prompt — open only if --open was explicitly passed.
+            const shouldOpen = ctx.json
+              ? opts.open === true
+              : await resolveOpenBrowser({
+                  open: opts.open === true,
+                  noOpen: opts.open === false,
+                  confirmFn: () => confirm({ message: "Open burnless in your browser?", default: true }),
+                });
+
             process.stderr.write(dim(`Starting on http://${displayHost}:${port} …`) + "\n");
             const child = startServer({
               entry,
@@ -191,7 +219,7 @@ export function registerStart(program: Command): void {
               env: process.env,
               nodeBin: resolveNodeBinary(),
             });
-            if (opts.open) {
+            if (shouldOpen) {
               void import("node:child_process").then(({ exec }) => {
                 const url = `http://${displayHost}:${port}`;
                 const opener =

@@ -73,7 +73,7 @@ export async function confirm(o: ConfirmOptions): Promise<boolean> {
 
 /** ora spinner when stdout is a TTY; plain start/finish logging otherwise. */
 export async function withSpinner<T>(text: string, fn: () => Promise<T>): Promise<T> {
-  if (process.stdout.isTTY !== true) {
+  if (process.stderr.isTTY !== true) {
     process.stderr.write(`${text}…\n`);
     return fn();
   }

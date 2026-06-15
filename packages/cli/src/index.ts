@@ -46,10 +46,15 @@ if (isMain) {
     process.exit(err.exitCode === 0 ? 0 : 2);
   });
   const verbForBare = topVerb(process.argv);
-  const wantsVersion = process.argv.includes("-V") || process.argv.includes("--version");
-  if (verbForBare === undefined && !wantsVersion) {
+  const wantsHelpOrVersion =
+    process.argv.includes("-V") || process.argv.includes("--version") ||
+    process.argv.includes("-h") || process.argv.includes("--help");
+  if (verbForBare === undefined && !wantsHelpOrVersion) {
+    await program.parseAsync([process.argv[0]!, process.argv[1]!, "start"]);
+  } else if (verbForBare === undefined) {
     program.outputHelp();
     process.exit(0);
+  } else {
+    await program.parseAsync(process.argv);
   }
-  await program.parseAsync(process.argv);
 }
