@@ -82,4 +82,12 @@ describe("prompt run modes", () => {
       AUTONOMOUS_SYSTEM_PROMPT.replace(/\{\{COMPANION_NAME\}\}/g, "Companion"),
     );
   });
+
+  it("interactive scheduling prompt forbids claiming the automation is already created", () => {
+    const sp = buildSystemPrompt("Companion", "interactive");
+    expect(sp).toMatch(/do not (say|claim|imply|tell).{0,60}(created|scheduled|set up|activ|will run)/i);
+    // The autonomous overlay (no scheduling tool, no proposal cards) must NOT need this.
+    const autonomous = buildSystemPrompt("Companion", "autonomous");
+    expect(autonomous).not.toMatch(/nothing is saved until the user clicks Confirm/i);
+  });
 });
