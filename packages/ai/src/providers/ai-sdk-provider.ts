@@ -216,8 +216,12 @@ export class AiSdkProvider extends LlmProvider {
       tools: request.tools?.length ? toAiSdkTools(request.tools) : undefined,
       maxOutputTokens: request.maxTokens ?? this.config.maxTokens ?? 4096,
     });
+    const content = fromContentParts(result.content as AiContentPart[]);
+    if (content.length === 0) {
+      throw new EmptyCompletionError(typeof this.model === "string" ? this.model : (this.config.model ?? "unknown"));
+    }
     return {
-      content: fromContentParts(result.content as AiContentPart[]),
+      content,
       stopReason: mapFinishReason(result.finishReason),
       usage: result.usage
         ? { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }

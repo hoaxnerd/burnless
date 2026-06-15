@@ -26,6 +26,26 @@ function providerStreaming(chunks: V3StreamPart[], modelId = "test-model"): AiSd
   return new AiSdkProvider(model as never, { apiKey: "", model: modelId, maxTokens: 256 });
 }
 
+/**
+ * Build an AiSdkProvider whose underlying model returns the given non-streaming
+ * generate result. Exercises the real generateText() plumbing for complete().
+ */
+function providerGenerating(
+  content: V3StreamPart[],
+  modelId = "test-model"
+): AiSdkProvider {
+  const model = new MockLanguageModelV3({
+    modelId,
+    doGenerate: async () => ({
+      content: content as never,
+      finishReason: "stop" as never,
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } as never,
+      warnings: [],
+    }),
+  });
+  return new AiSdkProvider(model as never, { apiKey: "", model: modelId, maxTokens: 256 });
+}
+
 const REQ: CompletionRequest = {
   messages: [{ role: "user", content: "hi" }],
 };
@@ -113,5 +133,22 @@ describe("AiSdkProvider.stream", () => {
     if (last?.type === "done") {
       expect(last.response.content.some((b) => b.type === "tool_use")).toBe(true);
     }
+  });
+});
+
+describe("AiSdkProvider.complete", () => {
+  test("empty result (no text, no tool-call) throws EmptyCompletionError", async () => {
+    const provider = providerGenerating([], "google/gemini-2.5-flash-lite");
+    await expect(provider.complete(REQ)).rejects.toBeInstanceOf(EmptyCompletionError);
+  });
+
+  test("text result resolves normally", async () => {
+    const provider = providerGenerating([{ type: "text", text: "Hello" }]);
+    const res = await provider.complete(REQ);
+    const text = res.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    expect(text).toBe("Hello");
   });
 });
