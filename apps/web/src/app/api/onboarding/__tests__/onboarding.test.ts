@@ -8,9 +8,10 @@ import { NextResponse } from "next/server";
 
 /* ── Hoisted mocks ─────────────────────────────────────────────────── */
 
-const { mockGetAuthUser, mockGetUserCompany } = vi.hoisted(() => ({
+const { mockGetAuthUser, mockGetUserCompany, mockRevalidateTag } = vi.hoisted(() => ({
   mockGetAuthUser: vi.fn(),
   mockGetUserCompany: vi.fn(),
+  mockRevalidateTag: vi.fn(),
 }));
 
 const {
@@ -72,6 +73,10 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@/lib/logger", () => ({
   logger: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidateTag: mockRevalidateTag,
 }));
 
 import { POST } from "../route";
@@ -299,6 +304,29 @@ describe("POST /api/onboarding", () => {
     expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
+  /* ── Cache invalidation contract (fix #3: empty dashboard on first load) ── */
+
+  // Onboarding is a WRITER of several cached domains (scenarios, accounts,
+  // departments). The dashboard reads the active scenario via getDefaultScenario,
+  // which is wrapped in unstable_cache tagged "scenarios". Without invalidation a
+  // stale `null` (cached before the scenario existed) renders "Create Your First
+  // Scenario" on the first soft-nav to /dashboard. The route MUST revalidate.
+  it("revalidates the scenarios cache on the CREATE path", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue(null);
+
+    const txResult = { companyId: "new-co", scenarioId: "new-scenario" };
+    mockTransaction.mockImplementation(async () => txResult);
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(201);
+
+    const tags = mockRevalidateTag.mock.calls.map((c) => c[0]);
+    expect(tags).toContain("scenarios");
+    expect(tags).toContain("accounts");
+    expect(tags).toContain("departments");
+  });
+
   it("uses default values when optional fields omitted", async () => {
     mockGetAuthUser.mockResolvedValue({ id: "user-1" });
     mockGetUserCompany.mockResolvedValue(null);
@@ -474,6 +502,24 @@ describe("POST /api/onboarding", () => {
     expect((rowsFor("financialAccounts") as unknown[]).length).toBeGreaterThanOrEqual(6);
     expect(rowsFor("departments")).toHaveLength(5);
     expect(rowsFor("aiFeatureFlags")).toHaveLength(1);
+  });
+
+  // Same invalidation contract on the CLAIM path: the claim creates the base
+  // scenario (the dashboard's read dependency) and must revalidate "scenarios".
+  it("revalidates the scenarios cache on the CLAIM path", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(false);
+
+    recordClaimTransaction();
+
+    const res = await POST(makeRequest({ company_name: "Acme Corp" }));
+    expect(res.status).toBe(201);
+
+    const tags = mockRevalidateTag.mock.calls.map((c) => c[0]);
+    expect(tags).toContain("scenarios");
+    expect(tags).toContain("accounts");
+    expect(tags).toContain("departments");
   });
 
   // Claim is NON-DESTRUCTIVE: an omitted optional field (industry/user_name)
