@@ -1,6 +1,6 @@
 {
   "name": "burnless",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The Burnless CLI — drive your Burnless instance from the terminal over MCP",
   "license": "Apache-2.0",
   "type": "module",
