@@ -21,6 +21,7 @@ import {
   type AiWriteMode,
 } from "@burnless/ai";
 import { executeToolCall, describeToolAction } from "@/lib/ai-tools";
+import { logger } from "@/lib/logger";
 
 export interface ChatStreamParams {
   companyId: string;
@@ -423,6 +424,13 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           }
         }
       } catch (error) {
+        // Self-host operators get NO visibility into chat failures otherwise: the
+        // error chunk goes to the browser, never to the server log. Log it here
+        // (safe identifiers + the error only — never prompt/message bodies).
+        logger("chat").error(
+          { err: error instanceof Error ? error : undefined, conversationId: params.conversationId },
+          "chat stream failed",
+        );
         const clean = fullResponse.replace(THINK_TAG, "").trim();
         if (clean) {
           await db
