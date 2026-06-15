@@ -127,9 +127,11 @@ export function GenProposeScheduledJob({
       });
       if (!res.ok) throw new Error("Could not schedule the automation.");
       await res.json().catch(() => null);
-      // Revalidate the Automations list so the new job appears immediately.
-      await mutate(KEYS.automations);
       setStatus("scheduled");
+      // Revalidate the Automations list so the new job appears immediately.
+      // Fire-and-forget: the job is already saved, so a revalidation hiccup must
+      // not flip this card to an error state (that would misreport a success).
+      void mutate(KEYS.automations);
       onAction?.(`Scheduled '${name}'. Anything else?`);
     } catch (err) {
       setStatus("error");
