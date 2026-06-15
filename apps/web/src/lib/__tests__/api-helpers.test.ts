@@ -7,9 +7,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { logInfoMock, logErrorMock } = vi.hoisted(() => ({
+const { logInfoMock, logErrorMock, logWarnMock } = vi.hoisted(() => ({
   logInfoMock: vi.fn(),
   logErrorMock: vi.fn(),
+  logWarnMock: vi.fn(),
 }));
 
 // Mock auth and db before importing api-helpers
@@ -26,10 +27,13 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
 }));
 vi.mock("../logger", () => ({
-  logger: () => ({ info: logInfoMock, error: logErrorMock, warn: vi.fn(), debug: vi.fn() }),
+  logger: () => ({ info: logInfoMock, error: logErrorMock, warn: logWarnMock, debug: vi.fn() }),
 }));
 
+import { z } from "zod";
 import { requireRole, errorResponse, parseBody, withErrorHandler } from "../api-helpers";
+import { ScenarioSafetyError } from "../scenario-middleware";
+import { ConfirmableError } from "../confirmable-error";
 
 describe("errorResponse", () => {
   it("returns JSON error with correct status", async () => {
@@ -112,6 +116,7 @@ describe("withErrorHandler — logging (E2)", () => {
   beforeEach(() => {
     logInfoMock.mockReset();
     logErrorMock.mockReset();
+    logWarnMock.mockReset();
   });
 
   it("logs a concise info completion line on success (method, path, status, duration)", async () => {
@@ -166,6 +171,56 @@ describe("withErrorHandler — logging (E2)", () => {
     expect(logInfoMock).toHaveBeenCalledTimes(1);
     const [ctx] = logInfoMock.mock.calls[0]!;
     expect(ctx).toMatchObject({ method: "UNKNOWN", pathname: "unknown", status: 204 });
+  });
+
+  it("warns (not 500) and never leaks the issue array on a ZodError → 400", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      // Trigger a real ZodError so withErrorHandler's instanceof branch fires.
+      z.object({ amount: z.number() }).parse({ amount: "not-a-number-SECRET" });
+      return errorResponse("unreachable", 200);
+    });
+    const req = new Request("http://localhost/api/forecast-lines", { method: "POST" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(400);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "POST", pathname: "/api/forecast-lines", status: 400 });
+    expect(msg).toBe("POST /api/forecast-lines 400 validation");
+    // No body / issue-array leakage in the log line.
+    expect(JSON.stringify({ ctx, msg })).not.toContain("SECRET");
+    expect(logErrorMock).not.toHaveBeenCalled();
+    expect(logInfoMock).not.toHaveBeenCalled();
+  });
+
+  it("warns on a ScenarioSafetyError → 409", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new ScenarioSafetyError("cookie/header scenario mismatch");
+    });
+    const req = new Request("http://localhost/api/transactions", { method: "PATCH" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(409);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "PATCH", pathname: "/api/transactions", status: 409, code: "SCENARIO_SAFETY" });
+    expect(msg).toBe("PATCH /api/transactions 409 scenario-safety");
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("warns on a ConfirmableError → 409", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new ConfirmableError("currency change needs confirmation", "CURRENCY_CHANGE");
+    });
+    const req = new Request("http://localhost/api/company", { method: "PATCH" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(409);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "PATCH", pathname: "/api/company", status: 409, code: "CONFIRMABLE" });
+    expect(msg).toBe("PATCH /api/company 409 confirmable");
+    expect(logErrorMock).not.toHaveBeenCalled();
   });
 });
 

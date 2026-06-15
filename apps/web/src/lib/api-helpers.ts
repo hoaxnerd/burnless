@@ -173,8 +173,15 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
       const { method, pathname, requestId } = safeRequestMeta(args[0]);
       const log = logger("api");
 
+      // Handled rejections (validation / scenario-safety / confirmable) return a
+      // 4xx, not a 500. They still get a concise warn line so a self-host operator
+      // can see *why* a request was rejected (e.g. a 409 scenario lockout is exactly
+      // the kind of thing one needs to debug) — never the Zod issue array or the
+      // confirmable payload, only a safe status + code.
+
       // Return 400 for validation errors instead of 500
       if (error instanceof ZodError) {
+        log.warn({ requestId, method, pathname, status: 400 }, `${method} ${pathname} 400 validation`);
         return NextResponse.json(
           { error: friendlyZodMessage(error) },
           { status: 400 }
@@ -183,6 +190,7 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
 
       // Return 409 when scenario safety check fails
       if (error instanceof ScenarioSafetyError) {
+        log.warn({ requestId, method, pathname, status: 409, code: "SCENARIO_SAFETY" }, `${method} ${pathname} 409 scenario-safety`);
         return NextResponse.json(
           { error: error.message, code: "SCENARIO_SAFETY" },
           { status: 409 }
@@ -191,6 +199,7 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
 
       // Return 409 when a mutation requires explicit confirmation from the client
       if (error instanceof ConfirmableError) {
+        log.warn({ requestId, method, pathname, status: 409, code: "CONFIRMABLE" }, `${method} ${pathname} 409 confirmable`);
         return NextResponse.json(serializeConfirmable(error), { status: 409 });
       }
 
