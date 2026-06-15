@@ -53,13 +53,36 @@ const CSRF_EXEMPT_PATHS = new Set(["/api/oauth/token", "/api/oauth/register"]);
  * Allowed origins for CSRF protection.
  * In production, this should be set via NEXT_PUBLIC_APP_URL or ALLOWED_ORIGINS env var.
  */
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+/** Loopback aliases (localhost / 127.0.0.1 / ::1) are the same trust principal.
+ *  If any loopback origin is allowed for a (protocol, port), allow all its aliases —
+ *  so a self-host user who opens localhost isn't CSRF-blocked when the allowlist was
+ *  configured with 127.0.0.1 (or vice-versa). Does not affect non-loopback (cloud) origins. */
+function expandLoopbackAliases(origins: Set<string>): Set<string> {
+  const out = new Set(origins);
+  for (const o of origins) {
+    try {
+      const u = new URL(o);
+      // Node's URL.hostname returns "[::1]" (bracketed) for IPv6 loopback; normalize
+      // a bare "::1" too in case a future runtime drops the brackets.
+      const host = u.hostname === "::1" ? "[::1]" : u.hostname;
+      if (LOOPBACK_HOSTS.includes(host)) {
+        const portPart = u.port ? `:${u.port}` : "";
+        for (const alias of LOOPBACK_HOSTS) out.add(`${u.protocol}//${alias}${portPart}`);
+      }
+    } catch { /* ignore malformed origin */ }
+  }
+  return out;
+}
+
 function getAllowedOrigins(): Set<string> {
   const origins = new Set<string>();
   if (process.env.NEXT_PUBLIC_APP_URL) origins.add(new URL(process.env.NEXT_PUBLIC_APP_URL).origin);
   if (process.env.ALLOWED_ORIGINS) {
     process.env.ALLOWED_ORIGINS.split(",").forEach((o) => origins.add(o.trim()));
   }
-  return origins;
+  return expandLoopbackAliases(origins);
 }
 
 /**

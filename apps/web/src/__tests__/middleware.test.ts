@@ -331,6 +331,62 @@ describe("middleware", () => {
         const res = await proxy(req);
         expect(res.status).not.toBe(403);
       });
+
+      // Self-host regression (fix #8): localhost / 127.0.0.1 / ::1 are the same
+      // loopback trust principal. A self-host artifact configured with 127.0.0.1
+      // must still accept a user who opens localhost (and vice-versa, and ::1).
+      it("loopback aliases are mutually allowed in production (localhost allowed when 127.0.0.1 configured)", async () => {
+        process.env.ALLOWED_ORIGINS = "http://127.0.0.1:2876";
+        const req = createRequest("/api/accounts", {
+          method: "POST",
+          headers: { origin: "http://localhost:2876" },
+        });
+        const res = await proxy(req);
+        expect(res.status).not.toBe(403);
+      });
+
+      it("loopback aliases include ::1 in production (::1 allowed when 127.0.0.1 configured)", async () => {
+        process.env.ALLOWED_ORIGINS = "http://127.0.0.1:2876";
+        const req = createRequest("/api/accounts", {
+          method: "POST",
+          headers: { origin: "http://[::1]:2876" },
+        });
+        const res = await proxy(req);
+        expect(res.status).not.toBe(403);
+      });
+
+      it("loopback aliasing is port-scoped (different port still rejected)", async () => {
+        process.env.ALLOWED_ORIGINS = "http://127.0.0.1:2876";
+        const req = createRequest("/api/accounts", {
+          method: "POST",
+          headers: { origin: "http://localhost:9999" },
+        });
+        const res = await proxy(req);
+        expect(res.status).toBe(403);
+      });
+
+      it("a non-loopback configured origin does NOT gain loopback aliases", async () => {
+        process.env.ALLOWED_ORIGINS = "https://app.burnless.ai";
+        const req = createRequest("/api/accounts", {
+          method: "POST",
+          headers: { origin: "http://localhost:2876" },
+        });
+        const res = await proxy(req);
+        expect(res.status).toBe(403);
+      });
+
+      // Security regression: loopback expansion matches the hostname EXACTLY
+      // (LOOPBACK_HOSTS.includes(host)), never a substring. A lookalike domain
+      // like localhost.evil.com must NOT be treated as a loopback alias.
+      it("does not treat a lookalike host (localhost.evil.com) as a loopback alias", async () => {
+        process.env.ALLOWED_ORIGINS = "http://127.0.0.1:2876";
+        const req = createRequest("/api/accounts", {
+          method: "POST",
+          headers: { origin: "http://localhost.evil.com:2876" },
+        });
+        const res = await proxy(req);
+        expect(res.status).toBe(403);
+      });
     });
   });
 
