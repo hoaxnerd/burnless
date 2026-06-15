@@ -1,8 +1,9 @@
 import { LandingNav } from "@/components/landing/nav";
 import { HeroSection } from "@/components/landing/hero";
-// import { SocialProofBar } from "@/components/landing/social-proof"; // Integrations — restore when live
-import { FeatureBento } from "@/components/landing/features";
-import { AIDemoSection } from "@/components/landing/ai-demo";
+import { TaglineBand } from "@/components/landing/tagline-band";
+import { DashboardPreview } from "@/components/landing/dashboard-preview";
+import { OpenSourceBand } from "@/components/landing/open-source-band";
+import { Editions } from "@/components/landing/editions";
 import { CTASection } from "@/components/landing/cta";
 import { LandingFooter } from "@/components/landing/footer";
 
@@ -19,11 +20,10 @@ export default function HomePage() {
       <LandingNav />
       <main>
         <HeroSection />
-        <FeatureBento />
-        <AIDemoSection />
-        {/* Integrations bar — coming soon. Restore <SocialProofBar /> here (sits
-            below the product tour + companion demo) once integrations ship. */}
-        {/* <SocialProofBar /> */}
+        <TaglineBand />
+        <DashboardPreview />
+        <OpenSourceBand />
+        <Editions />
         <CTASection />
       </main>
       <LandingFooter />
