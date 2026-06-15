@@ -3,7 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock("@/lib/api-fetch", () => ({ apiFetch }));
+const { mutate } = vi.hoisted(() => ({ mutate: vi.fn() }));
+vi.mock("swr", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("swr")>();
+  return { ...actual, useSWRConfig: () => ({ ...actual.useSWRConfig(), mutate }) };
+});
 import { GenProposeScheduledJob } from "../propose-scheduled-job";
+import { KEYS } from "@/lib/swr/keys";
 
 const props = {
   name: "Weekly Stripe revenue sync",
@@ -21,7 +27,7 @@ const props = {
 };
 
 describe("GenProposeScheduledJob", () => {
-  beforeEach(() => { apiFetch.mockReset(); });
+  beforeEach(() => { apiFetch.mockReset(); mutate.mockReset(); });
 
   it("renders name, schedule label, dry-run preview, allowlist chips + write tag", () => {
     render(<GenProposeScheduledJob {...props} />);
@@ -42,6 +48,21 @@ describe("GenProposeScheduledJob", () => {
     expect(sent.schedule).toBe("0 9 * * 1");
     expect(sent.actionKind).toBe("write");
     await waitFor(() => expect(screen.getByText(/scheduled/i)).toBeTruthy());
+  });
+
+  it("revalidates the automations list after a successful Confirm", async () => {
+    apiFetch.mockResolvedValue({ ok: true, json: async () => ({ job: { id: "new" } }) });
+    render(<GenProposeScheduledJob {...props} />);
+    fireEvent.click(screen.getByText(/Confirm & schedule/i));
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith(KEYS.automations));
+  });
+
+  it("does NOT revalidate the automations list when Confirm fails", async () => {
+    apiFetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+    render(<GenProposeScheduledJob {...props} />);
+    fireEvent.click(screen.getByText(/Confirm & schedule/i));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("Run for real now POSTs to /api/automations/run-draft", async () => {
