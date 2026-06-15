@@ -10,6 +10,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { LlmProvider } from "./base";
+import { EmptyCompletionError } from "./resilience";
 import type {
   CompletionRequest,
   LlmResponse,
@@ -173,7 +174,9 @@ export function streamPartToEvent(part: AiStreamPart): StreamEvent | null {
     case "tool-call":
       return { type: "tool_use", id: part.toolCallId ?? "", name: part.toolName ?? "", input: (part.input ?? {}) as Record<string, unknown> };
     case "error":
-      return { type: "error", error: part.error instanceof Error ? part.error : new Error(String(part.error)) };
+      // Errors are surfaced as a throw from stream() (so the resilience layer can
+      // retry), not emitted as an event.
+      return null;
     default:
       return null;
   }
@@ -236,7 +239,13 @@ export class AiSdkProvider extends LlmProvider {
     let finishReason: StopReason = "unknown";
     let usage: { inputTokens: number; outputTokens: number } | undefined;
 
+    let streamError: Error | undefined;
     for await (const part of result.fullStream as AsyncIterable<AiStreamPart>) {
+      if (part.type === "error") {
+        // Surface as a throw after the loop so the resilience layer can retry.
+        streamError = part.error instanceof Error ? part.error : new Error(String(part.error));
+        continue;
+      }
       if (part.type === "text-delta") fullText += part.text ?? "";
       if (part.type === "tool-call") {
         toolBlocks.push({ type: "tool_use", id: part.toolCallId ?? "", name: part.toolName ?? "", input: (part.input ?? {}) as Record<string, unknown> });
@@ -248,6 +257,11 @@ export class AiSdkProvider extends LlmProvider {
       }
       const event = streamPartToEvent(part);
       if (event) yield event;
+    }
+
+    if (streamError) throw streamError;
+    if (!fullText && toolBlocks.length === 0) {
+      throw new EmptyCompletionError(typeof this.model === "string" ? this.model : (this.config.model ?? "unknown"));
     }
 
     const content: ContentBlock[] = [];
