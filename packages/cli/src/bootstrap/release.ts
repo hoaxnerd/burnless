@@ -41,6 +41,23 @@ export function resolveReleaseSource(
   return base && base.length > 0 ? base : publicReleaseBaseFor(version);
 }
 
+export const LATEST_VERSION_URL = "https://burnless.ai/latest";
+
+/**
+ * Resolve the newest published version string from the hosted `/latest` endpoint (same source
+ * install.sh uses). The fetcher and URL are injectable for tests/mirrors; `BURNLESS_LATEST_URL`
+ * overrides the default. Strips a leading `v` and trims.
+ */
+export async function resolveLatestVersion(
+  opts: { url?: string; fetchText?: (u: string) => Promise<string> } = {},
+): Promise<string> {
+  const url = opts.url ?? (process.env.BURNLESS_LATEST_URL?.trim() || LATEST_VERSION_URL);
+  const fetchText = opts.fetchText ?? (async (u: string) => (await fetchBytes(u)).toString("utf8"));
+  const raw = (await fetchText(url)).trim().replace(/^v/, "");
+  if (!raw) throw new Error(`could not resolve the latest version from ${url}`);
+  return raw;
+}
+
 export function versionsDir(home?: string): string {
   return join(configDir(home), "versions");
 }
