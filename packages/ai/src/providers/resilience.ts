@@ -36,8 +36,19 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   jitterFactor: 1,
 };
 
+/** Thrown when a stream completes with no usable content (no text, no tool calls).
+ *  Transient with small models / large tool payloads; safe to retry (nothing was
+ *  streamed to the client yet). */
+export class EmptyCompletionError extends Error {
+  constructor(model: string) {
+    super(`Empty completion from model "${model}" (no text or tool calls)`);
+    this.name = "EmptyCompletionError";
+  }
+}
+
 /** Returns true if the error is retryable (rate limit, server error, network). */
 export function isRetryableError(error: unknown): boolean {
+  if (error instanceof EmptyCompletionError) return true;
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
 
