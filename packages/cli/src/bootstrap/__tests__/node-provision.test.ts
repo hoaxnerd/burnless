@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   PINNED_NODE_VERSION,
   nodeTargetFor,
   nodeTarballName,
   nodeBaseUrl,
   vendoredNodePath,
+  isMuslLinux,
+  ensureVendoredNode,
 } from "../node-provision";
 
 describe("nodeTargetFor", () => {
@@ -46,5 +48,62 @@ describe("vendoredNodePath", () => {
 describe("PINNED_NODE_VERSION", () => {
   it("is the pinned version", () => {
     expect(PINNED_NODE_VERSION).toBe("v22.14.0");
+  });
+});
+
+describe("isMuslLinux", () => {
+  const exists = (present: string[]) => (p: string) => present.includes(p);
+  it("true when /etc/alpine-release exists", () => {
+    expect(isMuslLinux({ platform: "linux", existsFn: exists(["/etc/alpine-release"]) })).toBe(true);
+  });
+  it("true when a /lib/ld-musl-* loader exists", () => {
+    expect(isMuslLinux({ platform: "linux", existsFn: exists(["/lib/ld-musl-aarch64.so.1"]) })).toBe(true);
+  });
+  it("false on glibc linux", () => {
+    expect(isMuslLinux({ platform: "linux", existsFn: exists([]) })).toBe(false);
+  });
+  it("false on darwin regardless", () => {
+    expect(isMuslLinux({ platform: "darwin", existsFn: exists(["/etc/alpine-release"]) })).toBe(false);
+  });
+});
+
+describe("ensureVendoredNode", () => {
+  it("is a no-op on musl/Alpine (apk node is used instead)", async () => {
+    const download = vi.fn();
+    const res = await ensureVendoredNode({
+      home: "/h", env: {}, platform: "linux", arch: "arm64",
+      isMusl: true, existsFn: () => false, downloadAndExtractFn: download,
+    });
+    expect(res).toEqual({ provisioned: false, reason: "musl" });
+    expect(download).not.toHaveBeenCalled();
+  });
+  it("returns the existing path without downloading when already present", async () => {
+    const download = vi.fn();
+    const res = await ensureVendoredNode({
+      home: "/h", env: {}, platform: "linux", arch: "x64",
+      isMusl: false, existsFn: (p) => p === "/h/.burnless/runtime/bin/node",
+      downloadAndExtractFn: download,
+    });
+    expect(res).toEqual({ provisioned: true, path: "/h/.burnless/runtime/bin/node" });
+    expect(download).not.toHaveBeenCalled();
+  });
+  it("downloads + extracts the pinned node when absent (glibc)", async () => {
+    const download = vi.fn().mockResolvedValue(undefined);
+    const res = await ensureVendoredNode({
+      home: "/h", env: {}, platform: "linux", arch: "x64",
+      isMusl: false, existsFn: () => false, downloadAndExtractFn: download,
+    });
+    expect(download).toHaveBeenCalledWith({
+      url: "https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.gz",
+      shasumsUrl: "https://nodejs.org/dist/v22.14.0/SHASUMS256.txt",
+      tarballName: "node-v22.14.0-linux-x64.tar.gz",
+      destRuntimeDir: "/h/.burnless/runtime",
+    });
+    expect(res).toEqual({ provisioned: true, path: "/h/.burnless/runtime/bin/node" });
+  });
+  it("throws on unsupported platform", async () => {
+    await expect(ensureVendoredNode({
+      home: "/h", env: {}, platform: "win32", arch: "x64", isMusl: false,
+    })).rejects.toThrow(/unsupported/i);
   });
 });
