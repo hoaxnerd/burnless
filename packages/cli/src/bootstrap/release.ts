@@ -50,7 +50,7 @@ function tarballName(version: string): string {
 }
 
 /** Fetch bytes from an http(s) or file:// URL (no deps). */
-async function fetchBytes(url: string): Promise<Buffer> {
+export async function fetchBytes(url: string): Promise<Buffer> {
   // Some Node builds reject file:// in global fetch — read the path directly.
   if (url.startsWith("file:")) {
     return readFileSync(fileURLToPath(url));
