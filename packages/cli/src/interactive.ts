@@ -5,7 +5,23 @@
  * TTY, plain logging otherwise. clack/ora are imported ONLY here + start.ts (kept out of the
  * thin bundle's eager graph via dynamic import).
  */
-import { existsSync } from "node:fs";
+import { openSync, closeSync } from "node:fs";
+
+/**
+ * Whether /dev/tty can actually be OPENED. existsSync("/dev/tty") is TRUE even in containers /
+ * CI / cron where there is no controlling terminal and open() fails with ENXIO — so we must
+ * probe an actual open, else the install.sh `exec burnless` hand-off crashes on the open-browser
+ * prompt with an unhandled 'error' event.
+ */
+function canOpenTty(): boolean {
+  try {
+    const fd = openSync("/dev/tty", "r");
+    closeSync(fd);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface ConfirmCore {
   message: string;
@@ -29,18 +45,35 @@ export async function resolveConfirm(o: ConfirmCore): Promise<boolean> {
 async function askViaTty(message: string, dflt: boolean): Promise<boolean> {
   const { createInterface } = await import("node:readline");
   const { createReadStream, createWriteStream } = await import("node:fs");
-  const input = createReadStream("/dev/tty");
-  const output = createWriteStream("/dev/tty");
-  const suffix = dflt ? " (Y/n) " : " (y/N) ";
   return new Promise<boolean>((resolve) => {
-    const rl = createInterface({ input, output });
+    let settled = false;
+    let input: ReturnType<typeof createReadStream> | undefined;
+    let output: ReturnType<typeof createWriteStream> | undefined;
+    let rl: ReturnType<typeof createInterface> | undefined;
+    const finish = (v: boolean) => {
+      if (settled) return;
+      settled = true;
+      try { rl?.close(); } catch { /* noop */ }
+      try { input?.destroy(); } catch { /* noop */ }
+      try { output?.end(); } catch { /* noop */ }
+      resolve(v);
+    };
+    try {
+      input = createReadStream("/dev/tty");
+      output = createWriteStream("/dev/tty");
+    } catch {
+      return finish(dflt);
+    }
+    // /dev/tty can pass canOpenTty() yet still emit an async 'error' (e.g. ENXIO on a races /
+    // detached terminal). Without these handlers it's an unhandled 'error' that crashes node.
+    input.on("error", () => finish(dflt));
+    output.on("error", () => { /* ignore write-side errors */ });
+    rl = createInterface({ input, output });
+    rl.on("error", () => finish(dflt));
+    const suffix = dflt ? " (Y/n) " : " (y/N) ";
     rl.question(message + suffix, (a) => {
-      rl.close();
-      input.close();
-      output.end();
       const t = a.trim().toLowerCase();
-      if (t === "") return resolve(dflt);
-      resolve(t === "y" || t === "yes");
+      finish(t === "" ? dflt : t === "y" || t === "yes");
     });
   });
 }
@@ -65,7 +98,7 @@ export async function confirm(o: ConfirmOptions): Promise<boolean> {
     default: o.default ?? true,
     assumeYes: o.assumeYes,
     stdinTTY: process.stdin.isTTY === true,
-    ttyAvailable: existsSync("/dev/tty"),
+    ttyAvailable: canOpenTty(),
     askClack: askViaClack,
     askTty: askViaTty,
   });
