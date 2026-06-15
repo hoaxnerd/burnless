@@ -69,6 +69,8 @@ OUT="$(run_in burnless-p5-install "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///releases
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only check: do NOT let install.sh exec the interactive launcher (blocking server).
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh
   # launcher runs through bin/burnless → versions/current → versions/<ver>/burnless
   echo "VERSION_OUT=$(/root/.burnless/bin/burnless --version)"
@@ -94,6 +96,8 @@ OUT="$(run_in burnless-p5-tamper "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///tmp/bad
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only check (fails before the launcher hand-off anyway; set for consistency).
+  export BURNLESS_NO_LAUNCH=1
   if NO_COLOR=1 sh /scripts/install.sh; then echo "INSTALL_EXIT=0"; else echo "INSTALL_EXIT=$?"; fi
   # prove NOTHING was unpacked
   if [ -d /root/.burnless/versions/'"$VER"' ]; then echo "UNPACKED=1"; else echo "UNPACKED=0"; fi
@@ -144,6 +148,8 @@ OUT="$(run_in burnless-p5-update "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///releases
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only step (we drive update via the bin below): no launcher hand-off.
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh >/dev/null
   # Realistic path: a CONFIGURED running instance is updated. The data dir + instance.env
   # live in the CANONICAL home (~/.burnless) so the post-swap `doctor` (which update runs
@@ -189,6 +195,8 @@ note "check 5: install.sh idempotency (re-run same version)"
 OUT="$(run_in burnless-p5-idem "$BASE_IMG" '
   set -e
   export BURNLESS_INSTALL_BASE_URL=file:///releases BURNLESS_VERSION='"$VER"' BURNLESS_HOME=/root/.burnless
+  # install-only check (both runs): no launcher hand-off so we can inspect the tree.
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh >/dev/null
   V1="$(/root/.burnless/bin/burnless --version)"
   # second run in the SAME home
