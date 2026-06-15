@@ -85,11 +85,14 @@ export interface DelegateOptions {
  * for `version` is present. `ensureArtifact` reads its base + env internally via
  * `resolveReleaseSource()` — so we only forward `{ version, home }`.
  */
-async function defaultEnsure(opts: {
+export async function defaultEnsure(opts: {
   version: string;
   home: string;
   env: NodeJS.ProcessEnv;
 }): Promise<void> {
+  // Always vendor our pinned Node for the app (no-op on musl/Alpine — apk node is used).
+  const { ensureVendoredNode } = await import("./bootstrap/node-provision");
+  await ensureVendoredNode({ home: opts.home, env: opts.env });
   const { ensureArtifact } = await import("./bootstrap/release");
   await ensureArtifact({ version: opts.version, home: opts.home });
 }
