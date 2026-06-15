@@ -8,8 +8,8 @@
 
 import { formatCurrency, isValidCurrency } from "@burnless/types";
 import type { FinancialSnapshot, Insight, InsightType } from "./types";
-import { getProviderForFeature } from "./routing";
-import { createProvider, type CreateProviderOptions } from "./providers";
+import { resolveResilientProvider } from "./routing";
+import { type CreateProviderOptions } from "./providers";
 
 // ── Page types ──────────────────────────────────────────────────────────────
 
@@ -345,14 +345,10 @@ Return ONLY the JSON array, no markdown fences.`;
 export async function generatePageInsights(
   context: PageInsightContext
 ): Promise<PageInsight[]> {
-  // A resolved providerConfig is only present when it is meant to be used —
-  // including keyless providers (ollama) where apiKey is undefined. Use it
-  // whenever a usable config is present (apiKey OR provider), falling back to
-  // env-config only if it can't build a provider.
-  const cfg = context.providerConfig;
-  const provider =
-    (cfg && (cfg.apiKey || cfg.provider) ? createProvider(cfg) : null) ??
-    getProviderForFeature(FEATURE_KEY);
+  // Route through THE seam: resilience (retry, which recovers transient empty
+  // completions) + usage tracking + request logging. An explicit company
+  // providerConfig is honored; otherwise the seam falls back to env/tier routing.
+  const provider = resolveResilientProvider(FEATURE_KEY, context.providerConfig);
   if (!provider) {
     return [];
   }

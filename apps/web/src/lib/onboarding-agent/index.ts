@@ -9,8 +9,7 @@
  */
 
 import {
-  getProviderForFeature,
-  createProvider,
+  resolveResilientProvider,
   getFinancialTools,
   type ContentBlock,
   type LlmMessage,
@@ -157,21 +156,17 @@ export async function runOnboardingAgent(
   onStatus: (msg: string) => void,
   companyId?: string,
 ): Promise<OnboardingAgentResult> {
-  // Prefer the company's configured DB provider (the one the user just saved in
-  // onboarding/settings), mirroring chat.ts:resolveProvider. Fall back to env.
-  let provider = null;
-  if (companyId) {
-    const cfg = await getCompanyProviderConfig(companyId);
-    if (cfg && (cfg.apiKey || cfg.provider)) {
-      provider = createProvider({
-        provider: cfg.provider,
-        apiKey: cfg.apiKey,
-        model: cfg.model,
-        baseUrl: cfg.baseUrl,
-      });
-    }
-  }
-  if (!provider) provider = getProviderForFeature("onboarding_enrich");
+  // Route through THE seam: resilience (retry, which recovers transient empty
+  // completions) + usage tracking + request logging. Prefer the company's
+  // configured DB provider (the one the user just saved in onboarding/settings);
+  // the seam falls back to env/tier routing when no usable config is supplied.
+  const cfg = companyId ? await getCompanyProviderConfig(companyId) : null;
+  const provider = resolveResilientProvider(
+    "onboarding_enrich",
+    cfg && (cfg.apiKey || cfg.provider)
+      ? { provider: cfg.provider, apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl }
+      : undefined,
+  );
   if (!provider) {
     throw new Error("No AI provider configured for onboarding enrichment.");
   }
