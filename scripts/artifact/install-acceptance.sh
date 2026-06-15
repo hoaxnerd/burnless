@@ -79,7 +79,7 @@ OUT="$(run_in burnless-p5-install "$BASE_IMG" '
   /root/.burnless/bin/burnless bootstrap >/dev/null
   /root/.burnless/bin/burnless provider list --json >/dev/null && echo "PROVIDER_LIST_OK=1"
 ')"
-echo "$OUT" | grep -q "checksum verified ✓"   || { echo "$OUT"; fail "no 'checksum verified ✓'"; }
+echo "$OUT" | grep -q "checksum verified"     || { echo "$OUT"; fail "no 'checksum verified'"; }
 echo "$OUT" | grep -q "VERSION_OUT=$VER"       || { echo "$OUT"; fail "launcher did not print $VER via symlink chain"; }
 echo "$OUT" | grep -q "PROVIDER_LIST_OK=1"     || { echo "$OUT"; fail "installed artifact failed bootstrap/provider list (PGLite)"; }
 ok "install.sh: checksum verified, launcher prints $VER, PGLite bootstrap+provider list run from the installed artifact"
