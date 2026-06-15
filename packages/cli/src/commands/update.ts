@@ -14,8 +14,7 @@ import { promisify } from "node:util";
 import type { Command } from "commander";
 import { green, red } from "../ansi";
 import { runAction } from "../context";
-import { ensureArtifact, flipCurrent, versionsDir } from "../bootstrap/release";
-import { UsageError } from "../errors";
+import { ensureArtifact, flipCurrent, resolveLatestVersion, versionsDir } from "../bootstrap/release";
 
 const execFileAsync = promisify(execFile);
 
@@ -114,15 +113,14 @@ export function registerUpdate(program: Command): void {
       await runAction(
         cmd,
         async (ctx) => {
-          if (version === undefined || version.trim() === "") {
-            throw new UsageError(
-              "specify a version to update to (e.g. `burnless update 0.2.0`); " +
-                "to grab the newest, resolve it first: `burnless update \"$(curl -fsSL https://burnless.ai/latest)\"`",
-            );
+          let targetVersion = version;
+          if (targetVersion === undefined || targetVersion.trim() === "") {
+            if (!ctx.json) process.stderr.write("resolving latest version…\n");
+            targetVersion = await resolveLatestVersion();
           }
           const result = await runUpdate({
             home: ctx.homeDir,
-            targetVersion: version,
+            targetVersion,
             base: opts.base,
           });
 

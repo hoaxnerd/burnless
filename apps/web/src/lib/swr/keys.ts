@@ -67,4 +67,6 @@ export const KEYS = {
   aiProviders: "/api/ai-features/providers",
   aiProvider: (id: string) => `/api/ai-features/providers/${id}`,
   aiProviderModels: (id: string) => `/api/ai-features/providers/${id}/models`,
+  // Pre-save model discovery (works before a provider id exists)
+  aiProviderDiscoverModels: "/api/ai-features/providers/discover-models",
 } as const;

@@ -23,6 +23,19 @@ export const updateProviderSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+/**
+ * Pre-save model discovery (no provider id yet). Mirrors the create form: the
+ * modal sends the currently-entered {kind, baseUrl?, apiKey?} so the Fetch button
+ * works before the provider is saved. Keyless providers (OpenRouter/Ollama) work
+ * with no apiKey; key-required ones return a friendly error when none is given.
+ */
+export const discoverModelsSchema = z.object({
+  kind: kindEnum,
+  baseUrl: z.string().url().max(512).optional(),
+  apiKey: z.string().min(1).max(512).optional(),
+  headers: z.record(z.string().max(128), z.string().max(1024)).refine((v) => Object.keys(v).length <= 20, "max 20 custom headers").optional(),
+});
+
 export const addModelSchema = z.object({
   modelId: z.string().min(1).max(200),
   displayName: z.string().max(200).optional(),

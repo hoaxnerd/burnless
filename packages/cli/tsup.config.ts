@@ -31,7 +31,7 @@ export default defineConfig({
   // and makes the CLI bundle self-contained — required for the fat-artifact, whose staged
   // `node_modules/` carries ONLY @electric-sql/pglite* (build-artifact.ts §5). Without this
   // the artifact CLI dies at boot with ERR_MODULE_NOT_FOUND resolving these bare imports.
-  noExternal: [/^@burnless\//, "commander", "drizzle-orm", /^@modelcontextprotocol\/sdk/],
+  noExternal: [/^@burnless\//, "commander", "drizzle-orm", /^@modelcontextprotocol\/sdk/, "@clack/prompts", "picocolors", "ora"],
   // Keep PGLite external (the 2a fix per spec §9). @burnless/db imports
   // @electric-sql/pglite + the pgvector extension, both of which ship WASM
   // (pglite.wasm/pglite.data) and a loadable-extension tarball (vector.tar.gz)

@@ -10,11 +10,13 @@
 
 import {
   getProviderForFeature,
+  createProvider,
   getFinancialTools,
   type ContentBlock,
   type LlmMessage,
 } from "@burnless/ai";
 import { executeToolCall } from "@/lib/ai-tools";
+import { getCompanyProviderConfig } from "@/lib/ai-feature-flags";
 import { blockedHint, NUDGE_FOR_JSON, buildAgentSystemPrompt } from "./system-prompt";
 import { isBlocked } from "./block-detection";
 import { healOnboardingResult } from "./heal";
@@ -153,8 +155,23 @@ export async function runOnboardingAgent(
   websiteUrl: string,
   userId: string,
   onStatus: (msg: string) => void,
+  companyId?: string,
 ): Promise<OnboardingAgentResult> {
-  const provider = getProviderForFeature("onboarding_enrich");
+  // Prefer the company's configured DB provider (the one the user just saved in
+  // onboarding/settings), mirroring chat.ts:resolveProvider. Fall back to env.
+  let provider = null;
+  if (companyId) {
+    const cfg = await getCompanyProviderConfig(companyId);
+    if (cfg && (cfg.apiKey || cfg.provider)) {
+      provider = createProvider({
+        provider: cfg.provider,
+        apiKey: cfg.apiKey,
+        model: cfg.model,
+        baseUrl: cfg.baseUrl,
+      });
+    }
+  }
+  if (!provider) provider = getProviderForFeature("onboarding_enrich");
   if (!provider) {
     throw new Error("No AI provider configured for onboarding enrichment.");
   }

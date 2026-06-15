@@ -13,6 +13,7 @@ import {
   addAiProviderModel,
   createAiProvider,
   deleteAiProvider,
+  discoverAiProviderModels,
   fetchAiProviderModels,
   setDefaultAiProviderModel,
   testAiProvider,
@@ -78,6 +79,9 @@ function ModalBody({
   const [testState, setTestState] = useState<ProviderTestState>("idle");
   const [testMsg, setTestMsg] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  // Pre-save discovery results (create-mode), before a provider id exists.
+  const [discovered, setDiscovered] = useState<Array<{ modelId: string; source: string }>>([]);
 
   const models = useAiProviderModels(isEdit ? provider.id : null);
   const modelRows = models.data?.models ?? [];
@@ -101,6 +105,9 @@ function ModalBody({
     const entry = getCatalogEntry(k);
     setBaseUrl(entry?.defaultBaseUrl ?? "");
     setName(entry?.label ?? "");
+    // A different provider's discovered models no longer apply.
+    setDiscovered([]);
+    setFetchError(null);
   }
 
   async function handleTest() {
@@ -123,11 +130,26 @@ function ModalBody({
   }
 
   async function handleFetch() {
-    if (!isEdit) return;
     setFetching(true);
+    setFetchError(null);
     try {
-      await fetchAiProviderModels(provider.id);
-      await models.mutate();
+      if (isEdit) {
+        await fetchAiProviderModels(provider.id);
+        await models.mutate();
+      } else {
+        // Pre-save discovery: works keyless for OpenRouter/Ollama and uses the
+        // currently-entered key for key-required providers.
+        const res = await discoverAiProviderModels({
+          kind,
+          baseUrl: baseUrl || undefined,
+          apiKey: key || undefined,
+        });
+        setDiscovered(res.models);
+        // Prefill the default-model field with the first result if empty.
+        if (!defaultModel.trim() && res.models[0]) setDefaultModel(res.models[0].modelId);
+      }
+    } catch (err) {
+      setFetchError(err instanceof Error ? toUserMessage(err) : "Could not fetch models. Please try again.");
     } finally {
       setFetching(false);
     }
@@ -281,7 +303,7 @@ function ModalBody({
             variant="ghost"
             size="sm"
             icon={<RefreshCw className="h-[15px] w-[15px]" />}
-            disabled={!isEdit}
+            disabled={!isEdit && !selected}
             state={fetching ? "loading" : "idle"}
             onClick={handleFetch}
           >
@@ -307,9 +329,34 @@ function ModalBody({
               No models yet — fetch from the endpoint, or set a default model id below.
             </p>
           )
+        ) : discovered.length > 0 ? (
+          <>
+            <div className="max-h-[150px] overflow-auto rounded-[10px] border border-surface-200">
+              {discovered.map((m) => (
+                <button
+                  type="button"
+                  key={m.modelId}
+                  onClick={() => setDefaultModel(m.modelId)}
+                  className="flex w-full items-center gap-2.5 border-b border-surface-100 px-3 py-2.5 text-left text-[13px] last:border-b-0 hover:bg-surface-50"
+                >
+                  <span className="font-mono text-[12.5px]">{m.modelId}</span>
+                  {defaultModel === m.modelId && (
+                    <span className="ml-auto text-[10.5px] text-surface-400">★ default</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-surface-400">
+              Click a model to set it as the default. It is saved with the provider.
+            </p>
+          </>
         ) : (
-          <p className="text-xs text-surface-400">Models can be fetched / added after saving.</p>
+          <p className="text-xs text-surface-400">
+            Fetch the provider&rsquo;s available models — no API key needed for OpenRouter or local
+            providers. Others use the key you enter above.
+          </p>
         )}
+        {fetchError && <p className="mt-1.5 text-xs text-danger-600">{fetchError}</p>}
       </div>
 
       {/* ── Default model ── */}

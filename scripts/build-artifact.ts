@@ -172,6 +172,11 @@ async function main(): Promise<void> {
   // 3. CLI bundle (pglite external — Task 1).
   run("pnpm", ["--filter", "burnless", "build"]);
   copyDir(join(repoRoot, "packages/cli/dist"), join(stageDir, "cli"));
+  // The tsup CLI bundle is ESM (`format: esm`) but emits `.js` files. Node >=22 auto-detects
+  // ESM, but Node 20 (e.g. Alpine's apk `nodejs`) treats bare `.js` as CommonJS → the launcher's
+  // `node cli/index.js` dies with "To load an ES module, set type: module". Stage a package.json
+  // so the cli/ bundle is unambiguously ESM on EVERY supported Node (>=20.9). (P5: Alpine/Node-20.)
+  writeFileSync(join(stageDir, "cli", "package.json"), JSON.stringify({ type: "module" }, null, 2) + "\n");
 
   // 4. Migrations (exclude the pre-collapse archive).
   copyDir(join(repoRoot, "packages/db/drizzle"), join(stageDir, ARTIFACT_LAYOUT.migrationsDir));

@@ -12,7 +12,8 @@
 #   3. npm Model-B download-on-demand — thin entry downloads+extracts on a local verb; remote verb no-download
 #   4. update happy path + data survives — install 0.1.0, write sentinel, update→0.2.0, sentinel survives
 #   5. idempotency                  — re-run install.sh for 0.1.0 → clean, same result
-#   6. Node hybrid detect+guide     — no-node container → non-zero + guide message (+ optional --with-node)
+#   6. Node always-vendor           — no-node glibc container → install.sh auto-downloads pinned
+#                                      Node (NOT apk), exits 0, launcher runs the CLI via it (net-gated)
 #
 # IDEMPOTENCY: deterministic container names (burnless-p5-<slug>), `docker rm -f` before each
 # run; the cached node:22-slim base image is reused (no --pull). Re-runnable any time.
@@ -41,7 +42,7 @@ fail() { printf '   ✗ %s\n' "$*"; exit 1; }
 rm_container() { docker rm -f "$1" >/dev/null 2>&1 || true; }
 
 # Common docker run wrapper for the staged-release mount. Args: <name> <image> <script>.
-# Mounts: dist-artifact→/releases:ro, install/provision scripts→/scripts:ro, CLI dist→/cli:ro.
+# Mounts: dist-artifact→/releases:ro, install.sh→/scripts:ro, CLI dist→/cli:ro.
 # Filters the harmless `tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr...'`
 # warnings Linux tar emits when unpacking a macOS-built tarball (apple provenance xattrs) —
 # they flood stderr and obscure the assertion markers, but are not errors.
@@ -51,7 +52,6 @@ run_in() {
   docker run --rm --name "$name" --platform "$PLATFORM" \
     -v "$REPO/dist-artifact:/releases:ro" \
     -v "$REPO/scripts/install.sh:/scripts/install.sh:ro" \
-    -v "$REPO/scripts/provision-node.sh:/scripts/provision-node.sh:ro" \
     -v "$REPO/packages/cli/dist:/cli:ro" \
     "$image" bash -c "$script" 2>&1 | grep -v "LIBARCHIVE.xattr" || true
 }
@@ -69,6 +69,8 @@ OUT="$(run_in burnless-p5-install "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///releases
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only check: do NOT let install.sh exec the interactive launcher (blocking server).
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh
   # launcher runs through bin/burnless → versions/current → versions/<ver>/burnless
   echo "VERSION_OUT=$(/root/.burnless/bin/burnless --version)"
@@ -77,7 +79,7 @@ OUT="$(run_in burnless-p5-install "$BASE_IMG" '
   /root/.burnless/bin/burnless bootstrap >/dev/null
   /root/.burnless/bin/burnless provider list --json >/dev/null && echo "PROVIDER_LIST_OK=1"
 ')"
-echo "$OUT" | grep -q "checksum verified ✓"   || { echo "$OUT"; fail "no 'checksum verified ✓'"; }
+echo "$OUT" | grep -q "checksum verified"     || { echo "$OUT"; fail "no 'checksum verified'"; }
 echo "$OUT" | grep -q "VERSION_OUT=$VER"       || { echo "$OUT"; fail "launcher did not print $VER via symlink chain"; }
 echo "$OUT" | grep -q "PROVIDER_LIST_OK=1"     || { echo "$OUT"; fail "installed artifact failed bootstrap/provider list (PGLite)"; }
 ok "install.sh: checksum verified, launcher prints $VER, PGLite bootstrap+provider list run from the installed artifact"
@@ -94,6 +96,8 @@ OUT="$(run_in burnless-p5-tamper "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///tmp/bad
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only check (fails before the launcher hand-off anyway; set for consistency).
+  export BURNLESS_NO_LAUNCH=1
   if NO_COLOR=1 sh /scripts/install.sh; then echo "INSTALL_EXIT=0"; else echo "INSTALL_EXIT=$?"; fi
   # prove NOTHING was unpacked
   if [ -d /root/.burnless/versions/'"$VER"' ]; then echo "UNPACKED=1"; else echo "UNPACKED=0"; fi
@@ -144,6 +148,8 @@ OUT="$(run_in burnless-p5-update "$BASE_IMG" '
   export BURNLESS_INSTALL_BASE_URL=file:///releases
   export BURNLESS_VERSION='"$VER"'
   export BURNLESS_HOME=/root/.burnless
+  # install-only step (we drive update via the bin below): no launcher hand-off.
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh >/dev/null
   # Realistic path: a CONFIGURED running instance is updated. The data dir + instance.env
   # live in the CANONICAL home (~/.burnless) so the post-swap `doctor` (which update runs
@@ -189,6 +195,8 @@ note "check 5: install.sh idempotency (re-run same version)"
 OUT="$(run_in burnless-p5-idem "$BASE_IMG" '
   set -e
   export BURNLESS_INSTALL_BASE_URL=file:///releases BURNLESS_VERSION='"$VER"' BURNLESS_HOME=/root/.burnless
+  # install-only check (both runs): no launcher hand-off so we can inspect the tree.
+  export BURNLESS_NO_LAUNCH=1
   NO_COLOR=1 sh /scripts/install.sh >/dev/null
   V1="$(/root/.burnless/bin/burnless --version)"
   # second run in the SAME home
@@ -206,40 +214,37 @@ echo "$OUT" | grep -q "CURRENT_OK=1"    || { echo "$OUT"; fail "current symlink 
 ok "idempotency: re-run install.sh for $VER → exit 0, same version, single version dir, current intact"
 
 # ---------------------------------------------------------------------------------------
-# 6. Node hybrid: detect + guide (no-node container) + optional --with-node provisioning
+# 6. Node always-vendor: no-node glibc host → install.sh auto-provisions pinned Node
 # ---------------------------------------------------------------------------------------
-note "check 6: Node hybrid — detect+guide (no node)"
-OUT="$(run_in burnless-p5-nonode "$NONODE_IMG" '
-  set -e
-  command -v node >/dev/null 2>&1 && echo "HAS_NODE=1" || echo "HAS_NODE=0"
-  export BURNLESS_INSTALL_BASE_URL=file:///releases BURNLESS_VERSION='"$VER"' BURNLESS_HOME=/root/.burnless
-  if NO_COLOR=1 sh /scripts/install.sh 2>&1; then echo "GUIDE_EXIT=0"; else echo "GUIDE_EXIT=$?"; fi
-')"
-echo "$OUT" | grep -q "HAS_NODE=0"                        || { echo "$OUT"; fail "no-node container unexpectedly has node"; }
-echo "$OUT" | grep -q "GUIDE_EXIT=0"                      && { echo "$OUT"; fail "install.sh exited 0 with no adequate node (must guide+fail)"; }
-echo "$OUT" | grep -qi "needs Node >= 20.9"               || { echo "$OUT"; fail "no Node guide message"; }
-echo "$OUT" | grep -q -- "--with-node"                    || { echo "$OUT"; fail "guide did not mention --with-node"; }
-ok "Node hybrid detect+guide: no-node container → non-zero exit + 'needs Node >= 20.9' + --with-node hint"
-
-# --with-node provisioning needs nodejs.org reachable from inside the container. Probe; run
-# it if reachable, else log an HONEST skip (host-validated in Task 7).
-note "check 6b: Node hybrid — --with-node provisioning (network-gated)"
+# New (P3) behavior: install.sh ALWAYS provisions our pinned Node — no --with-node flag, no
+# "needs Node >= 20.9" guide/fail. On a glibc Linux host with no node it DOWNLOADS the pinned
+# v22.14.0 tarball (verify-before-unpack) into ~/.burnless/runtime/bin/node, NOT apk. The
+# download path needs nodejs.org reachable from inside the container; probe first and, if it
+# is unreachable, log an HONEST skip (host-validated in Task 7) rather than failing.
+note "check 6: Node always-vendor — no-node glibc host auto-provisions pinned Node (network-gated)"
 if docker run --rm --platform "$PLATFORM" "$NONODE_IMG" bash -c \
      'command -v curl >/dev/null 2>&1 || (apt-get update -qq >/dev/null && apt-get install -y -qq curl >/dev/null); curl -fsSL -o /dev/null --max-time 15 https://nodejs.org/dist/index.json' >/dev/null 2>&1; then
-  OUT="$(run_in burnless-p5-withnode "$NONODE_IMG" '
+  OUT="$(run_in burnless-p5-nonode "$NONODE_IMG" '
     set -e
+    command -v node >/dev/null 2>&1 && echo "HAS_NODE=1" || echo "HAS_NODE=0"
     apt-get update -qq >/dev/null && apt-get install -y -qq curl tar >/dev/null
     export BURNLESS_INSTALL_BASE_URL=file:///releases BURNLESS_VERSION='"$VER"' BURNLESS_HOME=/root/.burnless
-    NO_COLOR=1 sh /scripts/install.sh --with-node
+    # BURNLESS_NO_LAUNCH=1 → install runs to completion but does NOT exec burnless.
+    if BURNLESS_NO_LAUNCH=1 NO_COLOR=1 sh /scripts/install.sh 2>&1; then echo "INSTALL_EXIT=0"; else echo "INSTALL_EXIT=$?"; fi
+    # pinned Node was DOWNLOADED into runtime/bin/node (glibc host = download path, not apk)
     "/root/.burnless/runtime/bin/node" -v && echo "RUNTIME_NODE_OK=1"
-    "/root/.burnless/bin/burnless" --version && echo "LAUNCHER_VIA_RUNTIME_OK=1"
+    # the installed launcher runs the CLI via that provisioned node
+    echo "VERSION_OUT=$(/root/.burnless/bin/burnless --version)" && echo "LAUNCHER_VIA_RUNTIME_OK=1"
   ')"
-  echo "$OUT" | grep -q "RUNTIME_NODE_OK=1"            || { echo "$OUT"; fail "runtime/bin/node not provisioned"; }
-  echo "$OUT" | grep -q "LAUNCHER_VIA_RUNTIME_OK=1"    || { echo "$OUT"; fail "launcher did not run via the provisioned runtime node"; }
-  ok "--with-node: provisioned runtime/bin/node, launcher runs via it"
+  echo "$OUT" | grep -q "HAS_NODE=0"                || { echo "$OUT"; fail "no-node container unexpectedly has node"; }
+  echo "$OUT" | grep -q "INSTALL_EXIT=0"            || { echo "$OUT"; fail "install.sh did not auto-provision (must exit 0, not guide/fail)"; }
+  echo "$OUT" | grep -q "RUNTIME_NODE_OK=1"         || { echo "$OUT"; fail "pinned Node not downloaded to runtime/bin/node"; }
+  echo "$OUT" | grep -q "VERSION_OUT=$VER"          || { echo "$OUT"; fail "launcher did not print $VER via the provisioned node"; }
+  echo "$OUT" | grep -q "LAUNCHER_VIA_RUNTIME_OK=1" || { echo "$OUT"; fail "launcher did not run the CLI via the provisioned runtime node"; }
+  ok "Node always-vendor: no-node glibc host → install.sh exit 0, pinned Node downloaded to runtime/bin/node, launcher runs CLI ($VER) via it"
 else
-  printf '   ⚠ SKIP --with-node provisioning: nodejs.org unreachable from the container (host-validated in Task 7)\n'
-  PASS+=("--with-node provisioning SKIPPED (nodejs.org unreachable; host-validated in Task 7)")
+  printf '   ⚠ SKIP Node always-vendor: nodejs.org unreachable from the container (host-validated in Task 7)\n'
+  PASS+=("Node always-vendor SKIPPED (nodejs.org unreachable; host-validated in Task 7)")
 fi
 
 # ---------------------------------------------------------------------------------------

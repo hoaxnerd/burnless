@@ -41,6 +41,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import OnboardingLayout from "../layout";
+import { SWRProvider } from "@/lib/swr/provider";
 
 const child = <div>wizard</div>;
 
@@ -92,6 +93,13 @@ describe("ONB-01 onboarding layout guard", () => {
     const result = await OnboardingLayout({ children: child });
     expectRendersChild(result);
     expect(mockIsClaimed).toHaveBeenCalledWith("company-1");
+  });
+
+  it("wraps onboarding children in SWRProvider (so the AI-provider list fetches in onboarding)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockGetCompany.mockResolvedValue(null);
+    const result = await OnboardingLayout({ children: child });
+    expect((result as { type: unknown }).type).toBe(SWRProvider);
   });
 
   it("redirects to /dashboard for a self-host company that is already CLAIMED", async () => {

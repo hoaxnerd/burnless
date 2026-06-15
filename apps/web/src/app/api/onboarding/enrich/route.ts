@@ -36,6 +36,7 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Check if user already has a company (to decide if we need to check AI flags)
   const membership = await getUserCompany(user.id);
+  const companyId = membership?.companyId;
   if (membership) {
     setTrackingCompanyId(membership.companyId);
     const aiCheck = await checkAiFeatureAllowed(membership.companyId, "onboarding");
@@ -69,7 +70,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         // Run the agent loop
         const agentResult = await runOnboardingAgent(body.websiteUrl, user.id, (statusMessage) => {
           send({ type: "status", message: statusMessage });
-        });
+        }, companyId);
 
         // Send greeting
         send({
