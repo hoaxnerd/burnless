@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getCompanyForAuthUser, isCompanyClaimed } from "@/lib/data";
 import { getCapabilities } from "@/lib/capabilities";
+import { SWRProvider } from "@/lib/swr/provider";
 
 /**
  * Server guard for /onboarding (ONB-01).
@@ -44,5 +45,5 @@ export default async function OnboardingLayout({
     if (claimed) redirect("/dashboard");
   }
 
-  return <>{children}</>;
+  return <SWRProvider>{children}</SWRProvider>;
 }
