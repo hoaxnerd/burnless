@@ -14,7 +14,7 @@ vi.mock("../providers", async (orig) => {
     createProvider: () => ({ complete: completeMock, stream: streamMock }),
   };
 });
-vi.mock("../routing", () => ({ getProviderForFeature: () => null }));
+vi.mock("../routing", () => ({ getProviderForFeature: () => null, resolveResilientProvider: () => ({ complete: completeMock, stream: streamMock }) }));
 
 const MCP_TOOL: ToolDefinition = {
   name: "mcp__stripe__list_invoices",

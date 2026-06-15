@@ -7,7 +7,7 @@ vi.mock("../providers", async (orig) => {
   const actual = await orig<typeof import("../providers")>();
   return { ...actual, getProvider: () => ({ complete: vi.fn(), stream: streamMock }), createProvider: () => ({ complete: vi.fn(), stream: streamMock }) };
 });
-vi.mock("../routing", () => ({ getProviderForFeature: () => null }));
+vi.mock("../routing", () => ({ getProviderForFeature: () => null, resolveResilientProvider: () => ({ complete: vi.fn(), stream: streamMock }) }));
 
 function fakeStream(blocks: unknown[], stopReason: string) {
   return (async function* () { yield { type: "done", response: { content: blocks, stopReason } }; })();
