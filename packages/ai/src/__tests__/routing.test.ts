@@ -5,6 +5,7 @@ import {
   getFeatureProviderMap,
   estimateCostMicros,
   onUsage,
+  resolveResilientProvider,
 } from "../routing";
 import {
   resolveModelForTier,
@@ -165,6 +166,43 @@ describe("Per-feature provider routing", () => {
     (map1 as Record<string, string>).chat = "modified";
     const map2 = getFeatureProviderMap();
     expect(map2.chat).not.toBe("modified");
+  });
+});
+
+describe("resolveResilientProvider seam", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    // Strip any AI provider env that could leak from the host into these tests.
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("AI_") || k.endsWith("_API_KEY") || k === "OLLAMA_BASE_URL") {
+        delete process.env[k];
+      }
+    }
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("wraps an explicit company config (returns a provider exposing the model id)", () => {
+    const p = resolveResilientProvider("chat", {
+      provider: "openrouter",
+      apiKey: "sk-x",
+      model: "google/gemini-2.5-flash-lite",
+    });
+    expect(p).not.toBeNull();
+    expect(p!.modelId).toBe("google/gemini-2.5-flash-lite");
+  });
+
+  it("falls back to env/tier routing when no config given", () => {
+    process.env.OPENROUTER_API_KEY = "sk-env";
+    expect(resolveResilientProvider("chat")).not.toBeNull();
+  });
+
+  it("returns null when nothing is configured", () => {
+    expect(resolveResilientProvider("chat", {})).toBeNull();
   });
 });
 

@@ -13,8 +13,10 @@
 import { LlmProvider } from "./providers/base";
 import type { ModelTier, CompletionRequest, LlmResponse, StreamEvent, UsageRecord, ProviderConfig } from "./providers/types";
 import {
+  createProvider,
   createProviderForTier,
   getFallbackTiers,
+  type CreateProviderOptions,
 } from "./providers";
 import {
   ResilientProvider,
@@ -380,6 +382,38 @@ export function getProviderForFeature(feature: string): LlmProvider | null {
   // Stack: TrackedProvider → ResilientProvider → raw provider
   // Resilience handles retries/circuit/rate, Tracked handles usage metrics
   const resilient = wrapWithResilience(provider, providerName, feature);
+  return new TrackedProvider(resilient, feature, tier, providerName);
+}
+
+/**
+ * THE provider seam for all real generation.
+ *
+ * Returns a fully production-grade provider (resilience: retry + circuit breaker +
+ * rate limit; usage tracking; request logging) for a feature. An OPTIONAL explicit
+ * `config` (e.g. a company's stored provider) may be supplied — but HOW that config
+ * was sourced (DB, env, vault, …) is irrelevant to this layer and to AI usage.
+ * Falls back to env/tier routing when no usable config is given. Returns null only
+ * when no provider can be built (graceful degradation).
+ *
+ * AI usage MUST go through this. Never call createProvider()/getProvider() directly
+ * for real generation — that bypasses resilience+logging.
+ */
+export function resolveResilientProvider(
+  feature: string,
+  config?: CreateProviderOptions
+): LlmProvider | null {
+  const tier = getFeatureTier(feature);
+  let raw: LlmProvider | null;
+  let providerName: string;
+  if (config && (config.apiKey || config.provider)) {
+    raw = createProvider(config);
+    providerName = config.provider ?? resolveProviderName(feature);
+  } else {
+    providerName = resolveProviderName(feature);
+    raw = createProviderForTier(tier, { provider: providerName !== "unknown" ? providerName : undefined });
+  }
+  if (!raw) return null;
+  const resilient = wrapWithResilience(raw, providerName, feature);
   return new TrackedProvider(resilient, feature, tier, providerName);
 }
 
