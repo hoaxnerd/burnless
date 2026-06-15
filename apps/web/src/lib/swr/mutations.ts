@@ -223,6 +223,22 @@ export async function fetchAiProviderModels(
   return r;
 }
 
+/**
+ * Pre-save model discovery — fetch the available models for an as-yet-unsaved
+ * provider directly from {kind, baseUrl?, apiKey?}. Keyless providers
+ * (OpenRouter/Ollama) work with no apiKey. Used by the modal's Fetch button in
+ * create-mode. Returns model descriptors (no DB rows yet); on failure throws a
+ * FetchError carrying the route's user-safe message (route through toUserMessage).
+ */
+export async function discoverAiProviderModels(input: {
+  kind: ProviderKind;
+  baseUrl?: string;
+  apiKey?: string;
+  headers?: Record<string, string>;
+}): Promise<{ models: Array<{ modelId: string; source: "fetched" | "preset" }>; fetched: number }> {
+  return apiCall(KEYS.aiProviderDiscoverModels, "POST", input);
+}
+
 export async function addAiProviderModel(
   id: string,
   data: { modelId: string; isDefault?: boolean },

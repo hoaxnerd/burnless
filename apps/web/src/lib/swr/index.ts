@@ -73,6 +73,7 @@ export {
   setDefaultAiProvider,
   testAiProvider,
   fetchAiProviderModels,
+  discoverAiProviderModels,
   addAiProviderModel,
   setDefaultAiProviderModel,
 } from "./mutations";
