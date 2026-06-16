@@ -178,3 +178,6 @@ export type {
   ResolvePermissionContext,
   BuiltinToolControl,
 } from "./permissions";
+
+// Durable chat-turn event log types (single source of truth)
+export type { TurnEvent, TurnEventType, TurnEventPayload, ToolUseRef, OpenGate } from "./turn-log/types";
