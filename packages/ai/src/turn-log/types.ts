@@ -34,4 +34,59 @@ export interface TurnEvent {
 /** The single open gate surfaced to the client as the live pending card. */
 export interface OpenGate { pauseId: string; kind: "permission" | "input" | "plan"; payload: TurnEventPayload; }
 
+// ---------------------------------------------------------------------------
+// Client render model (mirrors apps/web .../ai/_components/types.ts). These
+// shapes are STRUCTURALLY IDENTICAL to the client's Message / TimelineNodeClient
+// / UiBlockClient so the projection feeds the existing renderers unchanged. We
+// re-declare them here (rather than import from apps/web) to keep @burnless/ai
+// free of an app import; the field names / `kind` literals must stay in lock-step.
+// ---------------------------------------------------------------------------
+
+/** A rendered generative-UI display block (mirrors client UiBlockClient). */
+export interface ProjectedUiBlock {
+  id: string;
+  component: string;
+  props: Record<string, unknown>;
+  confidence?: "high" | "low";
+  rationale?: string;
+}
+
+export type ProjectedNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input" | "scenario";
+
+/** One worklog node (mirrors client TimelineNodeClient). */
+export interface ProjectedNode {
+  id: string;
+  kind: ProjectedNodeKind;
+  // tool
+  toolName?: string;
+  phase?: "pending" | "running" | "done" | "error";
+  category?: string;
+  // result
+  text?: string;
+  block?: ProjectedUiBlock;
+  confidence?: "high" | "low";
+  rationale?: string;
+  // pause payloads
+  resolved?: boolean;
+  // scenario marker
+  scenarioId?: string;
+  scenarioName?: string | null;
+}
+
+/** A projected chat message (mirrors the client Message's render fields). */
+export interface ProjectedMessage {
+  role: "user" | "assistant";
+  content: string;
+  timeline?: ProjectedNode[];
+  uiBlocks?: ProjectedUiBlock[];
+}
+
+/** Result of projecting the durable log into the client render model. */
+export interface ProjectedTimeline {
+  messages: ProjectedMessage[];
+  /** The single unresolved gate (resolvedAt === null), or null. The TTL /
+   *  `resumable` staleness decision is the CALLER's job (history endpoint). */
+  openGate: OpenGate | null;
+}
+
 export type { LlmMessage };
