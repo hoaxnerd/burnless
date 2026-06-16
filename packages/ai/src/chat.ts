@@ -272,20 +272,46 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
         (b): b is ContentBlock & { type: "tool_use" } => b.type === "tool_use"
       );
 
+      // Surface this round-trip's assistant content (text + the tool_use batch)
+      // as a first-class chunk BEFORE the tools execute/pause, so chat-stream can
+      // persist the model thread losslessly. Empty text is omitted (no stray
+      // text block downstream). Mirrors the same content pushed onto `messages`.
+      const stepText = lastResponse.content
+        .filter((b): b is ContentBlock & { type: "text" } => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+      yield {
+        type: "assistant_step",
+        ...(stepText ? { text: stepText } : {}),
+        toolUses: toolUseBlocks.map((b) => ({ id: b.id, name: b.name, input: b.input })),
+      };
+
       const completedResults: ContentBlock[] = [];
       const pending: PendingToolUse[] = [];
       const inputRequests: PendingToolUse[] = [];
       const planRequests: PendingToolUse[] = [];
 
-      for (const toolUse of toolUseBlocks) {
+      for (let bi = 0; bi < toolUseBlocks.length; bi++) {
+        const toolUse = toolUseBlocks[bi]!;
         const guard = checkGuard(guardCounts, toolUse.name, toolUse.input, guardLimits);
         if (guard.action === "stop") {
-          // Hard stop: satisfy the tool-result contract for this id, end the turn.
-          // No on* persistence callback fires on this path, so `messages`/
-          // `completedResults` are discarded — any trailing tool_use blocks in
-          // this same batch intentionally go without a tool_result. If a future
-          // change starts persisting here, fill the remaining ids first.
-          completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          // Hard stop: satisfy the tool-result contract for the stopping id AND
+          // every trailing same-batch tool_use that won't run, so the next turn's
+          // provider thread stays contract-valid (each tool_use needs a paired
+          // tool_result) once chat-stream persists the assistant_step. Emit each
+          // as a `stopped` tool_result chunk carrying the stop message.
+          const stoppedBlocks = toolUseBlocks.slice(bi);
+          for (const su of stoppedBlocks) {
+            yield {
+              type: "tool_result",
+              toolName: su.name,
+              toolResult: guard.message,
+              nodeId: su.id,
+              nodeKind: "tool",
+              kind: "stopped",
+            };
+            completedResults.push({ type: "tool_result", toolUseId: su.id, content: guard.message });
+          }
           messages.push({ role: "assistant", content: lastResponse.content });
           messages.push({ role: "user", content: completedResults });
           yield { type: "text", content: guard.message };

@@ -200,6 +200,7 @@ export interface StreamChunk {
     | "tool_use"
     | "tool_status"
     | "tool_result"
+    | "assistant_step"
     | "permission_request"
     | "input_request"
     | "plan_request"
@@ -210,6 +211,21 @@ export interface StreamChunk {
   toolName?: string;
   toolInput?: Record<string, unknown>;
   toolResult?: string;
+  /**
+   * For tool_result: distinguishes how the result was produced so the turn-log
+   * writer (chat-stream) can persist it faithfully. Optional — existing emitters
+   * and consumers are unaffected when absent. `"stopped"` marks a tool_use that
+   * a convergence-guard hard-stop never ran.
+   */
+  kind?: "executed" | "deferred" | "declined" | "stopped";
+  /**
+   * For assistant_step: the assistant's response content for ONE provider
+   * round-trip that requested tools — emitted BEFORE those tools execute/pause
+   * so the model thread can be reconstructed losslessly. `text` is the assistant
+   * text block (omitted when empty); `toolUses` is the batch of tool_use blocks.
+   */
+  text?: string;
+  toolUses?: { id: string; name: string; input: Record<string, unknown> }[];
   /** For tool_status: lifecycle phase of an executing tool. */
   phase?: "running" | "done" | "error";
   /** For permission_request: the tools awaiting a decision. */
