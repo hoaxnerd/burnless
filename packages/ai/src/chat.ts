@@ -18,6 +18,7 @@ import {
 import { resolveResilientProvider } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
 import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputRequestState, type PlanRequestState } from "./generative-ui";
+import { getAiLimits } from "./config";
 
 /**
  * Resolve the provider through THE seam — every real-generation path goes
@@ -89,8 +90,8 @@ function filterTools(
   return tools.filter((t) => !disabled.has(t.name));
 }
 
-/** Max tool-use round-trips before we force a text response. */
-const MAX_TOOL_ITERATIONS = 10;
+// Max tool-use round-trips per call comes from getAiLimits().maxToolIterations
+// (env BURNLESS_AI_MAX_TOOL_ITERATIONS, default 25). Read once per invocation.
 
 /** Non-streaming chat — sends message and returns complete response. */
 export async function chat(options: ChatOptions): Promise<{
@@ -106,6 +107,7 @@ export async function chat(options: ChatOptions): Promise<{
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
+  const maxIterations = getAiLimits().maxToolIterations;
   // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
   // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
   // interactive assembly is filtered.
@@ -123,7 +125,7 @@ export async function chat(options: ChatOptions): Promise<{
   const toolResults: ToolCallResult[] = [];
 
   // Loop to handle multi-turn tool use (capped to prevent runaway costs)
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
     const response = await provider.complete({
       messages,
       system,
@@ -191,6 +193,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   }
 
   const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
+  const maxIterations = getAiLimits().maxToolIterations;
   // Interactive assembly is filtered by disabledToolNames (S3b §11); a
   // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
   const tools = options.toolsOverride
@@ -211,7 +214,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   let ranTool = false;
 
   // Capped to prevent runaway tool loops
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
     const events = provider.stream({
       messages,
       system,
