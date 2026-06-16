@@ -121,6 +121,8 @@ vi.mock("@burnless/db", () => ({
   // S3b §11 disabled-tools overlay: default to nothing disabled.
   getSessionDisabledTools: vi.fn().mockResolvedValue({}),
   getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
+  // Phase 2 dual-write: chat POST appends a user_message turn-event.
+  appendTurnEvent: vi.fn().mockResolvedValue({ id: "evt1" }),
   aiConversations: {
     id: "id",
     companyId: "companyId",

@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
@@ -106,11 +106,25 @@ export const POST = withErrorHandler(async (request: Request) => {
     : BUILTIN_PERMISSION_DEFAULTS;
   const sessionGrants = await getSessionGrants(conversationId);
 
-  // Save user message
+  // Mint the turn id for this new turn. Threaded through to the streaming layer
+  // so later tasks tag their log events with it (Phase 2 dual-write).
+  const turnId = crypto.randomUUID();
+
+  // Save user message (existing aiMessages store — kept as-is for dual-write).
   await db.insert(aiMessages).values({
     conversationId,
     role: "user",
     content: body.message,
+  });
+
+  // Dual-write: append the user_message event to the append-as-you-go turn log
+  // (aiTurnEvents). Readers still read aiMessages; this just populates the log.
+  // Runs AFTER the conversation + user-message rows exist (valid FK).
+  await appendTurnEvent({
+    conversationId,
+    turnId,
+    type: "user_message",
+    payload: { text: body.message },
   });
 
   // Load conversation history
@@ -197,6 +211,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     scenarioId: scenario.id,
     writeScenarioId,
     conversationId,
+    turnId,
     messages,
     financialContext: contextText,
     companionName: aiFlags.companionName,

@@ -76,6 +76,10 @@ const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
   mockBuildChatSSEResponse: vi.fn(),
 }));
 
+const { mockAppendTurnEvent } = vi.hoisted(() => ({
+  mockAppendTurnEvent: vi.fn(),
+}));
+
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -106,6 +110,9 @@ vi.mock("@burnless/db", () => ({
   // scenarios stay unaffected.
   getSessionDisabledTools: vi.fn().mockResolvedValue({}),
   getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
+  // Phase 2 dual-write: the chat POST appends a user_message turn-event next to
+  // the existing aiMessages user-row insert.
+  appendTurnEvent: mockAppendTurnEvent,
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -246,6 +253,9 @@ describe("POST /api/chat", () => {
     // Default: override count
     mockGetOverrideCount.mockResolvedValue(0);
 
+    // Default: turn-event append resolves (Phase 2 dual-write).
+    mockAppendTurnEvent.mockResolvedValue({ id: "evt1" });
+
     // Default: shared SSE responder returns a basic streaming response
     mockBuildChatSSEResponse.mockImplementation(
       () =>
@@ -381,6 +391,34 @@ describe("POST /api/chat", () => {
     expect(Array.isArray(params.messages)).toBe(true);
     expect(params.financialContext).toContain("$500K cash");
     expect(params.companionName).toBe("Aria");
+  });
+
+  it("dual-writes: aiMessages user row AND a user_message turn-event", async () => {
+    mockReturning.mockResolvedValue([
+      { id: "dual-conv", companyId: "c1", userId: "u1" },
+    ]);
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "What is my runway?" }));
+
+    // OLD store still written: an aiMessages row with role "user" + the text.
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "user", content: "What is my runway?" })
+    );
+
+    // NEW log written: a user_message turn-event whose payload.text matches,
+    // tagged with the conversationId + a turnId.
+    expect(mockAppendTurnEvent).toHaveBeenCalledOnce();
+    const evt = mockAppendTurnEvent.mock.calls[0]![0];
+    expect(evt.type).toBe("user_message");
+    expect(evt.conversationId).toBe("dual-conv");
+    expect(typeof evt.turnId).toBe("string");
+    expect(evt.turnId.length).toBeGreaterThan(0);
+    expect(evt.payload).toEqual({ text: "What is my runway?" });
+
+    // The SAME turnId is threaded into the streaming layer.
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    expect(params.turnId).toBe(evt.turnId);
   });
 
   it("includes credit warning when credits >= 80% used", async () => {

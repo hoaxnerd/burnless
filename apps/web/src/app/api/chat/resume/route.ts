@@ -150,6 +150,9 @@ async function resumeStream(args: {
     scenarioId: scenario.id,
     writeScenarioId,
     conversationId,
+    // turnId is threaded but not yet consumed by chat-stream (Task 2.2). Mint one
+    // so the required field is satisfied; resume's turn-id handling lands later.
+    turnId: crypto.randomUUID(),
     messages,
     financialContext,
     companionName,

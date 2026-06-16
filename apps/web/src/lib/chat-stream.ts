@@ -31,6 +31,10 @@ export interface ChatStreamParams {
    *  Distinct from `scenarioId` (read context, persisted for resume's buildAiContext). */
   writeScenarioId: string | null;
   conversationId: string;
+  /** Turn id minted by the chat POST route for this turn. Threaded so the
+   *  streaming layer can tag its append-as-you-go log events with it (Task 2.2
+   *  consumes it; this task only threads it through). */
+  turnId: string;
   messages: ChatMessage[];
   financialContext: string;
   companionName: string;
