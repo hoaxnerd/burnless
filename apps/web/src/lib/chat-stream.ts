@@ -94,6 +94,18 @@ export function scenarioActivationFrom(
   return null;
 }
 
+/** User-facing message for a failed chat turn. NEVER leaks raw provider/internal
+ *  error text to the browser (e.g. `Empty completion from model "…"`); the
+ *  technical detail is logged server-side instead. An empty completion is usually
+ *  a weak-model symptom, so we nudge toward a more capable model. */
+export function friendlyChatError(error: unknown): string {
+  const name = error instanceof Error ? error.name : "";
+  if (name === "EmptyCompletionError") {
+    return "The assistant didn't return a response. Please try again — if this keeps happening, switch to a more capable model in Settings → AI.";
+  }
+  return "Something went wrong while generating a response. Please try again.";
+}
+
 export function buildChatSSEResponse(params: ChatStreamParams): Response {
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController, obj: unknown) =>
@@ -443,7 +455,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             .where(eq(aiConversations.id, params.conversationId))
             .catch(() => {});
         }
-        send(controller, { type: "error", content: error instanceof Error ? error.message : "AI error" });
+        send(controller, { type: "error", content: friendlyChatError(error) });
       } finally {
         controller.close();
       }
