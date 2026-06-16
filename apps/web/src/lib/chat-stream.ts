@@ -94,6 +94,17 @@ export function scenarioActivationFrom(
   return null;
 }
 
+/** True iff a tool result is a successful exit_scenario (return to base). */
+export function scenarioExitFrom(toolName: string, raw: string): boolean {
+  if (toolName !== "exit_scenario") return false;
+  try {
+    const p = JSON.parse(raw) as { success?: boolean; exited?: boolean };
+    return p?.success === true && p?.exited === true;
+  } catch {
+    return false;
+  }
+}
+
 export function buildChatSSEResponse(params: ChatStreamParams): Response {
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController, obj: unknown) =>
@@ -144,6 +155,16 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // Re-enter scenarios created/activated during a resumed Apply (Plan 5).
       for (const a of params.activatedScenarios ?? []) emitScenarioActivated(controller, a);
 
+      // A+B (spec §4.1): the turn's active scenario can change mid-turn. Start at the
+      // request's write target; create_scenario/activate_scenario move it; exit_scenario
+      // resets it to base. Every subsequent tool call reads/writes through it.
+      let turnScenarioId: string | null = params.writeScenarioId;
+
+      const emitScenarioExited = (controller: ReadableStreamDefaultController) => {
+        send(controller, { type: "scenario_exited" });
+        timeline.push({ id: `scenario-exit-${timeline.length}`, kind: "scenario", scenarioName: null });
+      };
+
       try {
         const chunks = chatStream({
           messages: params.messages,
@@ -166,13 +187,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           onToolCall: async (toolName, input) => {
             const raw = await executeToolCall(toolName, input, {
               companyId: params.companyId,
-              scenarioId: params.writeScenarioId,
+              scenarioId: turnScenarioId,
               userId: params.userId,
               conversationId: params.conversationId,
               permissionDecision: "auto",
             });
             const activation = scenarioActivationFrom(toolName, raw);
-            if (activation) emitScenarioActivated(controller, activation);
+            if (activation) { turnScenarioId = activation.scenarioId; emitScenarioActivated(controller, activation); }
+            else if (scenarioExitFrom(toolName, raw)) { turnScenarioId = null; emitScenarioExited(controller); }
             // Display tool: emit the render payload to the client, return the terse
             // modelResult to the model. A display tool is recognized either by the
             // DISPLAY_TOOL_NAMES membership (the spec's registry, populated in Plan 2)
@@ -247,7 +269,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 try {
                   const raw = await executeToolCall(action.toolName, action.toolInput, {
                     companyId: params.companyId,
-                    scenarioId: params.writeScenarioId,
+                    scenarioId: turnScenarioId,
                     userId: params.userId,
                     conversationId: params.conversationId,
                     mode: "plan",
@@ -268,7 +290,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               conversationId: params.conversationId,
               pauseId,
               scenarioId: params.scenarioId, // persist active scenario for correct resume targeting
-              writeScenarioId: params.writeScenarioId,
+              writeScenarioId: turnScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: enrichedPending,
@@ -282,7 +304,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               pauseId,
               kind: "input",
               scenarioId: params.scenarioId,
-              writeScenarioId: params.writeScenarioId,
+              writeScenarioId: turnScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: { inputToolUseId: state.inputToolUseId, spec: state.spec },
@@ -296,7 +318,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               pauseId,
               kind: "plan",
               scenarioId: params.scenarioId,
-              writeScenarioId: params.writeScenarioId,
+              writeScenarioId: turnScenarioId,
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: { planToolUseId: state.planToolUseId, spec: state.spec },
