@@ -17,16 +17,19 @@ import {
   getDisabledBuiltinTools,
   getOpenGate,
   resolveOpenGate,
+  getTurnEvents,
   appendTurnEvent,
 } from "@burnless/db";
-import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc } from "drizzle-orm";
+import { aiConversations, scenarios as scenariosTable } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
 import {
   categorizeToolName,
   BUILTIN_PERMISSION_DEFAULTS,
+  projectModelThread,
   type ChatMessage,
   type PermissionDefaults,
   type AiWriteMode,
+  type TurnEvent,
 } from "@burnless/ai";
 import type { ContentBlock, InputFormSpec, FormField, PlanSpec } from "@burnless/ai"; // already exported from the package index
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -39,7 +42,6 @@ import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse, scenarioActivationFrom } from "@/lib/chat-stream";
 import { NextResponse } from "next/server";
 import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
-import type { TimelineNode } from "@burnless/ai";
 
 const resumeSchema = z.object({
   conversationId: z.string().min(1),
@@ -67,20 +69,6 @@ interface PendingActionRecord {
   requestId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
-}
-
-/** Build the seed timeline for a resumed turn: the lead-up + gate nodes persisted
- *  at pause-time, with THIS pause's gate marked resolved so it renders historical
- *  once `done` persists the full run (Plan 5). */
-function buildSeedTimeline(timeline: unknown, pauseId: string): TimelineNode[] {
-  const nodes = (Array.isArray(timeline) ? timeline : []) as TimelineNode[];
-  return nodes.map((n) => {
-    if (n.id !== pauseId) return n;
-    if (n.plan) return { ...n, plan: { ...n.plan, resolved: true }, resolved: true };
-    if (n.pending) return { ...n, pending: { ...n.pending, resolved: true }, resolved: true };
-    if (n.input) return { ...n, input: { ...n.input, resolved: true }, resolved: true };
-    return { ...n, resolved: true };
-  });
 }
 
 /** Dual-write (Task 2.3): append the resume's synthesized decision results to the
@@ -115,21 +103,29 @@ async function appendResumeResults(
 }
 
 /**
- * Rebuild the resume stream: load full conversation history, append the paused
- * assistant turn + a single user turn carrying ALL tool_result blocks
- * (completedResults + this resume's synthesized results), rebuild the scenario
- * financial context, re-resolve permission defaults / session grants / writeMode,
- * and hand off to the shared SSE responder. Shared by the input, plan, and
- * permission resume branches (spec §4.0 — resume is a fresh chatStream).
+ * Rebuild the resume stream. The model thread is projected from the durable
+ * turn-event log (`aiTurnEvents`) — the COMPLETE, lossless thread regardless of
+ * how many times this turn paused (Phase 3 loop fix). Every prior pause's
+ * tool_use is already paired with its tool_result in the log (Phase 2
+ * invariant; the decision results for THIS pause are appended by the caller
+ * BEFORE this runs), so the projection is a valid provider thread that still
+ * carries every completed step. This REPLACES the old aiMessages history +
+ * assistantBlocks/completedResults reconstruction, which dropped tool calls
+ * completed in an earlier resume segment and looped the model.
+ *
+ * Rebuilds the scenario financial context, re-resolves permission defaults /
+ * session grants / writeMode, and hands off to the shared SSE responder. Shared
+ * by the input, plan, and permission resume branches (spec §4.0 — resume is a
+ * fresh chatStream). Reuses the gate's own turnId so the continuation's events
+ * group with the paused turn (one turn group; review finding #7).
  */
 async function resumeStream(args: {
   ctx: { companyId: string; userId: string };
   scenario: { id: string; name: string; source: string | null };
   writeScenarioId: string | null;
   conversationId: string;
-  assistantBlocks: ContentBlock[];
-  completedResults: ContentBlock[];
-  resumeResults: ContentBlock[];
+  /** The gate's turnId — reused so the resumed turn's events share the gate's turn. */
+  turnId: string;
   writeMode?: AiWriteMode;
   /** Companion name from the POST handler's getAiFlags (fetched once per turn). */
   companionName: string;
@@ -138,21 +134,18 @@ async function resumeStream(args: {
   mcp: AssembledMcpTools;
   /** Built-in tools disabled for this turn (S3b §11); resumes re-offer tools. */
   disabledToolNames?: ReadonlySet<string>;
-  seedTimeline?: TimelineNode[];
-  activatedScenarios?: { scenarioId: string; name: string }[];
 }): Promise<Response> {
-  const { ctx, scenario, writeScenarioId, conversationId, assistantBlocks, completedResults, resumeResults, writeMode, companionName, mcp, disabledToolNames, seedTimeline, activatedScenarios } = args;
+  const { ctx, scenario, writeScenarioId, conversationId, turnId, writeMode, companionName, mcp, disabledToolNames } = args;
 
-  const history = await db
-    .select()
-    .from(aiMessages)
-    .where(eq(aiMessages.conversationId, conversationId))
-    .orderBy(asc(aiMessages.createdAt));
-  const messages: ChatMessage[] = history
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-  messages.push({ role: "assistant", content: assistantBlocks });
-  messages.push({ role: "user", content: [...completedResults, ...resumeResults] });
+  // Project the COMPLETE provider thread from the append-as-you-go turn-event
+  // log. The caller has already appended this resume's decision tool_result(s)
+  // (appendResumeResults), so they are in the log before this projection runs —
+  // the resumed model sees the approved/denied results alongside every prior
+  // pause's completed work. projectModelThread only ever emits user/assistant
+  // turns, so the LlmMessage[] is a valid ChatMessage[] for the streaming layer.
+  const messages = projectModelThread(
+    (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
+  ) as ChatMessage[];
 
   const { contextText: baseContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
@@ -184,9 +177,10 @@ async function resumeStream(args: {
     scenarioId: scenario.id,
     writeScenarioId,
     conversationId,
-    // turnId is threaded but not yet consumed by chat-stream (Task 2.2). Mint one
-    // so the required field is satisfied; resume's turn-id handling lands later.
-    turnId: crypto.randomUUID(),
+    // Reuse the gate's own turnId: the continuation's log events (assistant_step,
+    // tool_result, turn_done) share the paused turn's id, so projectTimeline keeps
+    // the whole multi-pause turn as ONE group (review finding #7).
+    turnId,
     messages,
     financialContext,
     companionName,
@@ -196,8 +190,6 @@ async function resumeStream(args: {
     writeMode: writeMode ?? "confirm",
     mcp,
     disabledToolNames,
-    seedTimeline,
-    activatedScenarios,
   });
 }
 
@@ -236,28 +228,50 @@ export const POST = withErrorHandler(async (request: Request) => {
     .where(and(eq(aiConversations.id, body.conversationId), eq(aiConversations.companyId, ctx.companyId)));
   if (!conv) return errorResponse("Conversation not found", 404);
 
-  // Load the active pending batch and verify it matches.
+  // Load the active pending batch and verify it matches. The pending row is still
+  // dual-written (Phase 4 removes it); we keep it to free the single-active slot
+  // (resolvePendingAction) and as a fallback gate-metadata source for pre-2.3
+  // paused turns that have no gate event in the log.
   const pendingRow = await getActivePendingAction(body.conversationId);
   if (!pendingRow || pendingRow.pauseId !== body.pauseId) {
     return errorResponse("No matching pending action to resume", 409);
   }
 
-  const completedResults = pendingRow.completedResults as ContentBlock[];
-  const assistantBlocks = pendingRow.assistantBlocks as ContentBlock[];
-
-  // Dual-write (Task 2.3): the open gate carries the turnId this pause belongs to.
-  // Reuse it so the resume's synthesized decision results land on the SAME turn
-  // (finding #7); fall back to a fresh id if no gate row exists (pre-2.3 paused turn).
+  // The open gate event is now the source of truth for gate metadata: its turnId
+  // (reused so the resumed events share the paused turn — finding #7), kind, the
+  // gated actions/spec, and the persisted read/write scenario ids. The gate is
+  // written for every pause in chat-stream's onPause/onInputRequest/onPlanRequest,
+  // so production always has it; fall back to the dual-written pending row when a
+  // gate event is absent (pre-2.3 paused turn) so the resume still works.
   const openGate = await getOpenGate(body.conversationId);
   const gateTurnId = openGate?.turnId ?? crypto.randomUUID();
+  const gatePayload = (openGate?.payload ?? null) as {
+    kind?: "permission" | "input" | "plan";
+    actions?: unknown[];
+    spec?: unknown;
+    gatedToolUseId?: string;
+    scenarioId?: string;
+    writeScenarioId?: string | null;
+  } | null;
+
+  // Gate metadata, gate-preferred with a pending-row fallback (graceful when no
+  // gate event exists). kind drives the branch; scenarioId/writeScenarioId drive
+  // scenario targeting + the decision-4 re-confirm.
+  const gateKind = gatePayload?.kind ?? (pendingRow.kind as "permission" | "input" | "plan");
+  const gateReadScenarioId = gatePayload?.scenarioId ?? pendingRow.scenarioId;
+  const gateWriteScenarioId =
+    gatePayload?.writeScenarioId !== undefined
+      ? gatePayload.writeScenarioId
+      : (pendingRow.writeScenarioId ?? null);
 
   // SCENARIO SAFETY: execute held tools against the scenario the turn was paused in
-  // (persisted on the pending row), loaded scoped to the company — NOT getDefaultScenario.
-  // A pause inside a non-default scenario must resume into that same overlay (spec §5).
+  // (from the gate, with a pending-row fallback), loaded scoped to the company —
+  // NOT getDefaultScenario. A pause inside a non-default scenario must resume into
+  // that same overlay (spec §5).
   const [scenario] = await db
     .select()
     .from(scenariosTable)
-    .where(and(eq(scenariosTable.id, pendingRow.scenarioId), eq(scenariosTable.companyId, ctx.companyId)));
+    .where(and(eq(scenariosTable.id, gateReadScenarioId), eq(scenariosTable.companyId, ctx.companyId)));
   if (!scenario) return errorResponse("Scenario for the paused turn not found", 404);
 
   // Flags fetched ONCE per resume (checkAiFeatureAllowed has its own internal read;
@@ -284,9 +298,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   // spec, synthesize a single tool_result for the form's tool_use id, and resume
   // the loop. No permission decisions are involved (spec §7 — input and permission
   // pauses are exclusive).
-  if (pendingRow.kind === "input") {
-    const inputPending = pendingRow.pending as { inputToolUseId: string; spec: InputFormSpec };
-    const spec = inputPending.spec;
+  if (gateKind === "input") {
+    // Gate-preferred: the input spec + gated tool_use id come from the gate event
+    // (spec/gatedToolUseId); fall back to the dual-written pending row's `pending`.
+    const inputFallback = pendingRow.pending as { inputToolUseId: string; spec: InputFormSpec };
+    const inputToolUseId = gatePayload?.gatedToolUseId ?? inputFallback.inputToolUseId;
+    const spec = (gatePayload?.spec as InputFormSpec | undefined) ?? inputFallback.spec;
     const formData = (body.formData ?? {}) as Record<string, unknown>;
 
     const missing = (spec.fields as FormField[])
@@ -301,9 +318,11 @@ export const POST = withErrorHandler(async (request: Request) => {
 
     const inputResult: ContentBlock = {
       type: "tool_result",
-      toolUseId: inputPending.inputToolUseId,
+      toolUseId: inputToolUseId,
       content: JSON.stringify(formData),
     };
+    // Dual-write the decision result to the log BEFORE projecting (resumeStream),
+    // so the projected thread includes the submitted form result.
     await resolvePendingAction(pendingRow.id);
     await appendResumeResults(body.conversationId, gateTurnId, [inputResult]);
     await resolveOpenGate(body.conversationId);
@@ -311,16 +330,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
       scenario,
-      writeScenarioId: pendingRow.writeScenarioId ?? null,
+      writeScenarioId: gateWriteScenarioId,
       conversationId: body.conversationId,
-      assistantBlocks,
-      completedResults,
-      resumeResults: [inputResult],
+      turnId: gateTurnId,
       writeMode: aiCheck.writeMode ?? "confirm",
       companionName: aiFlags.companionName,
       mcp,
       disabledToolNames,
-      seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
 
@@ -328,15 +344,19 @@ export const POST = withErrorHandler(async (request: Request) => {
   // Synthesize a tool_result for the propose_plan tool_use id carrying the
   // approved plan, then resume — the model proceeds to call the real tools
   // (which themselves hit the permission/diff gate). Exclusive with input/permission.
-  if (pendingRow.kind === "plan") {
-    const planPending = pendingRow.pending as { planToolUseId: string; spec: PlanSpec };
-    const approvedPlan = (body.plan as PlanSpec | undefined) ?? planPending.spec;
+  if (gateKind === "plan") {
+    // Gate-preferred: the proposed plan spec + gated tool_use id come from the gate
+    // event; fall back to the dual-written pending row's `pending`.
+    const planFallback = pendingRow.pending as { planToolUseId: string; spec: PlanSpec };
+    const planToolUseId = gatePayload?.gatedToolUseId ?? planFallback.planToolUseId;
+    const approvedPlan = (body.plan as PlanSpec | undefined) ?? (gatePayload?.spec as PlanSpec | undefined) ?? planFallback.spec;
 
     const planResult: ContentBlock = {
       type: "tool_result",
-      toolUseId: planPending.planToolUseId,
+      toolUseId: planToolUseId,
       content: JSON.stringify({ approved: true, plan: approvedPlan }),
     };
+    // Dual-write the decision result to the log BEFORE projecting (resumeStream).
     await resolvePendingAction(pendingRow.id);
     await appendResumeResults(body.conversationId, gateTurnId, [planResult]);
     await resolveOpenGate(body.conversationId);
@@ -344,16 +364,13 @@ export const POST = withErrorHandler(async (request: Request) => {
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
       scenario,
-      writeScenarioId: pendingRow.writeScenarioId ?? null,
+      writeScenarioId: gateWriteScenarioId,
       conversationId: body.conversationId,
-      assistantBlocks,
-      completedResults,
-      resumeResults: [planResult],
+      turnId: gateTurnId,
       writeMode: aiCheck.writeMode ?? "confirm",
       companionName: aiFlags.companionName,
       mcp,
       disabledToolNames,
-      seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
     });
   }
 
@@ -361,7 +378,14 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!body.decisions || body.decisions.length === 0) {
     return errorResponse("decisions required to resume a permission pause", 400);
   }
-  const pending = pendingRow.pending as PendingActionRecord[];
+  // Gate-preferred: the gated action batch comes from the gate event's `actions`
+  // (the enriched pending batch — {requestId, toolName, toolInput, override?});
+  // fall back to the dual-written pending row's `pending` when the gate carries no
+  // actions (absent gate, or a stub gate with an empty batch).
+  const gateActions = gatePayload?.actions as PendingActionRecord[] | undefined;
+  const pending = gateActions && gateActions.length > 0
+    ? gateActions
+    : (pendingRow.pending as PendingActionRecord[]);
   const decisionMap = new Map(body.decisions.map((d) => [d.requestId, d.decision]));
 
   // Decision 4 (spec §6): re-confirm the user is still in the scenario this turn
@@ -391,7 +415,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     const cat = categorizeToolName(a.toolName, mcp.categories);
     return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
   });
-  if (headerScenarioId && hasApprovedOverlayWrite && pendingRow.writeScenarioId && headerScenarioId !== pendingRow.scenarioId) {
+  // Decision-4 reads the read/write scenario ids from the GATE (gate-preferred,
+  // pending-row fallback) — the paused turn's persisted overlay target.
+  if (headerScenarioId && hasApprovedOverlayWrite && gateWriteScenarioId && headerScenarioId !== gateReadScenarioId) {
     const [activeScn] = await db
       .select({ aiConversationId: scenariosTable.aiConversationId, name: scenariosTable.name })
       .from(scenariosTable)
@@ -402,7 +428,7 @@ export const POST = withErrorHandler(async (request: Request) => {
         {
           error: "The active scenario changed since this action was proposed.",
           code: "SCENARIO_CHANGED",
-          details: { pendingScenarioId: pendingRow.scenarioId, activeScenarioId: headerScenarioId, activeScenarioName: activeScn?.name ?? null },
+          details: { pendingScenarioId: gateReadScenarioId, activeScenarioId: headerScenarioId, activeScenarioName: activeScn?.name ?? null },
         },
         { status: 409 },
       );
@@ -410,7 +436,6 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   // Execute / synthesize results for each pending action.
-  const activatedScenarios: { scenarioId: string; name: string }[] = [];
   const pendingResults: ContentBlock[] = [];
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
@@ -438,14 +463,26 @@ export const POST = withErrorHandler(async (request: Request) => {
 
     const result = await executeToolCall(action.toolName, action.toolInput, {
       companyId: ctx.companyId,
-      scenarioId: pendingRow.writeScenarioId ?? null,
+      scenarioId: gateWriteScenarioId,
       userId: ctx.userId,
       conversationId: body.conversationId,
       permissionDecision: decision === "session" ? "granted_session" : "granted_once",
     });
     pendingResults.push({ type: "tool_result", toolUseId: action.requestId, content: result });
+    // A scenario the AI created/activated while executing this approved batch is
+    // recorded as a persisted scenario marker on the gate's turn (replaces the dead
+    // `activatedScenarios` chat-stream plumbing) so the projected timeline/history
+    // shows the activation. The live re-enter SSE is emitted by the continuing
+    // chatStream when it re-evaluates the thread; here we only persist the marker.
     const activation = scenarioActivationFrom(action.toolName, result);
-    if (activation) activatedScenarios.push(activation);
+    if (activation) {
+      await appendTurnEvent({
+        conversationId: body.conversationId,
+        turnId: gateTurnId,
+        type: "scenario",
+        payload: { action: "activated", scenarioId: activation.scenarioId, name: activation.name },
+      }).catch(() => {});
+    }
   }
 
   await resolvePendingAction(pendingRow.id);
@@ -455,16 +492,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   return resumeStream({
     ctx: { companyId: ctx.companyId, userId: ctx.userId },
     scenario,
-    writeScenarioId: pendingRow.writeScenarioId ?? null,
+    writeScenarioId: gateWriteScenarioId,
     conversationId: body.conversationId,
-    assistantBlocks,
-    completedResults,
-    resumeResults: pendingResults,
+    turnId: gateTurnId,
     writeMode: aiCheck.writeMode ?? "confirm",
     companionName: aiFlags.companionName,
     mcp,
     disabledToolNames,
-    seedTimeline: buildSeedTimeline(pendingRow.timeline, pendingRow.pauseId),
-    activatedScenarios,
   });
 });

@@ -51,12 +51,6 @@ export interface ChatStreamParams {
    *  before the loop (S3b §11). */
   disabledToolNames?: ReadonlySet<string>;
   creditWarning?: string;
-  /** Worklog timeline accumulated before a pause, seeded so the resumed turn's
-   *  `done` persists the FULL run (Plan 5 full-run persistence). */
-  seedTimeline?: TimelineNode[];
-  /** Scenarios the AI created/activated during the resumed Apply — emitted at
-   *  stream start so the client enters them (Plan 5 scenario activation). */
-  activatedScenarios?: { scenarioId: string; name: string }[];
 }
 
 const THINK_TAG = /<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi;
@@ -133,7 +127,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       const pendingOverrides = new Map<string, unknown[]>();
 
       // Ordered worklog nodes (spec §4.5), persisted to metadata.timeline on done.
-      const timeline: TimelineNode[] = params.seedTimeline ? [...params.seedTimeline] : [];
+      // A resumed turn no longer seeds this — the durable turn-event log is the
+      // single source for the historical timeline (projectTimeline in the history
+      // endpoint); this live `timeline` only accumulates THIS stream segment's nodes.
+      const timeline: TimelineNode[] = [];
       const findNode = (id: string) => timeline.find((n) => n.id === id);
       // Append/extend the trailing text-result node for streamed prose.
       const appendText = (content: string) => {
@@ -155,12 +152,6 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
         send(controller, { type: "scenario_activated", scenarioId: a.scenarioId, name: a.name });
         timeline.push({ id: `scenario-${a.scenarioId}-${timeline.length}`, kind: "scenario", scenarioId: a.scenarioId, scenarioName: a.name });
       };
-
-      // Re-enter scenarios created/activated during a resumed Apply (Plan 5).
-      for (const a of params.activatedScenarios ?? []) {
-        emitScenarioActivated(controller, a);
-        await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "scenario", payload: { action: "activated", scenarioId: a.scenarioId, name: a.name } });
-      }
 
       // A+B (spec §4.1): the turn's active scenario can change mid-turn. Start at the
       // request's write target; create_scenario/activate_scenario move it; exit_scenario
