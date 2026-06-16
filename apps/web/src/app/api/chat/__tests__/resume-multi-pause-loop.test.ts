@@ -86,7 +86,6 @@ import {
   db,
   aiConversations,
   aiMessages,
-  createPendingAction,
   appendTurnEvent,
   getTurnEvents,
 } from "@burnless/db";
@@ -140,19 +139,10 @@ describe("POST /api/chat/resume — multi-pause loop regression (PGLite)", () =>
       payload: { pauseId: "pause-2", kind: "permission", actions: [{ requestId: TU2, toolName: "create_revenue_stream", toolInput: { name: "Pro" } }], scenarioId: scn.id, writeScenarioId: scn.id },
     });
 
-    // The dual-written pending row for the SECOND pause (Phase 4 removes it; resume
-    // still resolves it). Its assistantBlocks/completedResults DELIBERATELY carry
-    // ONLY the second step — proving the fix does NOT depend on them (the old
-    // reconstruction read these; the first step is absent here, as it was in prod).
-    await createPendingAction({
-      conversationId,
-      pauseId: "pause-2",
-      scenarioId: scn.id,
-      writeScenarioId: scn.id,
-      assistantBlocks: [{ type: "tool_use", id: TU2, name: "create_revenue_stream", input: { name: "Pro" } }],
-      completedResults: [],
-      pending: [{ requestId: TU2, toolName: "create_revenue_stream", toolInput: { name: "Pro" } }],
-    });
+    // (Phase 4 removed the dual-written `aiPendingActions` row entirely — resume now
+    // reads the gate's payload + the durable log only. This test proves the fix does
+    // NOT depend on any pending-row reconstruction: the projected thread below is
+    // built solely from `aiTurnEvents`.)
 
     // ── SECOND resume: approve the create_revenue_stream write ───────────────
     const { POST } = await import("../resume/route");

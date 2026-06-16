@@ -1,10 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../index";
-import {
-  aiPermissionDefaults,
-  aiConversations,
-  aiPendingActions,
-} from "../schema";
+import { aiPermissionDefaults, aiConversations } from "../schema";
 
 // ── Per-user permission defaults ─────────────────────────────────────────────
 
@@ -125,77 +121,4 @@ export async function resetSessionDisabledTools(
     .update(aiConversations)
     .set({ sessionDisabledTools: {} })
     .where(eq(aiConversations.id, conversationId));
-}
-
-// ── Pending actions (paused turns) ───────────────────────────────────────────
-
-export interface NewPendingAction {
-  conversationId: string;
-  pauseId: string;
-  /** Why the turn paused. Defaults to "permission". */
-  kind?: "permission" | "input" | "plan";
-  /** Active scenario the paused turn operates in (resume executes against this). */
-  scenarioId: string;
-  /** AI-01: nullable WRITE target. null = base view → base-table write on resume. */
-  writeScenarioId?: string | null;
-  assistantBlocks: unknown;
-  completedResults: unknown;
-  pending: unknown;
-}
-
-/**
- * Persist a paused assistant turn. Throws (unique-violation) if the conversation
- * already has an unresolved pending batch — the single-active invariant.
- */
-export async function createPendingAction(input: NewPendingAction) {
-  const [row] = await db
-    .insert(aiPendingActions)
-    .values({
-      conversationId: input.conversationId,
-      pauseId: input.pauseId,
-      kind: input.kind ?? "permission",
-      scenarioId: input.scenarioId,
-      writeScenarioId: input.writeScenarioId ?? null,
-      assistantBlocks: input.assistantBlocks,
-      completedResults: input.completedResults,
-      pending: input.pending,
-    })
-    .returning();
-  return row!;
-}
-
-/** Get the conversation's current unresolved pending batch, or null. */
-export async function getActivePendingAction(conversationId: string) {
-  const [row] = await db
-    .select()
-    .from(aiPendingActions)
-    .where(
-      and(
-        eq(aiPendingActions.conversationId, conversationId),
-        isNull(aiPendingActions.resolvedAt)
-      )
-    )
-    .limit(1);
-  return row ?? null;
-}
-
-/** Mark a pending batch resolved (frees the single-active slot). */
-export async function resolvePendingAction(id: string): Promise<void> {
-  await db
-    .update(aiPendingActions)
-    .set({ resolvedAt: new Date() })
-    .where(eq(aiPendingActions.id, id));
-}
-
-/** Persist the accumulated worklog timeline onto a still-active pending row, keyed
- *  by pauseId (Plan 5). Called at pause-time so reload + the post-resume `done`
- *  can reconstruct the full run. No-op if the pauseId is unknown/already resolved. */
-export async function updatePendingActionTimeline(
-  pauseId: string,
-  timeline: unknown[]
-): Promise<void> {
-  await db
-    .update(aiPendingActions)
-    .set({ timeline })
-    .where(and(eq(aiPendingActions.pauseId, pauseId), isNull(aiPendingActions.resolvedAt)));
 }

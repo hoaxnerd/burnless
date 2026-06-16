@@ -103,15 +103,10 @@ export {
   getSessionDisabledTools,
   setSessionDisabledTool,
   resetSessionDisabledTools,
-  createPendingAction,
-  getActivePendingAction,
-  resolvePendingAction,
-  updatePendingActionTimeline,
 } from "./ai-permissions";
 export type {
   PermissionModeValue,
   PermissionDefaultsPatch,
-  NewPendingAction,
 } from "./ai-permissions";
 
 export {
