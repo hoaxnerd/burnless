@@ -193,24 +193,27 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // persisted at most once across onToolCall + pause.
       const appendedResultIds = new Set<string>();
 
-      // Append the not-yet-persisted (deferred/declined) same-batch tool_result
-      // events that accumulated in `completedResults` before a pause, in order,
-      // BEFORE the gate event (so the projector pairs every tool_use). Executed
-      // results were already appended in onToolCall (in the set); steer results
-      // carry no deferred/declined marker and are skipped. Returns nothing.
+      // Append the not-yet-persisted same-batch tool_result events that accumulated
+      // in `completedResults` before a pause, in order, BEFORE the gate event (so the
+      // projector pairs EVERY tool_use in the persisted assistant_step). Executed
+      // results were already appended in onToolCall (their id is in the set) and are
+      // skipped here — exactly-once. Every other block is appended regardless of
+      // marker: deferred/declined carry a JSON marker we classify; a soft-STEER block
+      // (`{repeated:true}`) carries no such marker but its tool_use STILL needs a
+      // paired result, so it falls through to kind "executed" (a completed result the
+      // model received). Dropping it would dangle its tool_use → provider 400.
       const appendPausedResults = async (completedResults: unknown[]) => {
         for (const block of completedResults) {
           const b = block as { toolUseId?: string; content?: string };
           if (typeof b.toolUseId !== "string" || appendedResultIds.has(b.toolUseId)) continue;
-          let kind: "deferred" | "declined" | undefined;
+          let kind: "executed" | "deferred" | "declined" = "executed";
           try {
             const parsed = JSON.parse(b.content ?? "") as { deferred?: boolean; declined?: boolean };
             if (parsed?.deferred) kind = "deferred";
             else if (parsed?.declined) kind = "declined";
           } catch {
-            /* non-JSON content → not a synthesized deferred/declined block */
+            /* non-JSON content → unclassifiable marker → kind stays "executed" */
           }
-          if (!kind) continue; // executed/stopped/steer: not ours to append here
           appendedResultIds.add(b.toolUseId);
           const ref = stepToolUses.find((t) => t.id === b.toolUseId);
           await appendTurnEvent({
@@ -441,6 +444,8 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 pauseId,
                 kind: "input",
                 spec: state.spec,
+                // The gated tool_use id (permission gates use actions[].requestId).
+                gatedToolUseId: state.inputToolUseId,
                 scenarioId: params.scenarioId,
                 writeScenarioId: turnScenarioId,
               },
@@ -469,6 +474,8 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 pauseId,
                 kind: "plan",
                 spec: state.spec,
+                // The gated tool_use id (permission gates use actions[].requestId).
+                gatedToolUseId: state.planToolUseId,
                 scenarioId: params.scenarioId,
                 writeScenarioId: turnScenarioId,
               },

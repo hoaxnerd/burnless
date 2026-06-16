@@ -76,9 +76,10 @@ const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
   mockBuildChatSSEResponse: vi.fn(),
 }));
 
-const { mockAppendTurnEvent, mockResolveOpenGate } = vi.hoisted(() => ({
+const { mockAppendTurnEvent, mockResolveOpenGate, mockGetOpenGate } = vi.hoisted(() => ({
   mockAppendTurnEvent: vi.fn(),
   mockResolveOpenGate: vi.fn(),
+  mockGetOpenGate: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -114,7 +115,8 @@ vi.mock("@burnless/db", () => ({
   // Phase 2 dual-write: the chat POST appends a user_message turn-event next to
   // the existing aiMessages user-row insert.
   appendTurnEvent: mockAppendTurnEvent,
-  // Task 2.3: the new turn resolves any open gate before it starts.
+  // Task 2.3: the new turn reads + resolves any open gate before it starts.
+  getOpenGate: mockGetOpenGate,
   resolveOpenGate: mockResolveOpenGate,
   aiConversations: {
     id: "id",
@@ -259,6 +261,8 @@ describe("POST /api/chat", () => {
     // Default: turn-event append resolves (Phase 2 dual-write).
     mockAppendTurnEvent.mockResolvedValue({ id: "evt1" });
     mockResolveOpenGate.mockResolvedValue(undefined);
+    // Default: no open gate (most turns) — abandoned-gate cancel path skipped.
+    mockGetOpenGate.mockResolvedValue(null);
 
     // Default: shared SSE responder returns a basic streaming response
     mockBuildChatSSEResponse.mockImplementation(
@@ -434,6 +438,69 @@ describe("POST /api/chat", () => {
     await POST(makeRequest({ message: "new question" }));
 
     expect(mockResolveOpenGate).toHaveBeenCalledWith("gate-conv");
+  });
+
+  it("Task 2.3 FIX 2: abandoned permission gate → declined cancel per gated tool_use BEFORE resolveOpenGate", async () => {
+    mockReturning.mockResolvedValue([
+      { id: "abandon-conv", companyId: "c1", userId: "u1" },
+    ]);
+    // An open permission gate listing two gated tool_uses (requestId = tool_use id).
+    mockGetOpenGate.mockResolvedValue({
+      turnId: "old-turn",
+      payload: {
+        pauseId: "p-old",
+        kind: "permission",
+        actions: [{ requestId: "tu-gated-1" }, { requestId: "tu-gated-2" }],
+      },
+    });
+
+    const order: string[] = [];
+    mockAppendTurnEvent.mockImplementation(async (e: { type: string }) => {
+      order.push(`append:${e.type}`);
+      return { id: "evt" };
+    });
+    mockResolveOpenGate.mockImplementation(async () => { order.push("resolve"); });
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "actually, never mind" }));
+
+    // A declined cancel tool_result for EACH gated tool_use, tagged with the gate's
+    // OWN turnId (groups with the abandoned turn).
+    const cancels = mockAppendTurnEvent.mock.calls
+      .map((c) => c[0] as { type: string; turnId: string; payload: Record<string, unknown> })
+      .filter((e) => e.type === "tool_result" && e.payload.kind === "declined");
+    expect(cancels).toHaveLength(2);
+    expect(cancels.map((c) => c.payload.toolUseId).sort()).toEqual(["tu-gated-1", "tu-gated-2"]);
+    expect(cancels.every((c) => c.turnId === "old-turn")).toBe(true);
+    expect(cancels.every((c) => typeof c.payload.result === "string" && (c.payload.result as string).includes("superseded"))).toBe(true);
+
+    // Cancels are appended BEFORE the gate is resolved (so the open gate still exists
+    // when we read it) and before the new user_message.
+    const firstResolve = order.indexOf("resolve");
+    const lastCancel = order.lastIndexOf("append:tool_result");
+    const userMsg = order.indexOf("append:user_message");
+    expect(lastCancel).toBeLessThan(firstResolve);
+    expect(lastCancel).toBeLessThan(userMsg);
+  });
+
+  it("Task 2.3 FIX 2: abandoned input gate → single declined cancel for gatedToolUseId", async () => {
+    mockReturning.mockResolvedValue([
+      { id: "abandon-input", companyId: "c1", userId: "u1" },
+    ]);
+    mockGetOpenGate.mockResolvedValue({
+      turnId: "old-input-turn",
+      payload: { pauseId: "p-in", kind: "input", spec: {}, gatedToolUseId: "tu-input" },
+    });
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "stop" }));
+
+    const cancels = mockAppendTurnEvent.mock.calls
+      .map((c) => c[0] as { type: string; turnId: string; payload: Record<string, unknown> })
+      .filter((e) => e.type === "tool_result" && e.payload.kind === "declined");
+    expect(cancels).toHaveLength(1);
+    expect(cancels[0]!.payload.toolUseId).toBe("tu-input");
+    expect(cancels[0]!.turnId).toBe("old-input-turn");
   });
 
   it("includes credit warning when credits >= 80% used", async () => {

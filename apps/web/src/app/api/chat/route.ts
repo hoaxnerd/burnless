@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, resolveOpenGate } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
@@ -93,9 +93,43 @@ export const POST = withErrorHandler(async (request: Request) => {
   const stalePending = await getActivePendingAction(conversationId);
   if (stalePending) await resolvePendingAction(stalePending.id);
 
-  // Dual-write (Task 2.3): also resolve any open gate in the turn log before the
-  // new turn starts, so the new turn's pause can't collide with the partial-unique
-  // open-gate index. Unconditional (cheap no-op when no gate is open).
+  // Dual-write (Task 2.3): abandoning an open gate by sending a new message leaves
+  // the gated (pending) tool_use without a tool_result — it would dangle forever in
+  // the log and make Phase 3's projectModelThread emit an assistant turn with an
+  // unpaired tool_use (provider 400). Before resolving the gate, synthesize a
+  // `declined` cancellation tool_result for EACH gated tool_use, tagged with the
+  // gate's OWN turnId so it groups with the abandoned turn (not the new one).
+  // Gated-id source: permission gates carry their ids in `actions[].requestId`;
+  // input/plan gates carry the single `gatedToolUseId`.
+  const openGate = await getOpenGate(conversationId);
+  if (openGate) {
+    const gatePayload = openGate.payload as {
+      kind?: "permission" | "input" | "plan";
+      actions?: { requestId?: unknown }[];
+      gatedToolUseId?: unknown;
+    } | null;
+    const gatedIds: string[] = [];
+    if (gatePayload?.kind === "permission") {
+      for (const a of gatePayload.actions ?? []) {
+        if (typeof a?.requestId === "string") gatedIds.push(a.requestId);
+      }
+    } else if (typeof gatePayload?.gatedToolUseId === "string") {
+      gatedIds.push(gatePayload.gatedToolUseId);
+    }
+    const cancelled = JSON.stringify({ declined: true, reason: "superseded by new message" });
+    for (const toolUseId of gatedIds) {
+      await appendTurnEvent({
+        conversationId,
+        turnId: openGate.turnId,
+        type: "tool_result",
+        payload: { toolUseId, toolName: "", result: cancelled, kind: "declined" },
+      });
+    }
+  }
+
+  // Resolve any open gate in the turn log before the new turn starts, so the new
+  // turn's pause can't collide with the partial-unique open-gate index.
+  // Unconditional (cheap no-op when no gate is open).
   await resolveOpenGate(conversationId);
 
   // Per-user permission defaults (fall back to builtin) + this conversation's grants.

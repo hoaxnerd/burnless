@@ -191,6 +191,51 @@ describe("buildChatSSEResponse — dual-write turn events (Task 2.2)", () => {
     // gate is unresolved (no resolvedAt on append).
   });
 
+  it("steer+pause same batch: appends the soft-steer result (kind executed) AND the deferred, no executed dup", async () => {
+    // Batch: tool A is soft-steered (`{repeated:true}`, no deferred/declined marker,
+    // never via onToolCall), tool B (executed) ran, tool C (deferred) gates → pause.
+    // FIX 1: A's tool_use MUST get a paired tool_result or it dangles → provider 400.
+    chatStreamMock.mockImplementation(async function* (opts: { onToolCall: (t: string, i: Record<string, unknown>) => Promise<string>; onPause: (s: unknown) => Promise<string> }) {
+      yield { type: "assistant_step", toolUses: [
+        { id: "tu-a", name: "loopy", input: {} },   // soft-steered
+        { id: "tu-b", name: "update_b", input: {} }, // executed
+        { id: "tu-c", name: "delete_c", input: {} }, // deferred to pause
+      ] };
+      const rb = await opts.onToolCall("update_b", {});
+      yield { type: "tool_result", toolName: "update_b", toolResult: rb, nodeId: "tu-b", nodeKind: "tool" };
+      await opts.onPause({
+        assistantBlocks: [],
+        completedResults: [
+          // Order as chat.ts pushes them: steer (no marker), executed, deferred.
+          { type: "tool_result", toolUseId: "tu-a", content: JSON.stringify({ repeated: true, message: "You already called this." }) },
+          { type: "tool_result", toolUseId: "tu-b", content: rb }, // executed (already appended)
+          { type: "tool_result", toolUseId: "tu-c", content: JSON.stringify({ deferred: true, message: "later" }) },
+        ],
+        pending: [{ requestId: "tu-d", toolName: "delete_c", toolInput: {} }],
+      });
+      yield { type: "permission_request", pauseId: "pause-s", actions: [] };
+      yield { type: "paused", pauseId: "pause-s" };
+    });
+    await drain(buildChatSSEResponse({ ...baseParams } as never));
+
+    const tr = ofType("tool_result");
+    const byId = Object.fromEntries(tr.map((a) => [a.payload.toolUseId, a.payload.kind]));
+    // tu-b executed once (onToolCall) — NOT duplicated by the pause path.
+    expect(tr.filter((a) => a.payload.toolUseId === "tu-b")).toHaveLength(1);
+    expect(byId["tu-b"]).toBe("executed");
+    // tu-a (soft-steer) IS now paired — classified as executed (completed result the
+    // model received), so projectModelThread won't dangle it.
+    expect(tr.filter((a) => a.payload.toolUseId === "tu-a")).toHaveLength(1);
+    expect(byId["tu-a"]).toBe("executed");
+    expect(tr.find((a) => a.payload.toolUseId === "tu-a")!.payload.result)
+      .toContain("repeated");
+    // tu-c deferred, paired.
+    expect(byId["tu-c"]).toBe("deferred");
+    // Every persisted assistant_step tool_use is paired before the gate.
+    const seq = appends().map((a) => a.type);
+    expect(seq.lastIndexOf("tool_result")).toBeLessThan(seq.indexOf("gate"));
+  });
+
   it("plan pause: appends gate kind:'plan' with the spec, deferred results, no executed dup", async () => {
     chatStreamMock.mockImplementation(async function* (opts: { onPlanRequest: (s: unknown) => Promise<string> }) {
       yield { type: "assistant_step", toolUses: [{ id: "p-1", name: "propose_plan", input: {} }, { id: "w-1", name: "update_a", input: {} }] };
@@ -216,6 +261,9 @@ describe("buildChatSSEResponse — dual-write turn events (Task 2.2)", () => {
     expect(gate).toHaveLength(1);
     expect(gate[0]!.payload.kind).toBe("plan");
     expect((gate[0]!.payload.spec as { title: string }).title).toBe("Plan");
+    // FIX 2 support: the plan gate carries its gated tool_use id so an abandoned
+    // gate can cancel it.
+    expect(gate[0]!.payload.gatedToolUseId).toBe("p-1");
   });
 
   it("error chunk appends a turn_error", async () => {

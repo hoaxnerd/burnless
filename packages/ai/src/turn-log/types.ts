@@ -16,7 +16,13 @@ export type TurnEventPayload =
       render?: { component: string; props: Record<string, unknown>; confidence?: "high" | "low"; rationale?: string } }
   | { action: "activated" | "exited"; scenarioId?: string; name?: string } // scenario
   | { pauseId: string; kind: "permission" | "input" | "plan";          // gate
-      actions?: unknown[]; spec?: unknown; scenarioId: string; writeScenarioId: string | null }
+      actions?: unknown[]; spec?: unknown;
+      // The gated tool_use id for input/plan gates (permission gates carry their
+      // gated ids in `actions[].requestId`). Persisted so an abandoned gate can be
+      // cancelled — each gated tool_use gets a synthesized `declined` tool_result so
+      // the model thread never dangles a tool_use (provider 400).
+      gatedToolUseId?: string;
+      scenarioId: string; writeScenarioId: string | null }
   | Record<string, never>                                              // turn_done
   | { message: string };                                               // turn_error
 
