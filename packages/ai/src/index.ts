@@ -159,6 +159,9 @@ export * from "./generative-ui";
 // Provider catalog (P2 — preset knowledge: base URLs, auth style, discovery, known models)
 export * from "./catalog";
 
+// Tool-loop convergence guard (pure functions)
+export { toolSignature, seedSignatureCounts, checkGuard, type GuardLimits, type GuardDecision } from "./tool-loop-guard";
+
 // Permissions (tool categorization + pure resolver)
 export {
   resolvePermission,
