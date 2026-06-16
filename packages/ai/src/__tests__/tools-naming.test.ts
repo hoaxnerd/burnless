@@ -9,7 +9,7 @@ const WEB_TOOLS = new Set(["search_web", "read_webpage"]);
 // they either change the user's UI view (e.g. active scenario) or list entities
 // without mutating data, so they do not fit the CRUD verb prefixes (`list_*` is
 // a read, not a CRUD verb). Allowlisted like WEB_TOOLS.
-const CONTROL_TOOLS = new Set(["activate_scenario", "list_scenarios", "list_accounts"]);
+const CONTROL_TOOLS = new Set(["activate_scenario", "exit_scenario", "list_scenarios", "list_accounts"]);
 // Write tools that legitimately use a domain verb instead of a CRUD prefix.
 // `record_transaction` writes the actuals ledger (it is in WRITE_TOOLS / gated as
 // a mutation) but "record" reads more naturally than "create" for booking an
