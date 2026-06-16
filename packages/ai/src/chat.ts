@@ -19,6 +19,7 @@ import { resolveResilientProvider } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
 import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputRequestState, type PlanRequestState } from "./generative-ui";
 import { getAiLimits } from "./config";
+import { seedSignatureCounts, checkGuard, type GuardLimits } from "./tool-loop-guard";
 
 /**
  * Resolve the provider through THE seam — every real-generation path goes
@@ -124,6 +125,10 @@ export async function chat(options: ChatOptions): Promise<{
 
   const toolResults: ToolCallResult[] = [];
 
+  const limits = getAiLimits();
+  const guardLimits: GuardLimits = { soft: limits.repeatSoftLimit, hard: limits.repeatHardLimit };
+  const guardCounts = seedSignatureCounts(messages);
+
   // Loop to handle multi-turn tool use (capped to prevent runaway costs)
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     const response = await provider.complete({
@@ -144,6 +149,23 @@ export async function chat(options: ChatOptions): Promise<{
       // Execute tools and build results
       const resultBlocks: ContentBlock[] = [];
       for (const toolUse of toolUseBlocks) {
+        const guard = checkGuard(guardCounts, toolUse.name, toolUse.input, guardLimits);
+        if (guard.action === "stop") {
+          // Hard stop ends the turn terminally. `messages` is local and discarded
+          // on return (callers read only .response/.toolResults), so any trailing
+          // tool_use blocks in this same batch intentionally go without a
+          // tool_result — the array is never persisted or replayed. If a future
+          // change starts persisting on this path, fill the remaining ids first.
+          resultBlocks.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          messages.push({ role: "user", content: resultBlocks });
+          return { response: guard.message, toolResults };
+        }
+        if (guard.action === "steer") {
+          toolResults.push({ tool: toolUse.name, input: toolUse.input, result: guard.message });
+          resultBlocks.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          continue;
+        }
+
         const result = await options.onToolCall(toolUse.name, toolUse.input);
         toolResults.push({
           tool: toolUse.name,
@@ -207,6 +229,10 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       : m.content,
   }));
 
+  const limits = getAiLimits();
+  const guardLimits: GuardLimits = { soft: limits.repeatSoftLimit, hard: limits.repeatHardLimit };
+  const guardCounts = seedSignatureCounts(messages);
+
   // Track whether the turn produced ANY visible output (text or an executed
   // tool). Some providers (e.g. small models on flaky multi-tool turns) return an
   // empty completion — without this we'd render a blank assistant bubble.
@@ -248,6 +274,27 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       const planRequests: PendingToolUse[] = [];
 
       for (const toolUse of toolUseBlocks) {
+        const guard = checkGuard(guardCounts, toolUse.name, toolUse.input, guardLimits);
+        if (guard.action === "stop") {
+          // Hard stop: satisfy the tool-result contract for this id, end the turn.
+          // No on* persistence callback fires on this path, so `messages`/
+          // `completedResults` are discarded — any trailing tool_use blocks in
+          // this same batch intentionally go without a tool_result. If a future
+          // change starts persisting here, fill the remaining ids first.
+          completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          messages.push({ role: "assistant", content: lastResponse.content });
+          messages.push({ role: "user", content: completedResults });
+          yield { type: "text", content: guard.message };
+          yield { type: "done" };
+          return;
+        }
+        if (guard.action === "steer") {
+          // Soft steer: skip execution; hand the model a "repeated" result to self-correct.
+          yield { type: "tool_result", toolName: toolUse.name, toolResult: guard.message, nodeId: toolUse.id, nodeKind: "tool" };
+          completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          continue;
+        }
+
         if (isPlanTool(toolUse.name)) {
           planRequests.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
           continue;

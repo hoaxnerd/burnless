@@ -143,10 +143,13 @@ describe("chat (non-streaming)", () => {
     const prev = process.env.BURNLESS_AI_MAX_TOOL_ITERATIONS;
     process.env.BURNLESS_AI_MAX_TOOL_ITERATIONS = "10";
     try {
-      // Every call triggers another tool use — simulate runaway loop
+      // Every call triggers another tool use — simulate runaway loop. Vary the
+      // input each iteration so the convergence guard (identical-call detector)
+      // does NOT fire; we are exercising the iteration CAP here, not the guard.
+      let n = 0;
       mockComplete.mockImplementation(async () => ({
         content: [
-          { type: "tool_use", id: `tool_${Date.now()}`, name: "suggest_cost_cuts", input: {} },
+          { type: "tool_use", id: `tool_${n}`, name: "suggest_cost_cuts", input: { i: n++ } },
         ],
         stopReason: "tool_use",
       }));
@@ -327,21 +330,25 @@ describe("chatStream", () => {
     const prev = process.env.BURNLESS_AI_MAX_TOOL_ITERATIONS;
     process.env.BURNLESS_AI_MAX_TOOL_ITERATIONS = "10";
     try {
-      // Every stream triggers another tool use
-      mockStream.mockImplementation(() =>
-        (async function* () {
-          yield { type: "tool_use", id: "t_loop", name: "suggest_cost_cuts", input: {} };
+      // Every stream triggers another tool use. Vary the input each iteration so
+      // the convergence guard (identical-call detector) does NOT fire; we are
+      // exercising the iteration CAP here, not the guard.
+      let n = 0;
+      mockStream.mockImplementation(() => {
+        const i = n++;
+        return (async function* () {
+          yield { type: "tool_use", id: `t_loop_${i}`, name: "suggest_cost_cuts", input: { i } };
           yield {
             type: "done",
             response: {
               content: [
-                { type: "tool_use", id: "t_loop", name: "suggest_cost_cuts", input: {} },
+                { type: "tool_use", id: `t_loop_${i}`, name: "suggest_cost_cuts", input: { i } },
               ],
               stopReason: "tool_use",
             },
           };
-        })()
-      );
+        })();
+      });
 
       const toolCallback = vi.fn().mockResolvedValue("{}");
 
