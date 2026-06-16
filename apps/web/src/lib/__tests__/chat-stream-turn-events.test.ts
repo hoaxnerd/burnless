@@ -147,6 +147,77 @@ describe("buildChatSSEResponse — dual-write turn events (Task 2.2)", () => {
     expect(sc[0]!.payload).toMatchObject({ action: "activated", scenarioId: "sc-new", name: "Aggressive Hiring" });
   });
 
+  it("permission pause: appends deferred result (exactly once, no dup of executed) then the gate", async () => {
+    // Batch: one executed write (tu-x) + one same-batch tool deferred to the pause
+    // (tu-y, synthesized {deferred:true} in completedResults — never via onToolCall).
+    chatStreamMock.mockImplementation(async function* (opts: { onToolCall: (t: string, i: Record<string, unknown>) => Promise<string>; onPause: (s: unknown) => Promise<string> }) {
+      yield { type: "assistant_step", toolUses: [{ id: "tu-x", name: "update_a", input: {} }, { id: "tu-y", name: "delete_b", input: {} }] };
+      const r = await opts.onToolCall("update_a", {});
+      yield { type: "tool_result", toolName: "update_a", toolResult: r, nodeId: "tu-x", nodeKind: "tool" };
+      // The model now requests delete_b which gates → pause.
+      await opts.onPause({
+        assistantBlocks: [],
+        completedResults: [
+          { type: "tool_result", toolUseId: "tu-x", content: r }, // executed (already appended)
+          { type: "tool_result", toolUseId: "tu-y", content: JSON.stringify({ declined: true, message: "blocked" }) },
+        ],
+        pending: [{ requestId: "tu-z", toolName: "delete_b", toolInput: {} }],
+      });
+      yield { type: "permission_request", pauseId: "pause-1", actions: [] };
+      yield { type: "paused", pauseId: "pause-1" };
+    });
+    await drain(buildChatSSEResponse({ ...baseParams } as never));
+
+    const tr = ofType("tool_result");
+    // tu-x executed (onToolCall) + tu-y declined (pause). NO duplicate of tu-x.
+    expect(tr).toHaveLength(2);
+    const byId = Object.fromEntries(tr.map((a) => [a.payload.toolUseId, a.payload.kind]));
+    expect(byId["tu-x"]).toBe("executed");
+    expect(byId["tu-y"]).toBe("declined");
+
+    const gate = ofType("gate");
+    expect(gate).toHaveLength(1);
+    // pauseId is minted inside onPause (crypto.randomUUID), not the chunk pauseId.
+    expect(typeof gate[0]!.payload.pauseId).toBe("string");
+    expect((gate[0]!.payload.pauseId as string).length).toBeGreaterThan(0);
+    expect(gate[0]!.payload.kind).toBe("permission");
+    expect(gate[0]!.payload.scenarioId).toBe("s1");
+    expect(gate[0]!.payload.writeScenarioId).toBeNull();
+    expect(gate[0]!.turnId).toBe("turn-1");
+
+    // Ordering: the deferred/declined result is appended BEFORE the gate.
+    const seq = appends().map((a) => a.type);
+    expect(seq.indexOf("tool_result")).toBeLessThan(seq.indexOf("gate"));
+    // gate is unresolved (no resolvedAt on append).
+  });
+
+  it("plan pause: appends gate kind:'plan' with the spec, deferred results, no executed dup", async () => {
+    chatStreamMock.mockImplementation(async function* (opts: { onPlanRequest: (s: unknown) => Promise<string> }) {
+      yield { type: "assistant_step", toolUses: [{ id: "p-1", name: "propose_plan", input: {} }, { id: "w-1", name: "update_a", input: {} }] };
+      await opts.onPlanRequest({
+        assistantBlocks: [],
+        completedResults: [
+          { type: "tool_result", toolUseId: "w-1", content: JSON.stringify({ deferred: true, message: "later" }) },
+        ],
+        planToolUseId: "p-1",
+        spec: { title: "Plan" },
+      });
+      yield { type: "plan_request", pauseId: "pp-1", plan: { title: "Plan" } };
+      yield { type: "paused", pauseId: "pp-1" };
+    });
+    await drain(buildChatSSEResponse({ ...baseParams } as never));
+
+    const tr = ofType("tool_result");
+    expect(tr).toHaveLength(1);
+    expect(tr[0]!.payload.toolUseId).toBe("w-1");
+    expect(tr[0]!.payload.kind).toBe("deferred");
+
+    const gate = ofType("gate");
+    expect(gate).toHaveLength(1);
+    expect(gate[0]!.payload.kind).toBe("plan");
+    expect((gate[0]!.payload.spec as { title: string }).title).toBe("Plan");
+  });
+
   it("error chunk appends a turn_error", async () => {
     chatStreamMock.mockImplementation(async function* () {
       yield { type: "error", content: "boom" };

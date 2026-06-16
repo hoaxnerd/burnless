@@ -123,6 +123,8 @@ vi.mock("@burnless/db", () => ({
   getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
   // Phase 2 dual-write: chat POST appends a user_message turn-event.
   appendTurnEvent: vi.fn().mockResolvedValue({ id: "evt1" }),
+  // Task 2.3: chat POST resolves any open gate before the new turn.
+  resolveOpenGate: vi.fn().mockResolvedValue(undefined),
   aiConversations: {
     id: "id",
     companyId: "companyId",

@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, resolveOpenGate } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
@@ -92,6 +92,11 @@ export const POST = withErrorHandler(async (request: Request) => {
   // The orphaned card goes inert (its resume 409s — already handled).
   const stalePending = await getActivePendingAction(conversationId);
   if (stalePending) await resolvePendingAction(stalePending.id);
+
+  // Dual-write (Task 2.3): also resolve any open gate in the turn log before the
+  // new turn starts, so the new turn's pause can't collide with the partial-unique
+  // open-gate index. Unconditional (cheap no-op when no gate is open).
+  await resolveOpenGate(conversationId);
 
   // Per-user permission defaults (fall back to builtin) + this conversation's grants.
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);

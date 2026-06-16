@@ -76,8 +76,9 @@ const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
   mockBuildChatSSEResponse: vi.fn(),
 }));
 
-const { mockAppendTurnEvent } = vi.hoisted(() => ({
+const { mockAppendTurnEvent, mockResolveOpenGate } = vi.hoisted(() => ({
   mockAppendTurnEvent: vi.fn(),
+  mockResolveOpenGate: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -113,6 +114,8 @@ vi.mock("@burnless/db", () => ({
   // Phase 2 dual-write: the chat POST appends a user_message turn-event next to
   // the existing aiMessages user-row insert.
   appendTurnEvent: mockAppendTurnEvent,
+  // Task 2.3: the new turn resolves any open gate before it starts.
+  resolveOpenGate: mockResolveOpenGate,
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -255,6 +258,7 @@ describe("POST /api/chat", () => {
 
     // Default: turn-event append resolves (Phase 2 dual-write).
     mockAppendTurnEvent.mockResolvedValue({ id: "evt1" });
+    mockResolveOpenGate.mockResolvedValue(undefined);
 
     // Default: shared SSE responder returns a basic streaming response
     mockBuildChatSSEResponse.mockImplementation(
@@ -419,6 +423,17 @@ describe("POST /api/chat", () => {
     // The SAME turnId is threaded into the streaming layer.
     const params = mockBuildChatSSEResponse.mock.calls[0]![0];
     expect(params.turnId).toBe(evt.turnId);
+  });
+
+  it("Task 2.3: resolves any open gate before the new turn starts", async () => {
+    mockReturning.mockResolvedValue([
+      { id: "gate-conv", companyId: "c1", userId: "u1" },
+    ]);
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "new question" }));
+
+    expect(mockResolveOpenGate).toHaveBeenCalledWith("gate-conv");
   });
 
   it("includes credit warning when credits >= 80% used", async () => {

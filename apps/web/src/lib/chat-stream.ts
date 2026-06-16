@@ -184,6 +184,49 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
         return hit?.id;
       };
 
+      // Task 2.3 exactly-once dedup: every `tool_result` event appended this turn
+      // records its toolUseId here. The executed-append (onToolCall) and the
+      // hard-stop `stopped` switch-append both add their id; the pause callbacks
+      // then append a tool_result ONLY for `completedResults` blocks whose id is
+      // NOT in this set (the synthesized deferred/declined same-batch results,
+      // which never pass through onToolCall). Guarantees each tool_use is
+      // persisted at most once across onToolCall + pause.
+      const appendedResultIds = new Set<string>();
+
+      // Append the not-yet-persisted (deferred/declined) same-batch tool_result
+      // events that accumulated in `completedResults` before a pause, in order,
+      // BEFORE the gate event (so the projector pairs every tool_use). Executed
+      // results were already appended in onToolCall (in the set); steer results
+      // carry no deferred/declined marker and are skipped. Returns nothing.
+      const appendPausedResults = async (completedResults: unknown[]) => {
+        for (const block of completedResults) {
+          const b = block as { toolUseId?: string; content?: string };
+          if (typeof b.toolUseId !== "string" || appendedResultIds.has(b.toolUseId)) continue;
+          let kind: "deferred" | "declined" | undefined;
+          try {
+            const parsed = JSON.parse(b.content ?? "") as { deferred?: boolean; declined?: boolean };
+            if (parsed?.deferred) kind = "deferred";
+            else if (parsed?.declined) kind = "declined";
+          } catch {
+            /* non-JSON content → not a synthesized deferred/declined block */
+          }
+          if (!kind) continue; // executed/stopped/steer: not ours to append here
+          appendedResultIds.add(b.toolUseId);
+          const ref = stepToolUses.find((t) => t.id === b.toolUseId);
+          await appendTurnEvent({
+            conversationId: params.conversationId,
+            turnId: params.turnId,
+            type: "tool_result",
+            payload: {
+              toolUseId: b.toolUseId,
+              toolName: ref?.name ?? "",
+              result: b.content ?? "",
+              kind,
+            },
+          });
+        }
+      };
+
       const emitScenarioExited = (controller: ReadableStreamDefaultController) => {
         send(controller, { type: "scenario_exited" });
         timeline.push({ id: `scenario-exit-${timeline.length}`, kind: "scenario", scenarioName: null });
@@ -298,12 +341,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             // model-facing string and the render are known. The hard-stop `stopped`
             // results never reach onToolCall (synthesized in chat.ts) and are appended
             // in the SSE switch; deferred/declined results are Task 2.3 (out of scope).
+            const executedId = toolUseId ?? toolName;
+            appendedResultIds.add(executedId);
             await appendTurnEvent({
               conversationId: params.conversationId,
               turnId: params.turnId,
               type: "tool_result",
               payload: {
-                toolUseId: toolUseId ?? toolName,
+                toolUseId: executedId,
                 toolName,
                 result: modelResult,
                 kind: "executed",
@@ -357,6 +402,21 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               completedResults: state.completedResults,
               pending: enrichedPending,
             });
+            // Dual-write (Task 2.3): persist the deferred/declined same-batch
+            // results BEFORE the gate (thread pairing), then the UNRESOLVED gate.
+            await appendPausedResults(state.completedResults);
+            await appendTurnEvent({
+              conversationId: params.conversationId,
+              turnId: params.turnId,
+              type: "gate",
+              payload: {
+                pauseId,
+                kind: "permission",
+                actions: enrichedPending,
+                scenarioId: params.scenarioId,
+                writeScenarioId: turnScenarioId,
+              },
+            });
             return pauseId;
           },
           onInputRequest: async (state) => {
@@ -371,6 +431,20 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               completedResults: state.completedResults,
               pending: { inputToolUseId: state.inputToolUseId, spec: state.spec },
             });
+            // Dual-write (Task 2.3): deferred/declined results BEFORE the gate.
+            await appendPausedResults(state.completedResults);
+            await appendTurnEvent({
+              conversationId: params.conversationId,
+              turnId: params.turnId,
+              type: "gate",
+              payload: {
+                pauseId,
+                kind: "input",
+                spec: state.spec,
+                scenarioId: params.scenarioId,
+                writeScenarioId: turnScenarioId,
+              },
+            });
             return pauseId;
           },
           onPlanRequest: async (state) => {
@@ -384,6 +458,20 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               assistantBlocks: state.assistantBlocks,
               completedResults: state.completedResults,
               pending: { planToolUseId: state.planToolUseId, spec: state.spec },
+            });
+            // Dual-write (Task 2.3): deferred/declined results BEFORE the gate.
+            await appendPausedResults(state.completedResults);
+            await appendTurnEvent({
+              conversationId: params.conversationId,
+              turnId: params.turnId,
+              type: "gate",
+              payload: {
+                pauseId,
+                kind: "plan",
+                spec: state.spec,
+                scenarioId: params.scenarioId,
+                writeScenarioId: turnScenarioId,
+              },
             });
             return pauseId;
           },
@@ -442,12 +530,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               // deferred/declined are Task 2.3. The chunk's `nodeId` is the provider
               // tool_use id, matching the assistant_step toolUses id space.
               if (chunk.kind === "stopped") {
+                const stoppedId = chunk.nodeId ?? chunk.toolName ?? "";
+                appendedResultIds.add(stoppedId);
                 await appendTurnEvent({
                   conversationId: params.conversationId,
                   turnId: params.turnId,
                   type: "tool_result",
                   payload: {
-                    toolUseId: chunk.nodeId ?? chunk.toolName ?? "",
+                    toolUseId: stoppedId,
                     toolName: chunk.toolName ?? "",
                     result: chunk.toolResult ?? "",
                     kind: "stopped",

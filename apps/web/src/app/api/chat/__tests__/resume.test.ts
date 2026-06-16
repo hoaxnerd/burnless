@@ -120,7 +120,7 @@ import {
   createCompany,
   createScenario,
 } from "@db-test/factories";
-import { db, aiConversations, aiMessages, createPendingAction } from "@burnless/db";
+import { db, aiConversations, aiMessages, createPendingAction, appendTurnEvent, getTurnEvents, getOpenGate } from "@burnless/db";
 
 describe("POST /api/chat/resume — integration (PGLite)", () => {
   beforeEach(() => {
@@ -221,5 +221,61 @@ describe("POST /api/chat/resume — integration (PGLite)", () => {
         )
       );
     expect(refreshed!.resolvedAt).not.toBeNull();
+  });
+
+  it("Task 2.3: resolves the open gate and appends the decision result with the gate's turnId", async () => {
+    const user = await createUser();
+    const company = await createCompany(user.id);
+    hoisted.userId = user.id;
+    hoisted.companyId = company.id;
+
+    const scn = await createScenario(company.id, { name: "Base", source: "blank", status: "active" });
+
+    const [conv] = await db
+      .insert(aiConversations)
+      .values({ companyId: company.id, userId: user.id, title: "t" })
+      .returning();
+    const conversationId = conv!.id;
+    await db.insert(aiMessages).values({ conversationId, role: "user", content: "hi" });
+
+    const turnId = "turn-23";
+    const pauseId = "pause-23";
+    const requestId = "tu-23";
+    // Append a user_message + an UNRESOLVED gate carrying the turnId (the pause).
+    await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "hi" } });
+    await appendTurnEvent({
+      conversationId, turnId, type: "gate",
+      payload: { pauseId, kind: "permission", actions: [], scenarioId: scn.id, writeScenarioId: scn.id },
+    });
+
+    const pendingRow = await createPendingAction({
+      conversationId, pauseId, scenarioId: scn.id, writeScenarioId: scn.id,
+      assistantBlocks: [{ type: "tool_use", id: requestId, name: "create_scenario", input: { name: "X" } }],
+      completedResults: [],
+      pending: [{ requestId, toolName: "create_scenario", toolInput: { name: "X" } }],
+    });
+
+    const { POST } = await import("../resume/route");
+    const res = await POST(
+      new Request("http://localhost/api/chat/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, pauseId, decisions: [{ requestId, decision: "once" }] }),
+      })
+    );
+    expect(res.status).toBe(200);
+
+    // (a) the open gate is resolved.
+    expect(await getOpenGate(conversationId)).toBeNull();
+
+    // (b) the decision result is appended as a tool_result on the gate's turnId.
+    const events = await getTurnEvents(conversationId);
+    const decisionResults = events.filter((e) => e.type === "tool_result");
+    expect(decisionResults).toHaveLength(1);
+    expect(decisionResults[0]!.turnId).toBe(turnId); // reused the gate's turnId
+    expect((decisionResults[0]!.payload as { toolUseId: string }).toolUseId).toBe(requestId);
+    expect((decisionResults[0]!.payload as { kind: string }).kind).toBe("executed");
+
+    void pendingRow;
   });
 });

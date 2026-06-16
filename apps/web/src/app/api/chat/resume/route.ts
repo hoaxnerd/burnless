@@ -15,6 +15,9 @@ import {
   getOverrideCount,
   getSessionDisabledTools,
   getDisabledBuiltinTools,
+  getOpenGate,
+  resolveOpenGate,
+  appendTurnEvent,
 } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and, asc } from "drizzle-orm";
@@ -78,6 +81,37 @@ function buildSeedTimeline(timeline: unknown, pauseId: string): TimelineNode[] {
     if (n.input) return { ...n, input: { ...n.input, resolved: true }, resolved: true };
     return { ...n, resolved: true };
   });
+}
+
+/** Dual-write (Task 2.3): append the resume's synthesized decision results to the
+ *  turn log, reusing the OPEN GATE's turnId so the resumed events share the gate's
+ *  turn (finding #7). Denied stubs (content carries `{declined:true}`) record
+ *  kind:"declined"; everything else (approved tool output, submitted form, approved
+ *  plan) records kind:"executed". Best-effort: a failing append must not block the
+ *  resume. The gate is resolved by the caller AFTER this. */
+async function appendResumeResults(
+  conversationId: string,
+  turnId: string,
+  results: ContentBlock[],
+): Promise<void> {
+  for (const block of results) {
+    if (block.type !== "tool_result") continue;
+    const b = block as { toolUseId?: string; content?: string };
+    if (typeof b.toolUseId !== "string") continue;
+    let kind: "executed" | "declined" = "executed";
+    try {
+      const parsed = JSON.parse(b.content ?? "") as { declined?: boolean };
+      if (parsed?.declined) kind = "declined";
+    } catch {
+      /* non-JSON content → treat as an executed result */
+    }
+    await appendTurnEvent({
+      conversationId,
+      turnId,
+      type: "tool_result",
+      payload: { toolUseId: b.toolUseId, toolName: "", result: b.content ?? "", kind },
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -211,6 +245,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   const completedResults = pendingRow.completedResults as ContentBlock[];
   const assistantBlocks = pendingRow.assistantBlocks as ContentBlock[];
 
+  // Dual-write (Task 2.3): the open gate carries the turnId this pause belongs to.
+  // Reuse it so the resume's synthesized decision results land on the SAME turn
+  // (finding #7); fall back to a fresh id if no gate row exists (pre-2.3 paused turn).
+  const openGate = await getOpenGate(body.conversationId);
+  const gateTurnId = openGate?.turnId ?? crypto.randomUUID();
+
   // SCENARIO SAFETY: execute held tools against the scenario the turn was paused in
   // (persisted on the pending row), loaded scoped to the company — NOT getDefaultScenario.
   // A pause inside a non-default scenario must resume into that same overlay (spec §5).
@@ -265,6 +305,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       content: JSON.stringify(formData),
     };
     await resolvePendingAction(pendingRow.id);
+    await appendResumeResults(body.conversationId, gateTurnId, [inputResult]);
+    await resolveOpenGate(body.conversationId);
 
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
@@ -296,6 +338,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       content: JSON.stringify({ approved: true, plan: approvedPlan }),
     };
     await resolvePendingAction(pendingRow.id);
+    await appendResumeResults(body.conversationId, gateTurnId, [planResult]);
+    await resolveOpenGate(body.conversationId);
 
     return resumeStream({
       ctx: { companyId: ctx.companyId, userId: ctx.userId },
@@ -405,6 +449,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   await resolvePendingAction(pendingRow.id);
+  await appendResumeResults(body.conversationId, gateTurnId, pendingResults);
+  await resolveOpenGate(body.conversationId);
 
   return resumeStream({
     ctx: { companyId: ctx.companyId, userId: ctx.userId },
