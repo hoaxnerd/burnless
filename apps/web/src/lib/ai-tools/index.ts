@@ -38,6 +38,7 @@ import { transactionSchemas, transactionHandlers } from "./transactions";
 // NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
 // and is loaded lazily inside executeToolCall instead.
 import { describeMcpToolAction } from "./mcp-describe";
+import { resolveToolScenario } from "./resolve-tool-scenario";
 
 // ── Merged registries ────────────────────────────────────────────────────────
 
@@ -116,6 +117,14 @@ const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
 function isDiffableMutationTool(toolName: string): boolean {
   return isMutationTool(toolName) && !NON_FACADE_MUTATION_TOOLS.has(toolName);
 }
+
+/** Tools where `scenarioId` is the tool's OWN required operand (the scenario to
+ *  act on), NOT a per-call read/write override target. The generic §4.4 override
+ *  must NOT hijack/strip `scenarioId` for these — it would erase the operand the
+ *  handler needs. (`activate_scenario` selects/activates THAT scenario by id.) */
+const SCENARIO_ID_OPERAND_TOOLS: ReadonlySet<string> = new Set<string>([
+  "activate_scenario",
+]);
 
 /** Maps mutation tool names to the cache tags they should invalidate.
  *  Scenario-override changes also invalidate "scenario-overrides" so the
@@ -253,11 +262,35 @@ export async function executeToolCall(
     return executeMcpTool(toolName, input, context as ToolContext & { companyId: string });
   }
 
+  // Explicit per-call scenario targeting (spec §4.4): if the model passed a
+  // `scenarioId` (a UUID or "base"), resolve it, override the turn target for THIS
+  // call only, and strip it from the input so the per-tool schema validates cleanly
+  // and read tools fall back to the resolved ctx value (never the raw "base" string).
+  // From here down, use `ctx`/`toolInput` (not `context`/`input`): they carry the
+  // resolved per-call scenario target and the scenarioId-stripped payload.
+  let ctx = context;
+  let toolInput = input;
+  if (
+    !SCENARIO_ID_OPERAND_TOOLS.has(toolName) &&
+    "scenarioId" in input &&
+    input.scenarioId !== undefined
+  ) {
+    const { scenarioId: explicit, ...rest } = input;
+    const resolved = await resolveToolScenario(typeof explicit === "string" ? explicit : undefined, context);
+    if (!resolved.ok) {
+      const errorResult = { error: resolved.error };
+      logToolAudit(context, toolName, input, "error", errorResult, Math.round(performance.now() - startTime));
+      return JSON.stringify(errorResult);
+    }
+    ctx = { ...context, scenarioId: resolved.scenarioId };
+    toolInput = rest;
+  }
+
   // Validate input before execution
-  const validation = validateToolInput(toolName, input);
+  const validation = validateToolInput(toolName, toolInput);
   if (!validation.success) {
     const errorResult = { error: validation.error };
-    logToolAudit(context, toolName, input, "validation_error", errorResult, Math.round(performance.now() - startTime));
+    logToolAudit(ctx, toolName, toolInput, "validation_error", errorResult, Math.round(performance.now() - startTime));
     return JSON.stringify(errorResult);
   }
   const data = validation.data;
@@ -265,7 +298,7 @@ export async function executeToolCall(
   const handler = toolHandlers[toolName];
   if (!handler) {
     const errorResult = { error: `Unknown tool: ${toolName}` };
-    logToolAudit(context, toolName, input, "error", errorResult, Math.round(performance.now() - startTime));
+    logToolAudit(ctx, toolName, toolInput, "error", errorResult, Math.round(performance.now() - startTime));
     return JSON.stringify(errorResult);
   }
 
@@ -273,23 +306,23 @@ export async function executeToolCall(
   // as a scenario-override delta and would WRITE if its handler ran. In plan mode,
   // skip execution entirely and return an empty plan envelope so the diff-gate
   // shows no diff (plain permission card); the real write happens on Apply (commit).
-  if (context.mode === "plan" && isMutationTool(toolName) && !isDiffableMutationTool(toolName)) {
+  if (ctx.mode === "plan" && isMutationTool(toolName) && !isDiffableMutationTool(toolName)) {
     const planned = JSON.stringify({ planned: true, overrides: [] });
-    logToolAudit(context, toolName, input, "pending_apply", { planned: true, overrides: [] }, Math.round(performance.now() - startTime));
+    logToolAudit(ctx, toolName, toolInput, "pending_apply", { planned: true, overrides: [] }, Math.round(performance.now() - startTime));
     return planned;
   }
 
   let result: string;
   try {
-    result = await handler(data, context);
+    result = await handler(data, ctx);
   } catch (err) {
     const durationMs = Math.round(performance.now() - startTime);
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logToolAudit(context, toolName, input, "error", { error: errorMsg }, durationMs);
+    logToolAudit(ctx, toolName, toolInput, "error", { error: errorMsg }, durationMs);
     return JSON.stringify({ error: `Tool execution failed: ${errorMsg}` });
   }
 
-  const isPlan = context.mode === "plan";
+  const isPlan = ctx.mode === "plan";
 
   // Plan mode previews the write — never invalidate caches (nothing was committed).
   if (!isPlan && isMutationTool(toolName)) {
@@ -303,7 +336,7 @@ export async function executeToolCall(
   } catch {
     parsedResult = { raw: result };
   }
-  logToolAudit(context, toolName, input, isPlan ? "pending_apply" : "success", parsedResult, durationMs);
+  logToolAudit(ctx, toolName, toolInput, isPlan ? "pending_apply" : "success", parsedResult, durationMs);
 
   return result;
 }
