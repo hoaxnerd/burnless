@@ -186,6 +186,10 @@ export type {
   ProjectedNode,
   ProjectedNodeKind,
   ProjectedUiBlock,
+  ProjectedCategory,
+  ProjectedPendingPermission,
+  ProjectedPendingInput,
+  ProjectedPendingPlan,
   ProjectedTimeline,
 } from "./turn-log/types";
 export { projectModelThread } from "./turn-log/project-model-thread";

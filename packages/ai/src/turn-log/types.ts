@@ -51,22 +51,55 @@ export interface ProjectedUiBlock {
   rationale?: string;
 }
 
+/** Permission category (mirrors client PermissionCategoryId). */
+export type ProjectedCategory = "read" | "write" | "delete" | "web_search" | "browser_use";
+
+/** A paused tool batch awaiting decision (mirrors client PendingPermission). */
+export interface ProjectedPendingPermission {
+  pauseId: string;
+  conversationId: string;
+  actions: unknown[];
+  resolved?: boolean;
+}
+
+/** A turn paused awaiting form input (mirrors client PendingInput). */
+export interface ProjectedPendingInput {
+  pauseId: string;
+  conversationId: string;
+  spec: unknown;
+  resolved?: boolean;
+}
+
+/** A turn paused awaiting plan approval (mirrors client PendingPlan). */
+export interface ProjectedPendingPlan {
+  pauseId: string;
+  conversationId: string;
+  spec: unknown;
+  resolved?: boolean;
+}
+
 export type ProjectedNodeKind = "plan" | "tool" | "diff_gate" | "result" | "input" | "scenario";
 
-/** One worklog node (mirrors client TimelineNodeClient). */
+/** One worklog node (mirrors client TimelineNodeClient). Pause nodes
+ *  (diff_gate / input / plan) carry their full payload inline so the client
+ *  renderer reconstructs the card — a payload-less pause node renders as null. */
 export interface ProjectedNode {
   id: string;
   kind: ProjectedNodeKind;
   // tool
   toolName?: string;
   phase?: "pending" | "running" | "done" | "error";
-  category?: string;
+  category?: ProjectedCategory;
   // result
   text?: string;
   block?: ProjectedUiBlock;
   confidence?: "high" | "low";
   rationale?: string;
-  // pause payloads
+  // pause payloads (hydrated from the gate event — mirror chat-stream.ts persist)
+  pending?: ProjectedPendingPermission; // diff_gate
+  plan?: ProjectedPendingPlan;          // plan
+  input?: ProjectedPendingInput;        // input
+  /** Set once a pause node's gate has been decided. */
   resolved?: boolean;
   // scenario marker
   scenarioId?: string;

@@ -16,7 +16,7 @@
  *   - assistant_step.toolUse[]  → a `tool` node each (phase "done")
  *   - tool_result WITH render   → a `result` node carrying `block` + push block to uiBlocks
  *   - tool_result WITHOUT render → updates its matching tool node's phase
- *                                  (error/declined/stopped → "error", else "done")
+ *                                  (declined/stopped → "error", else "done")
  *   - scenario                  → a `scenario` node (name null when action === "exited")
  *   - gate (unresolved)         → set `openGate` (the single live card)
  *   - gate (resolved)           → a historical pause node (diff_gate/input/plan), resolved
@@ -130,11 +130,25 @@ export function projectTimeline(events: TurnEvent[]): { messages: ProjectedMessa
           // The single live card. Staleness/resumable TTL is the caller's call.
           openGate = { pauseId: p.pauseId, kind: p.kind, payload: e.payload };
         }
-        msg.timeline!.push({
+        // Hydrate the pause payload inline — a payload-less pause node renders as
+        // null in the client (timeline-view.tsx). Mirror chat-stream.ts persist:
+        //  permission → pending:{pauseId, conversationId, actions}
+        //  input      → input:{pauseId, conversationId, spec}
+        //  plan       → plan:{pauseId, conversationId, spec}
+        const resolved = e.resolvedAt !== null;
+        const node: ProjectedNode = {
           id: p.pauseId,
           kind: gateKindToNodeKind(p.kind),
-          resolved: e.resolvedAt !== null,
-        });
+          resolved,
+        };
+        if (p.kind === "permission") {
+          node.pending = { pauseId: p.pauseId, conversationId: e.conversationId, actions: p.actions ?? [], resolved };
+        } else if (p.kind === "input") {
+          node.input = { pauseId: p.pauseId, conversationId: e.conversationId, spec: p.spec, resolved };
+        } else {
+          node.plan = { pauseId: p.pauseId, conversationId: e.conversationId, spec: p.spec, resolved };
+        }
+        msg.timeline!.push(node);
         break;
       }
       case "turn_done":

@@ -44,4 +44,17 @@ describe("projectTimeline", () => {
     const { openGate } = projectTimeline(events);
     expect(openGate).toMatchObject({ pauseId: "p1", kind: "permission" });
   });
+
+  it("hydrates pause nodes with their payload so the client can render the card", () => {
+    const events: TurnEvent[] = [
+      ev(1, "user_message", { text: "go" }),
+      ev(2, "assistant_step", { toolUses: [{ id: "u1", name: "delete_scenario", input: { id: "x" } }] }),
+      ev(3, "gate", { pauseId: "p1", kind: "permission", actions: [{ requestId: "u1", tool: "delete_scenario" }], scenarioId: "s", writeScenarioId: null }, new Date(0)),
+    ];
+    const asst = projectTimeline(events).messages.find((m) => m.role === "assistant")!;
+    const gateNode = asst.timeline!.find((n) => n.kind === "diff_gate")!;
+    expect(gateNode.pending).toMatchObject({ pauseId: "p1", conversationId: "c" });
+    expect(gateNode.pending!.actions).toHaveLength(1);
+    expect(gateNode.resolved).toBe(true);
+  });
 });
