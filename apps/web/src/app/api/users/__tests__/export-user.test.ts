@@ -13,11 +13,14 @@ const {
 }));
 
 const mockGetAuthUser = vi.hoisted(() => vi.fn());
+const mockGetTurnEvents = vi.hoisted(() => vi.fn());
+const mockProjectTimeline = vi.hoisted(() => vi.fn());
 
 vi.mock("@burnless/db", () => ({
   db: {
     select: mockSelect,
   },
+  getTurnEvents: mockGetTurnEvents,
   users: { id: "id", name: "name", email: "email", emailVerified: "email_verified", image: "image", createdAt: "created_at", updatedAt: "updated_at" },
   companies: { id: "id" },
   companyMembers: { userId: "user_id", companyId: "company_id" },
@@ -35,13 +38,18 @@ vi.mock("@burnless/db", () => ({
   importBatches: { companyId: "company_id" },
   aiFeatureFlags: { companyId: "company_id" },
   aiConversations: { userId: "user_id", companyId: "company_id", id: "id" },
-  aiMessages: { conversationId: "conversation_id" },
   aiInsightCache: { companyId: "company_id" },
+}));
+
+vi.mock("@burnless/ai", () => ({
+  projectTimeline: mockProjectTimeline,
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  and: vi.fn(),
   inArray: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("@/lib/api-helpers", () => ({
@@ -56,6 +64,12 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 import { GET } from "../me/export/route";
+import {
+  users as usersTable,
+  companyMembers as companyMembersTable,
+  companies as companiesTable,
+  aiConversations as aiConversationsTable,
+} from "@burnless/db";
 
 describe("GET /api/users/me/export", () => {
   beforeEach(() => {
@@ -64,6 +78,8 @@ describe("GET /api/users/me/export", () => {
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ limit: mockLimit, orderBy: vi.fn().mockResolvedValue([]) });
+    mockGetTurnEvents.mockResolvedValue([]);
+    mockProjectTimeline.mockReturnValue({ messages: [], openGate: null });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -183,5 +199,68 @@ describe("GET /api/users/me/export", () => {
     const text = await res.text();
     expect(text).not.toContain("passwordHash");
     expect(text).not.toContain("password_hash");
+  });
+
+  it("exports per-conversation messages projected from the turn-event log", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+
+    // Key the mock off the TABLE passed to `.from()` (the sentinel objects from
+    // the @burnless/db mock above) rather than call ordinal — robust to Batch 1
+    // query reordering. The first `users` query (profile) takes the `.limit()`
+    // path; the rest resolve directly.
+    mockSelect.mockImplementation(() => ({
+      from: (table: unknown) => ({
+        where: () => {
+          if (table === usersTable) {
+            return {
+              limit: () =>
+                Promise.resolve([
+                  {
+                    id: "user-1",
+                    name: "Test",
+                    email: "test@test.com",
+                    emailVerified: null,
+                    image: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  },
+                ]),
+            };
+          }
+          if (table === companyMembersTable) {
+            return Promise.resolve([{ companyId: "company-1", userId: "user-1" }]);
+          }
+          if (table === companiesTable) {
+            return Promise.resolve([{ id: "company-1" }]);
+          }
+          if (table === aiConversationsTable) {
+            return Promise.resolve([{ id: "conv-1", companyId: "company-1", userId: "user-1" }]);
+          }
+          return Promise.resolve([]);
+        },
+      }),
+    }));
+
+    // The export projects each conversation's messages from its turn-event log.
+    mockGetTurnEvents.mockResolvedValue([{ id: "e1", type: "user_message", seq: 0 }]);
+    mockProjectTimeline.mockReturnValue({
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello" },
+      ],
+      openGate: null,
+    });
+
+    const res = await GET();
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(mockGetTurnEvents).toHaveBeenCalledWith("conv-1");
+    expect(data.aiConversations).toHaveLength(1);
+    expect(data.aiConversations[0].id).toBe("conv-1");
+    expect(data.aiConversations[0].messages).toEqual([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+    ]);
   });
 });
