@@ -2,6 +2,9 @@
 // Provider-agnostic: supports Anthropic, OpenAI, OpenRouter, and more.
 // Configure via AI_PROVIDER + AI_MODEL + AI_API_KEY env vars.
 
+// Runtime-tunable AI limits (env-configurable)
+export { getAiLimits, type AiLimits } from "./config";
+
 // Chat
 export { chat, chatStream } from "./chat";
 
