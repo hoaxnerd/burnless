@@ -38,6 +38,8 @@ export const activateScenarioSchema = z.object({
 
 export const listScenariosSchema = z.object({});
 
+export const exitScenarioSchema = z.object({});
+
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
 async function createScenario(
@@ -61,7 +63,8 @@ async function createScenario(
     success: true,
     scenarioId: row!.id,
     name: row!.name,
-    message: `Created scenario "${row!.name}". ID: ${row!.id}`,
+    activated: true,
+    message: `Created scenario "${row!.name}" and switched to it. ID: ${row!.id}`,
   });
 }
 
@@ -183,6 +186,20 @@ async function activateScenario(
   });
 }
 
+async function exitScenario(
+  _input: Record<string, unknown>,
+  _context: ToolContext
+): Promise<string> {
+  // View-only control: returns to base data. No DB access — chat-stream detects
+  // this result, resets the turn's write target to base, and emits `scenario_exited`
+  // so the client runs the same exitScenario() the header's Exit button calls.
+  return JSON.stringify({
+    success: true,
+    exited: true,
+    message: "Exited the active scenario. Now working with base data.",
+  });
+}
+
 async function listScenarios(
   _input: Record<string, unknown>,
   context: ToolContext
@@ -224,6 +241,7 @@ export const scenarioSchemas: Record<string, z.ZodType> = {
   get_scenario_comparison: compareScenarioSchema,
   activate_scenario: activateScenarioSchema,
   list_scenarios: listScenariosSchema,
+  exit_scenario: exitScenarioSchema,
 };
 
 export const scenarioHandlers: Record<string, ToolHandler> = {
@@ -233,4 +251,5 @@ export const scenarioHandlers: Record<string, ToolHandler> = {
   get_scenario_comparison: compareScenariosTool,
   activate_scenario: activateScenario,
   list_scenarios: listScenarios,
+  exit_scenario: exitScenario,
 };

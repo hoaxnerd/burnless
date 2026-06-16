@@ -43,7 +43,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "create_scenario",
     description:
-      "Create a new financial scenario (e.g., best case, worst case, custom what-if). Returns the new scenario ID.",
+      "Create a new financial scenario (e.g., best case, worst case, custom what-if). It is AUTOMATICALLY activated — the result returns activated:true, so do NOT call activate_scenario afterward. Subsequent tools in this turn read/write this new scenario. Returns the new scenario ID.",
     inputSchema: {
       type: "object",
       properties: {
@@ -78,6 +78,12 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     name: "list_scenarios",
     description:
       "List the company's existing scenarios, each with a short diff headline (how many overrides it has, by entity type + action) so you can SEE what what-ifs already exist and what each one changes. ALWAYS call this before create_scenario to avoid creating a duplicate of a scenario that already exists — if a matching one exists, activate_scenario it instead. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "exit_scenario",
+    description:
+      "Exit the currently active scenario and return to BASE data. After this, all tools read and write the company's real base-case data (no scenario overlay). Call this when the user is done with a what-if or asks to go back to base / their real numbers. UI-only view change — modifies no data.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
