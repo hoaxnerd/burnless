@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { TurnEvent } from "@burnless/ai";
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
+// Task 3.3: each assistant turn's timeline is PROJECTED from the log (tool nodes
+// from assistant_step.toolUses, result/text nodes), not lifted from a stored
+// metadata blob. Asserts the per-message timeline shape the client consumes.
 
-const { mockRequireCompanyAccess, mockGetActivePendingAction } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetTurnEvents, mockGetOpenGate } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetActivePendingAction: vi.fn(),
+  mockGetTurnEvents: vi.fn(),
+  mockGetOpenGate: vi.fn(),
 }));
 
-const {
-  mockSelect,
-  mockFrom,
-  mockWhere,
-  mockOrderBy,
-} = vi.hoisted(() => ({
+const { mockSelect, mockFrom, mockWhere, mockOrderBy } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
@@ -27,37 +27,17 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: {
-    select: mockSelect,
-  },
-  aiConversations: {
-    id: "id",
-    companyId: "companyId",
-    userId: "userId",
-    updatedAt: "updatedAt",
-  },
-  aiMessages: {
-    conversationId: "conversationId",
-    createdAt: "createdAt",
-  },
-  getActivePendingAction: mockGetActivePendingAction,
-}));
-
-vi.mock("@burnless/ai", () => ({
-  categorizeToolName: vi.fn(() => "write"),
+  db: { select: mockSelect },
+  aiConversations: { id: "id", companyId: "companyId", userId: "userId", updatedAt: "updatedAt" },
+  getTurnEvents: mockGetTurnEvents,
+  getOpenGate: mockGetOpenGate,
 }));
 
 vi.mock("@/lib/ai-tools", () => ({
   describeToolAction: vi.fn((tool: string) => `do ${tool}`),
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  desc: vi.fn(),
-  asc: vi.fn(),
-  lt: vi.fn(),
-}));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), desc: vi.fn(), asc: vi.fn(), lt: vi.fn() }));
 
 vi.mock("@/lib/pagination", () => ({
   parsePaginationParams: vi.fn().mockReturnValue({ limit: 20, cursor: null }),
@@ -67,25 +47,36 @@ vi.mock("@/lib/pagination", () => ({
   })),
 }));
 
-vi.mock("@/lib/logger", () => ({
-  logger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }),
-}));
+vi.mock("@/lib/logger", () => ({ logger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }) }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CTX = { userId: "u1", companyId: "c1", role: "admin" };
+const makeRequest = (url: string): Request => new Request(url);
 
-function makeRequest(url: string): Request {
-  return new Request(url);
+let seq = 0;
+function ev(partial: Partial<TurnEvent> & { type: TurnEvent["type"]; payload: TurnEvent["payload"] }): TurnEvent {
+  seq += 1;
+  return {
+    id: `e${seq}`,
+    conversationId: "conv1",
+    seq,
+    turnId: "turn1",
+    resolvedAt: null,
+    createdAt: new Date(),
+    ...partial,
+  } as TurnEvent;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("GET /api/chat/history — timeline rehydrate", () => {
+describe("GET /api/chat/history — timeline projection", () => {
   beforeEach(() => {
+    seq = 0;
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(CTX);
-    mockGetActivePendingAction.mockResolvedValue(null);
+    mockGetTurnEvents.mockResolvedValue([]);
+    mockGetOpenGate.mockResolvedValue(null);
 
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
@@ -93,26 +84,17 @@ describe("GET /api/chat/history — timeline rehydrate", () => {
     mockOrderBy.mockResolvedValue([]);
   });
 
-  it("lifts metadata.timeline onto the restored message", async () => {
-    // conv found
+  it("projects a tool node + a text result node onto the assistant turn", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    // messages query → one assistant row carrying a persisted timeline
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([
-      {
-        role: "assistant",
-        content: "hi",
-        metadata: {
-          uiBlocks: [],
-          timeline: [
-            { id: "tu-1", kind: "tool", toolName: "show_runway", phase: "done" },
-            { id: "r1", kind: "result", text: "Healthy." },
-          ],
-        },
-      },
+    mockGetTurnEvents.mockResolvedValueOnce([
+      ev({ type: "user_message", payload: { text: "how's runway?" } }),
+      ev({
+        type: "assistant_step",
+        payload: { text: "Healthy.", toolUses: [{ id: "tu-1", name: "show_runway", input: {} }] },
+      }),
+      ev({ type: "tool_result", payload: { toolUseId: "tu-1", toolName: "show_runway", result: "ok" } }),
+      ev({ type: "turn_done", payload: {} }),
     ]);
-
-    mockGetActivePendingAction.mockResolvedValueOnce(null);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));
@@ -121,6 +103,10 @@ describe("GET /api/chat/history — timeline rehydrate", () => {
     expect(res.status).toBe(200);
     const msg = json.messages.find((m: { role: string }) => m.role === "assistant");
     expect(msg.timeline).toBeTruthy();
-    expect(msg.timeline.map((n: { kind: string }) => n.kind)).toEqual(["tool", "result"]);
+    // assistant_step emits a text result node + a tool node (order: text, tool).
+    expect(msg.timeline.map((n: { kind: string }) => n.kind)).toEqual(["result", "tool"]);
+    const tool = msg.timeline.find((n: { kind: string }) => n.kind === "tool");
+    expect(tool.toolName).toBe("show_runway");
+    expect(tool.phase).toBe("done");
   });
 });

@@ -7,13 +7,60 @@
  */
 
 import { NextResponse } from "next/server";
-import { db, getActivePendingAction } from "@burnless/db";
-import { aiConversations, aiMessages } from "@burnless/db";
-import { eq, and, desc, asc, lt } from "drizzle-orm";
-import { categorizeToolName } from "@burnless/ai";
+import { db, getTurnEvents, getOpenGate } from "@burnless/db";
+import { aiConversations } from "@burnless/db";
+import { eq, and, desc, lt } from "drizzle-orm";
+import { categorizeToolName, projectTimeline } from "@burnless/ai";
+import type { ProjectedMessage, ProjectedNode, TurnEvent } from "@burnless/ai";
 import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
 import { describeToolAction } from "@/lib/ai-tools";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
+
+/** Raw gate-action shape as persisted on the gate event (chat-stream.ts onPause):
+ *  the model's tool_use plus the diff-gate override delta computed at pause-time. */
+type RawGateAction = {
+  requestId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  override?: unknown[];
+};
+
+/** Map a raw persisted gate action → the client PermissionAction shape the
+ *  permission card renders (tool / category / description / input / override).
+ *  This is the SAME mapping the pre-turn-log reader applied to a pending row. */
+function mapPermissionActions(actions: unknown[]) {
+  return (actions as RawGateAction[]).map((a) => ({
+    requestId: a.requestId,
+    tool: a.toolName,
+    category: categorizeToolName(a.toolName),
+    description: describeToolAction(a.toolName, a.toolInput),
+    input: a.toolInput,
+    // Diff-gate delta persisted at pause-time (worklog Plan 3); null if none.
+    override: a.override ?? null,
+  }));
+}
+
+/** A projected timeline node carries RAW gate actions on permission pause nodes
+ *  (projectTimeline defers the client mapping to the caller). Rewrite any
+ *  diff_gate node's `pending.actions` into the client PermissionAction shape so
+ *  the per-turn timeline renders the card identically to the live SSE path. */
+function mapNodeGateActions(node: ProjectedNode): ProjectedNode {
+  if (node.kind === "diff_gate" && node.pending) {
+    return {
+      ...node,
+      pending: {
+        ...node.pending,
+        actions: mapPermissionActions(node.pending.actions),
+      },
+    };
+  }
+  return node;
+}
+
+function mapMessageGateActions(message: ProjectedMessage): ProjectedMessage {
+  if (!message.timeline) return message;
+  return { ...message, timeline: message.timeline.map(mapNodeGateActions) };
+}
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -38,78 +85,75 @@ export const GET = withErrorHandler(async (request: Request) => {
       return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
-    const rows = await db
-      .select()
-      .from(aiMessages)
-      .where(eq(aiMessages.conversationId, conversationId))
-      .orderBy(asc(aiMessages.createdAt));
+    // Project the conversation's render model from the durable turn-event log
+    // (Task 3.3). `projectTimeline` groups events per assistant turn — each
+    // assistant message carries its OWN `timeline` + `uiBlocks` — and surfaces
+    // the single UNRESOLVED gate as `openGate` (the live pending card). The
+    // permission-gate `actions` arrive RAW; map them to the client shape below.
+    const { messages: projected, openGate } = projectTimeline(
+      // TurnEventRow.payload is jsonb (`unknown`); the durable log shape is
+      // TurnEvent. Same bridge cast the resume route uses (Task 3.2).
+      (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
+    );
+    const messages = projected.map(mapMessageGateActions);
 
-    // Rehydrate genui display blocks persisted on `metadata.uiBlocks` so reload
-    // re-renders the inline components (spec §6/§8).
-    const messages = rows.map((row) => {
-      const meta = row.metadata as { uiBlocks?: unknown[]; timeline?: unknown[] } | null;
-      const lifted: Record<string, unknown> = { ...row };
-      if (meta?.uiBlocks) lifted.uiBlocks = meta.uiBlocks;
-      if (meta?.timeline) lifted.timeline = meta.timeline;
-      return lifted;
-    });
-
-    // Ownership was verified above; surface any persisted pending batch so the
-    // client can re-show the right card after a reload. A turn pauses for one of
-    // three reasons (kind): "permission" (a write/tool approval), "input" (a form
-    // the model asked the user to fill), or "plan" (an editable plan awaiting
-    // approval). Branch on kind so reload restores the matching card.
-    const pendingRow = await getActivePendingAction(conversationId);
+    // The open gate pauses for one of three reasons (kind): "permission" (a
+    // write/tool approval), "input" (a form the model asked the user to fill),
+    // or "plan" (an editable plan awaiting approval). Branch on kind to restore
+    // the matching card. Permission actions INCLUDE the override diff persisted
+    // at pause-time (worklog Plan 3), mapped to the client shape.
+    const gatePayload = openGate?.payload as
+      | { pauseId: string; actions?: unknown[]; spec?: unknown }
+      | undefined;
     const pendingPermission =
-      pendingRow && pendingRow.kind === "permission"
+      openGate && openGate.kind === "permission"
         ? {
-            pauseId: pendingRow.pauseId,
+            pauseId: openGate.pauseId,
             conversationId,
-            actions: (
-              pendingRow.pending as {
-                requestId: string;
-                toolName: string;
-                toolInput: Record<string, unknown>;
-                override?: unknown[];
-              }[]
-            ).map((a) => ({
-              requestId: a.requestId,
-              tool: a.toolName,
-              category: categorizeToolName(a.toolName),
-              description: describeToolAction(a.toolName, a.toolInput),
-              input: a.toolInput,
-              // Diff-gate delta persisted at pause-time (worklog Plan 3); null if none.
-              override: a.override ?? null,
-            })),
+            actions: mapPermissionActions(gatePayload?.actions ?? []),
           }
         : null;
     const pendingInput =
-      pendingRow && pendingRow.kind === "input"
+      openGate && openGate.kind === "input"
         ? {
-            pauseId: pendingRow.pauseId,
+            pauseId: openGate.pauseId,
             conversationId,
-            spec: (pendingRow.pending as { spec: unknown }).spec,
+            spec: gatePayload?.spec,
           }
         : null;
     const pendingPlan =
-      pendingRow && pendingRow.kind === "plan"
+      openGate && openGate.kind === "plan"
         ? {
-            pauseId: pendingRow.pauseId,
+            pauseId: openGate.pauseId,
             conversationId,
-            spec: (pendingRow.pending as { spec: unknown }).spec,
+            spec: gatePayload?.spec,
           }
         : null;
 
-    // AI-09: a pending gate is only "resumable" (genuinely-just-paused) for a
-    // short window. Older pending rows belong to a historical conversation the
-    // user is merely browsing — the client restores those as inert (resolved)
-    // rather than live controls, so a stale gate never locks the composer. TTL
-    // is read off the row's own createdAt; no extra query.
+    // Full-run reload (Plan 5): the open gate's full lead-up + live gate nodes
+    // rendered as ONE timeline on the last assistant turn — the gate-owning
+    // assistant message's projected timeline (with permission actions mapped).
+    // The client prefers this over the per-kind pending fields.
+    const pendingTimeline = openGate
+      ? messages.length > 0
+        ? (messages[messages.length - 1]!.timeline ?? null)
+        : null
+      : null;
+
+    // AI-09: an open gate is only "resumable" (genuinely-just-paused) for a
+    // short window. An older gate belongs to a historical conversation the user
+    // is merely browsing — the client restores it as inert (resolved) rather
+    // than live controls, so a stale gate never locks the composer. The TTL is
+    // read off the gate event's own createdAt (projectTimeline does not carry
+    // it; fetch the raw gate row only when a gate is open).
     const RESUMABLE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-    const resumable =
-      pendingRow != null &&
-      pendingRow.createdAt != null &&
-      Date.now() - new Date(pendingRow.createdAt).getTime() < RESUMABLE_TTL_MS;
+    let resumable = false;
+    if (openGate) {
+      const gateRow = await getOpenGate(conversationId);
+      resumable =
+        gateRow?.createdAt != null &&
+        Date.now() - new Date(gateRow.createdAt).getTime() < RESUMABLE_TTL_MS;
+    }
 
     return NextResponse.json({
       conversationId,
@@ -117,9 +161,7 @@ export const GET = withErrorHandler(async (request: Request) => {
       pendingPermission,
       pendingInput,
       pendingPlan,
-      // Full-run reload (Plan 5): the lead-up + live gate nodes persisted at
-      // pause-time; the client prefers this over the per-kind pending fields.
-      pendingTimeline: (pendingRow?.timeline as unknown[] | null) ?? null,
+      pendingTimeline,
       // AI-09: whether the restored pending gate should render live (true) or
       // inert/resolved (false) on the client.
       resumable,
