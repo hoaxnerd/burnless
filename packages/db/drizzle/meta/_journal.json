@@ -71,6 +71,13 @@
       "when": 1781409389555,
       "tag": "0009_uneven_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781642307731,
+      "tag": "0010_sticky_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

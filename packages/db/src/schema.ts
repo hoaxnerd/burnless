@@ -1422,6 +1422,49 @@ export const aiPendingActions = pgTable(
   ]
 );
 
+export const aiTurnEventTypeEnum = pgEnum("ai_turn_event_type", [
+  "user_message",
+  "assistant_step",
+  "tool_result",
+  "scenario",
+  "gate",
+  "turn_done",
+  "turn_error",
+]);
+
+export const aiTurnEvents = pgTable(
+  "ai_turn_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    /** Monotonic per-conversation order. Assigned via atomic MAX(seq)+1 (see turn-events.ts). */
+    seq: integer("seq").notNull(),
+    /** Groups events of one user→completion turn. */
+    turnId: text("turn_id").notNull(),
+    type: aiTurnEventTypeEnum("type").notNull(),
+    /** Type-specific payload (see @burnless/ai turn-log/types.ts). */
+    payload: jsonb("payload").notNull(),
+    /** Gate events only: null = open. */
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    // Ordered read + collision detection for the atomic seq assignment.
+    uniqueIndex("ai_turn_events_conversation_seq_idx").on(
+      table.conversationId,
+      table.seq
+    ),
+    // At most one OPEN gate per conversation (replaces ai_pending_actions_active_idx).
+    uniqueIndex("ai_turn_events_open_gate_idx")
+      .on(table.conversationId)
+      .where(sql`${table.type} = 'gate' AND ${table.resolvedAt} IS NULL`),
+  ]
+);
+
 // ── Dashboard Preferences (per-user layout, mode, card customization) ────────
 
 export const dashboardModeEnum = pgEnum("dashboard_mode", [
