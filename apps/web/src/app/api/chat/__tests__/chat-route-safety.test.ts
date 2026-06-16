@@ -126,6 +126,8 @@ vi.mock("@burnless/db", () => ({
   // Task 2.3: chat POST reads + resolves any open gate before the new turn.
   getOpenGate: vi.fn().mockResolvedValue(null),
   resolveOpenGate: vi.fn().mockResolvedValue(undefined),
+  // Phase 3 reader flip: chat POST projects the turn-event log for model context.
+  getTurnEvents: vi.fn().mockResolvedValue([]),
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -153,18 +155,22 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getAiFlags: mockGetAiFlags,
 }));
 
-vi.mock("@burnless/ai", () => ({
-  chatStream: mockChatStream,
-  resolvePermission: vi.fn(() => "allow"),
-  categorizeToolName: vi.fn(() => "read"),
-  BUILTIN_PERMISSION_DEFAULTS: {
-    read: "always",
-    write: "ask",
-    delete: "ask",
-    web_search: "always",
-    browser_use: "ask",
-  },
-}));
+vi.mock("@burnless/ai", async () => {
+  const actual = await vi.importActual<typeof import("@burnless/ai")>("@burnless/ai");
+  return {
+    chatStream: mockChatStream,
+    resolvePermission: vi.fn(() => "allow"),
+    categorizeToolName: vi.fn(() => "read"),
+    projectModelThread: actual.projectModelThread,
+    BUILTIN_PERMISSION_DEFAULTS: {
+      read: "always",
+      write: "ask",
+      delete: "ask",
+      web_search: "always",
+      browser_use: "ask",
+    },
+  };
+});
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,

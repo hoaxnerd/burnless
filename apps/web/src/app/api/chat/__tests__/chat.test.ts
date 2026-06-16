@@ -76,10 +76,11 @@ const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
   mockBuildChatSSEResponse: vi.fn(),
 }));
 
-const { mockAppendTurnEvent, mockResolveOpenGate, mockGetOpenGate } = vi.hoisted(() => ({
+const { mockAppendTurnEvent, mockResolveOpenGate, mockGetOpenGate, mockGetTurnEvents } = vi.hoisted(() => ({
   mockAppendTurnEvent: vi.fn(),
   mockResolveOpenGate: vi.fn(),
   mockGetOpenGate: vi.fn(),
+  mockGetTurnEvents: vi.fn(),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -118,6 +119,9 @@ vi.mock("@burnless/db", () => ({
   // Task 2.3: the new turn reads + resolves any open gate before it starts.
   getOpenGate: mockGetOpenGate,
   resolveOpenGate: mockResolveOpenGate,
+  // Phase 3 reader flip: the chat POST builds the model context by projecting
+  // the turn-event log from getTurnEvents.
+  getTurnEvents: mockGetTurnEvents,
   aiConversations: {
     id: "id",
     companyId: "companyId",
@@ -145,18 +149,24 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getAiFlags: mockGetAiFlags,
 }));
 
-vi.mock("@burnless/ai", () => ({
-  chatStream: mockChatStream,
-  resolvePermission: vi.fn(() => "allow"),
-  categorizeToolName: vi.fn(() => "read"),
-  BUILTIN_PERMISSION_DEFAULTS: {
-    read: "always",
-    write: "ask",
-    delete: "ask",
-    web_search: "always",
-    browser_use: "ask",
-  },
-}));
+vi.mock("@burnless/ai", async () => {
+  // Use the REAL projectModelThread so the parity test verifies the actual
+  // projection the route relies on (not a stub).
+  const actual = await vi.importActual<typeof import("@burnless/ai")>("@burnless/ai");
+  return {
+    chatStream: mockChatStream,
+    resolvePermission: vi.fn(() => "allow"),
+    categorizeToolName: vi.fn(() => "read"),
+    projectModelThread: actual.projectModelThread,
+    BUILTIN_PERMISSION_DEFAULTS: {
+      read: "always",
+      write: "ask",
+      delete: "ask",
+      web_search: "always",
+      browser_use: "ask",
+    },
+  };
+});
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
@@ -263,6 +273,8 @@ describe("POST /api/chat", () => {
     mockResolveOpenGate.mockResolvedValue(undefined);
     // Default: no open gate (most turns) — abandoned-gate cancel path skipped.
     mockGetOpenGate.mockResolvedValue(null);
+    // Default: empty turn-event log (Phase 3 reader flip) — fresh conversation.
+    mockGetTurnEvents.mockResolvedValue([]);
 
     // Default: shared SSE responder returns a basic streaming response
     mockBuildChatSSEResponse.mockImplementation(
@@ -401,6 +413,54 @@ describe("POST /api/chat", () => {
     expect(params.companionName).toBe("Aria");
   });
 
+  it("Phase 3 reader flip: builds the model thread by projecting the turn-event log", async () => {
+    mockReturning.mockResolvedValue([
+      { id: "log-conv", companyId: "c1", userId: "u1" },
+    ]);
+
+    // A representative log: a prior user/assistant turn with a tool call + result,
+    // then the current turn's user_message (appended by Task 2.1 before this read).
+    const events = [
+      { id: "e1", conversationId: "log-conv", seq: 1, turnId: "t1", type: "user_message", payload: { text: "What is my runway?" }, resolvedAt: null, createdAt: new Date() },
+      { id: "e2", conversationId: "log-conv", seq: 2, turnId: "t1", type: "assistant_step", payload: { text: "Let me check.", toolUses: [{ id: "tu1", name: "get_metric", input: { metric: "runway" } }] }, resolvedAt: null, createdAt: new Date() },
+      { id: "e3", conversationId: "log-conv", seq: 3, turnId: "t1", type: "tool_result", payload: { toolUseId: "tu1", toolName: "get_metric", result: "18 months", kind: "executed" }, resolvedAt: null, createdAt: new Date() },
+      { id: "e4", conversationId: "log-conv", seq: 4, turnId: "t1", type: "assistant_step", payload: { text: "Your runway is 18 months." }, resolvedAt: null, createdAt: new Date() },
+      // Control events must be skipped without breaking the thread.
+      { id: "e5", conversationId: "log-conv", seq: 5, turnId: "t1", type: "turn_done", payload: {}, resolvedAt: null, createdAt: new Date() },
+      // Current turn's user_message (Task 2.1 appended it before the projection).
+      { id: "e6", conversationId: "log-conv", seq: 6, turnId: "t2", type: "user_message", payload: { text: "And my burn?" }, resolvedAt: null, createdAt: new Date() },
+    ];
+    mockGetTurnEvents.mockResolvedValue(events);
+    // conversationId provided → conversation-ownership lookup must find the row.
+    mockWhere
+      .mockResolvedValueOnce([{ id: "log-conv" }]) // #1 conversation lookup found
+      .mockResolvedValueOnce([{ id: "s1", name: "Base Case", source: "blank", companyId: "c1" }]); // scenario lookup (unused; no body.scenarioId)
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "And my burn?", conversationId: "log-conv" }));
+
+    // The projection is read from the LOG (getTurnEvents), not aiMessages.
+    expect(mockGetTurnEvents).toHaveBeenCalledWith("log-conv");
+
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    expect(params.messages).toEqual([
+      { role: "user", content: "What is my runway?" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me check." },
+          { type: "tool_use", id: "tu1", name: "get_metric", input: { metric: "runway" } },
+        ],
+      },
+      { role: "user", content: [{ type: "tool_result", toolUseId: "tu1", content: "18 months" }] },
+      { role: "assistant", content: [{ type: "text", text: "Your runway is 18 months." }] },
+      { role: "user", content: "And my burn?" },
+    ]);
+
+    // The current turn's user_message is the LATEST turn in the projected thread.
+    expect(params.messages.at(-1)).toEqual({ role: "user", content: "And my burn?" });
+  });
+
   it("dual-writes: aiMessages user row AND a user_message turn-event", async () => {
     mockReturning.mockResolvedValue([
       { id: "dual-conv", companyId: "c1", userId: "u1" },
@@ -530,17 +590,14 @@ describe("POST /api/chat", () => {
   it("passes scenarioId to scenario lookup when provided", async () => {
     mockReturning.mockResolvedValue([{ id: "conv1" }]);
 
-    // where() calls in order:
+    // where() calls in order (Phase 3: history read removed — projects the log):
     // 1. conversation lookup → found
-    // 2. Load conversation history → needs .orderBy() → []
-    // 3. Scenario lookup (db.select().from().where()) → found scenario
+    // 2. Scenario lookup (db.select().from().where()) → found scenario
     mockWhere
       .mockResolvedValueOnce([{ id: "custom-conversation-id" }]) // #1 conversation lookup found
-      .mockReturnValueOnce({ orderBy: mockOrderBy }) // #2 history → chain to orderBy
       .mockResolvedValueOnce([
         { id: "custom-scenario-id", name: "Custom", source: "ai", companyId: "c1" },
-      ]); // #3 scenario found
-    mockOrderBy.mockResolvedValueOnce([]); // history messages empty
+      ]); // #2 scenario found
 
     const { POST } = await import("../route");
     await POST(

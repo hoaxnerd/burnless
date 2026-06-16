@@ -6,10 +6,10 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
 import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc } from "drizzle-orm";
-import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
+import { eq, and } from "drizzle-orm";
+import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
@@ -166,19 +166,21 @@ export const POST = withErrorHandler(async (request: Request) => {
     payload: { text: body.message },
   });
 
-  // Load conversation history
-  const history = await db
-    .select()
-    .from(aiMessages)
-    .where(eq(aiMessages.conversationId, conversationId))
-    .orderBy(asc(aiMessages.createdAt));
-
-  const messages: ChatMessage[] = history
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+  // Phase 3 reader flip: build the model's conversation context from the
+  // append-as-you-go turn-event log (aiTurnEvents) instead of aiMessages.
+  // The current turn's user_message was appended above (Task 2.1), so it's the
+  // latest event in the log and projectModelThread includes it as the final
+  // user turn. The projected thread is the exact provider message thread —
+  // every assistant tool_use is paired with a tool_result (Phase 2 invariant),
+  // so it's a valid provider thread. No cap: the old aiMessages read projected
+  // the full thread (no LIMIT), and the loop fix needs the complete thread.
+  // System prompt + financial snapshot are added separately by chatStream/context.
+  // getTurnEvents returns drizzle rows (payload: unknown) — cast to the typed
+  // TurnEvent shape. projectModelThread only ever emits user/assistant turns, so
+  // the LlmMessage[] result is a valid ChatMessage[] for the streaming layer.
+  const messages = projectModelThread(
+    (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
+  ) as ChatMessage[];
 
   // Resolve scenario for READ context (financial snapshot). Falls back to the
   // default scenario so the AI always has a base picture.
