@@ -105,16 +105,12 @@ vi.mock("@burnless/db", () => ({
   getOverrideCount: mockGetOverrideCount,
   getPermissionDefaults: vi.fn().mockResolvedValue(null),
   getSessionGrants: vi.fn().mockResolvedValue({}),
-  // Plan 5: stale-pause auto-resolve guard runs on every turn — default to no
-  // active pending action so the existing scenarios stay unaffected.
-  getActivePendingAction: vi.fn().mockResolvedValue(undefined),
-  resolvePendingAction: vi.fn().mockResolvedValue(undefined),
   // S3b §11 disabled-tools overlay: default to nothing disabled so existing
   // scenarios stay unaffected.
   getSessionDisabledTools: vi.fn().mockResolvedValue({}),
   getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
-  // Phase 2 dual-write: the chat POST appends a user_message turn-event next to
-  // the existing aiMessages user-row insert.
+  // The chat POST appends the user_message turn-event to the turn log (the sole
+  // conversation store).
   appendTurnEvent: mockAppendTurnEvent,
   // Task 2.3: the new turn reads + resolves any open gate before it starts.
   getOpenGate: mockGetOpenGate,
@@ -127,11 +123,6 @@ vi.mock("@burnless/db", () => ({
     companyId: "companyId",
     userId: "userId",
     updatedAt: "updatedAt",
-  },
-  aiMessages: {
-    conversationId: "conversationId",
-    role: "role",
-    createdAt: "createdAt",
   },
   scenarios: { id: "id", companyId: "companyId" },
 }));
@@ -461,7 +452,7 @@ describe("POST /api/chat", () => {
     expect(params.messages.at(-1)).toEqual({ role: "user", content: "And my burn?" });
   });
 
-  it("dual-writes: aiMessages user row AND a user_message turn-event", async () => {
+  it("appends the user message as a user_message turn-event (sole conversation store)", async () => {
     mockReturning.mockResolvedValue([
       { id: "dual-conv", companyId: "c1", userId: "u1" },
     ]);
@@ -469,13 +460,9 @@ describe("POST /api/chat", () => {
     const { POST } = await import("../route");
     await POST(makeRequest({ message: "What is my runway?" }));
 
-    // OLD store still written: an aiMessages row with role "user" + the text.
-    expect(mockValues).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "user", content: "What is my runway?" })
-    );
-
-    // NEW log written: a user_message turn-event whose payload.text matches,
-    // tagged with the conversationId + a turnId.
+    // The user message is appended to the turn log only: a user_message turn-event
+    // whose payload.text matches, tagged with the conversationId + a turnId.
+    // (The retired aiMessages user-row insert is gone — Phase 4.)
     expect(mockAppendTurnEvent).toHaveBeenCalledOnce();
     const evt = mockAppendTurnEvent.mock.calls[0]![0];
     expect(evt.type).toBe("user_message");

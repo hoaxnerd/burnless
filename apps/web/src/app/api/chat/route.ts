@@ -6,8 +6,8 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
-import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
+import { aiConversations, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
@@ -86,14 +86,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     conversationId = conv!.id;
   }
 
-  // Stale-pause guard (Plan 5): if the user left a plan/diff card unresolved and
-  // sends a new message, free the single-active slot first so the new turn's pause
-  // doesn't trip the ai_pending_actions_active_idx unique index (duplicate-key).
-  // The orphaned card goes inert (its resume 409s — already handled).
-  const stalePending = await getActivePendingAction(conversationId);
-  if (stalePending) await resolvePendingAction(stalePending.id);
-
-  // Dual-write (Task 2.3): abandoning an open gate by sending a new message leaves
+  // Abandoning an open gate by sending a new message leaves
   // the gated (pending) tool_use without a tool_result — it would dangle forever in
   // the log and make Phase 3's projectModelThread emit an assistant turn with an
   // unpaired tool_use (provider 400). Before resolving the gate, synthesize a
@@ -149,16 +142,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   // so later tasks tag their log events with it (Phase 2 dual-write).
   const turnId = crypto.randomUUID();
 
-  // Save user message (existing aiMessages store — kept as-is for dual-write).
-  await db.insert(aiMessages).values({
-    conversationId,
-    role: "user",
-    content: body.message,
-  });
-
-  // Dual-write: append the user_message event to the append-as-you-go turn log
-  // (aiTurnEvents). Readers still read aiMessages; this just populates the log.
-  // Runs AFTER the conversation + user-message rows exist (valid FK).
+  // Append the user_message event to the append-as-you-go turn log (aiTurnEvents)
+  // — the sole conversation store. Runs AFTER the conversation row exists (valid FK).
   await appendTurnEvent({
     conversationId,
     turnId,
@@ -166,8 +151,8 @@ export const POST = withErrorHandler(async (request: Request) => {
     payload: { text: body.message },
   });
 
-  // Phase 3 reader flip: build the model's conversation context from the
-  // append-as-you-go turn-event log (aiTurnEvents) instead of aiMessages.
+  // Build the model's conversation context from the
+  // append-as-you-go turn-event log (aiTurnEvents).
   // The current turn's user_message was appended above (Task 2.1), so it's the
   // latest event in the log and projectModelThread includes it as the final
   // user turn. The projected thread is the exact provider message thread —

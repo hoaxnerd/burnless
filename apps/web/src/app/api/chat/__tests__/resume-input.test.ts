@@ -72,7 +72,7 @@ vi.mock("@/lib/chat-stream", () => ({
 }));
 
 import { createUser, createCompany, createScenario } from "@db-test/factories";
-import { db, aiConversations, aiMessages, createPendingAction } from "@burnless/db";
+import { db, aiConversations, appendTurnEvent } from "@burnless/db";
 
 async function seedInputPause() {
   const user = await createUser();
@@ -91,28 +91,27 @@ async function seedInputPause() {
     .values({ companyId: company.id, userId: user.id, title: "t" })
     .returning();
   const conversationId = conv!.id;
-  await db.insert(aiMessages).values({
-    conversationId,
-    role: "user",
-    content: "add a revenue stream",
-  });
 
+  const turnId = "turn-in";
   const pauseId = "p-in";
-  await createPendingAction({
-    conversationId,
-    pauseId,
-    kind: "input",
-    scenarioId: scenario.id,
-    assistantBlocks: [
-      { type: "tool_use", id: "tu-1", name: "request_input_form", input: {} },
-    ],
-    completedResults: [],
-    pending: {
-      inputToolUseId: "tu-1",
+  // Durable log: user_message → assistant_step (request_input_form) → UNRESOLVED
+  // input gate carrying the spec + gated tool_use id.
+  await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "add a revenue stream" } });
+  await appendTurnEvent({
+    conversationId, turnId, type: "assistant_step",
+    payload: { toolUses: [{ id: "tu-1", name: "request_input_form", input: {} }] },
+  });
+  await appendTurnEvent({
+    conversationId, turnId, type: "gate",
+    payload: {
+      pauseId, kind: "input",
+      gatedToolUseId: "tu-1",
       spec: {
         title: "Add",
         fields: [{ name: "name", type: "text", label: "Name", required: true }],
       },
+      scenarioId: scenario.id,
+      writeScenarioId: scenario.id,
     },
   });
 

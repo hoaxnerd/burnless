@@ -17,7 +17,6 @@ vi.mock("@burnless/db", async (orig) => {
   return {
     ...actual,
     appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
-    createPendingAction: vi.fn(async () => ({ id: "r1" })),
     db: {
       insert: () => ({ values: insertValues }),
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),

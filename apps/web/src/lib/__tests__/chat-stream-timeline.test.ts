@@ -2,9 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.hoisted keeps these mocks accessible inside the hoisted vi.mock factories.
-const { chatStreamMock, insertValues } = vi.hoisted(() => ({
+const { chatStreamMock, appendTurnEventMock } = vi.hoisted(() => ({
   chatStreamMock: vi.fn(),
-  insertValues: vi.fn((_row?: unknown) => Promise.resolve()),
+  appendTurnEventMock: vi.fn(async (_e?: unknown) => ({ id: "evt" })),
 }));
 
 vi.mock("@burnless/ai", async (orig) => {
@@ -16,9 +16,8 @@ vi.mock("@burnless/db", async (orig) => {
   const actual = await orig<typeof import("@burnless/db")>();
   return {
     ...actual,
-    appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
-    createPendingAction: vi.fn(async () => ({ id: "r1" })),
-    db: { insert: () => ({ values: insertValues }), update: () => ({ set: () => ({ where: () => Promise.resolve() }) }) },
+    appendTurnEvent: (...a: unknown[]) => appendTurnEventMock(...(a as [])),
+    db: { insert: () => ({ values: () => Promise.resolve() }), update: () => ({ set: () => ({ where: () => Promise.resolve() }) }) },
   };
 });
 vi.mock("@/lib/ai-tools", () => ({ executeToolCall: vi.fn(async () => "{}"), describeToolAction: () => "d" }));
@@ -36,17 +35,17 @@ async function collect(res: Response): Promise<Record<string, unknown>[]> {
 }
 
 const baseParams = {
-  companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1",
+  companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1", turnId: "turn1",
   messages: [{ role: "user" as const, content: "show runway" }],
   financialContext: "ctx", companionName: "Aria", providerConfig: undefined,
   defaults: { read: "always", write: "ask", delete: "ask", web_search: "always", browser_use: "ask" } as const,
   sessionGrants: {}, writeMode: "confirm" as const,
 };
 
-beforeEach(() => { chatStreamMock.mockReset(); insertValues.mockClear(); });
+beforeEach(() => { chatStreamMock.mockReset(); appendTurnEventMock.mockClear(); });
 
 describe("buildChatSSEResponse — timeline accumulation", () => {
-  it("forwards nodeId/nodeKind on tool_status + persists a timeline on done", async () => {
+  it("forwards nodeId/nodeKind on tool_status + marks the turn done in the log", async () => {
     chatStreamMock.mockImplementation(async function* () {
       yield { type: "tool_use", toolName: "show_runway", toolInput: {}, nodeId: "tu-1", nodeKind: "tool" };
       yield { type: "tool_status", toolName: "show_runway", phase: "running", nodeId: "tu-1", nodeKind: "tool" };
@@ -61,11 +60,11 @@ describe("buildChatSSEResponse — timeline accumulation", () => {
     expect(status.nodeId).toBe("tu-1");
     expect(status.nodeKind).toBe("tool");
 
-    // metadata persisted on done carries an ordered timeline (tool node + text result node).
-    const saved = insertValues.mock.calls.find((c) => (c[0] as { role?: string })?.role === "assistant")?.[0] as { metadata?: { timeline?: { kind: string }[] } };
-    expect(saved?.metadata?.timeline).toBeTruthy();
-    const kinds = saved!.metadata!.timeline!.map((n) => n.kind);
-    expect(kinds).toContain("tool");
-    expect(kinds).toContain("result");
+    // The turn terminus is recorded as a turn_done event in the log. (The ordered
+    // timeline now lives in the assistant_step / tool_result events the loop
+    // appends — projectTimeline reconstructs it; the historical-timeline contract
+    // is covered by the chat-history tests, not the retired aiMessages.metadata row.)
+    const types = appendTurnEventMock.mock.calls.map((c) => (c[0] as { type: string }).type);
+    expect(types).toContain("turn_done");
   });
 });

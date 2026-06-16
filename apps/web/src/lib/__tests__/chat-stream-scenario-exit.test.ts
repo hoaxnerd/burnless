@@ -7,9 +7,8 @@ vi.mock("@/lib/ai-tools", () => ({
 }));
 vi.mock("@burnless/db", () => ({
   db: { insert: () => ({ values: async () => {} }), update: () => ({ set: () => ({ where: async () => {} }) }) },
-  createPendingAction: vi.fn(async () => ({ id: "p1" })),
-  updatePendingActionTimeline: vi.fn(async () => {}),
-  aiConversations: {}, aiMessages: {},
+  appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
+  aiConversations: {},
 }));
 
 import { scenarioExitFrom } from "../chat-stream";

@@ -7,8 +7,6 @@
 import { z } from "zod";
 import {
   db,
-  getActivePendingAction,
-  resolvePendingAction,
   grantSessionPermission,
   getSessionGrants,
   getPermissionDefaults,
@@ -228,24 +226,15 @@ export const POST = withErrorHandler(async (request: Request) => {
     .where(and(eq(aiConversations.id, body.conversationId), eq(aiConversations.companyId, ctx.companyId)));
   if (!conv) return errorResponse("Conversation not found", 404);
 
-  // Load the active pending batch and verify it matches. The pending row is still
-  // dual-written (Phase 4 removes it); we keep it to free the single-active slot
-  // (resolvePendingAction) and as a fallback gate-metadata source for pre-2.3
-  // paused turns that have no gate event in the log.
-  const pendingRow = await getActivePendingAction(body.conversationId);
-  if (!pendingRow || pendingRow.pauseId !== body.pauseId) {
-    return errorResponse("No matching pending action to resume", 409);
-  }
-
-  // The open gate event is now the source of truth for gate metadata: its turnId
+  // The open gate event is the SOLE source of truth for gate metadata: its turnId
   // (reused so the resumed events share the paused turn — finding #7), kind, the
   // gated actions/spec, and the persisted read/write scenario ids. The gate is
   // written for every pause in chat-stream's onPause/onInputRequest/onPlanRequest,
-  // so production always has it; fall back to the dual-written pending row when a
-  // gate event is absent (pre-2.3 paused turn) so the resume still works.
+  // so a paused turn always has exactly one open gate. Verify the client's pauseId
+  // matches the open gate's pauseId (the gate's own payload carries it).
   const openGate = await getOpenGate(body.conversationId);
-  const gateTurnId = openGate?.turnId ?? crypto.randomUUID();
   const gatePayload = (openGate?.payload ?? null) as {
+    pauseId?: string;
     kind?: "permission" | "input" | "plan";
     actions?: unknown[];
     spec?: unknown;
@@ -253,16 +242,16 @@ export const POST = withErrorHandler(async (request: Request) => {
     scenarioId?: string;
     writeScenarioId?: string | null;
   } | null;
+  if (!openGate || gatePayload?.pauseId !== body.pauseId) {
+    return errorResponse("No matching pending action to resume", 409);
+  }
 
-  // Gate metadata, gate-preferred with a pending-row fallback (graceful when no
-  // gate event exists). kind drives the branch; scenarioId/writeScenarioId drive
+  const gateTurnId = openGate.turnId;
+  // Gate metadata: kind drives the branch; scenarioId/writeScenarioId drive
   // scenario targeting + the decision-4 re-confirm.
-  const gateKind = gatePayload?.kind ?? (pendingRow.kind as "permission" | "input" | "plan");
-  const gateReadScenarioId = gatePayload?.scenarioId ?? pendingRow.scenarioId;
-  const gateWriteScenarioId =
-    gatePayload?.writeScenarioId !== undefined
-      ? gatePayload.writeScenarioId
-      : (pendingRow.writeScenarioId ?? null);
+  const gateKind = gatePayload!.kind as "permission" | "input" | "plan";
+  const gateReadScenarioId = gatePayload!.scenarioId!;
+  const gateWriteScenarioId = gatePayload!.writeScenarioId ?? null;
 
   // SCENARIO SAFETY: execute held tools against the scenario the turn was paused in
   // (from the gate, with a pending-row fallback), loaded scoped to the company —
@@ -299,11 +288,9 @@ export const POST = withErrorHandler(async (request: Request) => {
   // the loop. No permission decisions are involved (spec §7 — input and permission
   // pauses are exclusive).
   if (gateKind === "input") {
-    // Gate-preferred: the input spec + gated tool_use id come from the gate event
-    // (spec/gatedToolUseId); fall back to the dual-written pending row's `pending`.
-    const inputFallback = pendingRow.pending as { inputToolUseId: string; spec: InputFormSpec };
-    const inputToolUseId = gatePayload?.gatedToolUseId ?? inputFallback.inputToolUseId;
-    const spec = (gatePayload?.spec as InputFormSpec | undefined) ?? inputFallback.spec;
+    // The input spec + gated tool_use id come from the gate event.
+    const inputToolUseId = gatePayload!.gatedToolUseId!;
+    const spec = gatePayload!.spec as InputFormSpec;
     const formData = (body.formData ?? {}) as Record<string, unknown>;
 
     const missing = (spec.fields as FormField[])
@@ -321,9 +308,8 @@ export const POST = withErrorHandler(async (request: Request) => {
       toolUseId: inputToolUseId,
       content: JSON.stringify(formData),
     };
-    // Dual-write the decision result to the log BEFORE projecting (resumeStream),
+    // Append the decision result to the log BEFORE projecting (resumeStream),
     // so the projected thread includes the submitted form result.
-    await resolvePendingAction(pendingRow.id);
     await appendResumeResults(body.conversationId, gateTurnId, [inputResult]);
     await resolveOpenGate(body.conversationId);
 
@@ -345,19 +331,16 @@ export const POST = withErrorHandler(async (request: Request) => {
   // approved plan, then resume — the model proceeds to call the real tools
   // (which themselves hit the permission/diff gate). Exclusive with input/permission.
   if (gateKind === "plan") {
-    // Gate-preferred: the proposed plan spec + gated tool_use id come from the gate
-    // event; fall back to the dual-written pending row's `pending`.
-    const planFallback = pendingRow.pending as { planToolUseId: string; spec: PlanSpec };
-    const planToolUseId = gatePayload?.gatedToolUseId ?? planFallback.planToolUseId;
-    const approvedPlan = (body.plan as PlanSpec | undefined) ?? (gatePayload?.spec as PlanSpec | undefined) ?? planFallback.spec;
+    // The proposed plan spec + gated tool_use id come from the gate event.
+    const planToolUseId = gatePayload!.gatedToolUseId!;
+    const approvedPlan = (body.plan as PlanSpec | undefined) ?? (gatePayload!.spec as PlanSpec);
 
     const planResult: ContentBlock = {
       type: "tool_result",
       toolUseId: planToolUseId,
       content: JSON.stringify({ approved: true, plan: approvedPlan }),
     };
-    // Dual-write the decision result to the log BEFORE projecting (resumeStream).
-    await resolvePendingAction(pendingRow.id);
+    // Append the decision result to the log BEFORE projecting (resumeStream).
     await appendResumeResults(body.conversationId, gateTurnId, [planResult]);
     await resolveOpenGate(body.conversationId);
 
@@ -378,14 +361,9 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!body.decisions || body.decisions.length === 0) {
     return errorResponse("decisions required to resume a permission pause", 400);
   }
-  // Gate-preferred: the gated action batch comes from the gate event's `actions`
-  // (the enriched pending batch — {requestId, toolName, toolInput, override?});
-  // fall back to the dual-written pending row's `pending` when the gate carries no
-  // actions (absent gate, or a stub gate with an empty batch).
-  const gateActions = gatePayload?.actions as PendingActionRecord[] | undefined;
-  const pending = gateActions && gateActions.length > 0
-    ? gateActions
-    : (pendingRow.pending as PendingActionRecord[]);
+  // The gated action batch comes from the gate event's `actions` (the enriched
+  // pending batch — {requestId, toolName, toolInput, override?}).
+  const pending = (gatePayload!.actions ?? []) as PendingActionRecord[];
   const decisionMap = new Map(body.decisions.map((d) => [d.requestId, d.decision]));
 
   // Decision 4 (spec §6): re-confirm the user is still in the scenario this turn
@@ -485,7 +463,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     }
   }
 
-  await resolvePendingAction(pendingRow.id);
   await appendResumeResults(body.conversationId, gateTurnId, pendingResults);
   await resolveOpenGate(body.conversationId);
 

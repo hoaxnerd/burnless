@@ -1,14 +1,13 @@
 // apps/web/src/lib/__tests__/chat-stream-turn-events.test.ts
 //
-// Task 2.2 — dual-write of per-step turn-log events (assistant_step / executed
-// tool_result / scenario / hard-stop stopped tool_result / turn_done / turn_error)
-// alongside the existing aiMessages writes. Asserts via the appendTurnEvent mock.
+// Per-step turn-log events (assistant_step / executed tool_result / scenario /
+// hard-stop stopped tool_result / turn_done / turn_error) appended to the turn
+// log — the sole conversation store. Asserts via the appendTurnEvent mock.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { chatStreamMock, appendTurnEventMock, insertedMessages } = vi.hoisted(() => ({
+const { chatStreamMock, appendTurnEventMock } = vi.hoisted(() => ({
   chatStreamMock: vi.fn(),
   appendTurnEventMock: vi.fn(async (_e: unknown) => ({ id: "evt" })),
-  insertedMessages: [] as Array<{ content: string; metadata?: unknown }>,
 }));
 
 vi.mock("@burnless/ai", async (orig) => {
@@ -21,10 +20,8 @@ vi.mock("@burnless/db", async (orig) => {
   return {
     ...actual,
     appendTurnEvent: (e: unknown) => appendTurnEventMock(e),
-    createPendingAction: vi.fn(async () => ({ id: "row-1" })),
-    updatePendingActionTimeline: vi.fn(async () => {}),
     db: {
-      insert: () => ({ values: (v: { content: string; metadata?: unknown }) => { insertedMessages.push(v); return Promise.resolve(); } }),
+      insert: () => ({ values: () => Promise.resolve() }),
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     },
   };
@@ -60,7 +57,7 @@ const baseParams = {
   sessionGrants: {},
 };
 
-beforeEach(() => { chatStreamMock.mockReset(); appendTurnEventMock.mockClear(); insertedMessages.length = 0; });
+beforeEach(() => { chatStreamMock.mockReset(); appendTurnEventMock.mockClear(); });
 
 describe("buildChatSSEResponse — dual-write turn events (Task 2.2)", () => {
   it("display-tool turn: assistant_step + executed tool_result with terse result AND render", async () => {

@@ -4,8 +4,8 @@
  * resolver, persists paused turns, serializes stream chunks, and saves the
  * final assistant message. Used by POST /api/chat and POST /api/chat/resume.
  */
-import { db, createPendingAction, updatePendingActionTimeline, appendTurnEvent } from "@burnless/db";
-import { aiConversations, aiMessages } from "@burnless/db";
+import { db, appendTurnEvent } from "@burnless/db";
+import { aiConversations } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import {
   chatStream,
@@ -114,8 +114,10 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
     async start(controller) {
       send(controller, { type: "conversation_id", conversationId: params.conversationId });
 
-      // Display-tool render payloads accumulate here; persisted to
-      // aiMessages.metadata.uiBlocks on `done` so reload can re-render (spec §6/§8).
+      // Display-tool render payloads accumulate here within this stream segment.
+      // Reload re-renders from the turn-event log (assistant_step / tool_result
+      // events projected by projectTimeline), not from this in-memory list — it
+      // is kept only to detect a display-/worklog-only turn at `done` (spec §6/§8).
       const uiBlocks: UiBlock[] = [];
 
       // AI-05: dedup identical DISPLAY-only genui blocks within one turn (the model
@@ -126,8 +128,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       // tool_use requestId, so the permission_request SSE case can attach them.
       const pendingOverrides = new Map<string, unknown[]>();
 
-      // Ordered worklog nodes (spec §4.5), persisted to metadata.timeline on done.
-      // A resumed turn no longer seeds this — the durable turn-event log is the
+      // Ordered worklog nodes (spec §4.5). The durable turn-event log is the
       // single source for the historical timeline (projectTimeline in the history
       // endpoint); this live `timeline` only accumulates THIS stream segment's nodes.
       const timeline: TimelineNode[] = [];
@@ -387,17 +388,8 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 return action;
               }),
             );
-            await createPendingAction({
-              conversationId: params.conversationId,
-              pauseId,
-              scenarioId: params.scenarioId, // persist active scenario for correct resume targeting
-              writeScenarioId: turnScenarioId,
-              assistantBlocks: state.assistantBlocks,
-              completedResults: state.completedResults,
-              pending: enrichedPending,
-            });
-            // Dual-write (Task 2.3): persist the deferred/declined same-batch
-            // results BEFORE the gate (thread pairing), then the UNRESOLVED gate.
+            // Persist the deferred/declined same-batch results BEFORE the gate
+            // (thread pairing), then the UNRESOLVED gate event.
             await appendPausedResults(state.completedResults);
             await appendTurnEvent({
               conversationId: params.conversationId,
@@ -415,17 +407,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           },
           onInputRequest: async (state) => {
             const pauseId = crypto.randomUUID();
-            await createPendingAction({
-              conversationId: params.conversationId,
-              pauseId,
-              kind: "input",
-              scenarioId: params.scenarioId,
-              writeScenarioId: turnScenarioId,
-              assistantBlocks: state.assistantBlocks,
-              completedResults: state.completedResults,
-              pending: { inputToolUseId: state.inputToolUseId, spec: state.spec },
-            });
-            // Dual-write (Task 2.3): deferred/declined results BEFORE the gate.
+            // Deferred/declined results BEFORE the gate (thread pairing).
             await appendPausedResults(state.completedResults);
             await appendTurnEvent({
               conversationId: params.conversationId,
@@ -445,17 +427,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           },
           onPlanRequest: async (state) => {
             const pauseId = crypto.randomUUID();
-            await createPendingAction({
-              conversationId: params.conversationId,
-              pauseId,
-              kind: "plan",
-              scenarioId: params.scenarioId,
-              writeScenarioId: turnScenarioId,
-              assistantBlocks: state.assistantBlocks,
-              completedResults: state.completedResults,
-              pending: { planToolUseId: state.planToolUseId, spec: state.spec },
-            });
-            // Dual-write (Task 2.3): deferred/declined results BEFORE the gate.
+            // Deferred/declined results BEFORE the gate (thread pairing).
             await appendPausedResults(state.completedResults);
             await appendTurnEvent({
               conversationId: params.conversationId,
@@ -600,31 +572,22 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               });
               break;
             case "paused":
-              // Full-run persistence (Plan 5): the lead-up nodes + the rich gate node
-              // are now in `timeline`; stash them on the pending row so reload shows
-              // the lead-up and the resumed turn can seed them into its final `done`.
-              if (chunk.pauseId) await updatePendingActionTimeline(chunk.pauseId, timeline);
               send(controller, { type: "paused", pauseId: chunk.pauseId, conversationId: params.conversationId });
               break;
             case "done": {
               const clean = fullResponse.replace(THINK_TAG, "").trim();
-              // Persist when there is text OR rendered display blocks OR worklog nodes;
-              // a display-only or worklog turn carries metadata so reload re-renders
-              // (spec §6/§8 uiBlocks + §4.5 timeline).
+              // Bump the conversation's updatedAt when the turn produced text,
+              // display blocks, or worklog nodes (so it sorts correctly in history).
               if (clean || uiBlocks.length > 0 || timeline.length > 0) {
-                await db.insert(aiMessages).values({
-                  conversationId: params.conversationId,
-                  role: "assistant",
-                  content: clean,
-                  metadata: (uiBlocks.length > 0 || timeline.length > 0) ? { uiBlocks, timeline } : null,
-                });
                 await db
                   .update(aiConversations)
                   .set({ updatedAt: new Date() })
                   .where(eq(aiConversations.id, params.conversationId));
               }
-              // Dual-write: the turn closed cleanly (Task 2.2). Keep the aiMessages
-              // insert above (existing behavior) — this just marks the log's terminus.
+              // The turn closed cleanly: mark the log's terminus. The assistant
+              // step text + uiBlocks/timeline are already in the turn-event log
+              // (assistant_step / tool_result events), which the history/reload and
+              // model-context readers project from.
               await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "turn_done", payload: {} });
               send(controller, { type: "done", conversationId: params.conversationId });
               break;
@@ -647,16 +610,12 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
         const clean = fullResponse.replace(THINK_TAG, "").trim();
         if (clean) {
           await db
-            .insert(aiMessages)
-            .values({ conversationId: params.conversationId, role: "assistant", content: clean })
-            .catch(() => {});
-          await db
             .update(aiConversations)
             .set({ updatedAt: new Date() })
             .where(eq(aiConversations.id, params.conversationId))
             .catch(() => {});
         }
-        // Dual-write the terminal error (Task 2.2). Best-effort: a failing append must
+        // Persist the terminal error. Best-effort: a failing append must
         // not mask the original error or block the client's error frame.
         await appendTurnEvent({
           conversationId: params.conversationId,

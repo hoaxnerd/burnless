@@ -2,9 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.hoisted keeps these mocks accessible inside the hoisted vi.mock factories.
-const { chatStreamMock, createPendingActionMock, executeToolCallMock } = vi.hoisted(() => ({
+const { chatStreamMock, appendTurnEventMock, executeToolCallMock } = vi.hoisted(() => ({
   chatStreamMock: vi.fn(),
-  createPendingActionMock: vi.fn(async (_args: Record<string, unknown>) => ({ id: "row-1" })),
+  appendTurnEventMock: vi.fn(async (_e?: unknown) => ({ id: "evt" })),
   // executeToolCall in plan mode returns the facade envelope for a write; the
   // diff-gate enrichment parses { planned, overrides } off it.
   executeToolCallMock: vi.fn(async (_tool: string, _input: unknown, ctx: { mode?: string }) => {
@@ -27,8 +27,7 @@ vi.mock("@burnless/db", async (orig) => {
   const actual = await orig<typeof import("@burnless/db")>();
   return {
     ...actual,
-    appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
-    createPendingAction: (...a: unknown[]) => createPendingActionMock(...(a as [Record<string, unknown>])),
+    appendTurnEvent: (...a: unknown[]) => appendTurnEventMock(...(a as [])),
     db: {
       insert: () => ({ values: () => Promise.resolve() }),
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
@@ -63,17 +62,17 @@ async function collect(res: Response): Promise<Record<string, unknown>[]> {
 const baseParams = {
   // AI-01: writeScenarioId is the WRITE target the diff-gate computes the override
   // against; this test models an overlay write in scenario "s1".
-  companyId: "c1", userId: "u1", scenarioId: "s1", writeScenarioId: "s1", conversationId: "conv1",
+  companyId: "c1", userId: "u1", scenarioId: "s1", writeScenarioId: "s1", conversationId: "conv1", turnId: "turn1",
   messages: [{ role: "user" as const, content: "add a pro plan stream" }],
   financialContext: "ctx", companionName: "Aria", providerConfig: undefined,
   defaults: { read: "always", write: "ask", delete: "ask", web_search: "always", browser_use: "ask" } as const,
   sessionGrants: {}, writeMode: "confirm" as const,
 };
 
-beforeEach(() => { chatStreamMock.mockReset(); createPendingActionMock.mockClear(); executeToolCallMock.mockClear(); });
+beforeEach(() => { chatStreamMock.mockReset(); appendTurnEventMock.mockClear(); executeToolCallMock.mockClear(); });
 
 describe("buildChatSSEResponse — diff-gate pause enrichment", () => {
-  it("computes the override via mode:'plan' and attaches it to the pending row + SSE", async () => {
+  it("computes the override via mode:'plan' and attaches it to the gate event + SSE", async () => {
     chatStreamMock.mockImplementation(async function* (opts: { onPause: (s: unknown) => Promise<string> }) {
       const pending = [{ requestId: "tu-w", toolName: "create_revenue_stream", toolInput: { name: "Pro Plan" } }];
       const pauseId = await opts.onPause({ assistantBlocks: [], completedResults: [], pending });
@@ -91,10 +90,14 @@ describe("buildChatSSEResponse — diff-gate pause enrichment", () => {
       expect.objectContaining({ mode: "plan", scenarioId: "s1" }),
     );
 
-    // persisted pending row carries the override delta.
-    const persisted = createPendingActionMock.mock.calls[0]![0] as { pending: { requestId: string; override?: unknown[] }[] };
-    expect(persisted.pending[0]!.override).toBeTruthy();
-    expect((persisted.pending[0]!.override as { action: string }[])[0]!.action).toBe("create");
+    // the persisted gate event's actions carry the override delta (enrichedPending).
+    const gateCall = appendTurnEventMock.mock.calls
+      .map((c) => c[0] as { type: string; payload: { actions?: { requestId: string; override?: unknown[] }[] } })
+      .find((e) => e.type === "gate");
+    expect(gateCall).toBeDefined();
+    const persistedActions = gateCall!.payload.actions!;
+    expect(persistedActions[0]!.override).toBeTruthy();
+    expect((persistedActions[0]!.override as { action: string }[])[0]!.action).toBe("create");
 
     // live SSE permission_request action carries the same override.
     const pr = events.find((e) => e.type === "permission_request") as { actions: { override?: unknown[] }[] };

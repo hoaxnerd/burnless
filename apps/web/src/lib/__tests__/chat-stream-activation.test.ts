@@ -17,10 +17,8 @@ vi.mock("@burnless/ai", async (importOriginal) => {
 });
 vi.mock("@burnless/db", () => ({
   db: { insert: () => ({ values: async () => {} }), update: () => ({ set: () => ({ where: async () => {} }) }) },
-  createPendingAction: vi.fn(async () => ({ id: "p1" })),
-  updatePendingActionTimeline: vi.fn(async () => {}),
   appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
-  aiConversations: {}, aiMessages: {},
+  aiConversations: {},
 }));
 
 import { buildChatSSEResponse, scenarioActivationFrom } from "../chat-stream";
