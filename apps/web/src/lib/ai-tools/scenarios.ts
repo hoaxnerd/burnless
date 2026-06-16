@@ -190,9 +190,10 @@ async function exitScenario(
   _input: Record<string, unknown>,
   _context: ToolContext
 ): Promise<string> {
-  // View-only control: returns to base data. No DB access — chat-stream detects
-  // this result, resets the turn's write target to base, and emits `scenario_exited`
-  // so the client runs the same exitScenario() the header's Exit button calls.
+  // View-only control: returns to base data. No DB write here. The chat-stream
+  // integration (a later task in this batch) detects this result, resets the
+  // turn's write target to base, and emits `scenario_exited` so the client runs
+  // the same exitScenario() the scenario header's Exit button calls.
   return JSON.stringify({
     success: true,
     exited: true,
