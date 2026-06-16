@@ -1,4 +1,4 @@
-export const CLI_VERSION = "0.1.2";
+export const CLI_VERSION = "0.1.3";
 
 /**
  * Display version with optional build metadata injected at packaging time
