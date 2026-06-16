@@ -85,7 +85,6 @@ import { createUser, createCompany, createScenario } from "@db-test/factories";
 import {
   db,
   aiConversations,
-  aiMessages,
   appendTurnEvent,
   getTurnEvents,
 } from "@burnless/db";
@@ -108,7 +107,6 @@ describe("POST /api/chat/resume — multi-pause loop regression (PGLite)", () =>
       .values({ companyId: company.id, userId: user.id, title: "t" })
       .returning();
     const conversationId = conv!.id;
-    await db.insert(aiMessages).values({ conversationId, role: "user", content: "make a scenario then add revenue" });
 
     const turnId = "turn-multi";
     const TU1 = "tu-create-scenario"; // first write, completed in the FIRST resume
