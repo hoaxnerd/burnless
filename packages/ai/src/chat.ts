@@ -107,7 +107,6 @@ export async function chat(options: ChatOptions): Promise<{
     };
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
   const maxIterations = getAiLimits().maxToolIterations;
   // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
   // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
@@ -115,6 +114,9 @@ export async function chat(options: ChatOptions): Promise<{
   const tools = options.toolsOverride
     ? options.toolsOverride
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+
+  const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -214,13 +216,15 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     return;
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
   const maxIterations = getAiLimits().maxToolIterations;
   // Interactive assembly is filtered by disabledToolNames (S3b §11); a
   // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
   const tools = options.toolsOverride
     ? options.toolsOverride
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+
+  const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
