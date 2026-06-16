@@ -78,6 +78,13 @@
       "when": 1781642307731,
       "tag": "0010_sticky_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781651080570,
+      "tag": "0011_noisy_epoch",
+      "breakpoints": true
     }
   ]
 }
