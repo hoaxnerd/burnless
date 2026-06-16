@@ -9,35 +9,25 @@ import type { ChatMessage, StreamChunk, ToolCallResult, PauseState, PendingToolU
 import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
 import {
-  getProvider,
-  createProvider,
   type LlmProvider,
   type LlmMessage,
   type ContentBlock,
   type CompletionRequest,
   type ToolDefinition,
 } from "./providers";
-import { getProviderForFeature } from "./routing";
+import { resolveResilientProvider } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
 import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputRequestState, type PlanRequestState } from "./generative-ui";
 
-/** Resolve the provider: use explicit config override if present, else routing. */
+/**
+ * Resolve the provider through THE seam — every real-generation path goes
+ * through resolveResilientProvider so it gets resilience (retry, which recovers
+ * transient empty completions) + usage tracking + request logging. How the
+ * providerConfig was sourced (DB/env/vault) is invisible here; the seam falls
+ * back to env/tier routing when no usable config is supplied.
+ */
 function resolveProvider(options: ChatOptions): LlmProvider | null {
-  const cfg = options.providerConfig;
-  // A resolved providerConfig is only returned by getCompanyProviderConfig when
-  // it is meant to be used — including keyless providers (ollama) where apiKey
-  // is undefined. Use it whenever a usable config is present (apiKey OR provider),
-  // falling back to env-config only if it can't build a provider.
-  if (cfg && (cfg.apiKey || cfg.provider)) {
-    const p = createProvider({
-      provider: cfg.provider,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      baseUrl: cfg.baseUrl,
-    });
-    if (p) return p;
-  }
-  return getProviderForFeature(options.feature ?? "chat") ?? getProvider();
+  return resolveResilientProvider(options.feature ?? "chat", options.providerConfig);
 }
 
 interface ChatOptions {

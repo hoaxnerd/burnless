@@ -116,9 +116,37 @@ export async function getCompanyPlan(
 }
 
 /**
- * Wrap a route handler with standardized error handling.
- * Catches unhandled errors, logs them, reports to Sentry, and returns a safe 500.
- * Overloaded for routes with and without dynamic params.
+ * Pull safe request metadata (method, path, request id) for logging. Never reads
+ * the body, query, or any header beyond the correlation id. Defensive: some route
+ * handlers are declared `withErrorHandler(async () => …)` with no Request arg, so
+ * args[0] can be undefined — return safe fallbacks rather than throw.
+ */
+function safeRequestMeta(maybeRequest: unknown): {
+  method: string;
+  pathname: string;
+  requestId: string | undefined;
+} {
+  const request = maybeRequest as Request | undefined;
+  let pathname = "unknown";
+  try {
+    if (request?.url) pathname = new URL(request.url).pathname;
+  } catch {
+    /* malformed URL — keep fallback */
+  }
+  return {
+    method: request?.method ?? "UNKNOWN",
+    pathname,
+    requestId: request?.headers?.get?.("x-request-id") ?? undefined,
+  };
+}
+
+/**
+ * Wrap a route handler with standardized error handling + baseline request
+ * visibility. Catches unhandled errors, logs them, reports to Sentry, and returns
+ * a safe 500. Also logs a concise completion line (method, path, status, duration)
+ * at info level so a self-host operator running `burnless start` sees request
+ * activity on stdout. Never logs bodies, query, or headers beyond the correlation
+ * id. Overloaded for routes with and without dynamic params.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
@@ -126,16 +154,34 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
 ): (...args: Parameters<T>) => Promise<NextResponse> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wrapped = async (...args: any[]) => {
+    const start = Date.now();
     try {
-      return await handler(...args);
+      const res = await handler(...args);
+      // Baseline per-request visibility (E2): one info line per completed request.
+      // info is the artifact's prod LOG_LEVEL floor, so this surfaces under
+      // `burnless start` without a config change. On a platform that already has a
+      // request logger (e.g. Vercel access logs) this is a small, structured echo —
+      // not noisy duplication of bodies/headers.
+      const { method, pathname, requestId } = safeRequestMeta(args[0]);
+      const status = typeof res?.status === "number" ? res.status : undefined;
+      logger("api").info(
+        { requestId, method, pathname, status, durationMs: Date.now() - start },
+        `${method} ${pathname} ${status ?? ""}`.trim()
+      );
+      return res;
     } catch (error) {
-      const request = args[0] as Request;
-      const pathname = new URL(request.url).pathname;
-      const requestId = request.headers.get("x-request-id") ?? undefined;
+      const { method, pathname, requestId } = safeRequestMeta(args[0]);
       const log = logger("api");
+
+      // Handled rejections (validation / scenario-safety / confirmable) return a
+      // 4xx, not a 500. They still get a concise warn line so a self-host operator
+      // can see *why* a request was rejected (e.g. a 409 scenario lockout is exactly
+      // the kind of thing one needs to debug) — never the Zod issue array or the
+      // confirmable payload, only a safe status + code.
 
       // Return 400 for validation errors instead of 500
       if (error instanceof ZodError) {
+        log.warn({ requestId, method, pathname, status: 400 }, `${method} ${pathname} 400 validation`);
         return NextResponse.json(
           { error: friendlyZodMessage(error) },
           { status: 400 }
@@ -144,6 +190,7 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
 
       // Return 409 when scenario safety check fails
       if (error instanceof ScenarioSafetyError) {
+        log.warn({ requestId, method, pathname, status: 409, code: "SCENARIO_SAFETY" }, `${method} ${pathname} 409 scenario-safety`);
         return NextResponse.json(
           { error: error.message, code: "SCENARIO_SAFETY" },
           { status: 409 }
@@ -152,12 +199,13 @@ export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
 
       // Return 409 when a mutation requires explicit confirmation from the client
       if (error instanceof ConfirmableError) {
+        log.warn({ requestId, method, pathname, status: 409, code: "CONFIRMABLE" }, `${method} ${pathname} 409 confirmable`);
         return NextResponse.json(serializeConfirmable(error), { status: 409 });
       }
 
       log.error(
-        { requestId, method: request.method, pathname, err: error instanceof Error ? error : undefined },
-        `${request.method} ${pathname} failed`
+        { requestId, method, pathname, err: error instanceof Error ? error : undefined },
+        `${method} ${pathname} failed`
       );
 
       return NextResponse.json(

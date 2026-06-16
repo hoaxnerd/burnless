@@ -64,6 +64,7 @@ export type {
 // Model routing
 export {
   getProviderForFeature,
+  resolveResilientProvider,
   getProviderForTier,
   getFeatureTier,
   getFeatureTierMap,

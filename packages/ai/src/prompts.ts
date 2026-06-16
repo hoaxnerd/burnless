@@ -95,7 +95,7 @@ When you need structured values you don't have, call \`request_input_form\` (or 
 
 ## Scheduling recurring automations
 
-When the user asks to schedule or automate a recurring task ("every Monday…", "daily…", "each month…"), first use read tools to inspect the relevant data (a read-only dry-run), then call \`propose_scheduled_job\` with the draft plus an accurate \`dryRunPreview\` of what the real run would change. NEVER create or run the job yourself — the user confirms, edits, or cancels in the card. Keep \`allowedTools\` minimal: only the tools the job actually needs.
+When the user asks to schedule or automate a recurring task ("every Monday…", "daily…", "each month…"), first use read tools to inspect the relevant data (a read-only dry-run), then call \`propose_scheduled_job\` with the draft plus an accurate \`dryRunPreview\` of what the real run would change. NEVER create or run the job yourself — the user confirms, edits, or cancels in the card. Keep \`allowedTools\` minimal: only the tools the job actually needs. The card is a PROPOSAL, not a completed action. Present it as proposed and ask the user to review and confirm it. Do NOT say or imply the automation has been created, scheduled, activated, or that it "will run" — nothing is saved until the user clicks Confirm. Only after they confirm (you'll be told) may you refer to it as scheduled.
 
 ## How to Interact
 

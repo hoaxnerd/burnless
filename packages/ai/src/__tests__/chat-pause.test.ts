@@ -14,6 +14,7 @@ const fakeProvider = {
 
 vi.mock("../routing", () => ({
   getProviderForFeature: () => fakeProvider,
+  resolveResilientProvider: () => fakeProvider,
 }));
 vi.mock("../providers", async (orig) => {
   const actual = await (orig as any)();

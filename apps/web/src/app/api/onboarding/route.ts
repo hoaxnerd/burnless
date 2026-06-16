@@ -27,6 +27,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import {
   db,
   companies,
@@ -108,6 +109,7 @@ export const POST = withErrorHandler(async (request: Request) => {
             industry: body.industry,
             userName: body.user_name,
           });
+          revalidateOnboardingCaches();
           return NextResponse.json(result, { status: 201 });
         } catch (err) {
           const message =
@@ -185,6 +187,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       return { companyId: company.id, scenarioId: scenario.id };
     });
 
+    revalidateOnboardingCaches();
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong setting up your company";
@@ -192,6 +195,30 @@ export const POST = withErrorHandler(async (request: Request) => {
     return errorResponse(message, 500);
   }
 });
+
+/**
+ * Cache-invalidation contract. Onboarding is a WRITER of several cached data
+ * domains, so it must honor the same revalidation contract as the per-domain
+ * routes (e.g. POST /api/scenarios calls `revalidateTag("scenarios", { expire: 0 })`).
+ *
+ * The dashboard reads the active scenario via `getDefaultScenario()` (data.ts),
+ * which is wrapped in `unstable_cache` tagged "scenarios" (30s TTL). A stale
+ * `null` cached BEFORE the base scenario existed is served on the first soft-nav
+ * to /dashboard → the "Create Your First Scenario" prompt renders until a hard
+ * refresh. Invalidating here makes the dashboard correct on first load.
+ *
+ * Onboarding writes `scenarios` (base scenario), `financialAccounts` ("accounts"
+ * tag), and `departments` ("departments" tag) — the only domains it persists that
+ * have an `unstable_cache` tag. (`companies`/`aiFeatureFlags` reads use React
+ * request-level `cache()`, not tagged `unstable_cache`, so there is nothing to
+ * revalidate for them.) Revalidation is non-destructive, so it is safe to call on
+ * both the CREATE and CLAIM paths.
+ */
+function revalidateOnboardingCaches(): void {
+  revalidateTag("scenarios", { expire: 0 });
+  revalidateTag("accounts", { expire: 0 });
+  revalidateTag("departments", { expire: 0 });
+}
 
 /**
  * The install company is "claimed" once a base scenario exists for it. Boot

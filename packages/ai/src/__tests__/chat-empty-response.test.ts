@@ -10,7 +10,7 @@ vi.mock("../providers", async (orig) => {
     createProvider: () => ({ complete: vi.fn(), stream: streamMock }),
   };
 });
-vi.mock("../routing", () => ({ getProviderForFeature: () => null }));
+vi.mock("../routing", () => ({ getProviderForFeature: () => null, resolveResilientProvider: () => ({ complete: vi.fn(), stream: streamMock }) }));
 
 function fakeStream(blocks: unknown[], stopReason: string, textDeltas: string[] = []) {
   return (async function* () {

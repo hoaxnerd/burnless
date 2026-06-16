@@ -5,7 +5,13 @@
  * including revenue-streams, metrics, and other endpoints.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { logInfoMock, logErrorMock, logWarnMock } = vi.hoisted(() => ({
+  logInfoMock: vi.fn(),
+  logErrorMock: vi.fn(),
+  logWarnMock: vi.fn(),
+}));
 
 // Mock auth and db before importing api-helpers
 vi.mock("../auth", () => ({
@@ -20,8 +26,14 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
 }));
+vi.mock("../logger", () => ({
+  logger: () => ({ info: logInfoMock, error: logErrorMock, warn: logWarnMock, debug: vi.fn() }),
+}));
 
-import { requireRole, errorResponse, parseBody } from "../api-helpers";
+import { z } from "zod";
+import { requireRole, errorResponse, parseBody, withErrorHandler } from "../api-helpers";
+import { ScenarioSafetyError } from "../scenario-middleware";
+import { ConfirmableError } from "../confirmable-error";
 
 describe("errorResponse", () => {
   it("returns JSON error with correct status", async () => {
@@ -97,6 +109,118 @@ describe("requireRole", () => {
     const res = requireRole({ role: "unknown" }, "viewer");
     expect(res).not.toBeNull();
     expect(res!.status).toBe(403);
+  });
+});
+
+describe("withErrorHandler — logging (E2)", () => {
+  beforeEach(() => {
+    logInfoMock.mockReset();
+    logErrorMock.mockReset();
+    logWarnMock.mockReset();
+  });
+
+  it("logs a concise info completion line on success (method, path, status, duration)", async () => {
+    const handler = withErrorHandler(async (_request: Request) =>
+      errorResponse("ok", 200)
+    );
+    const req = new Request("http://localhost/api/metrics?secret=should-not-log", {
+      method: "GET",
+      headers: { "x-request-id": "req-123" },
+    });
+    await handler(req);
+
+    expect(logInfoMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logInfoMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({
+      requestId: "req-123",
+      method: "GET",
+      pathname: "/api/metrics",
+      status: 200,
+    });
+    expect(typeof (ctx as { durationMs: number }).durationMs).toBe("number");
+    expect(msg).toBe("GET /api/metrics 200");
+    // Never logs query strings / bodies.
+    expect(JSON.stringify({ ctx, msg })).not.toContain("secret");
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("logs an error line and returns a safe 500 when the handler throws", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new Error("boom: connection refused at 10.0.0.1:5432");
+    });
+    const req = new Request("http://localhost/api/transactions", { method: "POST" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Internal server error");
+
+    expect(logErrorMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logErrorMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "POST", pathname: "/api/transactions" });
+    expect((ctx as { err: Error }).err).toBeInstanceOf(Error);
+    expect(msg).toBe("POST /api/transactions failed");
+    // The thrown 500 path must NOT also emit a success info line.
+    expect(logInfoMock).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the handler takes no Request arg (declared () => …)", async () => {
+    const handler = withErrorHandler(async () => errorResponse("ok", 204));
+    const res = await (handler as () => Promise<Response>)();
+    expect(res.status).toBe(204);
+    expect(logInfoMock).toHaveBeenCalledTimes(1);
+    const [ctx] = logInfoMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "UNKNOWN", pathname: "unknown", status: 204 });
+  });
+
+  it("warns (not 500) and never leaks the issue array on a ZodError → 400", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      // Trigger a real ZodError so withErrorHandler's instanceof branch fires.
+      z.object({ amount: z.number() }).parse({ amount: "not-a-number-SECRET" });
+      return errorResponse("unreachable", 200);
+    });
+    const req = new Request("http://localhost/api/forecast-lines", { method: "POST" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(400);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "POST", pathname: "/api/forecast-lines", status: 400 });
+    expect(msg).toBe("POST /api/forecast-lines 400 validation");
+    // No body / issue-array leakage in the log line.
+    expect(JSON.stringify({ ctx, msg })).not.toContain("SECRET");
+    expect(logErrorMock).not.toHaveBeenCalled();
+    expect(logInfoMock).not.toHaveBeenCalled();
+  });
+
+  it("warns on a ScenarioSafetyError → 409", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new ScenarioSafetyError("cookie/header scenario mismatch");
+    });
+    const req = new Request("http://localhost/api/transactions", { method: "PATCH" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(409);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "PATCH", pathname: "/api/transactions", status: 409, code: "SCENARIO_SAFETY" });
+    expect(msg).toBe("PATCH /api/transactions 409 scenario-safety");
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("warns on a ConfirmableError → 409", async () => {
+    const handler = withErrorHandler(async (_request: Request) => {
+      throw new ConfirmableError("currency change needs confirmation", "CURRENCY_CHANGE");
+    });
+    const req = new Request("http://localhost/api/company", { method: "PATCH" });
+    const res = await handler(req);
+
+    expect(res.status).toBe(409);
+    expect(logWarnMock).toHaveBeenCalledTimes(1);
+    const [ctx, msg] = logWarnMock.mock.calls[0]!;
+    expect(ctx).toMatchObject({ method: "PATCH", pathname: "/api/company", status: 409, code: "CONFIRMABLE" });
+    expect(msg).toBe("PATCH /api/company 409 confirmable");
+    expect(logErrorMock).not.toHaveBeenCalled();
   });
 });
 

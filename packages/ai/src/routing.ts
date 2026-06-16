@@ -13,8 +13,10 @@
 import { LlmProvider } from "./providers/base";
 import type { ModelTier, CompletionRequest, LlmResponse, StreamEvent, UsageRecord, ProviderConfig } from "./providers/types";
 import {
+  createProvider,
   createProviderForTier,
   getFallbackTiers,
+  type CreateProviderOptions,
 } from "./providers";
 import {
   ResilientProvider,
@@ -365,21 +367,44 @@ function wrapWithResilience(
  * Returns null if no API key is configured.
  */
 export function getProviderForFeature(feature: string): LlmProvider | null {
+  // Delegate to the seam so the wrap order (Tracked → Resilient → raw) never
+  // drifts between the two entry points. The seam's env/tier else-branch is
+  // identical to the old body, including the unconfigured warn-log.
+  return resolveResilientProvider(feature);
+}
+
+/**
+ * THE provider seam for all real generation.
+ *
+ * Returns a fully production-grade provider (resilience: retry + circuit breaker +
+ * rate limit; usage tracking; request logging) for a feature. An OPTIONAL explicit
+ * `config` (e.g. a company's stored provider) may be supplied — but HOW that config
+ * was sourced (DB, env, vault, …) is irrelevant to this layer and to AI usage.
+ * Falls back to env/tier routing when no usable config is given. Returns null only
+ * when no provider can be built (graceful degradation).
+ *
+ * AI usage MUST go through this. Never call createProvider()/getProvider() directly
+ * for real generation — that bypasses resilience+logging.
+ */
+export function resolveResilientProvider(
+  feature: string,
+  config?: CreateProviderOptions
+): LlmProvider | null {
   const tier = getFeatureTier(feature);
-  const providerName = resolveProviderName(feature);
-
-  // Create provider with per-feature provider override
-  const provider = createProviderForTier(tier, {
-    provider: providerName !== "unknown" ? providerName : undefined,
-  });
-  if (!provider) {
-    console.warn(`[ai-router] No provider available for feature "${feature}" (tier: ${tier}, provider: ${providerName}). AI is unconfigured.`);
-    return null;
+  let raw: LlmProvider | null;
+  let providerName: string;
+  if (config && (config.apiKey || config.provider)) {
+    raw = createProvider(config);
+    providerName = config.provider ?? resolveProviderName(feature);
+  } else {
+    providerName = resolveProviderName(feature);
+    raw = createProviderForTier(tier, { provider: providerName !== "unknown" ? providerName : undefined });
+    if (!raw) {
+      console.warn(`[ai-router] No provider available for feature "${feature}" (tier: ${tier}, provider: ${providerName}). AI is unconfigured.`);
+    }
   }
-
-  // Stack: TrackedProvider → ResilientProvider → raw provider
-  // Resilience handles retries/circuit/rate, Tracked handles usage metrics
-  const resilient = wrapWithResilience(provider, providerName, feature);
+  if (!raw) return null;
+  const resilient = wrapWithResilience(raw, providerName, feature);
   return new TrackedProvider(resilient, feature, tier, providerName);
 }
 

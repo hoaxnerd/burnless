@@ -26,6 +26,7 @@ vi.mock("../providers", () => {
 // Mock routing to return the mocked provider
 vi.mock("../routing", () => ({
   getProviderForFeature: vi.fn(() => null),
+  resolveResilientProvider: vi.fn(() => null),
 }));
 
 // Mock tools
@@ -49,13 +50,19 @@ const routing = await import("../routing");
 const mockComplete = (providers as unknown as { __mockComplete: ReturnType<typeof vi.fn> }).__mockComplete;
 const mockStream = (providers as unknown as { __mockStream: ReturnType<typeof vi.fn> }).__mockStream;
 
+// chat now resolves every provider through the seam. Default it to the mocked
+// provider (sharing mockComplete/mockStream) so existing assertions hold; tests
+// that need "no provider" override it per-call below.
+const mockProvider = { complete: mockComplete, stream: mockStream, modelId: "mock-model" };
+vi.mocked(routing.resolveResilientProvider).mockImplementation(() => mockProvider as never);
+
 describe("chat (non-streaming)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("returns unconfigured message when no provider available", async () => {
-    vi.mocked(providers.getProvider).mockReturnValueOnce(null);
+    vi.mocked(routing.resolveResilientProvider).mockReturnValueOnce(null);
 
     const result = await chat({
       messages: [{ role: "user", content: "Hello" }],
@@ -169,18 +176,20 @@ describe("chat (non-streaming)", () => {
       },
     });
 
-    expect(providers.createProvider).toHaveBeenCalledWith({
+    // chat now routes every provider through THE seam, forwarding the config
+    // untouched (the seam owns how it's interpreted / which provider is built).
+    expect(routing.resolveResilientProvider).toHaveBeenCalledWith("chat", {
       provider: "openai",
       apiKey: "sk-test",
       model: "gpt-4o",
-      baseUrl: undefined,
     });
   });
 
   it("uses a keyless (ollama) provider config instead of the env fallback", async () => {
     // Regression: resolveProvider used to guard on `providerConfig?.apiKey`, so
     // a keyless ollama config (apiKey undefined) was silently discarded and the
-    // env fallback was used. A resolved config must be honoured whenever present.
+    // env fallback was used. The seam must receive the config whenever present;
+    // honouring keyless configs is now the seam's responsibility.
     mockComplete.mockResolvedValueOnce({
       content: [{ type: "text", text: "ok" }],
       stopReason: "end_turn",
@@ -196,13 +205,12 @@ describe("chat (non-streaming)", () => {
       },
     });
 
-    expect(providers.createProvider).toHaveBeenCalledWith({
+    expect(routing.resolveResilientProvider).toHaveBeenCalledWith("chat", {
       provider: "ollama",
-      apiKey: undefined,
-      model: "llama3",
       baseUrl: "http://localhost:11434/v1",
+      model: "llama3",
     });
-    // The env fallback must NOT have been consulted.
+    // The legacy env-fallback entry points must NOT be consulted from chat.
     expect(routing.getProviderForFeature).not.toHaveBeenCalled();
     expect(providers.getProvider).not.toHaveBeenCalled();
   });
@@ -214,7 +222,7 @@ describe("chatStream", () => {
   });
 
   it("yields unconfigured message when no provider", async () => {
-    vi.mocked(providers.getProvider).mockReturnValueOnce(null);
+    vi.mocked(routing.resolveResilientProvider).mockReturnValueOnce(null);
 
     const chunks: StreamChunk[] = [];
     for await (const chunk of chatStream({

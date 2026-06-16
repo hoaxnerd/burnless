@@ -17,9 +17,11 @@
  */
 
 import { useState } from "react";
+import { useSWRConfig } from "swr";
 import { Sparkles, Pencil, ShieldCheck, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-fetch";
+import { KEYS } from "@/lib/swr/keys";
 import { toUserMessage } from "@/lib/api-error";
 import { describeCron } from "@/lib/automations/schedule-presets";
 import { ScheduleEditor } from "../../../automations/_components/schedule-editor";
@@ -86,6 +88,7 @@ export function GenProposeScheduledJob({
   const [runResult, setRunResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const { mutate } = useSWRConfig();
 
   const isWrite = actionKind === "write";
 
@@ -125,6 +128,10 @@ export function GenProposeScheduledJob({
       if (!res.ok) throw new Error("Could not schedule the automation.");
       await res.json().catch(() => null);
       setStatus("scheduled");
+      // Revalidate the Automations list so the new job appears immediately.
+      // Fire-and-forget: the job is already saved, so a revalidation hiccup must
+      // not flip this card to an error state (that would misreport a success).
+      void mutate(KEYS.automations);
       onAction?.(`Scheduled '${name}'. Anything else?`);
     } catch (err) {
       setStatus("error");
