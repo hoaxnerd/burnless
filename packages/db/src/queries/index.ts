@@ -114,6 +114,14 @@ export type {
   NewPendingAction,
 } from "./ai-permissions";
 
+export {
+  appendTurnEvent,
+  getTurnEvents,
+  getOpenGate,
+  resolveOpenGate,
+} from "./turn-events";
+export type { NewTurnEvent, TurnEventRow } from "./turn-events";
+
 export * from "./local-user";
 
 export * from "./mcp";
