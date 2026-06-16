@@ -1120,12 +1120,45 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   ...GENUI_INPUT_TOOLS,
 ];
 
+/** Overlay-write tools whose target scenario the model may override per call
+ *  (spec §4.4). EXCLUDES scenario CRUD (create/update/delete_scenario), the
+ *  investor writer, and record_transaction (base-table actuals) — those don't
+ *  write a scenario overlay. */
+export const SCENARIO_TARGETABLE_TOOLS: ReadonlySet<string> = new Set<string>([
+  "create_forecast_line", "update_forecast_line", "delete_forecast_line",
+  "create_revenue_stream", "update_revenue_stream", "delete_revenue_stream",
+  "create_headcount", "update_headcount", "delete_headcount",
+  "create_salary_change", "create_bonus", "create_equity_grant",
+  "create_department", "update_department", "delete_department",
+  "create_account", "update_account", "delete_account",
+  "create_funding_round", "update_funding_round", "delete_funding_round",
+  "update_grant_milestone",
+]);
+
+const SCENARIO_ID_PROP = {
+  type: "string",
+  description:
+    "Optional. Target scenario for THIS call: a scenario id, or \"base\" for real base data. Omit to use the currently active scenario. Use only when you must target a specific scenario different from the active one (e.g. working across two scenarios).",
+} as const;
+
+/** Inject the optional scenarioId property into a tool's input schema (additive). */
+function withScenarioIdParam(tool: ToolDefinition): ToolDefinition {
+  if (!SCENARIO_TARGETABLE_TOOLS.has(tool.name)) return tool;
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...tool.inputSchema.properties, scenarioId: SCENARIO_ID_PROP },
+    },
+  };
+}
+
 /**
  * Get tool definitions in provider-agnostic format.
  * Each provider maps these to its own SDK format internally.
  */
 export function getFinancialTools(): ToolDefinition[] {
-  return FINANCIAL_TOOLS;
+  return FINANCIAL_TOOLS.map(withScenarioIdParam);
 }
 
 /**
@@ -1148,5 +1181,7 @@ export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
 /** The remote MCP server's tool surface: the full Companion mirror minus the
  *  exclusion set. Same names, same JSON schemas (spec B1). */
 export function getMcpExposedTools(): ToolDefinition[] {
-  return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name));
+  return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name)).map(
+    withScenarioIdParam,
+  );
 }
