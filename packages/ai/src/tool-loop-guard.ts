@@ -7,7 +7,7 @@
  * trips — see spec §1a). Distinct calls never accumulate, so legitimate repeats
  * (e.g. many record_transaction with different args) are unaffected.
  */
-import type { LlmMessage, ContentBlock } from "./providers";
+import type { LlmMessage } from "./providers";
 
 export interface GuardLimits {
   soft: number;
@@ -19,7 +19,9 @@ export type GuardDecision =
   | { action: "steer"; message: string }
   | { action: "stop"; message: string };
 
-/** Order-insensitive signature for a tool call (matches chat-stream's stableStringify). */
+/** Order-insensitive signature for a tool call (same shape as chat-stream's
+ *  stableStringify, with an added `?? "null"` fallback so top-level/nested
+ *  `undefined` values serialize stably instead of being dropped). */
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
@@ -47,7 +49,7 @@ export function seedSignatureCounts(messages: LlmMessage[]): Map<string, number>
   for (let i = start; i < messages.length; i++) {
     const m = messages[i]!;
     if (m.role !== "assistant" || !Array.isArray(m.content)) continue;
-    for (const block of m.content as ContentBlock[]) {
+    for (const block of m.content) {
       if (block.type === "tool_use") {
         const sig = toolSignature(block.name, block.input);
         counts.set(sig, (counts.get(sig) ?? 0) + 1);
