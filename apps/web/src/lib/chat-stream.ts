@@ -4,7 +4,7 @@
  * resolver, persists paused turns, serializes stream chunks, and saves the
  * final assistant message. Used by POST /api/chat and POST /api/chat/resume.
  */
-import { db, createPendingAction, updatePendingActionTimeline } from "@burnless/db";
+import { db, createPendingAction, updatePendingActionTimeline, appendTurnEvent } from "@burnless/db";
 import { aiConversations, aiMessages } from "@burnless/db";
 import { eq } from "drizzle-orm";
 import {
@@ -157,12 +157,32 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       };
 
       // Re-enter scenarios created/activated during a resumed Apply (Plan 5).
-      for (const a of params.activatedScenarios ?? []) emitScenarioActivated(controller, a);
+      for (const a of params.activatedScenarios ?? []) {
+        emitScenarioActivated(controller, a);
+        await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "scenario", payload: { action: "activated", scenarioId: a.scenarioId, name: a.name } });
+      }
 
       // A+B (spec §4.1): the turn's active scenario can change mid-turn. Start at the
       // request's write target; create_scenario/activate_scenario move it; exit_scenario
       // resets it to base. Every subsequent tool call reads/writes through it.
       let turnScenarioId: string | null = params.writeScenarioId;
+
+      // Phase 2 dual-write (Task 2.2): the executed `tool_result` event must carry the
+      // SAME provider tool_use id that the `assistant_step` persisted in `toolUses[].id`
+      // (the projector pairs tool_use↔tool_result by that id). `onToolCall` is only
+      // handed `(toolName, input)` — not the id — so we stash the latest assistant
+      // step's tool_use refs here and pair each `onToolCall` to its unconsumed ref by
+      // name+input. Tools in a batch run in order; consuming refs as we go keeps the
+      // pairing 1:1 even when the same tool appears twice. The `assistant_step` chunk
+      // arrives and is processed BEFORE its tools execute, so this is populated in time.
+      let stepToolUses: { id: string; name: string; input: Record<string, unknown>; consumed: boolean }[] = [];
+      const matchToolUseId = (toolName: string, input: Record<string, unknown>): string | undefined => {
+        const sig = stableStringify(input);
+        const exact = stepToolUses.find((t) => !t.consumed && t.name === toolName && stableStringify(t.input) === sig);
+        const hit = exact ?? stepToolUses.find((t) => !t.consumed && t.name === toolName);
+        if (hit) hit.consumed = true;
+        return hit?.id;
+      };
 
       const emitScenarioExited = (controller: ReadableStreamDefaultController) => {
         send(controller, { type: "scenario_exited" });
@@ -196,9 +216,24 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               conversationId: params.conversationId,
               permissionDecision: "auto",
             });
+            // Pair this executed call to the provider tool_use id the assistant_step
+            // persisted, so the dual-write tool_result event carries the SAME id space.
+            const toolUseId = matchToolUseId(toolName, input);
             const activation = scenarioActivationFrom(toolName, raw);
-            if (activation) { turnScenarioId = activation.scenarioId; emitScenarioActivated(controller, activation); }
-            else if (scenarioExitFrom(toolName, raw)) { turnScenarioId = null; emitScenarioExited(controller); }
+            if (activation) {
+              turnScenarioId = activation.scenarioId;
+              emitScenarioActivated(controller, activation);
+              await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "scenario", payload: { action: "activated", scenarioId: activation.scenarioId, name: activation.name } });
+            } else if (scenarioExitFrom(toolName, raw)) {
+              turnScenarioId = null;
+              emitScenarioExited(controller);
+              await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "scenario", payload: { action: "exited" } });
+            }
+            // The string handed back to the model (= what this turn's tool_result
+            // event records as `result`). Defaults to raw; display tools override it
+            // with their terse modelResult below.
+            let modelResult = raw;
+            let render: { component: string; props: Record<string, unknown>; confidence?: "high" | "low"; rationale?: string } | undefined;
             // Display tool: emit the render payload to the client, return the terse
             // modelResult to the model. A display tool is recognized either by the
             // DISPLAY_TOOL_NAMES membership (the spec's registry, populated in Plan 2)
@@ -227,32 +262,55 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                   const rationale = typeof parsed.rationale === "string" ? parsed.rationale : inRat;
                   if (confidence === "high" || confidence === "low") block.confidence = confidence;
                   if (typeof rationale === "string") block.rationale = rationale;
+                  // The dual-write render mirrors the live ui_component (Task 2.2). It is
+                  // recorded even for a deduped block, so a reloaded thread re-renders
+                  // the component the model "saw" at this step.
+                  render = { component: block.component, props: block.props };
+                  if (block.confidence) render.confidence = block.confidence;
+                  if (block.rationale) render.rationale = block.rationale;
+                  modelResult = typeof parsed.modelResult === "string" ? parsed.modelResult : `[${parsed.render.component} shown]`;
                   const sig = `${parsed.render.component}:${stableStringify(parsed.render.props ?? {})}`;
                   if (seenDisplaySignatures.has(sig)) {
                     // Identical display block already emitted this turn — skip the
-                    // duplicate render but still return the terse modelResult so the
-                    // model loop is unaffected.
-                    return typeof parsed.modelResult === "string" ? parsed.modelResult : `[${parsed.render.component} shown]`;
+                    // duplicate live render but still return the terse modelResult so the
+                    // model loop is unaffected (the executed tool_result is still
+                    // appended below — the model DID see this result).
+                  } else {
+                    seenDisplaySignatures.add(sig);
+                    uiBlocks.push(block);
+                    timeline.push({ id, kind: "result", block, confidence: block.confidence, rationale: block.rationale });
+                    send(controller, {
+                      type: "ui_component",
+                      id,
+                      component: block.component,
+                      props: block.props,
+                      tool: toolName,
+                      confidence: block.confidence,
+                      rationale: block.rationale,
+                    });
                   }
-                  seenDisplaySignatures.add(sig);
-                  uiBlocks.push(block);
-                  timeline.push({ id, kind: "result", block, confidence: block.confidence, rationale: block.rationale });
-                  send(controller, {
-                    type: "ui_component",
-                    id,
-                    component: block.component,
-                    props: block.props,
-                    tool: toolName,
-                    confidence: block.confidence,
-                    rationale: block.rationale,
-                  });
-                  return typeof parsed.modelResult === "string" ? parsed.modelResult : `[${parsed.render.component} shown]`;
                 }
               } catch {
-                /* not an envelope — return raw below */
+                /* not an envelope — modelResult stays raw */
               }
             }
-            return raw;
+            // Dual-write the EXECUTED tool_result here — the ONE place where both the
+            // model-facing string and the render are known. The hard-stop `stopped`
+            // results never reach onToolCall (synthesized in chat.ts) and are appended
+            // in the SSE switch; deferred/declined results are Task 2.3 (out of scope).
+            await appendTurnEvent({
+              conversationId: params.conversationId,
+              turnId: params.turnId,
+              type: "tool_result",
+              payload: {
+                toolUseId: toolUseId ?? toolName,
+                toolName,
+                result: modelResult,
+                kind: "executed",
+                ...(render ? { render } : {}),
+              },
+            });
+            return modelResult;
           },
           onPause: async (state) => {
             const pauseId = crypto.randomUUID();
@@ -343,6 +401,23 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             case "thinking":
               if (chunk.content) send(controller, { type: "thinking", content: chunk.content });
               break;
+            case "assistant_step": {
+              // Dual-write the model thread step (Task 2.2): record the assistant text
+              // + the tool_use batch BEFORE its tools run. Seed the pairing list so the
+              // upcoming onToolCall executions tag their tool_result events with the
+              // SAME tool_use ids persisted here (the projector pairs on these ids).
+              stepToolUses = (chunk.toolUses ?? []).map((t) => ({ id: t.id, name: t.name, input: t.input, consumed: false }));
+              await appendTurnEvent({
+                conversationId: params.conversationId,
+                turnId: params.turnId,
+                type: "assistant_step",
+                payload: {
+                  ...(chunk.text ? { text: chunk.text } : {}),
+                  ...(chunk.toolUses ? { toolUses: chunk.toolUses } : {}),
+                },
+              });
+              break;
+            }
             case "tool_use":
               if (chunk.nodeId) timeline.push({ id: chunk.nodeId, kind: "tool", toolName: chunk.toolName, phase: "pending" });
               send(controller, { type: "tool_use", tool: chunk.toolName, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
@@ -359,6 +434,25 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 parsed = chunk.toolResult ? JSON.parse(chunk.toolResult) : null;
               } catch {
                 /* non-JSON, skip */
+              }
+              // Dual-write ONLY the hard-stop `stopped` results here (Task 2.2). They are
+              // synthesized in chat.ts for every trailing tool_use a convergence-guard
+              // never ran, so they never pass through onToolCall — this is their single
+              // append point. Executed results were already appended inside onToolCall;
+              // deferred/declined are Task 2.3. The chunk's `nodeId` is the provider
+              // tool_use id, matching the assistant_step toolUses id space.
+              if (chunk.kind === "stopped") {
+                await appendTurnEvent({
+                  conversationId: params.conversationId,
+                  turnId: params.turnId,
+                  type: "tool_result",
+                  payload: {
+                    toolUseId: chunk.nodeId ?? chunk.toolName ?? "",
+                    toolName: chunk.toolName ?? "",
+                    result: chunk.toolResult ?? "",
+                    kind: "stopped",
+                  },
+                });
               }
               send(controller, { type: "tool_result", tool: chunk.toolName, data: parsed, nodeId: chunk.nodeId, nodeKind: chunk.nodeKind });
               break;
@@ -441,10 +535,15 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                   .set({ updatedAt: new Date() })
                   .where(eq(aiConversations.id, params.conversationId));
               }
+              // Dual-write: the turn closed cleanly (Task 2.2). Keep the aiMessages
+              // insert above (existing behavior) — this just marks the log's terminus.
+              await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "turn_done", payload: {} });
               send(controller, { type: "done", conversationId: params.conversationId });
               break;
             }
             case "error":
+              // Dual-write: a model-emitted error chunk ends the turn (Task 2.2).
+              await appendTurnEvent({ conversationId: params.conversationId, turnId: params.turnId, type: "turn_error", payload: { message: chunk.content ?? "AI error" } });
               send(controller, { type: "error", content: chunk.content ?? "AI error" });
               break;
           }
@@ -469,6 +568,14 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
             .where(eq(aiConversations.id, params.conversationId))
             .catch(() => {});
         }
+        // Dual-write the terminal error (Task 2.2). Best-effort: a failing append must
+        // not mask the original error or block the client's error frame.
+        await appendTurnEvent({
+          conversationId: params.conversationId,
+          turnId: params.turnId,
+          type: "turn_error",
+          payload: { message: error instanceof Error ? error.message : "AI error" },
+        }).catch(() => {});
         send(controller, { type: "error", content: error instanceof Error ? error.message : "AI error" });
       } finally {
         controller.close();
