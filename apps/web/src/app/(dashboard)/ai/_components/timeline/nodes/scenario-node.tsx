@@ -10,6 +10,15 @@ import type { TimelineNodeClient } from "../../types";
  *  real enterScenario (top bar) — so multi-scenario chats can re-enter a prior one. */
 export function ScenarioNode({ node }: { node: TimelineNodeClient }) {
   const { activeScenarioId, enterScenario } = useScenario();
+  // An exit marker carries no scenarioId/name — render a simple "Exited scenario" line.
+  if (!node.scenarioId) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-surface-200 bg-surface-50/60 px-3 py-2">
+        <GitBranch className="h-3.5 w-3.5 flex-shrink-0 text-surface-500" />
+        <span className="truncate text-sm text-surface-700">Exited scenario</span>
+      </div>
+    );
+  }
   const isActive = activeScenarioId === node.scenarioId;
   return (
     <div className="flex items-center justify-between gap-2 rounded-xl border border-accent-200 bg-accent-50/40 px-3 py-2">
