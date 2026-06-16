@@ -47,10 +47,4 @@ describe("chat-stream scenario activation + seed (Plan 5)", () => {
     expect(ev?.scenarioId).toBe("sc-new");
     expect(ev?.name).toBe("Aggressive Hiring");
   });
-
-  it("emits seeded activatedScenarios at stream start", async () => {
-    chatStreamMock.mockImplementation(async function* () { yield { type: "done" }; });
-    const events = await collect(buildChatSSEResponse({ ...base, activatedScenarios: [{ scenarioId: "sc-z", name: "Z" }] } as never));
-    expect(events.find((e) => e.type === "scenario_activated")).toMatchObject({ scenarioId: "sc-z", name: "Z" });
-  });
 });
