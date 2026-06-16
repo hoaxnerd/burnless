@@ -415,6 +415,13 @@ export const POST = withErrorHandler(async (request: Request) => {
 
   // Execute / synthesize results for each pending action.
   const pendingResults: ContentBlock[] = [];
+  // The continuation's write target. Seeded from the gate's original target
+  // (the scenario the turn paused in), but RE-POINTED when an approved action
+  // activates a new scenario mid-batch — so post-activation writes in the
+  // continuation land in the just-created scenario, not the previously-active
+  // one (A+B). "Last activation wins" mirrors chat-stream's onToolCall, which
+  // overwrites turnScenarioId on each activation.
+  let nextWriteScenarioId = gateWriteScenarioId;
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
     // Dynamic map first (MCP): the granted category must match what the
@@ -454,6 +461,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     // chatStream when it re-evaluates the thread; here we only persist the marker.
     const activation = scenarioActivationFrom(action.toolName, result);
     if (activation) {
+      // Re-target the continuation: a scenario created/activated by this approved
+      // batch becomes the write target for the resumed stream's subsequent writes.
+      nextWriteScenarioId = activation.scenarioId;
       await appendTurnEvent({
         conversationId: body.conversationId,
         turnId: gateTurnId,
@@ -469,7 +479,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   return resumeStream({
     ctx: { companyId: ctx.companyId, userId: ctx.userId },
     scenario,
-    writeScenarioId: gateWriteScenarioId,
+    writeScenarioId: nextWriteScenarioId,
     conversationId: body.conversationId,
     turnId: gateTurnId,
     writeMode: aiCheck.writeMode ?? "confirm",
