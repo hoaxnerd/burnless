@@ -366,5 +366,7 @@ export interface TimelineNode {
   resolved?: boolean;
   // ── scenario marker node (Plan 5) ──
   scenarioId?: string;
-  scenarioName?: string;
+  /** null marks an exit-to-base scenario node; the client will render it as
+   *  "Exited scenario" (client handling lands in the follow-up client task). */
+  scenarioName?: string | null;
 }

@@ -4,10 +4,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock the AI package's chatStream to drive deterministic chunks AND exercise the
 // onToolCall wrapper / onInputRequest callback the responder wires.
 // vi.hoisted keeps these mocks accessible inside the hoisted vi.mock factories.
-const { chatStreamMock, createPendingActionMock, insertedMessages } = vi.hoisted(() => ({
+const { chatStreamMock, appendTurnEventMock } = vi.hoisted(() => ({
   chatStreamMock: vi.fn(),
-  createPendingActionMock: vi.fn(async (_input: Record<string, unknown>) => ({ id: "row-1" })),
-  insertedMessages: [] as Array<{ content: string; metadata?: unknown }>,
+  appendTurnEventMock: vi.fn(async (_e?: unknown) => ({ id: "evt" })),
 }));
 
 vi.mock("@burnless/ai", async (orig) => {
@@ -19,9 +18,9 @@ vi.mock("@burnless/db", async (orig) => {
   const actual = await orig<typeof import("@burnless/db")>();
   return {
     ...actual,
-    createPendingAction: (input: Record<string, unknown>) => createPendingActionMock(input),
+    appendTurnEvent: (...a: unknown[]) => appendTurnEventMock(...(a as [])),
     db: {
-      insert: () => ({ values: (v: { content: string; metadata?: unknown }) => { insertedMessages.push(v); return Promise.resolve(); } }),
+      insert: () => ({ values: () => Promise.resolve() }),
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     },
   };
@@ -58,17 +57,17 @@ async function collect(res: Response): Promise<Record<string, unknown>[]> {
 }
 
 const baseParams = {
-  companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1",
+  companyId: "c1", userId: "u1", scenarioId: "s1", conversationId: "conv1", turnId: "turn1",
   messages: [{ role: "user" as const, content: "show runway" }],
   financialContext: "ctx", companionName: "Companion", providerConfig: undefined,
   defaults: { read: "always", write: "ask", delete: "ask", web_search: "always", browser_use: "ask" } as const,
   sessionGrants: {},
 };
 
-beforeEach(() => { chatStreamMock.mockReset(); createPendingActionMock.mockClear(); insertedMessages.length = 0; });
+beforeEach(() => { chatStreamMock.mockReset(); appendTurnEventMock.mockClear(); });
 
 describe("buildChatSSEResponse — generative UI", () => {
-  it("emits ui_component for a display tool and persists metadata.uiBlocks", async () => {
+  it("emits ui_component for a display tool", async () => {
     chatStreamMock.mockImplementation(async function* (opts: { onToolCall: (t: string, i: unknown) => Promise<string> }) {
       const r = await opts.onToolCall("show_metric_card", {});
       expect(r).toBe("[metric_card shown]"); // wrapper returns the TERSE result to the model
@@ -80,12 +79,12 @@ describe("buildChatSSEResponse — generative UI", () => {
     expect(ui).toBeTruthy();
     expect(ui!.component).toBe("metric_card");
     expect((ui!.props as { value: number }).value).toBe(14.2);
-    // Persisted assistant message carries the uiBlock in metadata.
-    const saved = insertedMessages.find((m) => m.metadata);
-    expect((saved!.metadata as { uiBlocks: { component: string }[] }).uiBlocks[0]!.component).toBe("metric_card");
+    // (The rendered uiBlock now lives in the turn-event log — assistant_step /
+    // tool_result events projected by projectTimeline — not in an aiMessages
+    // metadata row; reload/restore coverage lives in the chat-history tests.)
   });
 
-  it("wires onInputRequest → createPendingAction(kind:'input') and sends input_request", async () => {
+  it("wires onInputRequest → an input gate turn-event and sends input_request", async () => {
     chatStreamMock.mockImplementation(async function* (opts: { onInputRequest: (s: unknown) => Promise<string> }) {
       const pauseId = await opts.onInputRequest({
         assistantBlocks: [], completedResults: [], inputToolUseId: "tu-1",
@@ -96,8 +95,14 @@ describe("buildChatSSEResponse — generative UI", () => {
     });
     const res = buildChatSSEResponse({ ...baseParams } as never);
     const events = await collect(res);
-    expect(createPendingActionMock).toHaveBeenCalledOnce();
-    expect((createPendingActionMock.mock.calls[0]![0] as { kind: string }).kind).toBe("input");
+    // The pause is persisted as an UNRESOLVED gate turn-event with kind:'input'
+    // (replaces createPendingAction).
+    const gateCall = appendTurnEventMock.mock.calls
+      .map((c) => c[0] as { type: string; payload: Record<string, unknown> })
+      .find((e) => e.type === "gate");
+    expect(gateCall).toBeDefined();
+    expect(gateCall!.payload.kind).toBe("input");
+    expect(gateCall!.payload.gatedToolUseId).toBe("tu-1");
     const ir = events.find((e) => e.type === "input_request");
     expect((ir!.spec as { title: string }).title).toBe("Add revenue");
     expect(events.some((e) => e.type === "paused")).toBe(true);

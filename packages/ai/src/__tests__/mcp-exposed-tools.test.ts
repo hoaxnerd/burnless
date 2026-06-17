@@ -48,7 +48,9 @@ describe("getMcpExposedTools (spec §4.4 / B1)", () => {
   it("every exposed tool carries the same JSON schema as the Companion's", () => {
     const bySlug = new Map(getFinancialTools().map((t) => [t.name, t]));
     for (const tool of getMcpExposedTools()) {
-      expect(tool.inputSchema).toBe(bySlug.get(tool.name)!.inputSchema);
+      // Structural (not referential) equality: both surfaces apply the additive
+      // scenarioId injector and return fresh copies, but the schemas must match.
+      expect(tool.inputSchema).toEqual(bySlug.get(tool.name)!.inputSchema);
     }
   });
 });

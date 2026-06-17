@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
+import type { TurnEvent } from "@burnless/ai";
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
+// Task 3.3: the history reader projects the durable turn-event log. We mock the
+// log accessors (getTurnEvents / getOpenGate) with REAL TurnEvent rows and let
+// the real projectTimeline run, asserting the 5-field reload contract unchanged.
 
-const { mockRequireCompanyAccess, mockGetActivePendingAction } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetTurnEvents, mockGetOpenGate } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetActivePendingAction: vi.fn(),
+  mockGetTurnEvents: vi.fn(),
+  mockGetOpenGate: vi.fn(),
 }));
 
 const {
@@ -46,18 +51,11 @@ vi.mock("@burnless/db", () => ({
     userId: "userId",
     updatedAt: "updatedAt",
   },
-  aiMessages: {
-    conversationId: "conversationId",
-    createdAt: "createdAt",
-  },
-  getActivePendingAction: mockGetActivePendingAction,
+  getTurnEvents: mockGetTurnEvents,
+  getOpenGate: mockGetOpenGate,
 }));
 
-// The route maps a persisted pending action to the permission-card payload on load
-// (Plan 4 §6.5 #3); mock the classifier + describer it uses.
-vi.mock("@burnless/ai", () => ({
-  categorizeToolName: vi.fn(() => "write"),
-}));
+// Real @burnless/ai: projectTimeline + categorizeToolName are pure; let them run.
 
 vi.mock("@/lib/ai-tools", () => ({
   describeToolAction: vi.fn((tool: string) => `do ${tool}`),
@@ -88,14 +86,30 @@ function makeRequest(url: string): Request {
   return new Request(url);
 }
 
+let seq = 0;
+function ev(partial: Partial<TurnEvent> & { type: TurnEvent["type"]; payload: TurnEvent["payload"] }): TurnEvent {
+  seq += 1;
+  return {
+    id: partial.id ?? `e${seq}`,
+    conversationId: partial.conversationId ?? "conv1",
+    seq: partial.seq ?? seq,
+    turnId: partial.turnId ?? "turn1",
+    resolvedAt: partial.resolvedAt ?? null,
+    createdAt: partial.createdAt ?? new Date(),
+    ...partial,
+  } as TurnEvent;
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("GET /api/chat/history", () => {
   beforeEach(() => {
+    seq = 0;
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(CTX);
-    // No paused turn by default.
-    mockGetActivePendingAction.mockResolvedValue(null);
+    // Empty log + no open gate by default.
+    mockGetTurnEvents.mockResolvedValue([]);
+    mockGetOpenGate.mockResolvedValue(null);
 
     // DB chain setup: select -> from -> where -> orderBy / limit
     mockSelect.mockReturnValue({ from: mockFrom });
@@ -144,19 +158,14 @@ describe("GET /api/chat/history", () => {
   });
 
   it("returns messages for valid conversationId", async () => {
-    const messages = [
-      { id: "m1", conversationId: "conv1", role: "user", content: "Hello", createdAt: new Date() },
-      { id: "m2", conversationId: "conv1", role: "assistant", content: "Hi there!", createdAt: new Date() },
-    ];
-
-    // First query: const [conv] = await db.select().from().where()
-    // where() must resolve to array
-    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]); // found
-
-    // Second query: db.select().from().where().orderBy()
-    // where() returns chain object, orderBy() resolves to messages
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce(messages);
+    // conv ownership found
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    // turn-event log: a user message then an assistant reply
+    mockGetTurnEvents.mockResolvedValueOnce([
+      ev({ type: "user_message", payload: { text: "Hello" } }),
+      ev({ type: "assistant_step", payload: { text: "Hi there!" } }),
+      ev({ type: "turn_done", payload: {} }),
+    ]);
 
     const { GET } = await import("../history/route");
     const res = await GET(
@@ -169,6 +178,11 @@ describe("GET /api/chat/history", () => {
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe("user");
     expect(body.messages[1].role).toBe("assistant");
+    expect(body.messages[1].content).toBe("Hi there!");
+    // Completed conversation → no live pending card.
+    expect(body.pendingPermission).toBeNull();
+    expect(body.pendingTimeline).toBeNull();
+    expect(body.resumable).toBe(false);
   });
 
   it("returns paginated conversations when no conversationId", async () => {
@@ -194,6 +208,8 @@ describe("GET /api/chat/history", () => {
     expect(body.data).toHaveLength(2);
     expect(mockParsePaginationParams).toHaveBeenCalled();
     expect(mockPaginatedResponse).toHaveBeenCalled();
+    // The conversation-LIST branch never touches the turn-event log.
+    expect(mockGetTurnEvents).not.toHaveBeenCalled();
   });
 
   it("returns empty list when no conversations exist", async () => {
@@ -214,15 +230,25 @@ describe("GET /api/chat/history", () => {
   it("includes the active pending permission for a conversation (restore-on-reload)", async () => {
     // conv found
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    // messages query
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-    // an unresolved paused turn exists
-    mockGetActivePendingAction.mockResolvedValueOnce({
-      pauseId: "pause-1",
-      kind: "permission",
-      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
-    });
+    // log: user → assistant → an UNRESOLVED permission gate (events created in
+    // seq order so the projection's seq-sort keeps the gate on the last turn).
+    const events = [
+      ev({ type: "user_message", payload: { text: "make a scenario" } }),
+      ev({ type: "assistant_step", payload: { text: "" } }),
+      ev({
+        type: "gate",
+        resolvedAt: null,
+        payload: {
+          pauseId: "pause-1",
+          kind: "permission",
+          actions: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
+          scenarioId: "base",
+          writeScenarioId: null,
+        } as TurnEvent["payload"],
+      }),
+    ];
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(events[2]!);
 
     const { GET } = await import("../history/route");
     const res = await GET(
@@ -237,13 +263,19 @@ describe("GET /api/chat/history", () => {
     expect(body.pendingPermission.actions[0].tool).toBe("create_scenario");
     expect(body.pendingPermission.actions[0].category).toBe("write");
     expect(body.pendingPermission.actions[0].input).toEqual({ name: "QA" });
+    // The lead-up timeline carries the mapped gate node too.
+    expect(body.pendingTimeline).toBeTruthy();
+    expect(body.resumable).toBe(true);
   });
 
   it("returns null pendingPermission when no paused turn exists", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-    // mockGetActivePendingAction defaults to null (beforeEach)
+    mockGetTurnEvents.mockResolvedValueOnce([
+      ev({ type: "user_message", payload: { text: "hi" } }),
+      ev({ type: "assistant_step", payload: { text: "hello" } }),
+      ev({ type: "turn_done", payload: {} }),
+    ]);
+    // getOpenGate defaults to null (beforeEach)
 
     const { GET } = await import("../history/route");
     const res = await GET(
@@ -255,24 +287,31 @@ describe("GET /api/chat/history", () => {
     expect(body.pendingPermission).toBeNull();
   });
 
-  // ── Genui reload restore (Plan 4 Task 5) ──────────────────────────────────
+  // ── Genui reload restore ──────────────────────────────────────────────────
 
   it("returns pendingInput (and null pendingPermission) for an active input pause", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-    // an unresolved input pause exists
-    mockGetActivePendingAction.mockResolvedValueOnce({
-      pauseId: "pause-in",
-      kind: "input",
-      pending: {
-        inputToolUseId: "tu-1",
-        spec: {
-          title: "Add a revenue stream",
-          fields: [{ name: "name", type: "text", label: "Name", required: true }],
-        },
-      },
-    });
+    const events = [
+      ev({ type: "user_message", payload: { text: "add revenue" } }),
+      ev({ type: "assistant_step", payload: { text: "" } }),
+      ev({
+        type: "gate",
+        resolvedAt: null,
+        payload: {
+          pauseId: "pause-in",
+          kind: "input",
+          spec: {
+            title: "Add a revenue stream",
+            fields: [{ name: "name", type: "text", label: "Name", required: true }],
+          },
+          gatedToolUseId: "tu-1",
+          scenarioId: "base",
+          writeScenarioId: null,
+        } as TurnEvent["payload"],
+      }),
+    ];
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(events[2]!);
 
     const { GET } = await import("../history/route");
     const res = await GET(
@@ -289,22 +328,25 @@ describe("GET /api/chat/history", () => {
     expect(body.pendingInput.spec.fields).toHaveLength(1);
   });
 
-  it("rehydrates uiBlocks from stored message metadata", async () => {
-    const messages = [
-      { id: "m1", conversationId: "conv1", role: "user", content: "show me MRR", createdAt: new Date(), metadata: null },
-      {
-        id: "m2",
-        conversationId: "conv1",
-        role: "assistant",
-        content: "Here it is",
-        createdAt: new Date(),
-        metadata: { uiBlocks: [{ id: "b1", component: "MetricCard", props: { value: 42 } }] },
-      },
-    ];
-
+  it("rehydrates uiBlocks from a tool_result render block", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce(messages);
+    mockGetTurnEvents.mockResolvedValueOnce([
+      ev({ type: "user_message", payload: { text: "show me MRR" } }),
+      ev({
+        type: "assistant_step",
+        payload: { text: "Here it is", toolUses: [{ id: "tu-1", name: "show_mrr", input: {} }] },
+      }),
+      ev({
+        type: "tool_result",
+        payload: {
+          toolUseId: "tu-1",
+          toolName: "show_mrr",
+          result: "ok",
+          render: { component: "MetricCard", props: { value: 42 } },
+        },
+      }),
+      ev({ type: "turn_done", payload: {} }),
+    ]);
 
     const { GET } = await import("../history/route");
     const res = await GET(
@@ -313,10 +355,9 @@ describe("GET /api/chat/history", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.messages).toHaveLength(2);
-    expect(body.messages[0].uiBlocks).toBeUndefined();
-    expect(body.messages[1].uiBlocks).toEqual([
-      { id: "b1", component: "MetricCard", props: { value: 42 } },
-    ]);
+    const assistant = body.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistant.uiBlocks).toHaveLength(1);
+    expect(assistant.uiBlocks[0].component).toBe("MetricCard");
+    expect(assistant.uiBlocks[0].props).toEqual({ value: 42 });
   });
 });

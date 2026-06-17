@@ -44,6 +44,7 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { getAuthUser, getUserCompany, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { initialAiMasterEnabled } from "@/lib/ai-default";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import {
   onboardingSchema,
   parseStage,
@@ -109,7 +110,7 @@ export const POST = withErrorHandler(async (request: Request) => {
             industry: body.industry,
             userName: body.user_name,
           });
-          revalidateOnboardingCaches();
+          await revalidateOnboardingCaches(result.companyId);
           return NextResponse.json(result, { status: 201 });
         } catch (err) {
           const message =
@@ -187,7 +188,7 @@ export const POST = withErrorHandler(async (request: Request) => {
       return { companyId: company.id, scenarioId: scenario.id };
     });
 
-    revalidateOnboardingCaches();
+    await revalidateOnboardingCaches(result.companyId);
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong setting up your company";
@@ -213,11 +214,23 @@ export const POST = withErrorHandler(async (request: Request) => {
  * request-level `cache()`, not tagged `unstable_cache`, so there is nothing to
  * revalidate for them.) Revalidation is non-destructive, so it is safe to call on
  * both the CREATE and CLAIM paths.
+ *
+ * Onboarding is also a financial-data WRITER (base scenario + default accounts +
+ * departments), so it must honor the mutation-tracking contract alongside the
+ * cache contract: `trackDataMutation` bumps the company's lastMutationTime and
+ * queues insight invalidation, so the AI-insight badge / freshness signal fire
+ * for the freshly-seeded data instead of going stale-but-untracked. We track the
+ * broadest source the onboarding write touches — "accounts" invalidates the
+ * expense/revenue/dashboard/reports insight types, covering the seeded accounts;
+ * "scenarios" covers the base scenario; "departments" covers the seeded teams.
  */
-function revalidateOnboardingCaches(): void {
+async function revalidateOnboardingCaches(companyId: string): Promise<void> {
   revalidateTag("scenarios", { expire: 0 });
   revalidateTag("accounts", { expire: 0 });
   revalidateTag("departments", { expire: 0 });
+  await trackDataMutation(companyId, "accounts");
+  await trackDataMutation(companyId, "scenarios");
+  await trackDataMutation(companyId, "departments");
 }
 
 /**

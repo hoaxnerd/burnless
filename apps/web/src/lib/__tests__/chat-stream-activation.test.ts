@@ -17,9 +17,8 @@ vi.mock("@burnless/ai", async (importOriginal) => {
 });
 vi.mock("@burnless/db", () => ({
   db: { insert: () => ({ values: async () => {} }), update: () => ({ set: () => ({ where: async () => {} }) }) },
-  createPendingAction: vi.fn(async () => ({ id: "p1" })),
-  updatePendingActionTimeline: vi.fn(async () => {}),
-  aiConversations: {}, aiMessages: {},
+  appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
+  aiConversations: {},
 }));
 
 import { buildChatSSEResponse, scenarioActivationFrom } from "../chat-stream";
@@ -47,11 +46,5 @@ describe("chat-stream scenario activation + seed (Plan 5)", () => {
     const ev = events.find((e) => e.type === "scenario_activated") as { scenarioId?: string; name?: string };
     expect(ev?.scenarioId).toBe("sc-new");
     expect(ev?.name).toBe("Aggressive Hiring");
-  });
-
-  it("emits seeded activatedScenarios at stream start", async () => {
-    chatStreamMock.mockImplementation(async function* () { yield { type: "done" }; });
-    const events = await collect(buildChatSSEResponse({ ...base, activatedScenarios: [{ scenarioId: "sc-z", name: "Z" }] } as never));
-    expect(events.find((e) => e.type === "scenario_activated")).toMatchObject({ scenarioId: "sc-z", name: "Z" });
   });
 });

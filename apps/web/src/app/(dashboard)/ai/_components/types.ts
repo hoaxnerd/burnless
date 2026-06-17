@@ -110,7 +110,7 @@ export interface TimelineNodeClient {
   resolved?: boolean;
   // scenario marker (Plan 5)
   scenarioId?: string;
-  scenarioName?: string;
+  scenarioName?: string | null;
 }
 
 export interface PendingInputField {

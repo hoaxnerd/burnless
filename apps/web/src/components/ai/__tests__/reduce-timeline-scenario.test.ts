@@ -12,4 +12,9 @@ describe("reduceTimeline scenario_activated (Plan 5)", () => {
     const out = reduceTimeline([], { type: "text", content: "hi" });
     expect(out[0]?.kind).toBe("result");
   });
+
+  it("scenario_exited pushes a scenario node with null name", () => {
+    const out = reduceTimeline([], { type: "scenario_exited" });
+    expect(out.at(-1)).toMatchObject({ kind: "scenario", scenarioName: null });
+  });
 });

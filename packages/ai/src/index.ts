@@ -2,6 +2,9 @@
 // Provider-agnostic: supports Anthropic, OpenAI, OpenRouter, and more.
 // Configure via AI_PROVIDER + AI_MODEL + AI_API_KEY env vars.
 
+// Runtime-tunable AI limits (env-configurable)
+export { getAiLimits, type AiLimits } from "./config";
+
 // Chat
 export { chat, chatStream } from "./chat";
 
@@ -156,6 +159,9 @@ export * from "./generative-ui";
 // Provider catalog (P2 — preset knowledge: base URLs, auth style, discovery, known models)
 export * from "./catalog";
 
+// Tool-loop convergence guard (pure functions)
+export { toolSignature, seedSignatureCounts, checkGuard, type GuardLimits, type GuardDecision } from "./tool-loop-guard";
+
 // Permissions (tool categorization + pure resolver)
 export {
   resolvePermission,
@@ -172,3 +178,19 @@ export type {
   ResolvePermissionContext,
   BuiltinToolControl,
 } from "./permissions";
+
+// Durable chat-turn event log types (single source of truth)
+export type { TurnEvent, TurnEventType, TurnEventPayload, ToolUseRef, OpenGate } from "./turn-log/types";
+export type {
+  ProjectedMessage,
+  ProjectedNode,
+  ProjectedNodeKind,
+  ProjectedUiBlock,
+  ProjectedCategory,
+  ProjectedPendingPermission,
+  ProjectedPendingInput,
+  ProjectedPendingPlan,
+  ProjectedTimeline,
+} from "./turn-log/types";
+export { projectModelThread } from "./turn-log/project-model-thread";
+export { projectTimeline } from "./turn-log/project-timeline";

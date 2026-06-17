@@ -18,6 +18,8 @@ import {
 import { resolveResilientProvider } from "./routing";
 import { sanitizeUserMessage } from "./sanitize";
 import { isInputTool, isPlanTool, buildInputFormSpec, buildPlanSpec, type InputRequestState, type PlanRequestState } from "./generative-ui";
+import { getAiLimits } from "./config";
+import { seedSignatureCounts, checkGuard, type GuardLimits } from "./tool-loop-guard";
 
 /**
  * Resolve the provider through THE seam — every real-generation path goes
@@ -89,8 +91,8 @@ function filterTools(
   return tools.filter((t) => !disabled.has(t.name));
 }
 
-/** Max tool-use round-trips before we force a text response. */
-const MAX_TOOL_ITERATIONS = 10;
+// Max tool-use round-trips per call comes from getAiLimits().maxToolIterations
+// (env BURNLESS_AI_MAX_TOOL_ITERATIONS, default 25). Read once per invocation.
 
 /** Non-streaming chat — sends message and returns complete response. */
 export async function chat(options: ChatOptions): Promise<{
@@ -105,13 +107,16 @@ export async function chat(options: ChatOptions): Promise<{
     };
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
+  const maxIterations = getAiLimits().maxToolIterations;
   // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
   // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
   // interactive assembly is filtered.
   const tools = options.toolsOverride
     ? options.toolsOverride
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+
+  const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -122,8 +127,12 @@ export async function chat(options: ChatOptions): Promise<{
 
   const toolResults: ToolCallResult[] = [];
 
+  const limits = getAiLimits();
+  const guardLimits: GuardLimits = { soft: limits.repeatSoftLimit, hard: limits.repeatHardLimit };
+  const guardCounts = seedSignatureCounts(messages);
+
   // Loop to handle multi-turn tool use (capped to prevent runaway costs)
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
     const response = await provider.complete({
       messages,
       system,
@@ -142,6 +151,23 @@ export async function chat(options: ChatOptions): Promise<{
       // Execute tools and build results
       const resultBlocks: ContentBlock[] = [];
       for (const toolUse of toolUseBlocks) {
+        const guard = checkGuard(guardCounts, toolUse.name, toolUse.input, guardLimits);
+        if (guard.action === "stop") {
+          // Hard stop ends the turn terminally. `messages` is local and discarded
+          // on return (callers read only .response/.toolResults), so any trailing
+          // tool_use blocks in this same batch intentionally go without a
+          // tool_result — the array is never persisted or replayed. If a future
+          // change starts persisting on this path, fill the remaining ids first.
+          resultBlocks.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          messages.push({ role: "user", content: resultBlocks });
+          return { response: guard.message, toolResults };
+        }
+        if (guard.action === "steer") {
+          toolResults.push({ tool: toolUse.name, input: toolUse.input, result: guard.message });
+          resultBlocks.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          continue;
+        }
+
         const result = await options.onToolCall(toolUse.name, toolUse.input);
         toolResults.push({
           tool: toolUse.name,
@@ -190,12 +216,15 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     return;
   }
 
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode);
+  const maxIterations = getAiLimits().maxToolIterations;
   // Interactive assembly is filtered by disabledToolNames (S3b §11); a
   // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
   const tools = options.toolsOverride
     ? options.toolsOverride
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+
+  const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -204,6 +233,10 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
       : m.content,
   }));
 
+  const limits = getAiLimits();
+  const guardLimits: GuardLimits = { soft: limits.repeatSoftLimit, hard: limits.repeatHardLimit };
+  const guardCounts = seedSignatureCounts(messages);
+
   // Track whether the turn produced ANY visible output (text or an executed
   // tool). Some providers (e.g. small models on flaky multi-tool turns) return an
   // empty completion — without this we'd render a blank assistant bubble.
@@ -211,7 +244,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   let ranTool = false;
 
   // Capped to prevent runaway tool loops
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
     const events = provider.stream({
       messages,
       system,
@@ -239,12 +272,59 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
         (b): b is ContentBlock & { type: "tool_use" } => b.type === "tool_use"
       );
 
+      // Surface this round-trip's assistant content (text + the tool_use batch)
+      // as a first-class chunk BEFORE the tools execute/pause, so chat-stream can
+      // persist the model thread losslessly. Empty text is omitted (no stray
+      // text block downstream). Mirrors the same content pushed onto `messages`.
+      const stepText = lastResponse.content
+        .filter((b): b is ContentBlock & { type: "text" } => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+      yield {
+        type: "assistant_step",
+        ...(stepText ? { text: stepText } : {}),
+        toolUses: toolUseBlocks.map((b) => ({ id: b.id, name: b.name, input: b.input })),
+      };
+
       const completedResults: ContentBlock[] = [];
       const pending: PendingToolUse[] = [];
       const inputRequests: PendingToolUse[] = [];
       const planRequests: PendingToolUse[] = [];
 
-      for (const toolUse of toolUseBlocks) {
+      for (let bi = 0; bi < toolUseBlocks.length; bi++) {
+        const toolUse = toolUseBlocks[bi]!;
+        const guard = checkGuard(guardCounts, toolUse.name, toolUse.input, guardLimits);
+        if (guard.action === "stop") {
+          // Hard stop: satisfy the tool-result contract for the stopping id AND
+          // every trailing same-batch tool_use that won't run, so the next turn's
+          // provider thread stays contract-valid (each tool_use needs a paired
+          // tool_result) once chat-stream persists the assistant_step. Emit each
+          // as a `stopped` tool_result chunk carrying the stop message.
+          const stoppedBlocks = toolUseBlocks.slice(bi);
+          for (const su of stoppedBlocks) {
+            yield {
+              type: "tool_result",
+              toolName: su.name,
+              toolResult: guard.message,
+              nodeId: su.id,
+              nodeKind: "tool",
+              kind: "stopped",
+            };
+            completedResults.push({ type: "tool_result", toolUseId: su.id, content: guard.message });
+          }
+          messages.push({ role: "assistant", content: lastResponse.content });
+          messages.push({ role: "user", content: completedResults });
+          yield { type: "text", content: guard.message };
+          yield { type: "done" };
+          return;
+        }
+        if (guard.action === "steer") {
+          // Soft steer: skip execution; hand the model a "repeated" result to self-correct.
+          yield { type: "tool_result", toolName: toolUse.name, toolResult: guard.message, nodeId: toolUse.id, nodeKind: "tool" };
+          completedResults.push({ type: "tool_result", toolUseId: toolUse.id, content: guard.message });
+          continue;
+        }
+
         if (isPlanTool(toolUse.name)) {
           planRequests.push({ requestId: toolUse.id, toolName: toolUse.name, toolInput: toolUse.input });
           continue;

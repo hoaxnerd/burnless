@@ -6,10 +6,10 @@
  */
 
 import { z } from "zod";
-import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getActivePendingAction, resolvePendingAction, getSessionDisabledTools, getDisabledBuiltinTools } from "@burnless/db";
-import { aiConversations, aiMessages, scenarios as scenariosTable } from "@burnless/db";
-import { eq, and, asc } from "drizzle-orm";
-import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults } from "@burnless/ai";
+import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
+import { aiConversations, scenarios as scenariosTable } from "@burnless/db";
+import { eq, and } from "drizzle-orm";
+import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
@@ -86,12 +86,44 @@ export const POST = withErrorHandler(async (request: Request) => {
     conversationId = conv!.id;
   }
 
-  // Stale-pause guard (Plan 5): if the user left a plan/diff card unresolved and
-  // sends a new message, free the single-active slot first so the new turn's pause
-  // doesn't trip the ai_pending_actions_active_idx unique index (duplicate-key).
-  // The orphaned card goes inert (its resume 409s — already handled).
-  const stalePending = await getActivePendingAction(conversationId);
-  if (stalePending) await resolvePendingAction(stalePending.id);
+  // Abandoning an open gate by sending a new message leaves
+  // the gated (pending) tool_use without a tool_result — it would dangle forever in
+  // the log and make Phase 3's projectModelThread emit an assistant turn with an
+  // unpaired tool_use (provider 400). Before resolving the gate, synthesize a
+  // `declined` cancellation tool_result for EACH gated tool_use, tagged with the
+  // gate's OWN turnId so it groups with the abandoned turn (not the new one).
+  // Gated-id source: permission gates carry their ids in `actions[].requestId`;
+  // input/plan gates carry the single `gatedToolUseId`.
+  const openGate = await getOpenGate(conversationId);
+  if (openGate) {
+    const gatePayload = openGate.payload as {
+      kind?: "permission" | "input" | "plan";
+      actions?: { requestId?: unknown }[];
+      gatedToolUseId?: unknown;
+    } | null;
+    const gatedIds: string[] = [];
+    if (gatePayload?.kind === "permission") {
+      for (const a of gatePayload.actions ?? []) {
+        if (typeof a?.requestId === "string") gatedIds.push(a.requestId);
+      }
+    } else if (typeof gatePayload?.gatedToolUseId === "string") {
+      gatedIds.push(gatePayload.gatedToolUseId);
+    }
+    const cancelled = JSON.stringify({ declined: true, reason: "superseded by new message" });
+    for (const toolUseId of gatedIds) {
+      await appendTurnEvent({
+        conversationId,
+        turnId: openGate.turnId,
+        type: "tool_result",
+        payload: { toolUseId, toolName: "", result: cancelled, kind: "declined" },
+      });
+    }
+  }
+
+  // Resolve any open gate in the turn log before the new turn starts, so the new
+  // turn's pause can't collide with the partial-unique open-gate index.
+  // Unconditional (cheap no-op when no gate is open).
+  await resolveOpenGate(conversationId);
 
   // Per-user permission defaults (fall back to builtin) + this conversation's grants.
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
@@ -106,26 +138,34 @@ export const POST = withErrorHandler(async (request: Request) => {
     : BUILTIN_PERMISSION_DEFAULTS;
   const sessionGrants = await getSessionGrants(conversationId);
 
-  // Save user message
-  await db.insert(aiMessages).values({
+  // Mint the turn id for this new turn. Threaded through to the streaming layer
+  // so later tasks tag their log events with it (Phase 2 dual-write).
+  const turnId = crypto.randomUUID();
+
+  // Append the user_message event to the append-as-you-go turn log (aiTurnEvents)
+  // — the sole conversation store. Runs AFTER the conversation row exists (valid FK).
+  await appendTurnEvent({
     conversationId,
-    role: "user",
-    content: body.message,
+    turnId,
+    type: "user_message",
+    payload: { text: body.message },
   });
 
-  // Load conversation history
-  const history = await db
-    .select()
-    .from(aiMessages)
-    .where(eq(aiMessages.conversationId, conversationId))
-    .orderBy(asc(aiMessages.createdAt));
-
-  const messages: ChatMessage[] = history
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+  // Build the model's conversation context from the
+  // append-as-you-go turn-event log (aiTurnEvents).
+  // The current turn's user_message was appended above (Task 2.1), so it's the
+  // latest event in the log and projectModelThread includes it as the final
+  // user turn. The projected thread is the exact provider message thread —
+  // every assistant tool_use is paired with a tool_result (Phase 2 invariant),
+  // so it's a valid provider thread. No cap: the old aiMessages read projected
+  // the full thread (no LIMIT), and the loop fix needs the complete thread.
+  // System prompt + financial snapshot are added separately by chatStream/context.
+  // getTurnEvents returns drizzle rows (payload: unknown) — cast to the typed
+  // TurnEvent shape. projectModelThread only ever emits user/assistant turns, so
+  // the LlmMessage[] result is a valid ChatMessage[] for the streaming layer.
+  const messages = projectModelThread(
+    (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
+  ) as ChatMessage[];
 
   // Resolve scenario for READ context (financial snapshot). Falls back to the
   // default scenario so the AI always has a base picture.
@@ -197,6 +237,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     scenarioId: scenario.id,
     writeScenarioId,
     conversationId,
+    turnId,
     messages,
     financialContext: contextText,
     companionName: aiFlags.companionName,

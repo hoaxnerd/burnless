@@ -23,9 +23,8 @@ vi.mock("@burnless/db", async (orig) => {
   const actual = await orig<typeof import("@burnless/db")>();
   return {
     ...actual,
-    createPendingAction: vi.fn(async () => ({ id: "row-1" })),
+    appendTurnEvent: vi.fn(async () => ({ id: "evt" })),
     db: {
-      insert: () => ({ values: () => ({ catch: () => Promise.resolve() }) }),
       update: () => ({ set: () => ({ where: () => ({ catch: () => Promise.resolve() }) }) }),
     },
   };
@@ -60,7 +59,7 @@ async function collect(res: Response): Promise<Record<string, unknown>[]> {
 }
 
 const baseParams = {
-  companyId: "c1", userId: "u1", scenarioId: "s1", writeScenarioId: null, conversationId: "conv-err-1",
+  companyId: "c1", userId: "u1", scenarioId: "s1", writeScenarioId: null, conversationId: "conv-err-1", turnId: "turn-err",
   messages: [{ role: "user" as const, content: "secret prompt body that must not be logged" }],
   financialContext: "ctx", companionName: "Companion", providerConfig: undefined,
   defaults: { read: "always", write: "ask", delete: "ask", web_search: "always", browser_use: "ask" } as const,

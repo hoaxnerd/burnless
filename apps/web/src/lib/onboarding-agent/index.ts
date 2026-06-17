@@ -11,6 +11,7 @@
 import {
   resolveResilientProvider,
   getFinancialTools,
+  getAiLimits,
   type ContentBlock,
   type LlmMessage,
 } from "@burnless/ai";
@@ -26,10 +27,13 @@ export { healOnboardingResult } from "./heal";
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
-const MAX_LOOPS = 15;
-const SEARCH_BUDGET = 5;
-const CRAWL_BUDGET = 10; // bounds `read_webpage` calls
 const AGENT_TOOL_NAMES = ["search_web", "read_webpage"] as const;
+
+/** Single overall loop bound for the research agent (spec §3 decision 6).
+ *  Per-tool search/crawl budgets were removed — 50 loops is the only limit. */
+export function getOnboardingMaxLoops(): number {
+  return getAiLimits().onboardingMaxLoops;
+}
 
 type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 
@@ -67,18 +71,6 @@ function extractJson(text: string): unknown | null {
 
 // ── Tool execution ──────────────────────────────────────────────────────────
 
-interface Budget {
-  search: number;
-  crawl: number;
-}
-
-function budgetExceededMessage(tool: AgentToolName): string {
-  if (tool === "search_web") {
-    return "Error: Search budget exceeded (max 5 searches). Synthesize with current data.";
-  }
-  return "Error: Read-webpage budget exceeded (max 10). Synthesize with current data.";
-}
-
 async function runToolCall(
   toolName: AgentToolName,
   url: string | undefined,
@@ -102,7 +94,6 @@ async function runToolCall(
 
 async function dispatchToolCalls(
   toolCalls: ToolUseBlock[],
-  budget: Budget,
   userId: string,
   onStatus: (msg: string) => void,
 ): Promise<ContentBlock[]> {
@@ -110,41 +101,21 @@ async function dispatchToolCalls(
 
   for (const call of toolCalls) {
     if (call.name === "search_web") {
-      if (budget.search >= SEARCH_BUDGET) {
-        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("search_web") });
-        continue;
-      }
-      budget.search++;
       const query = typeof call.input.query === "string" ? call.input.query : "";
       onStatus(`Searching for: "${query}"...`);
-      // `search_web` (SearXNG/Tavily) returns structured JSON
-      // `{ results: [{ rank, title, url, snippet }] }` and accepts an optional
-      // `maxResults`; the raw JSON string is fed straight back to the model.
       const { content } = await runToolCall("search_web", undefined, { query }, userId);
       results.push({ type: "tool_result", toolUseId: call.id, content });
       continue;
     }
-
     if (call.name === "read_webpage") {
-      if (budget.crawl >= CRAWL_BUDGET) {
-        results.push({ type: "tool_result", toolUseId: call.id, content: budgetExceededMessage("read_webpage") });
-        continue;
-      }
-      budget.crawl++;
       const url = typeof call.input.url === "string" ? call.input.url : "";
       onStatus(`Reading: ${url}...`);
       const { content } = await runToolCall(call.name, url, { url }, userId);
       results.push({ type: "tool_result", toolUseId: call.id, content });
       continue;
     }
-
-    results.push({
-      type: "tool_result",
-      toolUseId: call.id,
-      content: `Error: Unknown tool "${call.name}"`,
-    });
+    results.push({ type: "tool_result", toolUseId: call.id, content: `Error: Unknown tool "${call.name}"` });
   }
-
   return results;
 }
 
@@ -183,7 +154,6 @@ Use your tools to find accurate information.`,
   const agentTools = getFinancialTools().filter((t) =>
     (AGENT_TOOL_NAMES as readonly string[]).includes(t.name),
   );
-  const budget: Budget = { search: 0, crawl: 0 };
 
   onStatus("Starting research agent...");
 
@@ -193,7 +163,7 @@ Use your tools to find accurate information.`,
   // the JSON template reflects the actual onboarding day, not server boot.
   const systemPrompt = buildAgentSystemPrompt();
 
-  for (let loop = 0; loop < MAX_LOOPS; loop++) {
+  for (let loop = 0, maxLoops = getOnboardingMaxLoops(); loop < maxLoops; loop++) {
     const response = await provider.complete({
       messages,
       system: systemPrompt,
@@ -215,7 +185,7 @@ Use your tools to find accurate information.`,
       continue;
     }
 
-    const toolResults = await dispatchToolCalls(toolCalls, budget, userId, onStatus);
+    const toolResults = await dispatchToolCalls(toolCalls, userId, onStatus);
     messages.push({ role: "user", content: toolResults });
   }
 

@@ -122,6 +122,16 @@ The actual data goes in display components (see "Showing results with components
 - When creating scenarios or forecasts, confirm the key assumptions with the user
 - If the user's request is ambiguous, ask a clarifying question rather than guessing`;
 
+/** Scenario-context guidance, appended only when the scenario tools are offered. */
+const SCENARIO_CONTEXT = `## Working with scenarios
+
+- Creating a scenario with \`create_scenario\` AUTOMATICALLY activates it (result has \`activated:true\`) — do NOT call \`activate_scenario\` right after creating.
+- \`activate_scenario\` switches the working context: every later tool call in this turn reads and writes that scenario unless you pass an explicit \`scenarioId\`. The user sees a header that the scenario view is active.
+- \`exit_scenario\` returns to BASE data; later tools then operate on real base-case numbers.
+- To target a specific scenario for a single call (e.g. comparing or editing across two scenarios) pass an explicit \`scenarioId\` — a scenario id, or \`"base"\` — on that tool. Explicit always wins over the active scenario.
+- Do NOT delete-and-recreate a scenario to "refresh" it; rename or update it instead.
+- After switching scenarios mid-conversation, your initial financial snapshot may still reflect the previous scenario — re-read with tools if you need the active scenario's current figures.`;
+
 /** Headless cron overlay: act autonomously, no UI, frozen allowlist, summarize. */
 const AUTONOMOUS_OVERLAY = `You are running as a SCHEDULED AUTOMATION — headless, with no live user and no UI. You are executing a job the user set up earlier; run it and report.
 
@@ -156,9 +166,14 @@ ${SECURITY_SECTION}`;
 export function buildSystemPrompt(
   companionName = "Companion",
   mode: PromptMode = "interactive",
+  scenarioToolsPresent = false,
 ): string {
   const base = mode === "autonomous" ? AUTONOMOUS_SYSTEM_PROMPT : SYSTEM_PROMPT;
-  return base.replace(/\{\{COMPANION_NAME\}\}/g, companionName);
+  const withScenario =
+    mode === "interactive" && scenarioToolsPresent
+      ? base.replace(SECURITY_SECTION, `${SCENARIO_CONTEXT}\n\n${SECURITY_SECTION}`)
+      : base;
+  return withScenario.replace(/\{\{COMPANION_NAME\}\}/g, companionName);
 }
 
 /** Build the full system message including financial context. */
@@ -166,8 +181,9 @@ export function buildSystemMessage(
   financialContext: string,
   companionName?: string,
   mode: PromptMode = "interactive",
+  scenarioToolsPresent = false,
 ): string {
-  return `${buildSystemPrompt(companionName, mode)}
+  return `${buildSystemPrompt(companionName, mode, scenarioToolsPresent)}
 
 ---
 

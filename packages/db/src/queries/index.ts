@@ -103,16 +103,19 @@ export {
   getSessionDisabledTools,
   setSessionDisabledTool,
   resetSessionDisabledTools,
-  createPendingAction,
-  getActivePendingAction,
-  resolvePendingAction,
-  updatePendingActionTimeline,
 } from "./ai-permissions";
 export type {
   PermissionModeValue,
   PermissionDefaultsPatch,
-  NewPendingAction,
 } from "./ai-permissions";
+
+export {
+  appendTurnEvent,
+  getTurnEvents,
+  getOpenGate,
+  resolveOpenGate,
+} from "./turn-events";
+export type { NewTurnEvent, TurnEventRow } from "./turn-events";
 
 export * from "./local-user";
 

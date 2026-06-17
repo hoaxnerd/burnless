@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { TurnEvent } from "@burnless/ai";
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
+// Task 3.3: the history reader projects the durable turn-event log; mock the log
+// accessors with real events and let projectTimeline run. Asserts the per-kind
+// gate guard (plan vs permission vs input) on the 5-field reload contract.
 
-const { mockRequireCompanyAccess, mockGetActivePendingAction } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetTurnEvents, mockGetOpenGate } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetActivePendingAction: vi.fn(),
+  mockGetTurnEvents: vi.fn(),
+  mockGetOpenGate: vi.fn(),
 }));
 
-const {
-  mockSelect,
-  mockFrom,
-  mockWhere,
-  mockOrderBy,
-} = vi.hoisted(() => ({
+const { mockSelect, mockFrom, mockWhere, mockOrderBy } = vi.hoisted(() => ({
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
@@ -27,37 +27,17 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: {
-    select: mockSelect,
-  },
-  aiConversations: {
-    id: "id",
-    companyId: "companyId",
-    userId: "userId",
-    updatedAt: "updatedAt",
-  },
-  aiMessages: {
-    conversationId: "conversationId",
-    createdAt: "createdAt",
-  },
-  getActivePendingAction: mockGetActivePendingAction,
-}));
-
-vi.mock("@burnless/ai", () => ({
-  categorizeToolName: vi.fn(() => "write"),
+  db: { select: mockSelect },
+  aiConversations: { id: "id", companyId: "companyId", userId: "userId", updatedAt: "updatedAt" },
+  getTurnEvents: mockGetTurnEvents,
+  getOpenGate: mockGetOpenGate,
 }));
 
 vi.mock("@/lib/ai-tools", () => ({
   describeToolAction: vi.fn((tool: string) => `do ${tool}`),
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  desc: vi.fn(),
-  asc: vi.fn(),
-  lt: vi.fn(),
-}));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), desc: vi.fn(), asc: vi.fn(), lt: vi.fn() }));
 
 vi.mock("@/lib/pagination", () => ({
   parsePaginationParams: vi.fn().mockReturnValue({ limit: 20, cursor: null }),
@@ -67,25 +47,45 @@ vi.mock("@/lib/pagination", () => ({
   })),
 }));
 
-vi.mock("@/lib/logger", () => ({
-  logger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }),
-}));
+vi.mock("@/lib/logger", () => ({ logger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }) }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CTX = { userId: "u1", companyId: "c1", role: "admin" };
+const makeRequest = (url: string): Request => new Request(url);
 
-function makeRequest(url: string): Request {
-  return new Request(url);
+let seq = 0;
+function ev(partial: Partial<TurnEvent> & { type: TurnEvent["type"]; payload: TurnEvent["payload"] }): TurnEvent {
+  seq += 1;
+  return {
+    id: `e${seq}`,
+    conversationId: "conv1",
+    seq,
+    turnId: "turn1",
+    resolvedAt: null,
+    createdAt: new Date(),
+    ...partial,
+  } as TurnEvent;
+}
+
+/** A paused conversation: user → assistant → an UNRESOLVED gate of the given kind. */
+function pausedLog(payload: TurnEvent["payload"]): TurnEvent[] {
+  return [
+    ev({ type: "user_message", payload: { text: "go" } }),
+    ev({ type: "assistant_step", payload: { text: "" } }),
+    ev({ type: "gate", resolvedAt: null, payload }),
+  ];
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("GET /api/chat/history — plan restore (kind guard)", () => {
   beforeEach(() => {
+    seq = 0;
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(CTX);
-    mockGetActivePendingAction.mockResolvedValue(null);
+    mockGetTurnEvents.mockResolvedValue([]);
+    mockGetOpenGate.mockResolvedValue(null);
 
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
@@ -94,20 +94,17 @@ describe("GET /api/chat/history — plan restore (kind guard)", () => {
   });
 
   it("returns pendingPlan (not pendingPermission/pendingInput) for a kind:'plan' row", async () => {
-    // conv found
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    // messages query
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-
-    mockGetActivePendingAction.mockResolvedValueOnce({
+    const events = pausedLog({
       pauseId: "p-plan",
       kind: "plan",
-      pending: {
-        planToolUseId: "tu-p",
-        spec: { title: "Model hire", steps: [] },
-      },
-    });
+      spec: { title: "Model hire", steps: [] },
+      gatedToolUseId: "tu-p",
+      scenarioId: "base",
+      writeScenarioId: null,
+    } as TurnEvent["payload"]);
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(events[2]!);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));
@@ -122,16 +119,17 @@ describe("GET /api/chat/history — plan restore (kind guard)", () => {
     expect(json.pendingPlan.spec.title).toBe("Model hire");
   });
 
-  it("does not break kind:'permission' rows after guard fix (regression)", async () => {
+  it("does not break kind:'permission' rows (regression)", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-
-    mockGetActivePendingAction.mockResolvedValueOnce({
+    const events = pausedLog({
       pauseId: "p-perm",
       kind: "permission",
-      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
-    });
+      actions: [{ requestId: "t1", toolName: "create_scenario", toolInput: { name: "QA" } }],
+      scenarioId: "base",
+      writeScenarioId: null,
+    } as TurnEvent["payload"]);
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(events[2]!);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));
@@ -145,19 +143,18 @@ describe("GET /api/chat/history — plan restore (kind guard)", () => {
     expect(json.pendingPlan).toBeNull();
   });
 
-  it("does not break kind:'input' rows after guard fix (regression)", async () => {
+  it("does not break kind:'input' rows (regression)", async () => {
     mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy });
-    mockOrderBy.mockResolvedValueOnce([]);
-
-    mockGetActivePendingAction.mockResolvedValueOnce({
+    const events = pausedLog({
       pauseId: "p-input",
       kind: "input",
-      pending: {
-        inputToolUseId: "tu-i",
-        spec: { title: "Fill form", fields: [] },
-      },
-    });
+      spec: { title: "Fill form", fields: [] },
+      gatedToolUseId: "tu-i",
+      scenarioId: "base",
+      writeScenarioId: null,
+    } as TurnEvent["payload"]);
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(events[2]!);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));

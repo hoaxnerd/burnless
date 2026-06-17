@@ -19,9 +19,11 @@ import {
   importBatches,
   aiFeatureFlags,
   aiConversations,
-  aiMessages,
   aiInsightCache,
+  getTurnEvents,
 } from "@burnless/db";
+import { projectTimeline } from "@burnless/ai";
+import type { TurnEvent } from "@burnless/ai";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { getAuthUser, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 
@@ -133,14 +135,15 @@ export const GET = withErrorHandler(async () => {
         .where(inArray(aiInsightCache.companyId, companyIds)),
     ]);
 
-    // Batch 2: Fetch company-scoped entity data and conversation-level nested data
-    const conversationIds = aiConversationsData.map((c) => c.id);
-
+    // Batch 2: Fetch company-scoped entity data and conversation message logs.
+    // Per-conversation chat messages now project from the durable turn-event
+    // log (`aiTurnEvents`) via `projectTimeline`, not the legacy `aiMessages`
+    // table — keeping export functional once `aiMessages` is retired (Phase 4).
     const [
       forecastLinesData,
       headcountPlansData,
       revenueStreamsData,
-      aiMessagesData,
+      conversationMessages,
     ] = await Promise.all([
       companyIds.length > 0
         ? db
@@ -160,13 +163,21 @@ export const GET = withErrorHandler(async () => {
             .from(revenueStreams)
             .where(inArray(revenueStreams.companyId, companyIds))
         : Promise.resolve([]),
-      conversationIds.length > 0
-        ? db
-            .select()
-            .from(aiMessages)
-            .where(inArray(aiMessages.conversationId, conversationIds))
-        : Promise.resolve([]),
+      Promise.all(
+        aiConversationsData.map(async (conv) => ({
+          conversationId: conv.id,
+          messages: projectTimeline(
+            // TurnEventRow.payload is jsonb (`unknown`); the durable log shape
+            // is TurnEvent. Same bridge cast the chat readers use.
+            (await getTurnEvents(conv.id)) as unknown as TurnEvent[]
+          ).messages,
+        }))
+      ),
     ]);
+
+    const messagesByConversation = new Map(
+      conversationMessages.map((c) => [c.conversationId, c.messages])
+    );
 
     // Batch 3: Fetch forecast values (depends on forecastLines)
     const forecastLineIds = forecastLinesData.map((fl) => fl.id);
@@ -230,9 +241,7 @@ export const GET = withErrorHandler(async () => {
       companies: companyExports,
       aiConversations: aiConversationsData.map((conv) => ({
         ...conv,
-        messages: aiMessagesData.filter(
-          (m) => m.conversationId === conv.id
-        ),
+        messages: messagesByConversation.get(conv.id) ?? [],
       })),
     };
 

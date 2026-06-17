@@ -1,10 +1,8 @@
 // apps/web/src/app/api/chat/__tests__/chat-route-safety.test.ts
 //
-// Plan 5 scenario-safety + stale-pause on the main chat route. Mirrors chat.test.ts's
+// Plan 5 scenario-safety + open-gate cleanup on the main chat route. Mirrors chat.test.ts's
 // mocked-DB harness verbatim (auth / rate-limit / feature-flags / SSE responder /
 // tool executor all mocked; the db chain is a plain mock), and adds:
-//   - getActivePendingAction / resolvePendingAction on the @burnless/db mock so the
-//     stale-pause auto-resolve is observable.
 //   - the real (unmocked) scenario-middleware for the dual-channel guard.
 // scenario-middleware reads request.headers.get("Cookie"); happy-dom strips the
 // forbidden "Cookie" header off a real Request, so the mismatch test uses a hand-
@@ -87,12 +85,9 @@ const { mockBuildChatSSEResponse } = vi.hoisted(() => ({
   mockBuildChatSSEResponse: vi.fn(),
 }));
 
-const { mockGetActivePendingAction, mockResolvePendingAction } = vi.hoisted(
-  () => ({
-    mockGetActivePendingAction: vi.fn(),
-    mockResolvePendingAction: vi.fn(),
-  })
-);
+const { mockResolveOpenGate } = vi.hoisted(() => ({
+  mockResolveOpenGate: vi.fn(),
+}));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -116,21 +111,22 @@ vi.mock("@burnless/db", () => ({
   getOverrideCount: mockGetOverrideCount,
   getPermissionDefaults: vi.fn().mockResolvedValue(null),
   getSessionGrants: vi.fn().mockResolvedValue({}),
-  getActivePendingAction: mockGetActivePendingAction,
-  resolvePendingAction: mockResolvePendingAction,
   // S3b §11 disabled-tools overlay: default to nothing disabled.
   getSessionDisabledTools: vi.fn().mockResolvedValue({}),
   getDisabledBuiltinTools: vi.fn().mockResolvedValue([]),
+  // The chat POST appends a user_message turn-event (sole conversation store).
+  appendTurnEvent: vi.fn().mockResolvedValue({ id: "evt1" }),
+  // The chat POST reads + resolves any open gate before the new turn (frees the
+  // single-open slot, replacing the retired stale-pending-action cleanup).
+  getOpenGate: vi.fn().mockResolvedValue(null),
+  resolveOpenGate: mockResolveOpenGate,
+  // Phase 3 reader flip: chat POST projects the turn-event log for model context.
+  getTurnEvents: vi.fn().mockResolvedValue([]),
   aiConversations: {
     id: "id",
     companyId: "companyId",
     userId: "userId",
     updatedAt: "updatedAt",
-  },
-  aiMessages: {
-    conversationId: "conversationId",
-    role: "role",
-    createdAt: "createdAt",
   },
   scenarios: { id: "id", companyId: "companyId" },
 }));
@@ -148,18 +144,22 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getAiFlags: mockGetAiFlags,
 }));
 
-vi.mock("@burnless/ai", () => ({
-  chatStream: mockChatStream,
-  resolvePermission: vi.fn(() => "allow"),
-  categorizeToolName: vi.fn(() => "read"),
-  BUILTIN_PERMISSION_DEFAULTS: {
-    read: "always",
-    write: "ask",
-    delete: "ask",
-    web_search: "always",
-    browser_use: "ask",
-  },
-}));
+vi.mock("@burnless/ai", async () => {
+  const actual = await vi.importActual<typeof import("@burnless/ai")>("@burnless/ai");
+  return {
+    chatStream: mockChatStream,
+    resolvePermission: vi.fn(() => "allow"),
+    categorizeToolName: vi.fn(() => "read"),
+    projectModelThread: actual.projectModelThread,
+    BUILTIN_PERMISSION_DEFAULTS: {
+      read: "always",
+      write: "ask",
+      delete: "ask",
+      web_search: "always",
+      browser_use: "ask",
+    },
+  };
+});
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
@@ -214,7 +214,7 @@ function reqWith(
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("chat route scenario safety + stale-pause (Plan 5)", () => {
+describe("chat route scenario safety + open-gate cleanup (Plan 5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -256,9 +256,7 @@ describe("chat route scenario safety + stale-pause (Plan 5)", () => {
     mockGetAiFlags.mockResolvedValue({ companionName: "Aria" });
     mockGetOverrideCount.mockResolvedValue(0);
 
-    // Default: no stale pending action.
-    mockGetActivePendingAction.mockResolvedValue(undefined);
-    mockResolvePendingAction.mockResolvedValue(undefined);
+    mockResolveOpenGate.mockResolvedValue(undefined);
 
     mockBuildChatSSEResponse.mockImplementation(
       () =>
@@ -282,23 +280,14 @@ describe("chat route scenario safety + stale-pause (Plan 5)", () => {
     expect(res.status).toBe(409);
   });
 
-  it("auto-resolves a stale pending action before a new turn (no duplicate-key)", async () => {
-    mockGetActivePendingAction.mockResolvedValue({ id: "stale" });
+  it("resolves any open gate before a new turn starts (frees the single-open slot)", async () => {
     mockReturning.mockResolvedValue([{ id: "new-conv" }]);
 
     const { POST } = await import("../route");
     const res = await POST(reqWith({}, { message: "new turn" }));
     expect(res.status).toBe(200);
-    expect(mockResolvePendingAction).toHaveBeenCalledWith("stale");
-  });
-
-  it("does not call resolve when there is no stale pending action", async () => {
-    mockGetActivePendingAction.mockResolvedValue(undefined);
-    mockReturning.mockResolvedValue([{ id: "new-conv" }]);
-
-    const { POST } = await import("../route");
-    const res = await POST(reqWith({}, { message: "fresh" }));
-    expect(res.status).toBe(200);
-    expect(mockResolvePendingAction).not.toHaveBeenCalled();
+    // Unconditional resolve (cheap no-op when no gate is open) — replaces the
+    // retired stale-pending-action cleanup.
+    expect(mockResolveOpenGate).toHaveBeenCalledWith("new-conv");
   });
 });

@@ -2,7 +2,7 @@
 //
 // Plan 5 scenario-safety on the resume route. Mirrors resume.test.ts's PGLite +
 // mocked-provider harness verbatim (the @burnless/db singleton is hijacked to
-// PGLite so getActivePendingAction / resolvePendingAction / scenario lookups +
+// PGLite so getOpenGate / resolveOpenGate / scenario lookups +
 // getDefaultScenario run against real Postgres semantics), while auth / rate-limit
 // / SSE responder / tool executor are mocked. We exercise the new dual-channel
 // guard + decision-4 re-validation:
@@ -66,7 +66,7 @@ vi.mock("@/lib/chat-stream", async (importOriginal) => {
 });
 
 import { createUser, createCompany, createScenario } from "@db-test/factories";
-import { db, aiConversations, aiMessages, createPendingAction } from "@burnless/db";
+import { db, aiConversations, appendTurnEvent } from "@burnless/db";
 
 // happy-dom strips the forbidden "Cookie" request header, so we hand-roll a minimal
 // Request shape exposing exactly what the route touches (headers.get / json / method
@@ -112,23 +112,27 @@ async function seedPermissionPause(opts: {
     .values({ companyId: company.id, userId: user.id, title: "t" })
     .returning();
   const conversationId = conv!.id;
-  await db.insert(aiMessages).values({ conversationId, role: "user", content: "do it" });
 
+  const turnId = "turn-safety-1";
   const pauseId = "pause-safety-1";
   const requestId = "r1";
-  await createPendingAction({
-    conversationId,
-    pauseId,
-    scenarioId: baseScenario.id,
-    // AI-01: this pause models an OVERLAY write (the turn was operating inside
-    // baseScenario as a write target), so the write target is non-null. Decision-4
-    // gates only when there is a real overlay write target.
-    writeScenarioId: baseScenario.id,
-    assistantBlocks: [
-      { type: "tool_use", id: requestId, name: toolName, input: {} },
-    ],
-    completedResults: [],
-    pending: [{ requestId, toolName, toolInput: {} }],
+  // Durable log: user_message → assistant_step → UNRESOLVED gate. The gate models
+  // an OVERLAY write (the turn was operating inside baseScenario as a write target),
+  // so writeScenarioId is non-null. Decision-4 gates only when there is a real
+  // overlay write target.
+  await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "do it" } });
+  await appendTurnEvent({
+    conversationId, turnId, type: "assistant_step",
+    payload: { toolUses: [{ id: requestId, name: toolName, input: {} }] },
+  });
+  await appendTurnEvent({
+    conversationId, turnId, type: "gate",
+    payload: {
+      pauseId, kind: "permission",
+      actions: [{ requestId, toolName, toolInput: {} }],
+      scenarioId: baseScenario.id,
+      writeScenarioId: baseScenario.id,
+    },
   });
 
   return { conversationId, pauseId, requestId, baseScenario, activeScenario };
@@ -238,7 +242,6 @@ describe("resume scenario safety (Plan 5)", () => {
       .values({ companyId: company.id, userId: user.id, title: "t" })
       .returning();
     const conversationId = conv!.id;
-    await db.insert(aiMessages).values({ conversationId, role: "user", content: "do it" });
 
     // The AI-created scenario this very conversation produced — decision-4 tolerates it.
     const aiMade = await createScenario(company.id, {
@@ -248,19 +251,24 @@ describe("resume scenario safety (Plan 5)", () => {
       aiConversationId: conversationId,
     });
 
+    const turnId = "turn-safety-1";
     const pauseId = "pause-safety-1";
     const requestId = "r1";
-    await createPendingAction({
-      conversationId,
-      pauseId,
-      scenarioId: baseScenario.id,
-      // AI-01: overlay write target — non-null so decision-4 can evaluate the gate.
-      writeScenarioId: baseScenario.id,
-      assistantBlocks: [
-        { type: "tool_use", id: requestId, name: "create_revenue_stream", input: {} },
-      ],
-      completedResults: [],
-      pending: [{ requestId, toolName: "create_revenue_stream", toolInput: {} }],
+    // Durable log: user_message → assistant_step → UNRESOLVED gate (overlay write
+    // target non-null so decision-4 can evaluate the gate).
+    await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "do it" } });
+    await appendTurnEvent({
+      conversationId, turnId, type: "assistant_step",
+      payload: { toolUses: [{ id: requestId, name: "create_revenue_stream", input: {} }] },
+    });
+    await appendTurnEvent({
+      conversationId, turnId, type: "gate",
+      payload: {
+        pauseId, kind: "permission",
+        actions: [{ requestId, toolName: "create_revenue_stream", toolInput: {} }],
+        scenarioId: baseScenario.id,
+        writeScenarioId: baseScenario.id,
+      },
     });
 
     const { POST } = await import("../resume/route");

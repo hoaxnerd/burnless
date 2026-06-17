@@ -77,7 +77,7 @@ vi.mock("@/lib/chat-stream", async (importOriginal) => {
 });
 
 import { createUser, createCompany, createScenario } from "@db-test/factories";
-import { db, aiConversations, aiMessages, createPendingAction, getSessionGrants } from "@burnless/db";
+import { db, aiConversations, appendTurnEvent, getSessionGrants } from "@burnless/db";
 
 // happy-dom strips the forbidden "Cookie" request header; hand-roll the minimal
 // Request shape (headers.get / json / method / url) like resume-scenario-safety.
@@ -114,18 +114,24 @@ async function seedMcpPause(toolName: string) {
     .values({ companyId: company.id, userId: user.id, title: "t" })
     .returning();
   const conversationId = conv!.id;
-  await db.insert(aiMessages).values({ conversationId, role: "user", content: "do it" });
 
+  const turnId = "turn-mcp-1";
   const pauseId = "pause-mcp-1";
   const requestId = "r1";
-  await createPendingAction({
-    conversationId,
-    pauseId,
-    scenarioId: baseScenario.id,
-    writeScenarioId: baseScenario.id,
-    assistantBlocks: [{ type: "tool_use", id: requestId, name: toolName, input: {} }],
-    completedResults: [],
-    pending: [{ requestId, toolName, toolInput: {} }],
+  // Durable log: user_message → assistant_step → UNRESOLVED permission gate.
+  await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "do it" } });
+  await appendTurnEvent({
+    conversationId, turnId, type: "assistant_step",
+    payload: { toolUses: [{ id: requestId, name: toolName, input: {} }] },
+  });
+  await appendTurnEvent({
+    conversationId, turnId, type: "gate",
+    payload: {
+      pauseId, kind: "permission",
+      actions: [{ requestId, toolName, toolInput: {} }],
+      scenarioId: baseScenario.id,
+      writeScenarioId: baseScenario.id,
+    },
   });
 
   return { conversationId, pauseId, requestId, baseScenario, otherScenario };

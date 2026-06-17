@@ -1,11 +1,15 @@
-// AI-09: GET /api/chat/history surfaces a `resumable` flag derived from the
-// pending row's createdAt freshness (30-minute TTL). A genuinely-just-paused run
-// is resumable (live gate); an old historical pause is not (restored inert).
+// AI-09: GET /api/chat/history surfaces a `resumable` flag derived from the open
+// gate's createdAt freshness (30-minute TTL). A genuinely-just-paused run is
+// resumable (live gate); an old historical pause is not (restored inert). Task
+// 3.3: the gate + its createdAt now come from the turn-event log (getOpenGate),
+// while projectTimeline surfaces the live card; the ENDPOINT applies the TTL.
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { TurnEvent } from "@burnless/ai";
 
-const { mockRequireCompanyAccess, mockGetActivePendingAction } = vi.hoisted(() => ({
+const { mockRequireCompanyAccess, mockGetTurnEvents, mockGetOpenGate } = vi.hoisted(() => ({
   mockRequireCompanyAccess: vi.fn(),
-  mockGetActivePendingAction: vi.fn(),
+  mockGetTurnEvents: vi.fn(),
+  mockGetOpenGate: vi.fn(),
 }));
 
 const { mockSelect, mockFrom, mockWhere, mockOrderBy } = vi.hoisted(() => ({
@@ -23,11 +27,10 @@ vi.mock("@/lib/api-helpers", () => ({
 vi.mock("@burnless/db", () => ({
   db: { select: mockSelect },
   aiConversations: { id: "id", companyId: "companyId", userId: "userId", updatedAt: "updatedAt" },
-  aiMessages: { conversationId: "conversationId", createdAt: "createdAt" },
-  getActivePendingAction: mockGetActivePendingAction,
+  getTurnEvents: mockGetTurnEvents,
+  getOpenGate: mockGetOpenGate,
 }));
 
-vi.mock("@burnless/ai", () => ({ categorizeToolName: vi.fn(() => "write") }));
 vi.mock("@/lib/ai-tools", () => ({ describeToolAction: vi.fn((tool: string) => `do ${tool}`) }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), desc: vi.fn(), asc: vi.fn(), lt: vi.fn() }));
 vi.mock("@/lib/pagination", () => ({
@@ -39,31 +42,55 @@ vi.mock("@/lib/logger", () => ({ logger: () => ({ warn: vi.fn(), info: vi.fn(), 
 const CTX = { userId: "u1", companyId: "c1", role: "admin" };
 const makeRequest = (url: string): Request => new Request(url);
 
+let seq = 0;
+function ev(partial: Partial<TurnEvent> & { type: TurnEvent["type"]; payload: TurnEvent["payload"] }): TurnEvent {
+  seq += 1;
+  return {
+    id: `e${seq}`,
+    conversationId: "conv1",
+    seq,
+    turnId: "turn1",
+    resolvedAt: null,
+    createdAt: new Date(),
+    ...partial,
+  } as TurnEvent;
+}
+
+const PERMISSION_PAYLOAD = {
+  kind: "permission" as const,
+  actions: [{ requestId: "t1", toolName: "create_scenario", toolInput: {} }],
+  scenarioId: "base",
+  writeScenarioId: null,
+};
+
+/** A paused conversation whose gate carries the given createdAt. */
+function pausedLog(pauseId: string, createdAt: Date): { events: TurnEvent[]; gate: TurnEvent } {
+  const events = [
+    ev({ type: "user_message", payload: { text: "go" } }),
+    ev({ type: "assistant_step", payload: { text: "" } }),
+    ev({ type: "gate", resolvedAt: null, createdAt, payload: { pauseId, ...PERMISSION_PAYLOAD } as TurnEvent["payload"] }),
+  ];
+  return { events, gate: events[2]! };
+}
+
 describe("GET /api/chat/history — resumable flag (AI-09)", () => {
   beforeEach(() => {
+    seq = 0;
     vi.clearAllMocks();
     mockRequireCompanyAccess.mockResolvedValue(CTX);
-    mockGetActivePendingAction.mockResolvedValue(null);
+    mockGetTurnEvents.mockResolvedValue([]);
+    mockGetOpenGate.mockResolvedValue(null);
     mockSelect.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ orderBy: mockOrderBy });
     mockOrderBy.mockResolvedValue([]);
   });
 
-  function primeConvAndMessages() {
-    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]); // conv ownership
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy }); // messages query
-    mockOrderBy.mockResolvedValueOnce([]);
-  }
-
-  it("returns resumable:true for a fresh (just-paused) pending row", async () => {
-    primeConvAndMessages();
-    mockGetActivePendingAction.mockResolvedValueOnce({
-      pauseId: "p-fresh",
-      kind: "permission",
-      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: {} }],
-      createdAt: new Date(), // now → within TTL
-    });
+  it("returns resumable:true for a fresh (just-paused) open gate", async () => {
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    const { events, gate } = pausedLog("p-fresh", new Date()); // now → within TTL
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(gate);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));
@@ -74,14 +101,11 @@ describe("GET /api/chat/history — resumable flag (AI-09)", () => {
     expect(json.pendingPermission).not.toBeNull();
   });
 
-  it("returns resumable:false for an old (historical) pending row", async () => {
-    primeConvAndMessages();
-    mockGetActivePendingAction.mockResolvedValueOnce({
-      pauseId: "p-old",
-      kind: "permission",
-      pending: [{ requestId: "t1", toolName: "create_scenario", toolInput: {} }],
-      createdAt: new Date(Date.now() - 60 * 60 * 1000), // 1h ago → past 30-min TTL
-    });
+  it("returns resumable:false for an old (historical) open gate", async () => {
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    const { events, gate } = pausedLog("p-old", new Date(Date.now() - 60 * 60 * 1000)); // 1h ago
+    mockGetTurnEvents.mockResolvedValueOnce(events);
+    mockGetOpenGate.mockResolvedValueOnce(gate);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));
@@ -89,13 +113,17 @@ describe("GET /api/chat/history — resumable flag (AI-09)", () => {
 
     expect(res.status).toBe(200);
     expect(json.resumable).toBe(false);
-    // The pending payload is still returned; the client decides to render it inert.
+    // The pending payload is still returned; the client renders it inert.
     expect(json.pendingPermission).not.toBeNull();
   });
 
-  it("returns resumable:false when there is no pending row", async () => {
-    primeConvAndMessages();
-    mockGetActivePendingAction.mockResolvedValueOnce(null);
+  it("returns resumable:false when there is no open gate", async () => {
+    mockWhere.mockResolvedValueOnce([{ id: "conv1" }]);
+    mockGetTurnEvents.mockResolvedValueOnce([
+      ev({ type: "user_message", payload: { text: "hi" } }),
+      ev({ type: "assistant_step", payload: { text: "done" } }),
+      ev({ type: "turn_done", payload: {} }),
+    ]);
 
     const { GET } = await import("../history/route");
     const res = await GET(makeRequest("http://localhost/api/chat/history?conversationId=conv1"));

@@ -147,12 +147,6 @@ export const metricCategoryEnum = pgEnum("metric_category", [
   "custom",
 ]);
 
-export const aiMessageRoleEnum = pgEnum("ai_message_role", [
-  "user",
-  "assistant",
-  "system",
-]);
-
 export const aiDataModeEnum = pgEnum("ai_data_mode", [
   "full",
   "show_cached",
@@ -1341,38 +1335,18 @@ export const aiInsightCache = pgTable(
   ]
 );
 
-export const aiMessages = pgTable(
-  "ai_messages",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    conversationId: text("conversation_id")
-      .notNull()
-      .references(() => aiConversations.id, { onDelete: "cascade" }),
-    role: aiMessageRoleEnum("role").notNull(),
-    content: text("content").notNull(),
-    metadata: jsonb("metadata").$type<{ uiBlocks?: unknown[]; timeline?: unknown[] }>(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("ai_messages_conversation_created_idx").on(
-      table.conversationId,
-      table.createdAt
-    ),
-  ]
-);
-
-// ── AI Pending Actions (a paused assistant turn awaiting permission) ─────────
-
-export const aiPendingActionKindEnum = pgEnum("ai_pending_action_kind", [
-  "permission",
-  "input",
-  "plan",
+export const aiTurnEventTypeEnum = pgEnum("ai_turn_event_type", [
+  "user_message",
+  "assistant_step",
+  "tool_result",
+  "scenario",
+  "gate",
+  "turn_done",
+  "turn_error",
 ]);
 
-export const aiPendingActions = pgTable(
-  "ai_pending_actions",
+export const aiTurnEvents = pgTable(
+  "ai_turn_events",
   {
     id: text("id")
       .primaryKey()
@@ -1380,45 +1354,27 @@ export const aiPendingActions = pgTable(
     conversationId: text("conversation_id")
       .notNull()
       .references(() => aiConversations.id, { onDelete: "cascade" }),
-    /** Correlates the SSE permission_request/paused event with this row. */
-    pauseId: text("pause_id").notNull(),
-    /** Why the turn paused: a permission decision, or a form-input request. */
-    kind: aiPendingActionKindEnum("kind").notNull().default("permission"),
-    /**
-     * The active scenario the paused turn operates in. Resume MUST run approved
-     * write/delete tools against THIS scenario (loaded scoped to companyId), not
-     * getDefaultScenario — otherwise a pause inside a non-default scenario writes
-     * overrides to the wrong overlay (scenario-safety; spec §5).
-     */
-    scenarioId: text("scenario_id").notNull(),
-    /**
-     * AI-01: the WRITE target for the paused turn. NULL = base view (the tool
-     * handler writes to base tables). Distinct from `scenarioId`, which stays
-     * non-null for READ context (buildAiContext/getOverrideCount on resume). Only
-     * an explicitly-selected, company-validated scenario is a write target.
-     */
-    writeScenarioId: text("write_scenario_id"),
-    /** Raw assistant tool-use content blocks for the paused turn. */
-    assistantBlocks: jsonb("assistant_blocks").notNull(),
-    /** tool_result blocks for tools already executed (auto-allowed/denied). */
-    completedResults: jsonb("completed_results").notNull().default([]),
-    /** Actions awaiting a user decision: [{ requestId, tool, category, ... }]. */
-    pending: jsonb("pending").notNull(),
-    /**
-     * Worklog timeline accumulated before this pause (Plan 5 full-run persistence).
-     * Mirrors @burnless/ai's TimelineNode shape; typed `unknown[]` to avoid a
-     * cross-package schema import.
-     */
-    timeline: jsonb("timeline").$type<unknown[]>(),
-    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    /** Monotonic per-conversation order. Assigned via atomic MAX(seq)+1 (see turn-events.ts). */
+    seq: integer("seq").notNull(),
+    /** Groups events of one user→completion turn. */
+    turnId: text("turn_id").notNull(),
+    type: aiTurnEventTypeEnum("type").notNull(),
+    /** Type-specific payload (see @burnless/ai turn-log/types.ts). */
+    payload: jsonb("payload").notNull(),
+    /** Gate events only: null = open. */
     resolvedAt: timestamp("resolved_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [
-    index("ai_pending_actions_conversation_idx").on(table.conversationId),
-    // At most one UNRESOLVED pending batch per conversation.
-    uniqueIndex("ai_pending_actions_active_idx")
+    // Ordered read + collision detection for the atomic seq assignment.
+    uniqueIndex("ai_turn_events_conversation_seq_idx").on(
+      table.conversationId,
+      table.seq
+    ),
+    // At most one OPEN gate per conversation.
+    uniqueIndex("ai_turn_events_open_gate_idx")
       .on(table.conversationId)
-      .where(sql`${table.resolvedAt} IS NULL`),
+      .where(sql`${table.type} = 'gate' AND ${table.resolvedAt} IS NULL`),
   ]
 );
 
@@ -1783,7 +1739,7 @@ export const aiProviderModelsRelations = relations(aiProviderModels, ({ one }) =
 
 export const aiConversationsRelations = relations(
   aiConversations,
-  ({ one, many }) => ({
+  ({ one }) => ({
     company: one(companies, {
       fields: [aiConversations.companyId],
       references: [companies.id],
@@ -1792,7 +1748,6 @@ export const aiConversationsRelations = relations(
       fields: [aiConversations.userId],
       references: [users.id],
     }),
-    messages: many(aiMessages),
   })
 );
 
@@ -1800,13 +1755,6 @@ export const aiInsightCacheRelations = relations(aiInsightCache, ({ one }) => ({
   company: one(companies, {
     fields: [aiInsightCache.companyId],
     references: [companies.id],
-  }),
-}));
-
-export const aiMessagesRelations = relations(aiMessages, ({ one }) => ({
-  conversation: one(aiConversations, {
-    fields: [aiMessages.conversationId],
-    references: [aiConversations.id],
   }),
 }));
 

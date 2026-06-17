@@ -43,7 +43,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "create_scenario",
     description:
-      "Create a new financial scenario (e.g., best case, worst case, custom what-if). Returns the new scenario ID.",
+      "Create a new financial scenario (e.g., best case, worst case, custom what-if). It is AUTOMATICALLY activated — the result returns activated:true, so do NOT call activate_scenario afterward. Subsequent tools in this turn read/write this new scenario. Returns the new scenario ID.",
     inputSchema: {
       type: "object",
       properties: {
@@ -78,6 +78,12 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
     name: "list_scenarios",
     description:
       "List the company's existing scenarios, each with a short diff headline (how many overrides it has, by entity type + action) so you can SEE what what-ifs already exist and what each one changes. ALWAYS call this before create_scenario to avoid creating a duplicate of a scenario that already exists — if a matching one exists, activate_scenario it instead. Read-only.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "exit_scenario",
+    description:
+      "Exit the currently active scenario and return to BASE data. After this, all tools read and write the company's real base-case data (no scenario overlay). Call this when the user is done with a what-if or asks to go back to base / their real numbers. UI-only view change — modifies no data.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
@@ -1114,12 +1120,45 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   ...GENUI_INPUT_TOOLS,
 ];
 
+/** Overlay-write tools whose target scenario the model may override per call
+ *  (spec §4.4). EXCLUDES scenario CRUD (create/update/delete_scenario), the
+ *  investor writer, and record_transaction (base-table actuals) — those don't
+ *  write a scenario overlay. */
+export const SCENARIO_TARGETABLE_TOOLS: ReadonlySet<string> = new Set<string>([
+  "create_forecast_line", "update_forecast_line", "delete_forecast_line",
+  "create_revenue_stream", "update_revenue_stream", "delete_revenue_stream",
+  "create_headcount", "update_headcount", "delete_headcount",
+  "create_salary_change", "create_bonus", "create_equity_grant",
+  "create_department", "update_department", "delete_department",
+  "create_account", "update_account", "delete_account",
+  "create_funding_round", "update_funding_round", "delete_funding_round",
+  "update_grant_milestone",
+]);
+
+const SCENARIO_ID_PROP = {
+  type: "string",
+  description:
+    "Optional. Target scenario for THIS call: a scenario id, or \"base\" for real base data. Omit to use the currently active scenario. Use only when you must target a specific scenario different from the active one (e.g. working across two scenarios).",
+} as const;
+
+/** Inject the optional scenarioId property into a tool's input schema (additive). */
+function withScenarioIdParam(tool: ToolDefinition): ToolDefinition {
+  if (!SCENARIO_TARGETABLE_TOOLS.has(tool.name)) return tool;
+  return {
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: { ...tool.inputSchema.properties, scenarioId: SCENARIO_ID_PROP },
+    },
+  };
+}
+
 /**
  * Get tool definitions in provider-agnostic format.
  * Each provider maps these to its own SDK format internally.
  */
 export function getFinancialTools(): ToolDefinition[] {
-  return FINANCIAL_TOOLS;
+  return FINANCIAL_TOOLS.map(withScenarioIdParam);
 }
 
 /**
@@ -1142,5 +1181,7 @@ export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
 /** The remote MCP server's tool surface: the full Companion mirror minus the
  *  exclusion set. Same names, same JSON schemas (spec B1). */
 export function getMcpExposedTools(): ToolDefinition[] {
-  return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name));
+  return FINANCIAL_TOOLS.filter((t) => !MCP_SERVER_EXCLUDED_TOOLS.has(t.name)).map(
+    withScenarioIdParam,
+  );
 }

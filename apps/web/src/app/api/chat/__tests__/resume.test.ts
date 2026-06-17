@@ -120,7 +120,7 @@ import {
   createCompany,
   createScenario,
 } from "@db-test/factories";
-import { db, aiConversations, aiMessages, createPendingAction } from "@burnless/db";
+import { db, aiConversations, appendTurnEvent, getTurnEvents, getOpenGate } from "@burnless/db";
 
 describe("POST /api/chat/resume — integration (PGLite)", () => {
   beforeEach(() => {
@@ -150,29 +150,29 @@ describe("POST /api/chat/resume — integration (PGLite)", () => {
       .values({ companyId: company.id, userId: user.id, title: "t" })
       .returning();
     const conversationId = conv!.id;
-    await db.insert(aiMessages).values({
-      conversationId,
-      role: "user",
-      content: "make a scenario",
-    });
 
-    // ── A paused turn: one pending create_scenario, persisting the NON-default
-    //    scenario as the active overlay. ───────────────────────────────────────
+    // ── A paused turn in the durable log: user_message → assistant_step
+    //    (create_scenario tool_use) → UNRESOLVED gate carrying the pending batch,
+    //    persisting the NON-default scenario as the active overlay. ─────────────
+    const turnId = "turn-int-1";
     const pauseId = "pause-int-1";
     const requestId = "t1";
-    const pendingRow = await createPendingAction({
-      conversationId,
-      pauseId,
-      scenarioId: pausedScenario.id,
-      // AI-01: the turn was operating inside the NON-default scenario as a WRITE
-      // target, so resume must execute held tools against THIS overlay. The write
-      // target is threaded via writeScenarioId (distinct from scenarioId = read ctx).
-      writeScenarioId: pausedScenario.id,
-      assistantBlocks: [
-        { type: "tool_use", id: requestId, name: "create_scenario", input: { name: "X" } },
-      ],
-      completedResults: [],
-      pending: [{ requestId, toolName: "create_scenario", toolInput: { name: "X" } }],
+    await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "make a scenario" } });
+    await appendTurnEvent({
+      conversationId, turnId, type: "assistant_step",
+      payload: { toolUses: [{ id: requestId, name: "create_scenario", input: { name: "X" } }] },
+    });
+    // AI-01: the turn was operating inside the NON-default scenario as a WRITE
+    // target, so resume must execute held tools against THIS overlay. The gate
+    // event carries the read scenario (scenarioId) + the write target (writeScenarioId).
+    await appendTurnEvent({
+      conversationId, turnId, type: "gate",
+      payload: {
+        pauseId, kind: "permission",
+        actions: [{ requestId, toolName: "create_scenario", toolInput: { name: "X" } }],
+        scenarioId: pausedScenario.id,
+        writeScenarioId: pausedScenario.id,
+      },
     });
 
     // ── POST /api/chat/resume with decision "once" ────────────────────────────
@@ -210,16 +210,62 @@ describe("POST /api/chat/resume — integration (PGLite)", () => {
     expect(resultBlocks).toHaveLength(1);
     expect(resultBlocks.map((b) => b.toolUseId)).toEqual([requestId]);
 
-    // (c) the pending row is resolved (single-active slot freed).
-    const [refreshed] = await db
-      .select()
-      .from((await import("@burnless/db")).aiPendingActions)
-      .where(
-        (await import("drizzle-orm")).eq(
-          (await import("@burnless/db")).aiPendingActions.id,
-          pendingRow.id
-        )
-      );
-    expect(refreshed!.resolvedAt).not.toBeNull();
+    // (c) the open gate is resolved (single-open slot freed).
+    expect(await getOpenGate(conversationId)).toBeNull();
+  });
+
+  it("Task 2.3: resolves the open gate and appends the decision result with the gate's turnId", async () => {
+    const user = await createUser();
+    const company = await createCompany(user.id);
+    hoisted.userId = user.id;
+    hoisted.companyId = company.id;
+
+    const scn = await createScenario(company.id, { name: "Base", source: "blank", status: "active" });
+
+    const [conv] = await db
+      .insert(aiConversations)
+      .values({ companyId: company.id, userId: user.id, title: "t" })
+      .returning();
+    const conversationId = conv!.id;
+
+    const turnId = "turn-23";
+    const pauseId = "pause-23";
+    const requestId = "tu-23";
+    // Append a user_message + assistant_step + an UNRESOLVED gate carrying the
+    // turnId (the pause) and the pending batch.
+    await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "hi" } });
+    await appendTurnEvent({
+      conversationId, turnId, type: "assistant_step",
+      payload: { toolUses: [{ id: requestId, name: "create_scenario", input: { name: "X" } }] },
+    });
+    await appendTurnEvent({
+      conversationId, turnId, type: "gate",
+      payload: {
+        pauseId, kind: "permission",
+        actions: [{ requestId, toolName: "create_scenario", toolInput: { name: "X" } }],
+        scenarioId: scn.id, writeScenarioId: scn.id,
+      },
+    });
+
+    const { POST } = await import("../resume/route");
+    const res = await POST(
+      new Request("http://localhost/api/chat/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, pauseId, decisions: [{ requestId, decision: "once" }] }),
+      })
+    );
+    expect(res.status).toBe(200);
+
+    // (a) the open gate is resolved.
+    expect(await getOpenGate(conversationId)).toBeNull();
+
+    // (b) the decision result is appended as a tool_result on the gate's turnId.
+    const events = await getTurnEvents(conversationId);
+    const decisionResults = events.filter((e) => e.type === "tool_result");
+    expect(decisionResults).toHaveLength(1);
+    expect(decisionResults[0]!.turnId).toBe(turnId); // reused the gate's turnId
+    expect((decisionResults[0]!.payload as { toolUseId: string }).toolUseId).toBe(requestId);
+    expect((decisionResults[0]!.payload as { kind: string }).kind).toBe("executed");
   });
 });

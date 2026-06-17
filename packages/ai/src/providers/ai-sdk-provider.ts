@@ -11,6 +11,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { LlmProvider } from "./base";
 import { EmptyCompletionError } from "./resilience";
+import { getAiLimits } from "../config";
 import type {
   CompletionRequest,
   LlmResponse,
@@ -199,6 +200,17 @@ export function buildModel(kind: string, config: ProviderConfig): LanguageModel 
   })(spec.modelId);
 }
 
+/** Resolve the per-call output-token cap. Precedence: request → provider config →
+ *  env default (0 = uncapped). 0/falsy maps to `undefined` so the AI SDK omits the
+ *  field and the model uses its natural max (spec §3 decision 6). */
+export function resolveMaxOutputTokens(
+  requestMax: number | undefined,
+  configMax: number | undefined,
+): number | undefined {
+  const cap = requestMax ?? configMax ?? getAiLimits().maxOutputTokens;
+  return cap && cap > 0 ? cap : undefined;
+}
+
 /** The single LlmProvider implementation, backed by the Vercel AI SDK. */
 export class AiSdkProvider extends LlmProvider {
   private model: LanguageModel;
@@ -214,7 +226,7 @@ export class AiSdkProvider extends LlmProvider {
       system: request.system,
       messages: toModelMessages(request.messages),
       tools: request.tools?.length ? toAiSdkTools(request.tools) : undefined,
-      maxOutputTokens: request.maxTokens ?? this.config.maxTokens ?? 4096,
+      maxOutputTokens: resolveMaxOutputTokens(request.maxTokens, this.config.maxTokens),
     });
     const content = fromContentParts(result.content as AiContentPart[]);
     if (content.length === 0) {
@@ -235,7 +247,7 @@ export class AiSdkProvider extends LlmProvider {
       system: request.system,
       messages: toModelMessages(request.messages),
       tools: request.tools?.length ? toAiSdkTools(request.tools) : undefined,
-      maxOutputTokens: request.maxTokens ?? this.config.maxTokens ?? 4096,
+      maxOutputTokens: resolveMaxOutputTokens(request.maxTokens, this.config.maxTokens),
     });
 
     let fullText = "";

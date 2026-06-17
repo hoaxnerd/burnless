@@ -72,6 +72,8 @@ export function reduceTimeline(
     next.push({ id: ev.pauseId as string, kind: "input", input: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } });
   } else if (t === "scenario_activated") {
     next.push({ id: `scenario-${ev.scenarioId as string}-${next.length}`, kind: "scenario", scenarioId: ev.scenarioId as string, scenarioName: ev.name as string });
+  } else if (t === "scenario_exited") {
+    next.push({ id: `scenario-exit-${next.length}`, kind: "scenario", scenarioName: null });
   }
   return next;
 }
@@ -86,7 +88,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   // ChatSessionProvider is mounted inside ScenarioProvider (dashboard shell), so
   // enterScenario is available here — the AI's scenario_activated event runs the
   // SAME activation the manual UI uses (cookie + sessionStorage + top bar). (Plan 5)
-  const { enterScenario } = useScenario();
+  const { enterScenario, exitScenario } = useScenario();
 
   const keyOf = (id: string | null) => id ?? NEW;
   const get = useCallback((id: string | null) => store.current.get(keyOf(id)) ?? EMPTY, []);
@@ -123,7 +125,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     const t = ev.type as string;
     // Worklog accumulation (spec §4.5): every streaming/pause event folds into the
     // ordered timeline; the legacy flat-field patches below remain during transition.
-    if (["text", "tool_use", "tool_status", "ui_component", "permission_request", "plan_request", "input_request", "scenario_activated"].includes(t)) {
+    if (["text", "tool_use", "tool_status", "ui_component", "permission_request", "plan_request", "input_request", "scenario_activated", "scenario_exited"].includes(t)) {
       patchLast(key, (m) => ({ ...m, timeline: reduceTimeline(m.timeline ?? [], ev) }));
     }
     if (t === "conversation_id" && ev.conversationId) onConversationId?.(ev.conversationId as string);
@@ -136,10 +138,11 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     else if (t === "input_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingInput: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.spec as PendingInput["spec"] } }));
     else if (t === "plan_request") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null, pendingPlan: { pauseId: ev.pauseId as string, conversationId: ev.conversationId as string, spec: ev.plan as PendingPlan["spec"] } }));
     else if (t === "scenario_activated") enterScenario(ev.scenarioId as string, ev.name as string);
+    else if (t === "scenario_exited") exitScenario();
     else if (t === "paused") write(key, (s) => ({ ...s, isLoading: false }));
     else if (t === "done") patchLast(key, (m) => ({ ...m, isStreaming: false, toolStatus: null }));
     else if (t === "error") patchLast(key, (m) => ({ ...m, content: m.content + `\n\n*Error: ${ev.content}*`, isStreaming: false }));
-  }, [patchLast, write, enterScenario]);
+  }, [patchLast, write, enterScenario, exitScenario]);
 
   const send = useCallback(async (id: string | null, text: string, scenarioId: string | null, onConversationId?: (id: string) => void) => {
     let key = keyOf(id);
