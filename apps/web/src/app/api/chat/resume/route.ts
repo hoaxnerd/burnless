@@ -446,9 +446,15 @@ export const POST = withErrorHandler(async (request: Request) => {
       await grantSessionPermission(body.conversationId, category);
     }
 
+    // Execute against the RUNNING write target, not the gate's fixed original:
+    // an approved action EARLIER in this same batch may have activated a new
+    // scenario (nextWriteScenarioId re-pointed below), so later same-batch
+    // overlay writes must land in the just-created scenario (A+B same-batch
+    // variant). create_scenario isn't scenario-scoped, so executing the
+    // activating action itself against the old target is irrelevant.
     const result = await executeToolCall(action.toolName, action.toolInput, {
       companyId: ctx.companyId,
-      scenarioId: gateWriteScenarioId,
+      scenarioId: nextWriteScenarioId,
       userId: ctx.userId,
       conversationId: body.conversationId,
       permissionDecision: decision === "session" ? "granted_session" : "granted_once",

@@ -31,6 +31,9 @@ const { hoisted } = vi.hoisted(() => ({
     // The scenarioId a successful create_scenario tool call "returns".
     activatedScenarioId: "",
     capturedWriteScenarioId: undefined as undefined | string | null,
+    // Per-action execution targets captured from executeToolCall's options
+    // (same-batch variant): toolName → scenarioId it executed against.
+    execScenarioByTool: {} as Record<string, string | null | undefined>,
   },
 }));
 
@@ -56,10 +59,14 @@ vi.mock("@/lib/ai-usage-tracker", () => ({ setTrackingCompanyId: vi.fn() }));
 // The tool executor returns a create_scenario-shaped activation result for
 // create_scenario, and a plain success for everything else.
 vi.mock("@/lib/ai-tools", () => ({
-  executeToolCall: vi.fn(async (toolName: string) =>
-    toolName === "create_scenario" || toolName === "activate_scenario"
-      ? JSON.stringify({ success: true, scenarioId: hoisted.activatedScenarioId, name: "Multi Pause Test" })
-      : JSON.stringify({ success: true })
+  executeToolCall: vi.fn(
+    async (toolName: string, _input: unknown, opts: { scenarioId?: string | null }) => {
+      // Capture the scenario each action executed against (same-batch variant).
+      hoisted.execScenarioByTool[toolName] = opts?.scenarioId;
+      return toolName === "create_scenario" || toolName === "activate_scenario"
+        ? JSON.stringify({ success: true, scenarioId: hoisted.activatedScenarioId, name: "Multi Pause Test" })
+        : JSON.stringify({ success: true });
+    }
   ),
   logDeniedToolCall: vi.fn(),
 }));
@@ -90,6 +97,7 @@ function reqWith(headers: Record<string, string>, body: Record<string, unknown>)
 describe("resume continuation re-targets the newly-activated scenario (A+B)", () => {
   beforeEach(() => {
     hoisted.capturedWriteScenarioId = undefined;
+    hoisted.execScenarioByTool = {};
   });
 
   it("hands the continuation the just-created scenario, not the gate's original write target", async () => {
@@ -169,5 +177,86 @@ describe("resume continuation re-targets the newly-activated scenario (A+B)", ()
     // THE FIX: the continuation targets Y (newly activated), not X (gate original).
     expect(hoisted.capturedWriteScenarioId).toBe(newlyMade.id);
     expect(hoisted.capturedWriteScenarioId).not.toBe(prevActive.id);
+  });
+
+  it("executes a same-batch write against the in-batch activated scenario, not the gate's original", async () => {
+    const user = await createUser();
+    const company = await createCompany(user.id);
+    hoisted.userId = user.id;
+    hoisted.companyId = company.id;
+
+    // X: the scenario the turn paused in / the gate's original write target.
+    const prevActive = await createScenario(company.id, {
+      name: "Hiring 2 Engineers",
+      source: "ai",
+      status: "active",
+    });
+    // Y: the scenario create_scenario activates within this same approved batch.
+    const newlyMade = await createScenario(company.id, {
+      name: "Multi Pause Test",
+      source: "ai",
+      status: "active",
+    });
+    hoisted.activatedScenarioId = newlyMade.id;
+
+    const [conv] = await db
+      .insert(aiConversations)
+      .values({ companyId: company.id, userId: user.id, title: "t" })
+      .returning();
+    const conversationId = conv!.id;
+
+    const turnId = "turn-retarget-samebatch";
+    const pauseId = "pause-retarget-samebatch";
+    // ONE approved batch, TWO actions: action 1 create_scenario (activates Y),
+    // action 2 create_revenue_stream (overlay write that must land in Y).
+    const r1 = "r1-create-scenario";
+    const r2 = "r2-create-revenue";
+
+    await appendTurnEvent({ conversationId, turnId, type: "user_message", payload: { text: "do it" } });
+    await appendTurnEvent({
+      conversationId, turnId, type: "assistant_step",
+      payload: {
+        toolUses: [
+          { id: r1, name: "create_scenario", input: { name: "Multi Pause Test" } },
+          { id: r2, name: "create_revenue_stream", input: { name: "Gamma Tier" } },
+        ],
+      },
+    });
+    await appendTurnEvent({
+      conversationId, turnId, type: "gate",
+      payload: {
+        pauseId, kind: "permission",
+        actions: [
+          { requestId: r1, toolName: "create_scenario", toolInput: { name: "Multi Pause Test" } },
+          { requestId: r2, toolName: "create_revenue_stream", toolInput: { name: "Gamma Tier" } },
+        ],
+        scenarioId: prevActive.id,
+        writeScenarioId: prevActive.id,
+      },
+    });
+
+    const { POST } = await import("../resume/route");
+    const res = await POST(
+      reqWith(
+        { "X-Scenario-Id": prevActive.id, Cookie: `active-scenario-id=${prevActive.id}` },
+        {
+          conversationId,
+          pauseId,
+          decisions: [
+            { requestId: r1, decision: "once" },
+            { requestId: r2, decision: "once" },
+          ],
+        }
+      )
+    );
+
+    expect(res.status).toBe(200);
+    // THE FIX (same-batch): action 2's write executed against Y (the in-batch
+    // activated scenario), NOT X (the gate's original target). Pre-fix this was X.
+    expect(hoisted.execScenarioByTool["create_revenue_stream"]).toBe(newlyMade.id);
+    expect(hoisted.execScenarioByTool["create_revenue_stream"]).not.toBe(prevActive.id);
+    // create_scenario itself isn't scenario-scoped; it ran against the gate's
+    // original target before any activation re-pointed it.
+    expect(hoisted.execScenarioByTool["create_scenario"]).toBe(prevActive.id);
   });
 });
