@@ -84,7 +84,11 @@ describe("buildChatSSEResponse — error logging (E1)", () => {
     const events = await collect(res);
 
     // Client still gets a friendly error chunk.
-    expect(events.some((e) => e.type === "error")).toBe(true);
+    // Client gets a friendly error chunk — but NEVER the raw internal error text.
+    const errEvent = events.find((e) => e.type === "error");
+    expect(errEvent).toBeTruthy();
+    expect(errEvent!.content).toBe("Something went wrong while generating a response. Please try again.");
+    expect(JSON.stringify(events)).not.toContain("provider exploded");
 
     // Server logged it exactly once.
     expect(loggerErrorMock).toHaveBeenCalledTimes(1);
@@ -96,6 +100,27 @@ describe("buildChatSSEResponse — error logging (E1)", () => {
     // Never logs the prompt/message body.
     const serialized = JSON.stringify({ ctx: { conversationId: (ctx as { conversationId: string }).conversationId }, msg });
     expect(serialized).not.toContain("secret prompt body");
+  });
+
+  it("surfaces a model-hint (not the raw text) when the model returns an empty completion", async () => {
+    chatStreamMock.mockImplementation(async function* () {
+      const e = new Error('Empty completion from model "google/gemini-2.5-flash-lite" (no text or tool calls)');
+      e.name = "EmptyCompletionError";
+      throw e;
+      // eslint-disable-next-line no-unreachable
+      yield { type: "done" };
+    });
+
+    const res = buildChatSSEResponse({ ...baseParams } as never);
+    const events = await collect(res);
+
+    const errEvent = events.find((e) => e.type === "error");
+    expect(errEvent!.content).toBe(
+      "The assistant didn't return a response. Please try again — if this keeps happening, switch to a more capable model in Settings → AI.",
+    );
+    // The raw model/empty-completion text never reaches the browser.
+    expect(JSON.stringify(events)).not.toContain("Empty completion from model");
+    expect(JSON.stringify(events)).not.toContain("gemini-2.5-flash-lite");
   });
 
   it("does NOT log when the stream completes successfully", async () => {
