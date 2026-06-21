@@ -188,7 +188,7 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
 
   try {
     const scenario = await getDefaultScenario(job.companyId);
-    const { contextText } = await buildAiContext(
+    const { contextText, nowContext } = await buildAiContext(
       job.companyId,
       scenario
         ? { id: scenario.id, name: scenario.name, source: scenario.source }
@@ -220,10 +220,11 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
       chat({
         messages,
         financialContext: contextText,
-      mode: "autonomous",
+        mode: "autonomous",
         companionName: undefined,
         toolsOverride,
         providerConfig,
+        nowContext,
         onToolCall: makeOnToolCall(ctx, { dryRun: isDryRun, allowedNames: new Set(job.allowedTools) }),
       }),
       isDryRun ? limits.dryRunTimeoutMs : limits.runTimeoutMs
@@ -283,7 +284,7 @@ export async function dryRunJobDraft(draft: JobDraft): Promise<{ response: strin
   if (!aiCheck.allowed) return { response: aiCheck.reason ?? "AI not available.", toolResults: [] };
   setTrackingCompanyId(draft.companyId);
   const scenario = await getDefaultScenario(draft.companyId);
-  const { contextText } = await buildAiContext(
+  const { contextText, nowContext } = await buildAiContext(
     draft.companyId,
     scenario
       ? { id: scenario.id, name: scenario.name, source: scenario.source }
@@ -305,6 +306,7 @@ export async function dryRunJobDraft(draft: JobDraft): Promise<{ response: strin
       mode: "autonomous",
       toolsOverride,
       providerConfig,
+      nowContext,
       onToolCall: makeOnToolCall(ctx, { dryRun: true, allowedNames: new Set(draft.allowedTools) }),
     }),
     getSafetyLimits().dryRunTimeoutMs
@@ -320,7 +322,7 @@ export async function runJobDraftForReal(draft: JobDraft): Promise<{ response: s
     return { response: "AI write-mode is read-only; this automation can't write.", toolResults: [], error: "read_only" };
   setTrackingCompanyId(draft.companyId);
   const scenario = await getDefaultScenario(draft.companyId);
-  const { contextText } = await buildAiContext(
+  const { contextText, nowContext } = await buildAiContext(
     draft.companyId,
     scenario
       ? { id: scenario.id, name: scenario.name, source: scenario.source }
@@ -342,6 +344,7 @@ export async function runJobDraftForReal(draft: JobDraft): Promise<{ response: s
       mode: "autonomous",
       toolsOverride,
       providerConfig,
+      nowContext,
       onToolCall: makeOnToolCall(ctx, { dryRun: false, allowedNames: new Set(draft.allowedTools) }),
     }),
     getSafetyLimits().runTimeoutMs

@@ -51,6 +51,10 @@ export interface ChatStreamParams {
    *  before the loop (S3b §11). */
   disabledToolNames?: ReadonlySet<string>;
   creditWarning?: string;
+  /** Per-request current time in the company's timezone (B2). Threaded into
+   *  chatStream so the AI companion can answer "what time is it?" correctly.
+   *  Computed fresh per request in buildAiContext — never cached. */
+  nowContext?: { iso: string; timezone: string };
 }
 
 const THINK_TAG = /<(?:think|thinking|antThinking)[^>]*>[\s\S]*?<\/(?:think|thinking|antThinking)>/gi;
@@ -244,6 +248,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
           financialContext: params.financialContext,
           companionName: params.companionName,
           providerConfig: params.providerConfig,
+          nowContext: params.nowContext,
           // NOTE: two unrelated "writeMode"s converge here. `defaults.write` is the
           // per-USER permission-category default (PermissionMode ask/session/always).
           // `params.writeMode` is the per-COMPANY AiWriteMode clamp (full/confirm/

@@ -145,7 +145,7 @@ async function resumeStream(args: {
     (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
   ) as ChatMessage[];
 
-  const { contextText: baseContext } = await buildAiContext(ctx.companyId, {
+  const { contextText: baseContext, nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",
@@ -188,6 +188,7 @@ async function resumeStream(args: {
     writeMode: writeMode ?? "confirm",
     mcp,
     disabledToolNames,
+    nowContext,
   });
 }
 

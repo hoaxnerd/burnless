@@ -24,10 +24,26 @@ interface ScenarioRef {
   source: string;
 }
 
+/**
+ * Format the current time in a given timezone for the AI companion's "now" context.
+ * Returns a string like "2026-06-21T20:34 (Saturday)".
+ * CACHE SAFETY: this helper is called per-request in buildAiContext, never inside
+ * unstable_cache. The result is returned as `nowContext` and must NOT be written
+ * into the cached FinancialSnapshot or contextText.
+ */
+function formatNowInZone(date: Date, timeZone: string): string {
+  const f = new Intl.DateTimeFormat("en-CA", {
+    timeZone, hour12: false, weekday: "long",
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const p = Object.fromEntries(f.formatToParts(date).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour === "24" ? "00" : p.hour}:${p.minute} (${p.weekday})`;
+}
+
 export async function buildAiContext(
   companyId: string,
   scenario: ScenarioRef
-): Promise<{ snapshot: FinancialSnapshot; contextText: string }> {
+): Promise<{ snapshot: FinancialSnapshot; contextText: string; nowContext: { iso: string; timezone: string } }> {
   const [companyRows, dashboard, allScenarios, accounts, depts, funding] =
     await Promise.all([
       db.select().from(companies).where(eq(companies.id, companyId)).limit(1),
@@ -40,6 +56,11 @@ export async function buildAiContext(
 
   const company = companyRows[0];
 
+  // CACHE SAFETY: only the stable timezone string goes into the snapshot (which
+  // may be cached). The live "now" is computed fresh per request below and
+  // returned as `nowContext` — it is never written into the cached snapshot.
+  const timezone = company?.timezone ?? "America/New_York";
+
   const snapshot = buildFinancialSnapshot({
     company: {
       name: company?.name ?? "Company",
@@ -47,6 +68,8 @@ export async function buildAiContext(
       businessModel: company?.businessModel ?? "saas",
       industry: company?.industry ?? null,
       currency: company?.currency ?? "USD",
+      locale: company?.locale ?? "en-US",
+      timezone,
     },
     scenario: {
       id: scenario.id,
@@ -95,5 +118,11 @@ export async function buildAiContext(
   });
 
   const contextText = formatContextForPrompt(snapshot);
-  return { snapshot, contextText };
+
+  // Per-request live "now" in the company's timezone. NOT written into the
+  // cached snapshot — passed to callers as `nowContext` for them to thread
+  // into ChatOptions.nowContext on each live request.
+  const nowContext = { iso: formatNowInZone(new Date(), timezone), timezone };
+
+  return { snapshot, contextText, nowContext };
 }
