@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import { LOCAL_VERBS, resolveRuntimeMode, topVerb, bareVerbOrDefault } from "../runtime";
 
 describe("bareVerbOrDefault", () => {
-  it("treats a bare (no-verb) invocation as the start launcher", () => {
-    expect(bareVerbOrDefault(["node", "burnless"])).toBe("start");
-    expect(bareVerbOrDefault(["node", "burnless", "health"])).toBe("health");
+  it("returns undefined for a bare invocation (no verb) — bare = help, not start", () => {
+    expect(bareVerbOrDefault(["node", "burnless"])).toBeUndefined();
+  });
+  it("returns undefined for --help / --version", () => {
     expect(bareVerbOrDefault(["node", "burnless", "--help"])).toBeUndefined();
     expect(bareVerbOrDefault(["node", "burnless", "--version"])).toBeUndefined();
+  });
+  it("returns the verb when one is present", () => {
+    expect(bareVerbOrDefault(["node", "burnless", "start"])).toBe("start");
+    expect(bareVerbOrDefault(["node", "burnless", "health"])).toBe("health");
   });
 });
 

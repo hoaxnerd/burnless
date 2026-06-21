@@ -168,8 +168,8 @@ fi
 
 # ---- hand off to burnless (interactive when a TTY is available — P4) ----
 if [ -n "${BURNLESS_NO_LAUNCH:-}" ]; then
-  ok "Done. Run: burnless"
+  ok "Done. Run: burnless start"
   exit 0
 fi
 ok "Done. Launching burnless..."
-exec "$HOME_DIR/bin/burnless"
+exec "$HOME_DIR/bin/burnless" start
