@@ -117,4 +117,19 @@ describe("runScheduledJob", () => {
       })
     );
   });
+
+  // D3: runner passes job.timezone to computeNextRunAt when advancing schedule
+  it("D3: runner uses job.timezone when computing nextRunAt after a successful run", async () => {
+    // Set job timezone to Asia/Kolkata; after a run, nextRunAt for "0 9 * * *" must be 03:30Z not 09:00Z
+    h.job.timezone = "Asia/Kolkata";
+    h.job.schedule = "0 9 * * *";
+    await runScheduledJob("job1", "schedule");
+    // updateScheduledJob was called with the nextRunAt in IST (03:30Z minutes=30)
+    const patch = h.updateJob.mock.calls[0]![2] as { nextRunAt: Date };
+    expect(patch.nextRunAt).toBeInstanceOf(Date);
+    expect(patch.nextRunAt.getUTCMinutes()).toBe(30); // 09:00 IST = 03:30 UTC
+    // restore
+    h.job.timezone = "UTC";
+    h.job.schedule = "0 9 * * 1";
+  });
 });

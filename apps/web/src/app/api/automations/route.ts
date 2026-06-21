@@ -1,7 +1,7 @@
 // apps/web/src/app/api/automations/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { listScheduledJobs, createScheduledJob, countScheduledJobs } from "@burnless/db";
+import { listScheduledJobs, createScheduledJob, countScheduledJobs, getCompanyById } from "@burnless/db";
 import { requireCompanyAccess, requireRole, withErrorHandler } from "@/lib/api-helpers";
 import { checkAiFeatureAllowed } from "@/lib/ai-feature-flags";
 import { getSafetyLimits, computeNextRunAt } from "@/lib/automations/safety";
@@ -31,8 +31,12 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (roleErr) return roleErr;
   const draft = createSchema.parse(await request.json());
 
-  // Validate the cron (also yields the first nextRunAt).
-  const nextRunAt = computeNextRunAt(draft.schedule, new Date());
+  // Load the company timezone to default the job timezone when the client doesn't specify one.
+  const company = await getCompanyById(ctx.companyId);
+  const jobTimezone = draft.timezone ?? company?.timezone ?? "UTC";
+
+  // Validate the cron (also yields the first nextRunAt, computed in the job's timezone).
+  const nextRunAt = computeNextRunAt(draft.schedule, new Date(), jobTimezone);
   if (!nextRunAt) {
     return NextResponse.json({ error: "Invalid schedule expression." }, { status: 400 });
   }
@@ -65,7 +69,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     allowedTools: draft.allowedTools,
     boundConnectionIds: draft.boundConnectionIds,
     schedule: draft.schedule,
-    timezone: draft.timezone,
+    timezone: jobTimezone,
     notifyPolicy: draft.notifyPolicy,
     nextRunAt,
   });

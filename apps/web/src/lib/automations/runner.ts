@@ -163,7 +163,7 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
   };
   const advanceSchedule = async (patch: Record<string, unknown>) => {
     if (isDryRun) return; // dry runs never mutate the job
-    const next = computeNextRunAt(job.schedule, new Date());
+    const next = computeNextRunAt(job.schedule, new Date(), job.timezone ?? "UTC");
     await updateScheduledJob(job.id, job.companyId, { lastRunAt: new Date(), nextRunAt: next, ...patch });
   };
 

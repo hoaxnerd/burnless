@@ -23,6 +23,7 @@ const patchSchema = z.object({
   allowedTools: z.array(z.string().max(200)).max(50).optional(),
   boundConnectionIds: z.array(z.string().max(100)).max(20).optional(),
   schedule: z.string().min(1).max(120).optional(),
+  timezone: z.string().max(64).optional(),
   notifyPolicy: z.enum(["smart", "failures", "every", "off"]).optional(),
   enabled: z.boolean().optional(),
 });
@@ -39,8 +40,11 @@ export const PATCH = withErrorHandler(async (request: Request, { params }: Ctx) 
 
   const patch: Record<string, unknown> = { ...body };
 
+  // Resolve the effective timezone: an explicit patch value wins, else keep the stored job tz.
+  const tz = body.timezone ?? job.timezone ?? "UTC";
+
   if (body.schedule) {
-    const next = computeNextRunAt(body.schedule, new Date());
+    const next = computeNextRunAt(body.schedule, new Date(), tz);
     if (!next) return NextResponse.json({ error: "Invalid schedule expression." }, { status: 400 });
     patch.nextRunAt = next;
   }
@@ -48,7 +52,7 @@ export const PATCH = withErrorHandler(async (request: Request, { params }: Ctx) 
   if (body.enabled === true && job.status !== "active") {
     patch.status = "active";
     patch.consecutiveFailures = 0;
-    patch.nextRunAt = patch.nextRunAt ?? computeNextRunAt(job.schedule, new Date());
+    patch.nextRunAt = patch.nextRunAt ?? computeNextRunAt(job.schedule, new Date(), tz);
   }
   if (body.enabled === false) {
     patch.status = "disabled";

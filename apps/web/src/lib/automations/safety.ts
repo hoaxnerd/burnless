@@ -37,7 +37,8 @@ const MINUTE_MS = 60_000;
 const MISSED_THRESHOLD_MS = 2.5 * MINUTE_MS;
 
 /**
- * Next minute (UTC) strictly after `from` whose cron matches. Minute-by-minute
+ * Next minute strictly after `from` whose cron matches, evaluated in `timeZone`
+ * (IANA name; defaults to "UTC" for backwards compatibility). Minute-by-minute
  * scan, bounded to ~366 days so a garbage/unmatchable cron returns null instead
  * of looping forever.
  */
