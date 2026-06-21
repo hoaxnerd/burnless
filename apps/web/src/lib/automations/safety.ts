@@ -41,12 +41,12 @@ const MISSED_THRESHOLD_MS = 2.5 * MINUTE_MS;
  * scan, bounded to ~366 days so a garbage/unmatchable cron returns null instead
  * of looping forever.
  */
-export function computeNextRunAt(cron: string, from: Date): Date | null {
+export function computeNextRunAt(cron: string, from: Date, timeZone = "UTC"): Date | null {
   const start = new Date(Math.floor(from.getTime() / MINUTE_MS) * MINUTE_MS + MINUTE_MS); // next whole minute
   const maxIterations = 366 * 24 * 60;
   const cursor = new Date(start.getTime());
   for (let i = 0; i < maxIterations; i++) {
-    if (cronMatches(cron, cursor)) return new Date(cursor.getTime());
+    if (cronMatches(cron, cursor, timeZone)) return new Date(cursor.getTime());
     cursor.setTime(cursor.getTime() + MINUTE_MS);
   }
   return null;

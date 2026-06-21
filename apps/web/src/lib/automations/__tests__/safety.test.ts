@@ -55,6 +55,15 @@ describe("computeNextRunAt", () => {
   it("returns null for an unmatchable/garbage cron (bounded scan gives up)", () => {
     expect(computeNextRunAt("bogus", at("2026-06-12T00:00:00Z"))).toBeNull();
   });
+  it("computeNextRunAt respects the timezone", () => {
+    // next 09:00 Asia/Kolkata after 2026-06-21T00:00Z → 03:30Z same day
+    const next = computeNextRunAt("0 9 * * *", at("2026-06-21T00:00:00Z"), "Asia/Kolkata");
+    expect(next?.toISOString()).toBe("2026-06-21T03:30:00.000Z");
+  });
+  it("computeNextRunAt UTC default is unchanged", () => {
+    const next = computeNextRunAt("0 9 * * 1", at("2026-06-14T10:00:00Z")); // Sunday
+    expect(next?.getUTCDay()).toBe(1);
+  });
 });
 
 describe("isMissed", () => {
