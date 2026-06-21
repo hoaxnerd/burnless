@@ -51,6 +51,7 @@ export interface FinancialSnapshot {
     industry: string | null;
     currency: string;
     locale?: string;
+    timezone?: string;
   };
   scenario: {
     id: string;
