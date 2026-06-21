@@ -8,14 +8,15 @@ import {
   Star,
 } from "lucide-react";
 import { GITHUB_REPO_URL } from "@/lib/public-repo";
+import { CopyButton } from "./copy-button";
 
 /* Section 5 — OPEN-SOURCE BAND (dark repo zone).
    This band stays DARK in BOTH light and dark mode: it intentionally uses the
    mockup's literal dark colors (arbitrary Tailwind values) rather than the
    semantic surface-* tokens, which would flip with the theme. Background
    radial+linear gradients and the faint grid overlay are inlined to mirror
-   `.os` and `.os::before` from the approved mockup. Static — no hooks; the
-   "⧉ copy" affordance is decorative. */
+   `.os` and `.os::before` from the approved mockup. The install-terminal
+   header uses <CopyButton> as a client island — it copies the install command. */
 
 const features = [
   {
@@ -173,9 +174,10 @@ export function OpenSourceBand() {
             <div className="overflow-hidden rounded-[14px] border border-[rgba(255,255,255,0.14)] bg-[#070b14]">
               <div className="flex items-center gap-2 border-b border-[rgba(255,255,255,0.09)] px-[0.85rem] py-[0.55rem]">
                 <span className="font-mono text-[0.68rem] text-[#6b7794]">install.sh</span>
-                <span className="ml-auto rounded-[7px] border border-[rgba(255,255,255,0.14)] px-[0.45rem] py-[0.2rem] font-mono text-[0.66rem] text-[#9aa6c2]">
-                  ⧉ copy
-                </span>
+                <CopyButton
+                  command="curl -fsSL burnless.ai/install | sh"
+                  className="ml-auto cursor-pointer rounded-[7px] border border-[rgba(255,255,255,0.14)] px-[0.45rem] py-[0.2rem] font-mono text-[0.66rem] text-[#9aa6c2] transition-colors hover:border-[rgba(255,255,255,0.3)] hover:text-[#f4f7ff]"
+                />
               </div>
               <div className="overflow-x-auto px-4 py-[0.9rem] font-mono text-[0.8rem] leading-[1.85] text-[#c7d0e4]">
                 <div className="whitespace-nowrap">

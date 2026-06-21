@@ -6,6 +6,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCapabilities } from "@/components/providers/capability-context";
 import { GITHUB_REPO_URL } from "@/lib/public-repo";
 import { CompanionWindow } from "./companion-window";
+import { CopyButton } from "./copy-button";
 
 /* Split hero — the AI leads. Left: the promise + one-command install + CTAs.
    Right: the deep companion playing the full agentic worklog in an auto-scroll
@@ -72,9 +73,10 @@ export function HeroSection() {
           <code className="whitespace-nowrap font-mono text-[0.82rem] text-[#c3cce0]">
             <span className="text-accent-400">$</span> curl -fsSL burnless.ai/install | sh
           </code>
-          <span className="ml-auto flex-none cursor-default rounded-lg border border-white/15 px-2 py-1.5 font-mono text-[0.7rem] text-[#9aa6c2]">
-            ⧉ copy
-          </span>
+          <CopyButton
+            command="curl -fsSL burnless.ai/install | sh"
+            className="ml-auto flex-none cursor-pointer rounded-lg border border-white/15 px-2 py-1.5 font-mono text-[0.7rem] text-[#9aa6c2] transition-colors hover:border-white/30 hover:text-white"
+          />
         </div>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-surface-500">
           {["Embedded database", "No Docker", "Runs on :2876", "AGPL-3.0"].map((c) => (
