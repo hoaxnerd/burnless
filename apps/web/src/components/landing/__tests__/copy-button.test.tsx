@@ -21,4 +21,17 @@ describe("CopyButton", () => {
       expect(screen.getByRole("button", { name: /copied install command/i })).toBeInTheDocument(),
     );
   });
+
+  it("surfaces a failure when the clipboard is blocked (no silent swallow)", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+      configurable: true,
+      writable: true,
+    });
+    render(<CopyButton command="curl -fsSL burnless.ai/install | sh" />);
+    fireEvent.click(screen.getByRole("button", { name: /copy install command/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /couldn't copy/i })).toBeInTheDocument(),
+    );
+  });
 });
