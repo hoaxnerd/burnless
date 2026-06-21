@@ -113,7 +113,7 @@ export function scenarioExitFrom(toolName: string, raw: string): boolean {
 export function friendlyChatError(error: unknown): string {
   const name = error instanceof Error ? error.name : "";
   if (name === "EmptyCompletionError") {
-    return "The assistant didn't return a response. Please try again — if this keeps happening, try switching to a different model in Settings → AI.";
+    return "The assistant didn't return a response. Please try again — if this keeps happening, switch to a more capable model in Settings → AI.";
   }
   return "Something went wrong while generating a response. Please try again.";
 }
