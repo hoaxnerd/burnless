@@ -598,4 +598,93 @@ describe("POST /api/onboarding", () => {
     expect(body.companyId).toBe("cloud-co");
     expect(mockTransaction).not.toHaveBeenCalled();
   });
+
+  /* ── Timezone: CREATE path ────────────────────────────────────────── */
+
+  // The client sends Intl.DateTimeFormat().resolvedOptions().timeZone; the route
+  // must persist it on the CREATE insert. Assert the inserted company row carries
+  // the exact IANA zone string.
+  it("CREATE: persists timezone when provided in the body", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue(null);
+
+    const { rowsFor } = recordTransactionInserts();
+
+    const res = await POST(
+      makeRequest({
+        company_name: "Acme Corp",
+        stage: "Seed",
+        business_model: "SaaS",
+        timezone: "Asia/Kolkata",
+      }),
+    );
+
+    expect(res.status).toBe(201);
+
+    const companyRows = rowsFor("companies") as { timezone?: string }[];
+    expect(companyRows).toHaveLength(1);
+    expect(companyRows[0]?.timezone).toBe("Asia/Kolkata");
+  });
+
+  // When timezone is omitted the column default (America/New_York) handles it —
+  // undefined in the INSERT values lets Drizzle/the column default take over.
+  it("CREATE: does not set timezone when absent (column default preserved)", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "user-1" });
+    mockGetUserCompany.mockResolvedValue(null);
+
+    const { rowsFor } = recordTransactionInserts();
+
+    const res = await POST(
+      makeRequest({ company_name: "Minimal Corp", stage: "Seed", business_model: "SaaS" }),
+    );
+
+    expect(res.status).toBe(201);
+
+    const companyRows = rowsFor("companies") as { timezone?: string }[];
+    expect(companyRows).toHaveLength(1);
+    // Must be undefined (not "America/New_York" string) so the column default applies.
+    expect(companyRows[0]?.timezone).toBeUndefined();
+  });
+
+  /* ── Timezone: CLAIM path ─────────────────────────────────────────── */
+
+  // The client sends timezone on CLAIM too; the UPDATE set must include it.
+  it("CLAIM: persists timezone in the UPDATE set when provided", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(false);
+
+    const { updateFor } = recordClaimTransaction();
+
+    const res = await POST(
+      makeRequest({
+        company_name: "Acme Corp",
+        stage: "Seed",
+        business_model: "SaaS",
+        timezone: "Asia/Kolkata",
+      }),
+    );
+
+    expect(res.status).toBe(201);
+
+    const companyUpdate = updateFor("companies");
+    expect(companyUpdate).toBeTruthy();
+    expect((companyUpdate?.set as { timezone?: string }).timezone).toBe("Asia/Kolkata");
+  });
+
+  // Non-destructive: omitted timezone must NOT appear in the UPDATE set.
+  it("CLAIM: timezone absent from UPDATE set when not provided (non-destructive)", async () => {
+    mockGetAuthUser.mockResolvedValue({ id: "owner-1" });
+    mockGetUserCompany.mockResolvedValue({ companyId: INSTALL_COMPANY_ID, role: "owner" });
+    stubIsClaimed(false);
+
+    const { updateFor } = recordClaimTransaction();
+
+    const res = await POST(makeRequest({ company_name: "Acme Corp" }));
+    expect(res.status).toBe(201);
+
+    const companyUpdate = updateFor("companies");
+    const setPayload = companyUpdate?.set as Record<string, unknown>;
+    expect("timezone" in setPayload).toBe(false);
+  });
 });
