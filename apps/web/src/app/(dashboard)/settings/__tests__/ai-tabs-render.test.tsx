@@ -21,7 +21,8 @@ import { tabs } from "../settings-data";
 import { CapabilityProvider } from "@/components/providers/capability-context";
 import { EDITION_PRESETS } from "@/lib/capabilities";
 
-// AiFeaturesTab now reads useCapabilities() (Task 12), so it must mount inside the provider.
+// AiFeaturesTab and AiDashboardTab both read useCapabilities() (credits are billing-gated),
+// so they must mount inside the provider.
 const renderWithCaps = (ui: React.ReactElement) =>
   render(<CapabilityProvider value={EDITION_PRESETS.cloud}>{ui}</CapabilityProvider>);
 
@@ -57,6 +58,6 @@ describe("SET-07 — AI settings tabs are shipped", () => {
   });
 
   it("AiDashboardTab mounts without throwing", () => {
-    expect(() => render(<AiDashboardTab />)).not.toThrow();
+    expect(() => renderWithCaps(<AiDashboardTab />)).not.toThrow();
   });
 });
