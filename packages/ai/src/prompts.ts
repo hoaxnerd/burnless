@@ -182,12 +182,20 @@ export function buildSystemMessage(
   companionName?: string,
   mode: PromptMode = "interactive",
   scenarioToolsPresent = false,
+  nowContext?: { iso: string; timezone: string },
 ): string {
+  const timeSection = nowContext
+    ? `## Current date and time
+
+It is currently ${nowContext.iso} in the user's timezone (${nowContext.timezone}). Use this as "now" for anything time-relative — "this month", "last quarter", "overdue", upcoming dates, and when reading metrics at the current month. All dates you state should be interpreted in this timezone.
+
+`
+    : "";
   return `${buildSystemPrompt(companionName, mode, scenarioToolsPresent)}
 
 ---
 
-## Current Financial Data
+${timeSection}## Current Financial Data
 
 ${financialContext}
 `;

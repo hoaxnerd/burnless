@@ -21,6 +21,7 @@ export const onboardingSchema = z.object({
   industry: z.string().optional(),
   user_name: z.string().optional(),
   founders: z.array(z.string()).optional().default([]),
+  timezone: z.string().min(1).max(100).optional(),
 });
 
 /** Map user-friendly stage names to enum values */

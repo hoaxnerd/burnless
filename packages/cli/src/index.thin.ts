@@ -5,18 +5,12 @@
  * local command modules (they pull @burnless/db → PGLite). Spec §2 layer 1 (Model B).
  */
 import { buildRemoteProgram } from "./program-remote";
-import { bareVerbOrDefault, delegateToArtifact, LOCAL_VERBS, topVerb } from "./runtime";
+import { bareVerbOrDefault, delegateToArtifact, LOCAL_VERBS } from "./runtime";
 
 async function main(): Promise<void> {
-  // A bare (no-verb) invocation becomes the interactive `start` launcher — this is what the
-  // install.sh `exec burnless` hand-off lands on. --help/--version stay native (bareVerbOrDefault
-  // returns undefined for those).
   const verb = bareVerbOrDefault(process.argv);
   if (verb !== undefined && LOCAL_VERBS.has(verb)) {
-    // When the verb is the synthesized `start` from a bare argv, the delegated argv must
-    // carry `start` so the artifact runs the launcher (not its own bare branch).
-    const argv = topVerb(process.argv) === undefined ? [...process.argv, "start"] : process.argv;
-    const code = await delegateToArtifact(argv);
+    const code = await delegateToArtifact(process.argv);
     process.exit(code);
   }
   const program = buildRemoteProgram();

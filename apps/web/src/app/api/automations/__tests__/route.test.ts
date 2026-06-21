@@ -21,8 +21,9 @@ const h = vi.hoisted(() => ({
   create: vi.fn().mockResolvedValue({ id: "new", name: "J" }),
   count: vi.fn().mockResolvedValue(0),
   aiCheck: vi.fn().mockResolvedValue({ allowed: true, writeMode: "full" }),
+  getCompany: vi.fn().mockResolvedValue({ id: "c1", timezone: "America/New_York" }),
 }));
-vi.mock("@burnless/db", () => ({ listScheduledJobs: h.list, createScheduledJob: h.create, countScheduledJobs: h.count }));
+vi.mock("@burnless/db", () => ({ listScheduledJobs: h.list, createScheduledJob: h.create, countScheduledJobs: h.count, getCompanyById: h.getCompany }));
 vi.mock("@/lib/ai-feature-flags", () => ({ checkAiFeatureAllowed: h.aiCheck }));
 
 import { GET, POST } from "../route";
@@ -31,7 +32,7 @@ const body = (b: unknown) => new Request("http://x/api/automations", { method: "
 const validDraft = { name: "J", prompt: "do it", actionKind: "notify", allowedTools: ["list_accounts"], boundConnectionIds: [], schedule: "0 8 * * *" };
 
 describe("/api/automations", () => {
-  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }); h.count.mockResolvedValue(0); h.aiCheck.mockResolvedValue({ allowed: true, writeMode: "full" }); });
+  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }); h.count.mockResolvedValue(0); h.aiCheck.mockResolvedValue({ allowed: true, writeMode: "full" }); h.getCompany.mockResolvedValue({ id: "c1", timezone: "America/New_York" }); });
 
   it("GET lists the company's jobs", async () => {
     const res = await GET();
@@ -72,5 +73,29 @@ describe("/api/automations", () => {
     const res = await POST(body(validDraft));
     expect(res.status).toBe(403);
     expect(h.create).not.toHaveBeenCalled();
+  });
+
+  // D3: timezone-aware scheduler
+  it("POST: new job defaults timezone to company timezone (Asia/Kolkata) when not specified", async () => {
+    h.getCompany.mockResolvedValue({ id: "c1", timezone: "Asia/Kolkata" });
+    const res = await POST(body({ ...validDraft, schedule: "0 9 * * *" }));
+    expect(res.status).toBe(200);
+    const [arg] = h.create.mock.calls[0] as [{ timezone: string; nextRunAt: Date }];
+    // (a) stored job timezone must match company timezone
+    expect(arg.timezone).toBe("Asia/Kolkata");
+    // (b) nextRunAt must be consistent with IST (offset +05:30):
+    //     "0 9 * * *" → 09:00 IST = 03:30 UTC; so minutes of UTC must be 30
+    expect(arg.nextRunAt).toBeInstanceOf(Date);
+    expect(arg.nextRunAt.getUTCMinutes()).toBe(30); // 03:30Z → minutes=30 (IST offset is 5h30m)
+  });
+
+  it("POST: explicit client timezone overrides company timezone", async () => {
+    h.getCompany.mockResolvedValue({ id: "c1", timezone: "Asia/Kolkata" });
+    const res = await POST(body({ ...validDraft, schedule: "0 9 * * *", timezone: "UTC" }));
+    expect(res.status).toBe(200);
+    const [arg] = h.create.mock.calls[0] as [{ timezone: string; nextRunAt: Date }];
+    expect(arg.timezone).toBe("UTC"); // explicit client tz wins
+    // nextRunAt for "0 9 * * *" in UTC has minutes=0
+    expect(arg.nextRunAt.getUTCMinutes()).toBe(0);
   });
 });

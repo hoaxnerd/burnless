@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAiDashboard } from "@/lib/swr";
 import { useLocale } from "@/components/locale/locale-context";
+import { useCapabilities } from "@/components/providers/capability-context";
 import {
   Activity,
   BarChart3,
@@ -75,6 +76,8 @@ export function AiDashboardTab() {
   const [days, setDays] = useState(30);
   const { data, isLoading: loading } = useAiDashboard<DashboardData>(days);
   const { fmtCurrency, fmtPercent } = useLocale();
+  // Credits are a billing concept — hide them when billing is off (self-host / BYO AI).
+  const caps = useCapabilities();
 
   if (loading) {
     return (
@@ -128,12 +131,14 @@ export function AiDashboardTab() {
           value={data.summary.totalRequests.toLocaleString()}
           color="blue"
         />
-        <SummaryCard
-          icon={<Zap className="h-4 w-4" />}
-          label="Credits Used"
-          value={fmtPercent(data.credits.percentUsed, 1)}
-          color={data.credits.exceeded ? "red" : data.credits.warning ? "amber" : "green"}
-        />
+        {caps.billing && (
+          <SummaryCard
+            icon={<Zap className="h-4 w-4" />}
+            label="Credits Used"
+            value={fmtPercent(data.credits.percentUsed, 1)}
+            color={data.credits.exceeded ? "red" : data.credits.warning ? "amber" : "green"}
+          />
+        )}
         <SummaryCard
           icon={<Clock className="h-4 w-4" />}
           label="Avg Latency"
@@ -150,26 +155,28 @@ export function AiDashboardTab() {
       </div>
 
       {/* Credits Bar */}
-      <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-surface-900">Monthly Credits</h3>
-          <span className="text-xs text-surface-500">
-            {data.credits.used.toLocaleString()} / {data.credits.total.toLocaleString()} credits
-          </span>
+      {caps.billing && (
+        <div className="rounded-2xl bg-surface-0 border border-surface-200 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-surface-900">Monthly Credits</h3>
+            <span className="text-xs text-surface-500">
+              {data.credits.used.toLocaleString()} / {data.credits.total.toLocaleString()} credits
+            </span>
+          </div>
+          <div className="h-3 bg-surface-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                data.credits.exceeded
+                  ? "bg-red-500"
+                  : data.credits.warning
+                    ? "bg-amber-500"
+                    : "bg-brand-500"
+              }`}
+              style={{ width: `${Math.min(data.credits.percentUsed, 100)}%` }}
+            />
+          </div>
         </div>
-        <div className="h-3 bg-surface-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              data.credits.exceeded
-                ? "bg-red-500"
-                : data.credits.warning
-                  ? "bg-amber-500"
-                  : "bg-brand-500"
-            }`}
-            style={{ width: `${Math.min(data.credits.percentUsed, 100)}%` }}
-          />
-        </div>
-      </div>
+      )}
 
       {/* Daily Spend Mini-Chart */}
       {data.dailySpend.length > 0 && (

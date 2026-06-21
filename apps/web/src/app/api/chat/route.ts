@@ -191,7 +191,7 @@ export const POST = withErrorHandler(async (request: Request) => {
   const writeScenarioId = resolveWriteScenarioId(body.scenarioId, found ?? null);
 
   // Build financial context
-  const { contextText: baseContextText } = await buildAiContext(ctx.companyId, {
+  const { contextText: baseContextText, nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",
@@ -248,5 +248,6 @@ export const POST = withErrorHandler(async (request: Request) => {
     mcp,
     disabledToolNames,
     creditWarning,
+    nowContext,
   });
 });

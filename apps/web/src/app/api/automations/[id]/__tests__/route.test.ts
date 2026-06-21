@@ -29,7 +29,7 @@ import { GET, PATCH, DELETE } from "../route";
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe("/api/automations/[id]", () => {
-  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }); h.get.mockResolvedValue({ id: "j1", name: "J", schedule: "0 8 * * *", status: "active" }); });
+  beforeEach(() => { vi.clearAllMocks(); mockReq.mockResolvedValue({ userId: "u1", companyId: "c1", role: "editor" }); h.get.mockResolvedValue({ id: "j1", name: "J", schedule: "0 8 * * *", status: "active", timezone: "UTC" }); });
 
   it("GET returns the job + recent runs", async () => {
     const res = await GET(new Request("http://x"), params("j1"));
@@ -83,5 +83,23 @@ describe("/api/automations/[id]", () => {
     expect(delRes.status).toBe(403);
     expect(h.update).not.toHaveBeenCalled();
     expect(h.del).not.toHaveBeenCalled();
+  });
+
+  // D3: PATCH uses the job's stored timezone when recomputing nextRunAt
+  it("PATCH schedule change uses the job's stored timezone (Asia/Kolkata) for nextRunAt", async () => {
+    h.get.mockResolvedValue({ id: "j1", schedule: "0 8 * * *", status: "active", timezone: "Asia/Kolkata" });
+    await PATCH(new Request("http://x", { method: "PATCH", body: JSON.stringify({ schedule: "0 9 * * *" }) }), params("j1"));
+    const [, , patch] = h.update.mock.calls[0] as [unknown, unknown, { nextRunAt: Date }];
+    // 09:00 Asia/Kolkata = 03:30 UTC → minutes must be 30
+    expect(patch.nextRunAt).toBeInstanceOf(Date);
+    expect(patch.nextRunAt.getUTCMinutes()).toBe(30);
+  });
+
+  it("PATCH re-enable uses the job's stored timezone (Asia/Kolkata) for nextRunAt", async () => {
+    h.get.mockResolvedValue({ id: "j1", schedule: "0 9 * * *", status: "auto_disabled", timezone: "Asia/Kolkata" });
+    await PATCH(new Request("http://x", { method: "PATCH", body: JSON.stringify({ enabled: true }) }), params("j1"));
+    const [, , patch] = h.update.mock.calls[0] as [unknown, unknown, { nextRunAt: Date }];
+    expect(patch.nextRunAt).toBeInstanceOf(Date);
+    expect(patch.nextRunAt.getUTCMinutes()).toBe(30);
   });
 });

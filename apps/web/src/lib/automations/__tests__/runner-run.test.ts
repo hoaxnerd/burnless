@@ -36,7 +36,7 @@ vi.mock("@burnless/ai", async (orig) => {
 vi.mock("@/lib/ai-feature-flags", () => ({ checkAiFeatureAllowed: h.aiCheck, getCompanyProviderConfig: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/ai-usage-tracker", () => ({ setTrackingCompanyId: vi.fn() }));
 vi.mock("@/lib/data", () => ({ getDefaultScenario: vi.fn().mockResolvedValue({ id: "s1", name: "Base", source: "blank" }) }));
-vi.mock("@/lib/build-ai-context", () => ({ buildAiContext: vi.fn().mockResolvedValue({ snapshot: {}, contextText: "CTX" }) }));
+vi.mock("@/lib/build-ai-context", () => ({ buildAiContext: vi.fn().mockResolvedValue({ snapshot: {}, contextText: "CTX", nowContext: { iso: "2020-01-01T00:00:00.000Z", timezone: "UTC" } }) }));
 vi.mock("@/lib/ai-tools/mcp", () => ({ assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], categories: {} }) }));
 vi.mock("@/lib/ai-tools", () => ({ executeToolCall: vi.fn().mockResolvedValue("{}") }));
 
@@ -105,5 +105,31 @@ describe("runScheduledJob", () => {
     expect(h.notify).not.toHaveBeenCalled();
     expect(out.run.id).toBe("run1");
     expect(out.result?.response).toContain("Updated MRR");
+  });
+
+  it("REGRESSION: headless scheduled-job run passes nowContext (with timezone) into chat", async () => {
+    // Guarantees that autonomous runs are time-aware: the company timezone is
+    // threaded from buildAiContext → chat so the model reasons about "now" correctly.
+    await runScheduledJob("job1", "schedule");
+    expect(h.chat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nowContext: expect.objectContaining({ timezone: "UTC" }),
+      })
+    );
+  });
+
+  // D3: runner passes job.timezone to computeNextRunAt when advancing schedule
+  it("D3: runner uses job.timezone when computing nextRunAt after a successful run", async () => {
+    // Set job timezone to Asia/Kolkata; after a run, nextRunAt for "0 9 * * *" must be 03:30Z not 09:00Z
+    h.job.timezone = "Asia/Kolkata";
+    h.job.schedule = "0 9 * * *";
+    await runScheduledJob("job1", "schedule");
+    // updateScheduledJob was called with the nextRunAt in IST (03:30Z minutes=30)
+    const patch = h.updateJob.mock.calls[0]![2] as { nextRunAt: Date };
+    expect(patch.nextRunAt).toBeInstanceOf(Date);
+    expect(patch.nextRunAt.getUTCMinutes()).toBe(30); // 09:00 IST = 03:30 UTC
+    // restore
+    h.job.timezone = "UTC";
+    h.job.schedule = "0 9 * * 1";
   });
 });

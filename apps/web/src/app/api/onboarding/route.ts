@@ -109,6 +109,7 @@ export const POST = withErrorHandler(async (request: Request) => {
             businessModel,
             industry: body.industry,
             userName: body.user_name,
+            timezone: body.timezone,
           });
           await revalidateOnboardingCaches(result.companyId);
           return NextResponse.json(result, { status: 201 });
@@ -146,6 +147,7 @@ export const POST = withErrorHandler(async (request: Request) => {
           stage,
           businessModel,
           industry: body.industry ?? null,
+          timezone: body.timezone ?? undefined,
           ownerId: userId,
         })
         .returning();
@@ -261,6 +263,7 @@ async function claimInstallCompany(input: {
   businessModel: ReturnType<typeof parseBusinessModel>;
   industry?: string;
   userName?: string;
+  timezone?: string;
 }): Promise<{ companyId: string; scenarioId: string }> {
   const companyId = LOCAL_OWNER_COMPANY_ID;
   return db.transaction(async (tx) => {
@@ -272,12 +275,14 @@ async function claimInstallCompany(input: {
       stage: ReturnType<typeof parseStage>;
       businessModel: ReturnType<typeof parseBusinessModel>;
       industry?: string;
+      timezone?: string;
     } = {
       name: input.companyName,
       stage: input.stage,
       businessModel: input.businessModel,
     };
     if (input.industry) companyUpdate.industry = input.industry;
+    if (input.timezone) companyUpdate.timezone = input.timezone;
     await tx.update(companies).set(companyUpdate).where(eq(companies.id, companyId));
 
     if (input.userName) {

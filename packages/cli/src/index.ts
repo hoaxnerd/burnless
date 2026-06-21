@@ -50,10 +50,9 @@ if (isMain) {
     process.argv.includes("-V") || process.argv.includes("--version") ||
     process.argv.includes("-h") || process.argv.includes("--help");
   if (verbForBare === undefined && !wantsHelpOrVersion) {
-    // Bare `burnless` (no verb, no flags) = interactive launcher (the install.sh hand-off).
-    await program.parseAsync([process.argv[0]!, process.argv[1]!, "start"]);
-  } else {
-    // Explicit verb OR -h/--help/-V/--version → let commander handle it natively.
-    await program.parseAsync(process.argv);
+    // Bare `burnless` (no verb, no flags) = help, NOT start.
+    program.outputHelp();
+    process.exit(0);
   }
+  await program.parseAsync(process.argv);
 }

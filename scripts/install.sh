@@ -37,6 +37,34 @@ have() { command -v "$1" >/dev/null 2>&1; }
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then have sudo && SUDO="sudo"; fi
 
+# Detect the user's login shell rc file(s).
+detect_rc_files() {
+  _sh="${SHELL:-}"
+  case "$_sh" in
+    *zsh)  printf '%s\n' "$HOME/.zshrc" ;;
+    *bash) printf '%s\n' "$HOME/.bashrc"; [ -f "$HOME/.bash_profile" ] || printf '%s\n' "$HOME/.profile" ;;
+    *)     printf '%s\n' "$HOME/.profile" ;;
+  esac
+}
+
+# Idempotently add ~/.burnless/bin to PATH in the shell rc (marker-guarded).
+ensure_on_path() {
+  _home_dir="$1"
+  case ":$PATH:" in *":$_home_dir/bin:"*) return 0 ;; esac
+  for _rc in $(detect_rc_files); do
+    [ -e "$_rc" ] || : > "$_rc"
+    if ! grep -q 'burnless installer (PATH)' "$_rc" 2>/dev/null; then
+      {
+        printf '\n# burnless installer (PATH)\n'
+        printf 'export PATH="%s/bin:$PATH"\n' "$_home_dir"
+      } >> "$_rc"
+    fi
+  done
+}
+
+# Allow tests to source this file to get function definitions only.
+if [ -n "${BURNLESS_LIB_ONLY:-}" ]; then return 0 2>/dev/null || exit 0; fi
+
 printf '%b\n' "${B}burnless${R} installer"
 
 # ---- detect platform / libc ----
@@ -154,22 +182,22 @@ ln -sfn "../versions/current/burnless" "$HOME_DIR/bin/burnless"
 chmod +x "$VDIR/$VER/burnless" 2>/dev/null || true
 ok "installed burnless v$VER -> $VDIR/$VER"
 
-# ---- PATH note ----
-case ":$PATH:" in
-  *":$HOME_DIR/bin:"*) ON_PATH=1 ;;
-  *) ON_PATH=0 ;;
-esac
+# ---- PATH (auto-add + fallback note) ----
 say ""
-if [ "$ON_PATH" = 0 ]; then
-  say "Add burnless to your PATH:"
-  printf '%b\n' "  ${B}export PATH=\"$HOME_DIR/bin:\$PATH\"${R}"
-  say ""
-fi
+case ":$PATH:" in
+  *":$HOME_DIR/bin:"*) : ;;  # already on PATH
+  *)
+    ensure_on_path "$HOME_DIR"
+    say "Added burnless to your PATH (restart your shell or run):"
+    printf '%b\n' "  ${B}export PATH=\"$HOME_DIR/bin:\$PATH\"${R}"
+    say ""
+    ;;
+esac
 
 # ---- hand off to burnless (interactive when a TTY is available — P4) ----
 if [ -n "${BURNLESS_NO_LAUNCH:-}" ]; then
-  ok "Done. Run: burnless"
+  ok "Done. Run: burnless start"
   exit 0
 fi
 ok "Done. Launching burnless..."
-exec "$HOME_DIR/bin/burnless"
+exec "$HOME_DIR/bin/burnless" start

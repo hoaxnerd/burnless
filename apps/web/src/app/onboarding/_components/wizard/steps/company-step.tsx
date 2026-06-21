@@ -81,6 +81,10 @@ export const CompanyStep = forwardRef<WizardStepHandle, CompanyStepProps>(
           industry: values.industry || undefined,
           user_name: values.user_name || undefined,
           founders: values.founders,
+          timezone:
+            typeof Intl !== "undefined"
+              ? Intl.DateTimeFormat().resolvedOptions().timeZone
+              : undefined,
         }),
       });
       if (!res.ok) {

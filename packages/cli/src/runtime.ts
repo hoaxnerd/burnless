@@ -57,13 +57,9 @@ export function topVerb(argv: string[]): string | undefined {
   return undefined;
 }
 
-/** A bare invocation (no verb) launches `start`; --help/--version are left for commander. */
+/** The first positional verb, or undefined when bare (→ help) or a help/version flag. */
 export function bareVerbOrDefault(argv: string[]): string | undefined {
-  const v = topVerb(argv);
-  if (v !== undefined) return v;
-  const rest = argv.slice(2);
-  if (rest.some((t) => t === "--help" || t === "-h" || t === "--version" || t === "-V")) return undefined;
-  return "start";
+  return topVerb(argv);
 }
 
 /** Where the downloaded fat-artifact binary lives (download lands in P5). */

@@ -48,6 +48,7 @@ interface ContextInput {
     industry: string | null;
     currency: string;
     locale?: string;
+    timezone?: string;
   };
   scenario: {
     id: string;
@@ -251,6 +252,7 @@ export function formatContextForPrompt(snapshot: FinancialSnapshot): string {
     `**Scenario:** ${snapshot.scenario.name} (${snapshot.scenario.source})`,
     `**Period:** ${period.start} to ${period.end} | Current month: ${period.currentMonth}`,
     `**Currency:** ${currency}`,
+    ...(company.timezone ? [`**Timezone:** ${company.timezone}`] : []),
     ``,
     `## Key Metrics (Latest Month)`,
     `- MRR: ${fmtCur(keyMetrics.mrr)}`,
