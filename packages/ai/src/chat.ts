@@ -71,6 +71,13 @@ interface ChatOptions {
    * as given — S3b §11.
    */
   disabledToolNames?: ReadonlySet<string>;
+  /**
+   * Live "current date and time" context injected into the system message per
+   * request. Must NOT be baked into the cached financial context (it would go
+   * stale via unstable_cache). When present, buildSystemMessage inserts a
+   * "## Current date and time" section before the financial data block.
+   */
+  nowContext?: { iso: string; timezone: string };
   /** Override provider config (e.g., from per-company DB settings). */
   providerConfig?: {
     provider?: string;
@@ -116,7 +123,7 @@ export async function chat(options: ChatOptions): Promise<{
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -224,7 +231,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent);
+  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
