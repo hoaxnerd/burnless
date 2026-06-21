@@ -5,6 +5,28 @@ import { cronMatches } from "../cron";
 // All comparisons are in UTC (matches scripts/cron-worker.ts semantics).
 const at = (iso: string) => new Date(iso);
 
+describe("cronMatches timezone", () => {
+  it("UTC default is unchanged", () => {
+    expect(cronMatches("30 14 * * *", at("2026-06-21T14:30:00Z"))).toBe(true);
+    expect(cronMatches("30 14 * * *", at("2026-06-21T15:30:00Z"))).toBe(false);
+  });
+  it("matches against the job's timezone wall clock", () => {
+    // 09:00 in Asia/Kolkata (UTC+5:30) === 03:30 UTC
+    expect(cronMatches("0 9 * * *", at("2026-06-21T03:30:00Z"), "Asia/Kolkata")).toBe(true);
+    expect(cronMatches("0 9 * * *", at("2026-06-21T09:00:00Z"), "Asia/Kolkata")).toBe(false);
+  });
+  it("is DST-correct for a US zone", () => {
+    // 09:00 America/New_York in June is EDT (UTC-4) === 13:00 UTC
+    expect(cronMatches("0 9 * * *", at("2026-06-21T13:00:00Z"), "America/New_York")).toBe(true);
+    // In January it is EST (UTC-5) === 14:00 UTC
+    expect(cronMatches("0 9 * * *", at("2026-01-21T14:00:00Z"), "America/New_York")).toBe(true);
+  });
+  it("day-of-week is read in the zone (0/7 = Sunday)", () => {
+    // 2026-06-21 is a Sunday; 23:30 Kolkata is still Sunday though it's 18:00 UTC Sunday
+    expect(cronMatches("0 9 * * 0", at("2026-06-21T03:30:00Z"), "Asia/Kolkata")).toBe(true);
+  });
+});
+
 describe("cronMatches", () => {
   it("matches the wildcard every minute", () => {
     expect(cronMatches("* * * * *", at("2026-06-12T03:07:00Z"))).toBe(true);
