@@ -18,3 +18,31 @@ export interface ContextSection {
 
 /** Heading for the legacy single finance-context block (back-compat wrap). Single source. */
 export const DEFAULT_CONTEXT_HEADING = "Current Financial Data";
+
+/**
+ * An additional domain-specific section appended after the core system prompt.
+ * Sorted by `order` (ascending, default 0) and joined by blank lines.
+ */
+export interface PromptSection {
+  id: string;
+  domain: string;
+  body: string;
+  order?: number;
+}
+
+/**
+ * A contributor that produces context sections (e.g. financial snapshot) for
+ * composition into the system message. Async — may hit DB/compute.
+ */
+export interface ContextContributor {
+  id: string;
+  domain: string;
+  /** Returns the sections this contributor adds, or [] / null when there is nothing to add. */
+  sections(ctx: ContributeCtx): Promise<ContextSection[]>;
+}
+
+/** Runtime context passed to a ContextContributor when building the system message. */
+export interface ContributeCtx {
+  companyId: string;
+  scenarioId?: string | null;
+}

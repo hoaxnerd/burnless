@@ -15,7 +15,7 @@
  * for back-compat. Select a mode with `buildSystemPrompt(name, mode)`.
  */
 
-import { type ContextSection, DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
+import { type ContextSection, type PromptSection, DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
 
 export type PromptMode = "interactive" | "autonomous";
 
@@ -185,6 +185,7 @@ export function buildSystemMessage(
   mode: PromptMode = "interactive",
   scenarioToolsPresent = false,
   nowContext?: { iso: string; timezone: string },
+  promptSections: PromptSection[] = [],
 ): string {
   const sections: ContextSection[] =
     typeof context === "string"
@@ -201,7 +202,11 @@ It is currently ${nowContext.iso} in the user's timezone (${nowContext.timezone}
 
   const contextBlock = sections.map((s) => `## ${s.heading}\n\n${s.body}`).join("\n\n");
 
-  return `${buildSystemPrompt(companionName, mode, scenarioToolsPresent)}
+  const promptSectionsBlock = promptSections.length
+    ? "\n\n" + [...promptSections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s) => s.body).join("\n\n")
+    : "";
+
+  return `${buildSystemPrompt(companionName, mode, scenarioToolsPresent)}${promptSectionsBlock}
 
 ---
 

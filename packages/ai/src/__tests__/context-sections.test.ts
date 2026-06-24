@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemMessage, buildSystemPrompt } from "../prompts";
 import type { ContextSection } from "../domain-contracts";
+import type { PromptSection } from "../domain-contracts";
 import { resolveContextSections } from "../chat";
 
 describe("buildSystemMessage — context sections", () => {
@@ -31,6 +32,35 @@ describe("buildSystemMessage — context sections", () => {
     const asString = buildSystemMessage("MRR: $10,000");
     const asSection = buildSystemMessage([{ heading: "Current Financial Data", body: "MRR: $10,000" }]);
     expect(asSection).toBe(asString);
+  });
+});
+
+describe("buildSystemMessage — promptSections", () => {
+  it("byte-identical when promptSections is omitted vs. passed as empty array", () => {
+    const withoutParam = buildSystemMessage([{ heading: "X", body: "y" }], "Companion", "interactive", false, undefined);
+    const withEmpty = buildSystemMessage([{ heading: "X", body: "y" }], "Companion", "interactive", false, undefined, []);
+    expect(withEmpty).toBe(withoutParam);
+  });
+
+  it("inserts promptSection body AFTER buildSystemPrompt output and BEFORE the --- separator", () => {
+    const sections: PromptSection[] = [{ id: "d", domain: "d", body: "EXTRA GUIDANCE" }];
+    const out = buildSystemMessage([{ heading: "X", body: "y" }], "Companion", "interactive", false, undefined, sections);
+    const promptEnd = buildSystemPrompt("Companion", "interactive", false);
+    const idxPromptEnd = out.indexOf(promptEnd) + promptEnd.length;
+    const idxExtra = out.indexOf("EXTRA GUIDANCE");
+    const idxSeparator = out.indexOf("\n\n---\n\n");
+    expect(idxExtra).toBeGreaterThan(idxPromptEnd);
+    expect(idxExtra).toBeLessThan(idxSeparator);
+    expect(out).toContain("EXTRA GUIDANCE");
+  });
+
+  it("sorts multiple promptSections by order ascending", () => {
+    const sections: PromptSection[] = [
+      { id: "b", domain: "d", body: "SECTION_B", order: 10 },
+      { id: "a", domain: "d", body: "SECTION_A", order: 1 },
+    ];
+    const out = buildSystemMessage([{ heading: "X", body: "y" }], "Companion", "interactive", false, undefined, sections);
+    expect(out.indexOf("SECTION_A")).toBeLessThan(out.indexOf("SECTION_B"));
   });
 });
 
