@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemMessage, buildSystemPrompt } from "../prompts";
 import type { ContextSection } from "../domain-contracts";
+import { resolveContextSections } from "../chat";
 
 describe("buildSystemMessage — context sections", () => {
   it("back-compat: a string renders identically to the legacy finance block", () => {
@@ -30,5 +31,28 @@ describe("buildSystemMessage — context sections", () => {
     const asString = buildSystemMessage("MRR: $10,000");
     const asSection = buildSystemMessage([{ heading: "Current Financial Data", body: "MRR: $10,000" }]);
     expect(asSection).toBe(asString);
+  });
+});
+
+describe("resolveContextSections", () => {
+  it("returns explicit contextSections when present", () => {
+    const sections = [{ heading: "X", body: "y" }];
+    expect(resolveContextSections({ contextSections: sections })).toBe(sections);
+  });
+
+  it("wraps legacy financialContext into a single Current Financial Data section", () => {
+    expect(resolveContextSections({ financialContext: "MRR: $10,000" }))
+      .toEqual([{ heading: "Current Financial Data", body: "MRR: $10,000" }]);
+  });
+
+  it("defaults to one empty Current Financial Data section when neither is set", () => {
+    expect(resolveContextSections({}))
+      .toEqual([{ heading: "Current Financial Data", body: "" }]);
+  });
+
+  it("prefers contextSections over financialContext when both are set", () => {
+    const sections = [{ heading: "X", body: "y" }];
+    expect(resolveContextSections({ contextSections: sections, financialContext: "ignored" }))
+      .toBe(sections);
   });
 });

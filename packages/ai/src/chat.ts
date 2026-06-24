@@ -8,6 +8,7 @@
 import type { ChatMessage, StreamChunk, ToolCallResult, PauseState, PendingToolUse } from "./types";
 import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
+import { type ContextSection, DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
 import {
   type LlmProvider,
   type LlmMessage,
@@ -34,7 +35,10 @@ function resolveProvider(options: ChatOptions): LlmProvider | null {
 
 interface ChatOptions {
   messages: ChatMessage[];
-  financialContext: string;
+  /** @deprecated pass `contextSections` instead; auto-wrapped into one "Current Financial Data" section. */
+  financialContext?: string;
+  /** Ordered context blocks composed into the system message. Preferred over `financialContext`. */
+  contextSections?: ContextSection[];
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** Decide whether a tool may run without prompting. Default: everything "allow". */
   resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask" | "deny";
@@ -101,6 +105,17 @@ function filterTools(
 // Max tool-use round-trips per call comes from getAiLimits().maxToolIterations
 // (env BURNLESS_AI_MAX_TOOL_ITERATIONS, default 25). Read once per invocation.
 
+/** Pick the context source: explicit sections win; else wrap the legacy
+ *  financialContext string into a single section. Exported for unit testing. */
+export function resolveContextSections(
+  options: Pick<ChatOptions, "contextSections" | "financialContext">
+): ContextSection[] {
+  if (options.contextSections && options.contextSections.length > 0) {
+    return options.contextSections;
+  }
+  return [{ heading: DEFAULT_CONTEXT_HEADING, body: options.financialContext ?? "" }];
+}
+
 /** Non-streaming chat — sends message and returns complete response. */
 export async function chat(options: ChatOptions): Promise<{
   response: string;
@@ -123,7 +138,7 @@ export async function chat(options: ChatOptions): Promise<{
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
+  const system = buildSystemMessage(resolveContextSections(options), options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -231,7 +246,7 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
     : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
+  const system = buildSystemMessage(resolveContextSections(options), options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
