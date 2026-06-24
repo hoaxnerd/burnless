@@ -345,6 +345,12 @@ export function logDeniedToolCall(
 // Re-export types for consumers
 export type { ToolContext } from "./types";
 
+/**
+ * Merged tool handler map for all financial tools (A3a-2: exposed for DomainModule).
+ * Internal — do not use outside of domain module wiring.
+ */
+export { toolHandlers };
+
 /** Internal handles exposed for regression guards only — not a public API. */
 export const __testables = {
   MUTATION_TOOLS,

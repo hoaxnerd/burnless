@@ -15,6 +15,7 @@ import { requireCompanyAccess, requireRole, errorResponse, withErrorHandler } fr
 import { DEFAULT_AI_FLAGS, type AiFeatureConfig } from "@burnless/ai";
 import { initialAiMasterEnabled } from "@/lib/ai-default";
 import { getCreditStatus } from "@/lib/ai-feature-flags";
+import { domainRegistry } from "@/lib/domains/index";
 
 // ── GET ─────────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,12 @@ export const GET = withErrorHandler(async (_request: Request) => {
   if ("error" in ctx) return ctx.error;
 
   const flags = await getOrCreateFlags(ctx.companyId);
-  const credits = await getCreditStatus(ctx.companyId);
-  return NextResponse.json({ ...flags, credits });
+  const [credits, enabledModules] = await Promise.all([
+    getCreditStatus(ctx.companyId),
+    domainRegistry.getEnabled({ companyId: ctx.companyId }),
+  ]);
+  const enabledDomains = enabledModules.map((m) => m.id);
+  return NextResponse.json({ ...flags, credits, enabledDomains });
 });
 
 // ── PATCH ───────────────────────────────────────────────────────────────────

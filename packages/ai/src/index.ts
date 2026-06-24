@@ -40,6 +40,7 @@ export { SYSTEM_PROMPT, AUTONOMOUS_SYSTEM_PROMPT, buildSystemPrompt, buildSystem
 // Domain leaf contracts (A1: ContextSection; A3a adds the registry/port types)
 export type { ContextSection } from "./domain-contracts";
 export type { PromptSection, ContextContributor, ContributeCtx } from "./domain-contracts";
+export { DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
 
 // Input sanitization
 export { sanitizeUserMessage, detectInjectionAttempt } from "./sanitize";

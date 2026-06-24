@@ -13,6 +13,13 @@ import {
 } from "lucide-react";
 
 /* ── Nav item definitions ─────────────────────────────────────────────────── */
+//
+// A3a-2 NOTE: The sidebar array (coreNavItems) is intentionally kept hardcoded here.
+// `navEntries` on each DomainModule is the backend data representation (icon as string
+// name; used by API consumers that cannot import Lucide components).
+// When a second domain registers nav entries, switch the sidebar to call
+// `domainRegistry.getActive*()` and map icon strings to Lucide components at render time.
+//
 
 export interface NavItem {
   id: string;

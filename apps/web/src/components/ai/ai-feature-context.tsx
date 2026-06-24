@@ -46,6 +46,12 @@ interface AiFeatureContextValue {
   credits: CreditStatus | null;
   /** Configurable companion name */
   companionName: string;
+  /**
+   * Domain ids that are currently enabled for this company (A3a-2).
+   * Populated from the server's `enabledDomains` field on GET /api/ai-features.
+   * Empty set until loaded.
+   */
+  enabledDomains: ReadonlySet<string>;
 }
 
 const AiFeatureContext = createContext<AiFeatureContextValue | null>(null);
@@ -56,6 +62,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
   const [flags, setFlags] = useState<AiFeatureFlagsState>(DEFAULT_AI_FLAGS);
   const [credits, setCredits] = useState<CreditStatus | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [enabledDomains, setEnabledDomains] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     apiFetch("/api/ai-features")
@@ -70,6 +77,9 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
             features: data.features,
           });
           if (data.credits) setCredits(data.credits);
+          if (Array.isArray(data.enabledDomains)) {
+            setEnabledDomains(new Set<string>(data.enabledDomains as string[]));
+          }
         }
       })
       .catch(() => {})
@@ -139,6 +149,7 @@ export function AiFeatureProvider({ children }: { children: ReactNode }) {
         masterEnabled: flags.masterEnabled,
         credits,
         companionName: flags.companionName ?? DEFAULT_COMPANION_NAME,
+        enabledDomains,
       }}
     >
       {children}

@@ -81,6 +81,14 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getCreditStatus: mockGetCreditStatus,
 }));
 
+// A3a-2: domainRegistry is imported by route.ts to return enabledDomains.
+// Finance is core → always enabled; mock returns ["finance"].
+vi.mock("@/lib/domains/index", () => ({
+  domainRegistry: {
+    getEnabled: vi.fn(async () => [{ id: "finance" }]),
+  },
+}));
+
 // ── Chain setup ──────────────────────────────────────────────────────────────
 
 mockSelect.mockReturnValue({ from: mockFrom });
