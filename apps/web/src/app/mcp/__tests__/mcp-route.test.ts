@@ -1,7 +1,7 @@
 /**
  * Keystone integration (spec §8): initialize → tools/list → tools/call over
- * the real /mcp route with a real PAT against PGLite. Only executeToolCall
- * and getAiFlags are mocked.
+ * the real /mcp route with a real PAT against PGLite. Only executeToolCall,
+ * getAiFlags, and domainRegistry are mocked.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
@@ -21,6 +21,20 @@ vi.mock("@/lib/ai-feature-flags", () => ({ getAiFlags: mockGetAiFlags }));
 // extensionless "next/server" that vitest cannot resolve. Same stub as
 // lib/mcp-server/__tests__/resources.test.ts.
 vi.mock("@/lib/compute-cap-table", () => ({ computeCapTableForCompany: vi.fn() }));
+// A3a-3 regression fix: tools.ts now dynamically imports @/lib/domains to
+// resolve through domainRegistry.getActiveMcpExposedTools. The real domains
+// module pulls in finance.ts → build-ai-context.ts → data.ts → auth.ts →
+// next-auth → env.js → next/server, which vitest cannot resolve. Stub the
+// registry so it returns the real getMcpExposedTools() output — byte-identical
+// to pre-A3a-3 (finance is core/always-enabled). Mirrors tools.test.ts.
+vi.mock("@/lib/domains", async () => {
+  const { getMcpExposedTools } = await import("@burnless/ai");
+  return {
+    domainRegistry: {
+      getActiveMcpExposedTools: vi.fn(async () => getMcpExposedTools()),
+    },
+  };
+});
 
 process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
 
