@@ -37,6 +37,9 @@ export type { InsightPage, PageInsightContext, PageInsight } from "./page-insigh
 // Prompts
 export { SYSTEM_PROMPT, AUTONOMOUS_SYSTEM_PROMPT, buildSystemPrompt, buildSystemMessage, type PromptMode } from "./prompts";
 
+// Domain leaf contracts (A1: ContextSection; A3a adds the registry/port types)
+export type { ContextSection } from "./domain-contracts";
+
 // Input sanitization
 export { sanitizeUserMessage, detectInjectionAttempt } from "./sanitize";
 

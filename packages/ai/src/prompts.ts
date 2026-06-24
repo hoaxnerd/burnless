@@ -15,6 +15,8 @@
  * for back-compat. Select a mode with `buildSystemPrompt(name, mode)`.
  */
 
+import { type ContextSection, DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
+
 export type PromptMode = "interactive" | "autonomous";
 
 /** Identity + capabilities + expertise + data-accuracy. Shared by both modes. */
@@ -176,14 +178,19 @@ export function buildSystemPrompt(
   return withScenario.replace(/\{\{COMPANION_NAME\}\}/g, companionName);
 }
 
-/** Build the full system message including financial context. */
+/** Build the full system message including the composed context sections. */
 export function buildSystemMessage(
-  financialContext: string,
+  context: string | ContextSection[],
   companionName?: string,
   mode: PromptMode = "interactive",
   scenarioToolsPresent = false,
   nowContext?: { iso: string; timezone: string },
 ): string {
+  const sections: ContextSection[] =
+    typeof context === "string"
+      ? [{ heading: DEFAULT_CONTEXT_HEADING, body: context }]
+      : [...context].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
   const timeSection = nowContext
     ? `## Current date and time
 
@@ -191,12 +198,13 @@ It is currently ${nowContext.iso} in the user's timezone (${nowContext.timezone}
 
 `
     : "";
+
+  const contextBlock = sections.map((s) => `## ${s.heading}\n\n${s.body}`).join("\n\n");
+
   return `${buildSystemPrompt(companionName, mode, scenarioToolsPresent)}
 
 ---
 
-${timeSection}## Current Financial Data
-
-${financialContext}
+${timeSection}${contextBlock}
 `;
 }
