@@ -42,11 +42,11 @@ async function handle(request: Request): Promise<Response> {
     sessions: getMcpSessionManager(),
     credentialKey: `${auth.credentialType}:${auth.credentialId}`,
     scopes: auth.scopes,
-    buildServer: (state, clientInfo) =>
+    buildServer: async (state, clientInfo) =>
       createBurnlessMcpServer({
-        tools: getExposedMcpToolDefs(),
+        tools: await getExposedMcpToolDefs(),
         resources: MCP_RESOURCES,
-        executeTool: buildMcpExecuteTool({ auth, state, clientInfo }),
+        executeTool: await buildMcpExecuteTool({ auth, state, clientInfo }),
         readResource: buildMcpReadResource({ auth, state }),
         serverInfo: { name: "burnless", version: "1.0.0" },
       }),

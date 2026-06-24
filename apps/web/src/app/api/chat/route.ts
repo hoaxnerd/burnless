@@ -9,7 +9,7 @@ import { z } from "zod";
 import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
 import { aiConversations, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent } from "@burnless/ai";
+import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent, DEFAULT_CONTEXT_HEADING } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
@@ -202,7 +202,19 @@ export const POST = withErrorHandler(async (request: Request) => {
   const scenarioContext = overrideCount > 0
     ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
     : "";
-  const contextText = scenarioContext + baseContextText;
+
+  // Registry: resolve tools + prompt sections. Context is built above (byte-identical).
+  // contextSections wraps the existing scenario-prefix + contextText into ONE section
+  // (same as the legacy financialContext single-block — pin #1 in A3a-3).
+  // Dynamic import keeps domains/finance.ts out of the module parse graph so
+  // existing test mocks of @/lib/ai-tools (which finance.ts references) work unchanged.
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCtx = { companyId: ctx.companyId };
+  const [baseTools, promptSections] = await Promise.all([
+    domainRegistry.getActiveTools(domainCtx),
+    domainRegistry.getActivePromptSections(domainCtx),
+  ]);
+  const contextSections = [{ heading: DEFAULT_CONTEXT_HEADING, body: scenarioContext + baseContextText }];
 
   // Load company's custom AI provider config (if any)
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
@@ -239,7 +251,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     conversationId,
     turnId,
     messages,
-    financialContext: contextText,
+    contextSections,
+    baseTools,
+    promptSections,
     companionName: aiFlags.companionName,
     providerConfig,
     defaults,

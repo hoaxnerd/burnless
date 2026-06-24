@@ -70,6 +70,12 @@ vi.mock("@/lib/ai-tools", () => ({
   ),
   logDeniedToolCall: vi.fn(),
 }));
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+  },
+}));
 vi.mock("@/lib/chat-stream", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/chat-stream")>();
   return {

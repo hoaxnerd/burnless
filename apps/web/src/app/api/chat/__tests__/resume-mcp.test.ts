@@ -56,6 +56,12 @@ vi.mock("@/lib/ai-tools", () => ({
   }),
   logDeniedToolCall: vi.fn(),
 }));
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+  },
+}));
 // Deterministic dynamic category map: refund is classified DELETE by the server
 // hints, send_reminder WRITE.
 vi.mock("@/lib/ai-tools/mcp", () => ({

@@ -149,6 +149,7 @@ vi.mock("@burnless/ai", async () => {
     resolvePermission: vi.fn(() => "allow"),
     categorizeToolName: vi.fn(() => "read"),
     projectModelThread: actual.projectModelThread,
+    DEFAULT_CONTEXT_HEADING: actual.DEFAULT_CONTEXT_HEADING,
     BUILTIN_PERMISSION_DEFAULTS: {
       read: "always",
       write: "ask",
@@ -166,6 +167,13 @@ vi.mock("@/lib/ai-tools", () => ({
 // MCP tools assembly (spec §3.4): empty for these tests — no connected servers.
 vi.mock("@/lib/ai-tools/mcp", () => ({
   assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], handlers: {} }),
+}));
+
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+  },
 }));
 
 vi.mock("@/lib/chat-stream", () => ({
@@ -400,7 +408,8 @@ describe("POST /api/chat", () => {
 
     const params = mockBuildChatSSEResponse.mock.calls[0]![0];
     expect(Array.isArray(params.messages)).toBe(true);
-    expect(params.financialContext).toContain("$500K cash");
+    // A3a-3: context is now passed as contextSections (not financialContext).
+    expect(params.contextSections?.[0]?.body ?? params.financialContext ?? "").toContain("$500K cash");
     expect(params.companionName).toBe("Aria");
   });
 

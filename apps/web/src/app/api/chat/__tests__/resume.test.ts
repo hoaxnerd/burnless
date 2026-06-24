@@ -99,6 +99,13 @@ vi.mock("@/lib/ai-tools", () => ({
   logDeniedToolCall: vi.fn(),
 }));
 
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+  },
+}));
+
 // Mock the shared SSE responder: capture the reconstructed messages + scenarioId
 // (proves one-tool_result-per-tool_use-id), and return a dummy stream so the
 // continuation does NOT call a real provider.

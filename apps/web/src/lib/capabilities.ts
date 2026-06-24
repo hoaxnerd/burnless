@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { AiFeatureConfig } from "@burnless/ai";
 
 export type Capability =
   | "marketingSite" | "billing" | "multiTenant" | "selfServeSignup"
@@ -145,8 +144,7 @@ export async function isDomainEnabled(
 
   const { getAiFlags } = await import("@/lib/ai-feature-flags");
   const flags = await getAiFlags(opts.companyId);
-  const features = flags.features as AiFeatureConfig & Record<string, boolean | undefined>;
-  const companyEnabled = (features as Record<string, boolean | undefined>)[domainId] ?? true;
+  const companyEnabled = (flags.features as unknown as Record<string, boolean | undefined>)[domainId] ?? true;
   return companyEnabled;
 }
 

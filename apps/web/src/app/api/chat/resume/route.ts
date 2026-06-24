@@ -24,6 +24,7 @@ import {
   categorizeToolName,
   BUILTIN_PERMISSION_DEFAULTS,
   projectModelThread,
+  DEFAULT_CONTEXT_HEADING,
   type ChatMessage,
   type PermissionDefaults,
   type AiWriteMode,
@@ -151,10 +152,21 @@ async function resumeStream(args: {
     source: scenario.source ?? "blank",
   });
   const overrideCount = await getOverrideCount(scenario.id);
-  const financialContext =
-    (overrideCount > 0
-      ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
-      : "") + baseContext;
+  const scenarioContext = overrideCount > 0
+    ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
+    : "";
+
+  // Registry: resolve tools + prompt sections. Context is built above (byte-identical).
+  // contextSections wraps the scenario-prefix + contextText into ONE section (pin #1 A3a-3).
+  // Dynamic import keeps domains/finance.ts out of the module parse graph so
+  // existing test mocks of @/lib/ai-tools (which finance.ts references) work unchanged.
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCtx = { companyId: ctx.companyId };
+  const [baseTools, promptSections] = await Promise.all([
+    domainRegistry.getActiveTools(domainCtx),
+    domainRegistry.getActivePromptSections(domainCtx),
+  ]);
+  const contextSections = [{ heading: DEFAULT_CONTEXT_HEADING, body: scenarioContext + baseContext }];
 
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
@@ -180,7 +192,9 @@ async function resumeStream(args: {
     // the whole multi-pause turn as ONE group (review finding #7).
     turnId,
     messages,
-    financialContext,
+    contextSections,
+    baseTools,
+    promptSections,
     companionName,
     providerConfig,
     defaults,

@@ -19,6 +19,8 @@ import {
   type UiBlock,
   type TimelineNode,
   type AiWriteMode,
+  type ContextSection,
+  type PromptSection,
 } from "@burnless/ai";
 import { executeToolCall, describeToolAction } from "@/lib/ai-tools";
 import { logger } from "@/lib/logger";
@@ -36,7 +38,14 @@ export interface ChatStreamParams {
    *  consumes it; this task only threads it through). */
   turnId: string;
   messages: ChatMessage[];
-  financialContext: string;
+  /** @deprecated use contextSections instead; kept for the scheduler's financialContext path. */
+  financialContext?: string;
+  /** Registry-resolved context sections (preferred over financialContext). */
+  contextSections?: ContextSection[];
+  /** Registry-resolved extra prompt sections (empty for finance-only). */
+  promptSections?: PromptSection[];
+  /** Registry-resolved base tool set (defaults to getFinancialTools() inside chatStream). */
+  baseTools?: ToolDefinition[];
   companionName: string;
   providerConfig: Parameters<typeof chatStream>[0]["providerConfig"];
   defaults: PermissionDefaults;
@@ -245,7 +254,9 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
       try {
         const chunks = chatStream({
           messages: params.messages,
-          financialContext: params.financialContext,
+          ...(params.contextSections ? { contextSections: params.contextSections } : { financialContext: params.financialContext ?? "" }),
+          ...(params.promptSections ? { promptSections: params.promptSections } : {}),
+          ...(params.baseTools ? { baseTools: params.baseTools } : {}),
           companionName: params.companionName,
           providerConfig: params.providerConfig,
           nowContext: params.nowContext,

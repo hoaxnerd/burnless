@@ -3,16 +3,24 @@
  * the execute closure gates scope-per-category, clamps read_only writeMode,
  * intercepts activate_scenario into session state, then dispatches through
  * executeToolCall (Zod validation, cache tags, audit ride along).
+ *
+ * A3a-3: getExposedMcpToolDefs and the exposed set in buildMcpExecuteTool now
+ * resolve through domainRegistry.getActiveMcpExposedTools (byte-identical:
+ * finance is the only domain, so the set equals getMcpExposedTools()).
+ * The exposed set is computed EAGERLY before the sync executor closure to avoid
+ * a race where the closure captures a pending Promise (explorer landmine #4).
  */
-import { getMcpExposedTools, categorizeToolName } from "@burnless/ai";
+import { categorizeToolName } from "@burnless/ai";
 import type { BurnlessToolDef, McpClientInfo, McpSessionState } from "@burnless/mcp/server";
 import { getScenarioForCompany } from "@burnless/db";
 import { executeToolCall } from "@/lib/ai-tools";
 import { getAiFlags } from "@/lib/ai-feature-flags";
 import type { McpAuthResult } from "./auth";
 
-export function getExposedMcpToolDefs(): BurnlessToolDef[] {
-  return getMcpExposedTools().map((t) => ({
+export async function getExposedMcpToolDefs(): Promise<BurnlessToolDef[]> {
+  const { domainRegistry } = await import("@/lib/domains");
+  const tools = await domainRegistry.getActiveMcpExposedTools({});
+  return tools.map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema as Record<string, unknown>,
@@ -26,10 +34,14 @@ export interface McpExecuteDeps {
   clientInfo: McpClientInfo | null;
 }
 
-export function buildMcpExecuteTool(
+export async function buildMcpExecuteTool(
   deps: McpExecuteDeps
-): (toolName: string, input: Record<string, unknown>) => Promise<string> {
-  const exposed = new Set(getMcpExposedTools().map((t) => t.name));
+): Promise<(toolName: string, input: Record<string, unknown>) => Promise<string>> {
+  // Compute the exposed set EAGERLY before returning the sync executor closure
+  // (explorer landmine #4 — must not capture a pending Promise in the closure).
+  const { domainRegistry } = await import("@/lib/domains");
+  const exposedTools = await domainRegistry.getActiveMcpExposedTools({ companyId: deps.auth.companyId });
+  const exposed = new Set(exposedTools.map((t) => t.name));
 
   return async (toolName, input) => {
     // Gate refusals THROW (not return-as-string): createBurnlessMcpServer turns a
