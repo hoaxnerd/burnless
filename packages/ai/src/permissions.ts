@@ -44,41 +44,21 @@ const WEB_SEARCH_TOOLS = new Set<string>(["search_web", "read_webpage"]);
 // classify into `browser_use` via the per-turn dynamicCategories map.
 const BROWSER_TOOLS = new Set<string>([]);
 
-const DELETE_TOOLS = new Set<string>([
-  "delete_forecast_line",
-  "delete_revenue_stream",
-  "delete_headcount",
-  "delete_department",
-  "delete_account",
-  "delete_scenario",
-  "delete_funding_round",
-]);
-
-const WRITE_TOOLS = new Set<string>([
-  "create_forecast_line",
-  "update_forecast_line",
-  "create_revenue_stream",
-  "update_revenue_stream",
-  "create_headcount",
-  "update_headcount",
-  "create_salary_change",
-  "create_bonus",
-  "create_equity_grant",
-  "create_department",
-  "update_department",
-  "create_account",
-  "update_account",
-  "create_scenario",
-  "update_scenario",
-  "create_funding_round",
-  "update_funding_round",
-  "create_funding_round_investor",
-  "update_grant_milestone",
-  "record_transaction",
-]);
+// Derived from tool metadata (A2b): mutates:"write" / "delete" annotations on
+// each ToolDefinition in tools.ts. The hand-maintained lists are removed — the
+// annotations are the single source of truth. ZERO behavior change: the
+// registry-derivation snapshot test freezes the pre-A2b membership and asserts
+// the derivation reproduces it exactly.
+const _tools = getFinancialTools();
+const WRITE_TOOLS: ReadonlySet<string> = new Set(
+  _tools.filter((t) => t.mutates === "write").map((t) => t.name),
+);
+const DELETE_TOOLS: ReadonlySet<string> = new Set(
+  _tools.filter((t) => t.mutates === "delete").map((t) => t.name),
+);
 
 /** All tools that mutate data (write + delete). */
-export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...WRITE_TOOLS,
   ...DELETE_TOOLS,
 ]);

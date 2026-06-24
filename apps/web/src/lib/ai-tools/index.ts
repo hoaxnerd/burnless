@@ -28,6 +28,7 @@ import {
   MarkGrantMilestoneHitSchema,
   ModelDilutionSchema,
   MUTATION_TOOL_NAMES,
+  getFinancialTools,
 } from "@burnless/ai";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
@@ -102,16 +103,11 @@ function isMutationTool(toolName: string): boolean {
  *  write non-overridable tables directly (scenario CRUD writes `scenarios`;
  *  investor writes `fundingRoundInvestors`) and ignore ctx.mode. They cannot be
  *  previewed as a scenario-override diff, so plan mode must not run them (it would
- *  write while auditing pending_apply). See worklog Plan 3 / carry-over follow-up a. */
-const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
-  "create_scenario",
-  "update_scenario",
-  "delete_scenario",
-  "create_funding_round_investor",
-  // Base-table actuals writer (S3a Plan 3): writes `transactions` directly, not a
-  // scenario overlay → plan mode must return the empty envelope, not a diff.
-  "record_transaction",
-]);
+ *  write while auditing pending_apply). See worklog Plan 3 / carry-over follow-up a.
+ *  Derived from ToolDefinition.nonFacade (A2b). */
+const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set(
+  getFinancialTools().filter((t) => t.nonFacade).map((t) => t.name),
+);
 
 /** A mutation whose plan mode yields a real scenario-override delta (diff-gate). */
 function isDiffableMutationTool(toolName: string): boolean {
@@ -128,35 +124,14 @@ const SCENARIO_ID_OPERAND_TOOLS: ReadonlySet<string> = new Set<string>([
 
 /** Maps mutation tool names to the cache tags they should invalidate.
  *  Scenario-override changes also invalidate "scenario-overrides" so the
- *  banner / diff views refresh. */
-const MUTATION_CACHE_TAGS: Record<string, string[]> = {
-  create_scenario: ["scenarios"],
-  update_scenario: ["scenarios"],
-  delete_scenario: ["scenarios"],
-  create_headcount: ["headcount-plans", "scenario-overrides"],
-  update_headcount: ["headcount-plans", "scenario-overrides"],
-  delete_headcount: ["headcount-plans", "scenario-overrides"],
-  create_salary_change: ["headcount-plans", "scenario-overrides"],
-  create_bonus: ["headcount-plans", "scenario-overrides"],
-  create_equity_grant: ["headcount-plans", "scenario-overrides"],
-  create_department: ["departments", "scenario-overrides"],
-  update_department: ["departments", "scenario-overrides"],
-  delete_department: ["departments", "headcount-plans", "scenario-overrides"],
-  create_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  update_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  delete_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  create_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  update_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  delete_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  create_funding_round_investor: ["funding-rounds", "cap-table"],
-  update_grant_milestone: ["funding-rounds", "scenario-overrides", "cap-table"],
-  create_forecast_line: ["forecast-lines", "scenario-overrides"],
-  update_forecast_line: ["forecast-lines", "scenario-overrides"],
-  delete_forecast_line: ["forecast-lines", "scenario-overrides"],
-  create_account: ["accounts", "scenario-overrides"],
-  update_account: ["accounts", "scenario-overrides"],
-  delete_account: ["accounts", "scenario-overrides"],
-};
+ *  banner / diff views refresh.
+ *  Derived from ToolDefinition.cacheTags (A2b). record_transaction is intentionally
+ *  absent (no cacheTags annotation) — it writes the uncached transactions ledger. */
+const MUTATION_CACHE_TAGS: Record<string, string[]> = Object.fromEntries(
+  getFinancialTools()
+    .filter((t) => t.cacheTags && t.cacheTags.length > 0)
+    .map((t) => [t.name, t.cacheTags!]),
+);
 
 function invalidateCacheForTool(toolName: string): void {
   const tags = MUTATION_CACHE_TAGS[toolName];

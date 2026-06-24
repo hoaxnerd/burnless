@@ -59,6 +59,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name"],
     },
+    mutates: "write",
+    cacheTags: ["scenarios"],
+    nonFacade: true,
   },
   {
     name: "activate_scenario",
@@ -144,6 +147,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["accountId", "method", "parameters", "startDate"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["forecast-lines", "scenario-overrides"],
   },
   {
     name: "create_headcount",
@@ -202,6 +207,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["departmentId", "title", "salary", "startDate"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "update_headcount",
@@ -260,6 +267,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "delete_headcount",
@@ -276,6 +285,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "update_department",
@@ -296,6 +307,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["departments", "scenario-overrides"],
   },
   {
     name: "delete_department",
@@ -312,6 +325,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["departments", "headcount-plans", "scenario-overrides"],
   },
   {
     name: "create_revenue_stream",
@@ -353,6 +368,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["name", "type", "startDate", "parameters"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["revenue-streams", "scenario-overrides"],
   },
   {
     name: "update_scenario",
@@ -381,6 +398,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    mutates: "write",
+    cacheTags: ["scenarios"],
+    nonFacade: true,
   },
   {
     name: "delete_scenario",
@@ -396,6 +416,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    mutates: "delete",
+    cacheTags: ["scenarios"],
+    nonFacade: true,
   },
   {
     name: "update_revenue_stream",
@@ -431,6 +454,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["revenue-streams", "scenario-overrides"],
   },
   {
     name: "delete_revenue_stream",
@@ -447,6 +472,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["revenue-streams", "scenario-overrides"],
   },
   {
     name: "get_scenario_comparison",
@@ -557,6 +584,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["name", "roundType", "amount", "date"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["funding-rounds", "scenario-overrides", "cap-table"],
   },
   {
     name: "update_funding_round",
@@ -609,6 +638,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["funding-rounds", "scenario-overrides", "cap-table"],
   },
   {
     name: "delete_funding_round",
@@ -625,6 +656,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["funding-rounds", "scenario-overrides", "cap-table"],
   },
   {
     name: "create_funding_round_investor",
@@ -652,6 +685,9 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["fundingRoundId", "name", "amountInvested"],
     },
+    mutates: "write",
+    cacheTags: ["funding-rounds", "cap-table"],
+    nonFacade: true,
   },
   {
     name: "update_grant_milestone",
@@ -676,6 +712,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["fundingRoundId", "milestoneId", "hitDate"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["funding-rounds", "scenario-overrides", "cap-table"],
   },
   {
     name: "update_forecast_line",
@@ -734,6 +772,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["forecast-lines", "scenario-overrides"],
   },
   {
     name: "delete_forecast_line",
@@ -750,6 +790,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["forecast-lines", "scenario-overrides"],
   },
   {
     name: "create_account",
@@ -776,6 +818,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["name", "type", "category"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["accounts", "scenario-overrides"],
   },
   {
     name: "update_account",
@@ -806,6 +850,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["accounts", "scenario-overrides"],
   },
   {
     name: "delete_account",
@@ -822,6 +868,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["id"],
     },
     scenarioTargetable: true,
+    mutates: "delete",
+    cacheTags: ["accounts", "scenario-overrides"],
   },
   {
     name: "list_accounts",
@@ -845,6 +893,11 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["accountId", "date", "amount"],
     },
+    mutates: "write",
+    // No cacheTags: record_transaction writes the uncached `transactions` ledger directly.
+    // Cache invalidation is handled via trackDataMutation + React.cache re-read,
+    // exactly like the api/transactions route. Intentionally uncached — do NOT add tags.
+    nonFacade: true,
   },
   {
     name: "create_department",
@@ -861,6 +914,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["name"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["departments", "scenario-overrides"],
   },
   {
     name: "get_transaction_categories",
@@ -1040,6 +1095,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["headcountId", "effectiveDate", "newSalary"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "create_bonus",
@@ -1061,6 +1118,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["headcountId", "payoutMonth", "amount"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "create_equity_grant",
@@ -1101,6 +1160,8 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       required: ["headcountId", "grantDate", "shares"],
     },
     scenarioTargetable: true,
+    mutates: "write",
+    cacheTags: ["headcount-plans", "scenario-overrides"],
   },
   {
     name: "get_revenue_projection",
