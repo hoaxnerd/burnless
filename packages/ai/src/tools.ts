@@ -1247,6 +1247,10 @@ export function getFinancialTools(): ToolDefinition[] {
  * - search_web / read_webpage (mcpExcluded:true) — agents bring their own web access.
  * Derived from ToolDefinition.flavor and .mcpExcluded metadata.
  * Guarded by __tests__/mcp-exposed-tools.test.ts.
+ *
+ * flavor:"core" — always-on, domain-less primitive (e.g. calculate()).
+ * Core tools are MCP-exposed (not excluded here), read-categorized by default,
+ * and not part of display/input/plan sets. The hook is wired in Workstream 2.
  */
 export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set(
   FINANCIAL_TOOLS.filter(

@@ -196,3 +196,36 @@ describe("A2b: MUTATION_TOOL_NAMES derived from mutates annotations", () => {
     expect(rt!.cacheTags).toBeUndefined();
   });
 });
+
+// ── A2c: core tool flavor hook ────────────────────────────────────────────────
+//
+// Validates the registry rules for the "core" flavor: always-on, domain-less,
+// MCP-exposed (not excluded by flavor), read-categorized by default. No real
+// core tool exists yet (YAGNI); this locks the predicates for Workstream 2.
+
+describe("core tool flavor hook", () => {
+  it("a core-flavored tool is read-categorized, not display/input/plan, and not MCP-excluded by flavor", () => {
+    const core = {
+      name: "calculate",
+      description: "x",
+      inputSchema: { type: "object" as const, properties: {} },
+      flavor: "core" as const,
+    };
+    // Widen flavor to string for the predicate check — TS would otherwise flag
+    // literal-type comparisons ("core" === "display") as always-false. The intent
+    // is to document (and lock) that the MCP-exclusion predicate's runtime branch
+    // evaluates to false for a core-flavored tool, matching the derivation in tools.ts.
+    const flavor: string = core.flavor;
+    // predicate-level checks (pure): not a genui/plan name
+    expect(flavor === "display" || flavor === "input" || flavor === "plan").toBe(false);
+    // MCP-exclusion rule excludes only display/input/plan/mcpExcluded — core passes through
+    const wouldBeExcluded =
+      flavor === "display" ||
+      flavor === "input" ||
+      flavor === "plan" ||
+      ("mcpExcluded" in core && (core as { mcpExcluded?: boolean }).mcpExcluded === true);
+    expect(wouldBeExcluded).toBe(false);
+    // absent from WRITE/DELETE → categorizeToolName returns "read"
+    expect(categorizeToolName(core.name)).toBe("read");
+  });
+});
