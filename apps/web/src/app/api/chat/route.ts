@@ -190,8 +190,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   // falls back to.
   const writeScenarioId = resolveWriteScenarioId(body.scenarioId, found ?? null);
 
-  // Build financial context
-  const { contextText: baseContextText, nowContext } = await buildAiContext(ctx.companyId, {
+  // buildAiContext is retained for nowContext (+ cache-priming); the context body now comes from getActiveContextContributors
+  const { nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",

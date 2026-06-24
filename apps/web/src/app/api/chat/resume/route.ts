@@ -146,7 +146,8 @@ async function resumeStream(args: {
     (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
   ) as ChatMessage[];
 
-  const { contextText: baseContext, nowContext } = await buildAiContext(ctx.companyId, {
+  // buildAiContext is retained for nowContext (+ cache-priming); the context body now comes from getActiveContextContributors
+  const { nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",
