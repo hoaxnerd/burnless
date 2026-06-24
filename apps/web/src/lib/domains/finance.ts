@@ -29,17 +29,21 @@ import type { ContributeCtx } from "@burnless/ai";
 /**
  * Produces the financial snapshot context section for the system message.
  *
- * NOTE (A3a-2): The scenario-override prefix handling (currently done in the
- * chat route before calling buildAiContext) is intentionally NOT moved here.
- * A3a-3 will decide whether to move it into the contributor or keep it at the
- * call site. For now, the contributor calls buildAiContext with the scenario
- * from ctx (which may be the baseline scenario) — same as today.
+ * Uses ctx.scenarioRef when supplied (set by the chat/resume routes) so that the
+ * real scenario name flows into buildAiContext (which embeds it in the context
+ * text). Falls back to a safe baseline placeholder for callers that only pass
+ * scenarioId. The scenario-override prefix is NOT applied here — the route
+ * prepends it to the returned body after flat-mapping contributors (A3a-3).
+ *
+ * buildAiContext's heavy work (computeDashboardData, cachedQuery reads) is
+ * React.cache / unstable_cache deduped within the request, so the route's own
+ * buildAiContext call (for nowContext) and this call share the cache entry.
  */
 export const financeContributor: ContextContributor = {
   id: "finance-snapshot",
   domain: "finance",
   async sections(ctx: ContributeCtx): Promise<ContextSection[]> {
-    const scenario = {
+    const scenario = ctx.scenarioRef ?? {
       id: ctx.scenarioId ?? "base",
       name: "Baseline",
       source: "base",

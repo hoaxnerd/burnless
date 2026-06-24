@@ -203,18 +203,36 @@ export const POST = withErrorHandler(async (request: Request) => {
     ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
     : "";
 
-  // Registry: resolve tools + prompt sections. Context is built above (byte-identical).
-  // contextSections wraps the existing scenario-prefix + contextText into ONE section
-  // (same as the legacy financialContext single-block — pin #1 in A3a-3).
+  // Registry: resolve tools, prompt sections, AND context sections through the
+  // DomainRegistry so future domains (e.g. company-knowledge) automatically
+  // contribute their sections without touching this route.
+  //
   // Dynamic import keeps domains/finance.ts out of the module parse graph so
-  // existing test mocks of @/lib/ai-tools (which finance.ts references) work unchanged.
+  // existing test mocks of @/lib/ai-tools (which finance.ts references) work.
+  //
+  // buildAiContext above is kept for nowContext (and cache-priming); the finance
+  // contributor internally re-calls buildAiContext — React.cache / unstable_cache
+  // deduplicates the heavy work (computeDashboardData, cachedQuery) within the request.
   const { domainRegistry } = await import("@/lib/domains");
   const domainCtx = { companyId: ctx.companyId };
-  const [baseTools, promptSections] = await Promise.all([
+  const contributeCtx = {
+    companyId: ctx.companyId,
+    scenarioId: scenario.id,
+    scenarioRef: { id: scenario.id, name: scenario.name, source: scenario.source ?? "blank" },
+  };
+  const [baseTools, promptSections, contributors] = await Promise.all([
     domainRegistry.getActiveTools(domainCtx),
     domainRegistry.getActivePromptSections(domainCtx),
+    domainRegistry.getActiveContextContributors(domainCtx),
   ]);
-  const contextSections = [{ heading: DEFAULT_CONTEXT_HEADING, body: scenarioContext + baseContextText }];
+  const rawSections = (await Promise.all(contributors.map((c) => c.sections(contributeCtx)))).flat();
+  // Prepend the scenario-override prefix to the first DEFAULT_CONTEXT_HEADING section
+  // (the finance snapshot) — identical to the single-block behaviour before this change.
+  const contextSections = rawSections.map((s, i) =>
+    i === 0 && s.heading === DEFAULT_CONTEXT_HEADING
+      ? { ...s, body: scenarioContext + s.body }
+      : s
+  );
 
   // Load company's custom AI provider config (if any)
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);

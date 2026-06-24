@@ -45,4 +45,11 @@ export interface ContextContributor {
 export interface ContributeCtx {
   companyId: string;
   scenarioId?: string | null;
+  /**
+   * Full scenario reference for contributors that need the scenario name/source
+   * (e.g. the finance contributor passes these to buildAiContext). Optional so
+   * callers that only have a scenarioId can omit this; contributors fall back to
+   * safe defaults when absent.
+   */
+  scenarioRef?: { id: string; name: string; source: string };
 }
