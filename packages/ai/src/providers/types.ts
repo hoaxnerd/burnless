@@ -44,6 +44,14 @@ export interface ToolDefinition {
     properties: Record<string, unknown>;
     required?: string[];
   };
+  /** A2 declarative tool metadata — drives the derived registry sets.
+   *  All optional, plain data; the provider bridge (toAiSdkTools) ignores them. */
+  flavor?: "display" | "input" | "plan" | "core"; // family; absent = ordinary domain tool
+  mutates?: "write" | "delete";                    // absent = read-only
+  scenarioTargetable?: boolean;                    // gets scenarioId param + overlay-write targeting
+  mcpExcluded?: boolean;                           // hidden from MCP server (non-genui exclusions)
+  cacheTags?: string[];                            // revalidateTag targets after a successful mutation (web)
+  nonFacade?: boolean;                             // mutation bypasses the scenario-overlay facade (web)
 }
 
 // ── Response ────────────────────────────────────────────────────────────────

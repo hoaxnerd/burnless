@@ -39,6 +39,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["title", "steps"],
     },
+    flavor: "plan",
   },
   {
     name: "create_scenario",
@@ -142,6 +143,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["accountId", "method", "parameters", "startDate"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_headcount",
@@ -199,6 +201,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["departmentId", "title", "salary", "startDate"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_headcount",
@@ -256,6 +259,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_headcount",
@@ -271,6 +275,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_department",
@@ -290,6 +295,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_department",
@@ -305,6 +311,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_revenue_stream",
@@ -345,6 +352,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name", "type", "startDate", "parameters"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_scenario",
@@ -422,6 +430,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_revenue_stream",
@@ -437,6 +446,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "get_scenario_comparison",
@@ -546,6 +556,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name", "roundType", "amount", "date"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_funding_round",
@@ -597,6 +608,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_funding_round",
@@ -612,6 +624,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_funding_round_investor",
@@ -662,6 +675,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["fundingRoundId", "milestoneId", "hitDate"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_forecast_line",
@@ -719,6 +733,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_forecast_line",
@@ -734,6 +749,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_account",
@@ -759,6 +775,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name", "type", "category"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "update_account",
@@ -788,6 +805,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "delete_account",
@@ -803,6 +821,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["id"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "list_accounts",
@@ -841,6 +860,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["name"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "get_transaction_categories",
@@ -1000,6 +1020,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["query"],
     },
+    mcpExcluded: true,
   },
   {
     name: "create_salary_change",
@@ -1018,6 +1039,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["headcountId", "effectiveDate", "newSalary"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_bonus",
@@ -1038,6 +1060,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["headcountId", "payoutMonth", "amount"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "create_equity_grant",
@@ -1077,6 +1100,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["headcountId", "grantDate", "shares"],
     },
+    scenarioTargetable: true,
   },
   {
     name: "get_revenue_projection",
@@ -1115,6 +1139,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
       },
       required: ["url"],
     },
+    mcpExcluded: true,
   },
   ...GENUI_DISPLAY_TOOLS,
   ...GENUI_INPUT_TOOLS,
@@ -1123,17 +1148,10 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
 /** Overlay-write tools whose target scenario the model may override per call
  *  (spec §4.4). EXCLUDES scenario CRUD (create/update/delete_scenario), the
  *  investor writer, and record_transaction (base-table actuals) — those don't
- *  write a scenario overlay. */
-export const SCENARIO_TARGETABLE_TOOLS: ReadonlySet<string> = new Set<string>([
-  "create_forecast_line", "update_forecast_line", "delete_forecast_line",
-  "create_revenue_stream", "update_revenue_stream", "delete_revenue_stream",
-  "create_headcount", "update_headcount", "delete_headcount",
-  "create_salary_change", "create_bonus", "create_equity_grant",
-  "create_department", "update_department", "delete_department",
-  "create_account", "update_account", "delete_account",
-  "create_funding_round", "update_funding_round", "delete_funding_round",
-  "update_grant_milestone",
-]);
+ *  write a scenario overlay. Derived from ToolDefinition.scenarioTargetable. */
+export const SCENARIO_TARGETABLE_TOOLS: ReadonlySet<string> = new Set(
+  FINANCIAL_TOOLS.filter((t) => t.scenarioTargetable).map((t) => t.name),
+);
 
 const SCENARIO_ID_PROP = {
   type: "string",
@@ -1163,20 +1181,17 @@ export function getFinancialTools(): ToolDefinition[] {
 
 /**
  * Tools NOT exposed over the remote MCP server (expose spec §4.4):
- * - genui show_x/request_x — render only inside our chat UI;
- * - propose_plan — a chat-loop gating construct;
- * - search_web / read_webpage — agents bring their own web access; keeps the
- *   local DuckDuckGo/direct-fetch backends off the external surface.
- * Genui names are DERIVED from the genui arrays so new genui tools are
- * excluded automatically. Guarded by __tests__/mcp-exposed-tools.test.ts.
+ * - genui show_x/request_x (flavor:"display"/"input") — render only inside our chat UI;
+ * - propose_plan (flavor:"plan") — a chat-loop gating construct;
+ * - search_web / read_webpage (mcpExcluded:true) — agents bring their own web access.
+ * Derived from ToolDefinition.flavor and .mcpExcluded metadata.
+ * Guarded by __tests__/mcp-exposed-tools.test.ts.
  */
-export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set<string>([
-  ...GENUI_DISPLAY_TOOLS.map((t) => t.name),
-  ...GENUI_INPUT_TOOLS.map((t) => t.name),
-  "propose_plan",
-  "search_web",
-  "read_webpage",
-]);
+export const MCP_SERVER_EXCLUDED_TOOLS: ReadonlySet<string> = new Set(
+  FINANCIAL_TOOLS.filter(
+    (t) => t.flavor === "display" || t.flavor === "input" || t.flavor === "plan" || t.mcpExcluded,
+  ).map((t) => t.name),
+);
 
 /** The remote MCP server's tool surface: the full Companion mirror minus the
  *  exclusion set. Same names, same JSON schemas (spec B1). */

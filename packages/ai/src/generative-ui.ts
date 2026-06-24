@@ -7,6 +7,7 @@
  *    feed the submission back as a tool_result on resume.
  * Both classify as `read` (categorizeToolName default) — no permission card.
  */
+import { GENUI_DISPLAY_TOOLS, GENUI_INPUT_TOOLS } from "./tools-genui";
 
 export type FormFieldType =
   | "currency" | "percent" | "number" | "integer"
@@ -74,44 +75,18 @@ export interface InputRequestState {
 }
 
 /**
- * Display tool names. Populated incrementally by later plans; the membership
- * is the single source for the chat-stream `ui_component` emit and the
- * read-classification test. Keep in sync with the FINANCIAL_TOOLS additions.
+ * Display tool names. Derived from GENUI_DISPLAY_TOOLS (flavor:"display").
+ * Single source of truth for the chat-stream `ui_component` emit and the
+ * read-classification test. New display tools only need a def in tools-genui.ts.
  */
-export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
-  // Plan 2 (data-bound): show_metric_card, show_kpi_grid, show_line_chart,
-  //   show_bar_chart, show_area_chart, show_data_table, show_runway,
-  //   show_cap_table, show_scenario_diff, show_burn_breakdown, show_funding_summary
-  "show_metric_card",
-  "show_kpi_grid",
-  "show_line_chart",
-  "show_bar_chart",
-  "show_area_chart",
-  "show_runway",
-  "show_cap_table",
-  "show_scenario_diff",
-  "show_burn_breakdown",
-  "show_funding_summary",
-  "show_data_table",
-  // Plan 3 (presentational): show_callout, show_comparison_table, show_checklist,
-  //   show_suggested_actions, show_progress_steps
-  "show_callout",
-  "show_comparison_table",
-  "show_checklist",
-  "show_suggested_actions",
-  "show_progress_steps",
-  // Scheduling proposal card (MCP-D): renders the AI's draft scheduled job; the
-  // tool input IS the card props (passthrough handler in genui-display.ts).
-  "propose_scheduled_job",
-]);
+export const DISPLAY_TOOL_NAMES: ReadonlySet<string> = new Set(
+  GENUI_DISPLAY_TOOLS.map((t) => t.name),
+);
 
-/** Input tool names. request_* presets are added in Plan 4. */
-export const INPUT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
-  "request_input_form",
-  "request_revenue_stream",
-  "request_headcount",
-  "request_forecast_line",
-]);
+/** Input tool names. Derived from GENUI_INPUT_TOOLS (flavor:"input"). */
+export const INPUT_TOOL_NAMES: ReadonlySet<string> = new Set(
+  GENUI_INPUT_TOOLS.map((t) => t.name),
+);
 
 export function isDisplayTool(toolName: string): boolean {
   return DISPLAY_TOOL_NAMES.has(toolName);
