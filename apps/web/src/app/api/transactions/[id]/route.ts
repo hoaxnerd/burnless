@@ -5,7 +5,7 @@ import { requireCompanyWrite, parseBody, errorResponse, withErrorHandler } from 
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import { getActiveScenario } from "@/lib/scenario-middleware";
-import { updateTransactionSchema } from "../route";
+import { updateTransactionSchema } from "../schemas";
 
 /**
  * Manual-CRUD on a single transaction. Transactions are actuals (spec §0.1/§0.2):

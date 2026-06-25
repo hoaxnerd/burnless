@@ -46,8 +46,8 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
-// The [id] route imports updateTransactionSchema from ../route; mock it to passthrough.
-vi.mock("../route", () => ({ updateTransactionSchema: { parse: (d: unknown) => d } }));
+// The [id] route imports updateTransactionSchema from ../schemas; mock it to passthrough.
+vi.mock("../schemas", () => ({ updateTransactionSchema: { parse: (d: unknown) => d } }));
 
 import { PATCH, DELETE } from "../[id]/route";
 
