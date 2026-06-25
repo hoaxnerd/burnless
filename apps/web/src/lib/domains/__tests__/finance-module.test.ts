@@ -174,7 +174,12 @@ describe("domainRegistry with only finance — getActiveTools parity", () => {
     vi.mock("@/lib/ai-tools/resolve-tool-scenario", () => ({ resolveToolScenario: vi.fn() }));
   });
 
-  it("getActiveTools({companyId}) deep-equals getFinancialTools()", async () => {
+  it("getActiveTools({companyId}) deep-equals getFinancialTools() (finance only enabled)", async () => {
+    // A3b-2: company-knowledge is now also registered, so to keep this a pure
+    // finance-parity proof we enable only finance for this company.
+    const { isDomainEnabled } = await import("@/lib/capabilities");
+    vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "finance");
+
     // Import fresh registry (populated by registerDomains() at module load)
     const { domainRegistry } = await import("../index");
     const { getFinancialTools } = await import("@burnless/ai");
@@ -183,7 +188,10 @@ describe("domainRegistry with only finance — getActiveTools parity", () => {
     expect(activeTools).toEqual(getFinancialTools());
   });
 
-  it("getActiveMcpExposedTools deep-equals getMcpExposedTools()", async () => {
+  it("getActiveMcpExposedTools deep-equals getMcpExposedTools() (finance only enabled)", async () => {
+    const { isDomainEnabled } = await import("@/lib/capabilities");
+    vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "finance");
+
     const { domainRegistry } = await import("../index");
     const { getMcpExposedTools } = await import("@burnless/ai");
 

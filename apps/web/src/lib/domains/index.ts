@@ -11,6 +11,7 @@
 
 import { domainRegistry } from "./registry";
 import { financeDomainModule } from "./finance";
+import { companyKnowledgeModule } from "./company-knowledge";
 
 let registered = false;
 
@@ -18,6 +19,7 @@ export function registerDomains(): void {
   if (registered) return;
   registered = true;
   domainRegistry.register(financeDomainModule);
+  domainRegistry.register(companyKnowledgeModule);
 }
 
 // Auto-register at module load so any importer gets a populated registry.
