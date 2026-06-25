@@ -149,6 +149,7 @@ vi.mock("@burnless/ai", async () => {
     resolvePermission: vi.fn(() => "allow"),
     categorizeToolName: vi.fn(() => "read"),
     projectModelThread: actual.projectModelThread,
+    DEFAULT_CONTEXT_HEADING: actual.DEFAULT_CONTEXT_HEADING,
     BUILTIN_PERMISSION_DEFAULTS: {
       read: "always",
       write: "ask",
@@ -161,11 +162,30 @@ vi.mock("@burnless/ai", async () => {
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
+  buildDomainToolCategories: () => ({}),
 }));
 
 // MCP tools assembly (spec §3.4): empty for these tests — no connected servers.
 vi.mock("@/lib/ai-tools/mcp", () => ({
   assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], handlers: {} }),
+}));
+
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+    getActiveContextContributors: vi.fn(async () => [
+      {
+        id: "finance-snapshot",
+        domain: "finance",
+        sections: async (ctx: { companyId: string }) => {
+          const { buildAiContext } = await import("@/lib/build-ai-context");
+          const { contextText } = await buildAiContext(ctx.companyId, { id: "base", name: "Baseline", source: "base" });
+          return [{ heading: "Current Financial Data", body: contextText }];
+        },
+      },
+    ]),
+  },
 }));
 
 vi.mock("@/lib/chat-stream", () => ({
@@ -400,7 +420,8 @@ describe("POST /api/chat", () => {
 
     const params = mockBuildChatSSEResponse.mock.calls[0]![0];
     expect(Array.isArray(params.messages)).toBe(true);
-    expect(params.financialContext).toContain("$500K cash");
+    // A3a-3: context is now passed as contextSections (not financialContext).
+    expect(params.contextSections?.[0]?.body ?? params.financialContext ?? "").toContain("$500K cash");
     expect(params.companionName).toBe("Aria");
   });
 
@@ -609,5 +630,51 @@ describe("POST /api/chat", () => {
     await POST(makeRequest({ message: "Track me" }));
 
     expect(mockSetTrackingCompanyId).toHaveBeenCalledWith("c1");
+  });
+
+  it("A3a-3 live-seam: a 2nd domain contributor's section appears in contextSections alongside the finance section", async () => {
+    // Proves that the chat route flat-maps ALL active contributors through
+    // getActiveContextContributors — a future domain (e.g. company-knowledge) will
+    // be included automatically without touching this route.
+    const { domainRegistry } = await import("@/lib/domains");
+    const { getActiveContextContributors } = domainRegistry as unknown as {
+      getActiveContextContributors: ReturnType<typeof vi.fn>;
+    };
+
+    // Override for this test: finance contributor + a fake 2nd-domain contributor.
+    getActiveContextContributors.mockResolvedValueOnce([
+      {
+        id: "finance-snapshot",
+        domain: "finance",
+        sections: async () => [{ heading: "Current Financial Data", body: "finance body" }],
+      },
+      {
+        id: "fake-domain-context",
+        domain: "fake-domain",
+        sections: async () => [{ heading: "Fake Domain Context", body: "extra domain data" }],
+      },
+    ]);
+
+    mockBuildAiContext.mockResolvedValueOnce({
+      contextText: "finance body",
+      snapshot: {},
+      nowContext: { iso: "2026-01-01T00:00", timezone: "UTC" },
+    });
+    mockReturning.mockResolvedValue([{ id: "seam-conv" }]);
+
+    const { POST } = await import("../route");
+    await POST(makeRequest({ message: "What do both domains know?" }));
+
+    const params = mockBuildChatSSEResponse.mock.calls[0]![0];
+    const sections: Array<{ heading: string; body: string }> = params.contextSections ?? [];
+
+    // Finance section present (first, with scenario prefix prepended)
+    expect(sections.some((s) => s.heading === "Current Financial Data")).toBe(true);
+    // 2nd domain section present — proves the seam is live
+    expect(sections.some((s) => s.heading === "Fake Domain Context" && s.body === "extra domain data")).toBe(true);
+    // Order: finance first, then the 2nd domain
+    const financeIdx = sections.findIndex((s) => s.heading === "Current Financial Data");
+    const fakeIdx = sections.findIndex((s) => s.heading === "Fake Domain Context");
+    expect(financeIdx).toBeLessThan(fakeIdx);
   });
 });

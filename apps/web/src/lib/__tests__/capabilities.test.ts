@@ -1,10 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { EDITION_PRESETS, type Capability } from "../capabilities";
 
 const ALL_CAPS: Capability[] = [
   "marketingSite","billing","multiTenant","selfServeSignup","oauthLogin",
   "autoLogin","stdioMcp","planEnforcement","emailVerification",
   "managedAiProvider","integrations","inviteCodes","semanticSearch","dataResidency",
+  "skills",
 ];
 
 describe("EDITION_PRESETS", () => {

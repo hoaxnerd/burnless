@@ -33,6 +33,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["metric"],
     },
+    flavor: "display",
   },
   {
     name: "show_kpi_grid",
@@ -69,6 +70,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["metrics"],
     },
+    flavor: "display",
   },
   {
     name: "show_line_chart",
@@ -95,6 +97,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_bar_chart",
@@ -116,6 +119,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_area_chart",
@@ -143,6 +147,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_runway",
@@ -158,6 +163,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_cap_table",
@@ -173,6 +179,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_scenario_diff",
@@ -192,6 +199,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["scenarioA", "scenarioB"],
     },
+    flavor: "display",
   },
   {
     name: "show_burn_breakdown",
@@ -207,6 +215,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_funding_summary",
@@ -222,6 +231,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_data_table",
@@ -242,6 +252,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: [],
     },
+    flavor: "display",
   },
   {
     name: "show_callout",
@@ -260,6 +271,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["severity", "body"],
     },
+    flavor: "display",
   },
   {
     name: "show_comparison_table",
@@ -296,6 +308,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["columns", "rows"],
     },
+    flavor: "display",
   },
   {
     name: "show_checklist",
@@ -325,6 +338,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["items"],
     },
+    flavor: "display",
   },
   {
     name: "show_suggested_actions",
@@ -353,6 +367,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["actions"],
     },
+    flavor: "display",
   },
   {
     name: "show_progress_steps",
@@ -383,6 +398,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["steps"],
     },
+    flavor: "display",
   },
   {
     name: "propose_scheduled_job",
@@ -416,6 +432,7 @@ const BASE_GENUI_DISPLAY_TOOLS: ToolDefinition[] = [
       },
       required: ["name", "prompt", "schedule", "scheduleLabel", "actionKind", "whatItDoes", "allowedTools"],
     },
+    flavor: "display",
   },
 ];
 
@@ -476,6 +493,7 @@ GENUI_INPUT_TOOLS.push(
       },
       required: ["title", "fields"],
     },
+    flavor: "input",
   },
   {
     name: "request_revenue_stream",
@@ -490,6 +508,7 @@ GENUI_INPUT_TOOLS.push(
       },
       required: [],
     },
+    flavor: "input",
   },
   {
     name: "request_headcount",
@@ -504,6 +523,7 @@ GENUI_INPUT_TOOLS.push(
       },
       required: [],
     },
+    flavor: "input",
   },
   {
     name: "request_forecast_line",
@@ -518,6 +538,7 @@ GENUI_INPUT_TOOLS.push(
       },
       required: [],
     },
+    flavor: "input",
   },
 );
 

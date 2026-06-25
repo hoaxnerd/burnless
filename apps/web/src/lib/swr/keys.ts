@@ -21,6 +21,7 @@ export const KEYS = {
   twoFactorStatus: "/api/auth/two-factor/status",
   digest: "/api/digest",
   aiPermissions: "/api/ai/permissions",
+  aiDomainTools: "/api/ai/domain-tools",
   alerts: "/api/alerts",
   integrations: "/api/integrations",
   company: "/api/company",

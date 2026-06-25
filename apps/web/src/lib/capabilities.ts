@@ -4,7 +4,8 @@ export type Capability =
   | "marketingSite" | "billing" | "multiTenant" | "selfServeSignup"
   | "oauthLogin" | "autoLogin" | "stdioMcp" | "planEnforcement"
   | "emailVerification" | "managedAiProvider" | "integrations"
-  | "inviteCodes" | "semanticSearch" | "dataResidency";
+  | "inviteCodes" | "semanticSearch" | "dataResidency"
+  | "skills";
 
 export type Capabilities = Record<Capability, boolean>;
 export type Edition = "self_host" | "cloud";
@@ -15,12 +16,19 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
     oauthLogin: false, autoLogin: true, stdioMcp: true, planEnforcement: false,
     emailVerification: false, managedAiProvider: false, integrations: false,
     inviteCodes: false, semanticSearch: false, dataResidency: false,
+    // Filesystem-backed; cloud/DB-backed skills are a later consumer.
+    skills: true,
   },
   cloud: {
     marketingSite: true, billing: true, multiTenant: true, selfServeSignup: true,
     oauthLogin: true, autoLogin: false, stdioMcp: false, planEnforcement: true,
     emailVerification: true, managedAiProvider: true, integrations: true,
-    inviteCodes: true, semanticSearch: false, dataResidency: true,
+    // semanticSearch ON for cloud (managed 1536-dim embedder). Self-host stays false:
+    // its default Ollama embedder is 768-dim, incompatible with the vector(1536) column —
+    // operators enable it via BURNLESS_CAP_SEMANTIC_SEARCH=true once a 1536-dim embedder is set.
+    inviteCodes: true, semanticSearch: true, dataResidency: true,
+    // Filesystem-backed; cloud/DB-backed skills are a later consumer.
+    skills: false,
   },
 };
 
@@ -39,6 +47,7 @@ const CAP_ENV: Record<Capability, string> = {
   inviteCodes: "BURNLESS_CAP_INVITE_CODES",
   semanticSearch: "BURNLESS_CAP_SEMANTIC_SEARCH",
   dataResidency: "BURNLESS_CAP_DATA_RESIDENCY",
+  skills: "BURNLESS_CAP_SKILLS",
 };
 
 function envFlag(name: string): boolean | undefined {

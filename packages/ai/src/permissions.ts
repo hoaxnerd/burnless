@@ -44,41 +44,21 @@ const WEB_SEARCH_TOOLS = new Set<string>(["search_web", "read_webpage"]);
 // classify into `browser_use` via the per-turn dynamicCategories map.
 const BROWSER_TOOLS = new Set<string>([]);
 
-const DELETE_TOOLS = new Set<string>([
-  "delete_forecast_line",
-  "delete_revenue_stream",
-  "delete_headcount",
-  "delete_department",
-  "delete_account",
-  "delete_scenario",
-  "delete_funding_round",
-]);
-
-const WRITE_TOOLS = new Set<string>([
-  "create_forecast_line",
-  "update_forecast_line",
-  "create_revenue_stream",
-  "update_revenue_stream",
-  "create_headcount",
-  "update_headcount",
-  "create_salary_change",
-  "create_bonus",
-  "create_equity_grant",
-  "create_department",
-  "update_department",
-  "create_account",
-  "update_account",
-  "create_scenario",
-  "update_scenario",
-  "create_funding_round",
-  "update_funding_round",
-  "create_funding_round_investor",
-  "update_grant_milestone",
-  "record_transaction",
-]);
+// Derived from tool metadata (A2b): mutates:"write" / "delete" annotations on
+// each ToolDefinition in tools.ts. The hand-maintained lists are removed — the
+// annotations are the single source of truth. ZERO behavior change: the
+// registry-derivation snapshot test freezes the pre-A2b membership and asserts
+// the derivation reproduces it exactly.
+const _tools = getFinancialTools();
+const WRITE_TOOLS: ReadonlySet<string> = new Set(
+  _tools.filter((t) => t.mutates === "write").map((t) => t.name),
+);
+const DELETE_TOOLS: ReadonlySet<string> = new Set(
+  _tools.filter((t) => t.mutates === "delete").map((t) => t.name),
+);
 
 /** All tools that mutate data (write + delete). */
-export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+export const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...WRITE_TOOLS,
   ...DELETE_TOOLS,
 ]);
@@ -112,6 +92,15 @@ export interface BuiltinToolControl {
   category: PermissionCategory;
 }
 
+/** A domain-registered tool's control metadata, passed in by the caller (the
+ *  apps/web Tools pane resolves which domain tools are active server-side —
+ *  this pure package cannot import the domain registry). `mutates` mirrors
+ *  ToolDefinition.mutates; absent → a read tool. */
+export interface DomainToolControl {
+  name: string;
+  mutates?: "write" | "delete" | null;
+}
+
 /**
  * Built-in tools a user may individually disable in the Tools pane. Derived from
  * the live `getFinancialTools()` registry (the single source of truth) so new
@@ -123,16 +112,31 @@ export interface BuiltinToolControl {
  *    category, not here).
  * Each surviving name is classified via `categorizeToolName` (read/write/delete/
  * web_search). No second list to keep in sync — the categorizer is the classifier.
+ *
+ * `domainTools` adds cross-domain registry tools (A3b-3) the caller resolved
+ * server-side (e.g. company-knowledge's remember_fact/forget_fact). They live
+ * outside getFinancialTools(), so categorizeToolName's finance-only set would
+ * call every one "read" — they are classified from their own `mutates` instead.
  */
-export function listBuiltinToolsForControl(): BuiltinToolControl[] {
+export function listBuiltinToolsForControl(
+  domainTools: ReadonlyArray<DomainToolControl> = [],
+): BuiltinToolControl[] {
   const out: BuiltinToolControl[] = [];
-  for (const tool of getFinancialTools()) {
-    const name = tool.name;
-    if (name.startsWith("mcp__")) continue;
-    if (DISPLAY_TOOL_NAMES.has(name)) continue;
-    if (INPUT_TOOL_NAMES.has(name)) continue;
-    if (PLAN_TOOL_NAMES.has(name)) continue;
-    out.push({ name, category: categorizeToolName(name) });
+  const seen = new Set<string>();
+  const consider = (name: string, category: PermissionCategory): void => {
+    if (seen.has(name)) return;
+    if (name.startsWith("mcp__")) return;
+    if (DISPLAY_TOOL_NAMES.has(name)) return;
+    if (INPUT_TOOL_NAMES.has(name)) return;
+    if (PLAN_TOOL_NAMES.has(name)) return;
+    seen.add(name);
+    out.push({ name, category });
+  };
+  for (const tool of getFinancialTools()) consider(tool.name, categorizeToolName(tool.name));
+  for (const tool of domainTools) {
+    const category: PermissionCategory =
+      tool.mutates === "delete" ? "delete" : tool.mutates === "write" ? "write" : "read";
+    consider(tool.name, category);
   }
   return out;
 }

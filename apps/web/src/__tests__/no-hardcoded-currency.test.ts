@@ -243,11 +243,17 @@ describe("no-hardcoded-currency", () => {
     );
 
     const HARDCODED_DOLLAR = /\$\$\{|\$\d/;
+    // A `$<value>` inside a trailing `//` line comment is documentation, never
+    // display code (e.g. a schema column annotated `// $50 default`). Strip the
+    // comment tail before matching — but keep `://` intact so URLs like
+    // `https://…` aren't truncated. Real formatting violations live in code
+    // (template literals / JSX) BEFORE any `//`, so they remain caught.
+    const stripLineComment = (line: string): string => line.replace(/(^|[^:])\/\/.*$/, "$1");
     const offenders = raw
       .split("\n")
       .filter(Boolean)
       .filter((line) => !line.includes(".d.ts:"))
-      .filter((line) => HARDCODED_DOLLAR.test(line))
+      .filter((line) => HARDCODED_DOLLAR.test(stripLineComment(line)))
       .filter((line) => !isAllowed(line));
 
     expect(offenders, `Hardcoded $ patterns found:\n${offenders.join("\n")}`).toEqual([]);

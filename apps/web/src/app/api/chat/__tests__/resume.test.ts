@@ -97,6 +97,25 @@ vi.mock("@/lib/ai-tools", () => ({
     return JSON.stringify({ success: true, scenarioId: context.scenarioId });
   }),
   logDeniedToolCall: vi.fn(),
+  buildDomainToolCategories: () => ({}),
+}));
+
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+    getActiveContextContributors: vi.fn(async () => [
+      {
+        id: "finance-snapshot",
+        domain: "finance",
+        sections: async (ctx: { companyId: string }) => {
+          const { buildAiContext } = await import("@/lib/build-ai-context");
+          const { contextText } = await buildAiContext(ctx.companyId, { id: "base", name: "Baseline", source: "base" });
+          return [{ heading: "Current Financial Data", body: contextText }];
+        },
+      },
+    ]),
+  },
 }));
 
 // Mock the shared SSE responder: capture the reconstructed messages + scenarioId

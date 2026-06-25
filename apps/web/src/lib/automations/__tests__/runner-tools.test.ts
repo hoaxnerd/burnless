@@ -26,22 +26,29 @@ vi.mock("@burnless/ai", async (orig) => {
   return {
     ...actual,
     MUTATION_TOOL_NAMES: new Set(["update_revenue_stream", "record_transaction"]),
-    getFinancialTools: () => [
+  };
+});
+
+// A3a-3: domainRegistry.getActiveTools replaces getFinancialTools in assembleAllowedTools.
+// Provide a deterministic stub so the test has no DB/registry dependency.
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => [
       { name: "list_accounts", description: "", inputSchema: { type: "object", properties: {} } },
       { name: "update_revenue_stream", description: "", inputSchema: { type: "object", properties: {} } },
       { name: "delete_account", description: "", inputSchema: { type: "object", properties: {} } },
-    ],
-  };
-});
+    ]),
+  },
+}));
 
 import { assembleAllowedTools, makeOnToolCall } from "../runner";
 
 const baseCtx = { companyId: "c1", userId: "u1", auditSource: "scheduled_job" as const, scheduledJobRunId: "run1" };
 
 describe("assembleAllowedTools", () => {
-  it("includes only allowlisted financial + MCP tools", () => {
+  it("includes only allowlisted financial + MCP tools", async () => {
     const mcpTools = [{ name: "mcp__stripe__list_charges", description: "", inputSchema: { type: "object" as const, properties: {} } }];
-    const tools = assembleAllowedTools(["list_accounts", "mcp__stripe__list_charges"], mcpTools);
+    const tools = await assembleAllowedTools(["list_accounts", "mcp__stripe__list_charges"], mcpTools, { companyId: "c1" });
     expect(tools.map((t) => t.name).sort()).toEqual(["list_accounts", "mcp__stripe__list_charges"]);
     // delete_account / update_revenue_stream NOT allowlisted → excluded
     expect(tools.some((t) => t.name === "delete_account")).toBe(false);

@@ -151,6 +151,7 @@ vi.mock("@burnless/ai", async () => {
     resolvePermission: vi.fn(() => "allow"),
     categorizeToolName: vi.fn(() => "read"),
     projectModelThread: actual.projectModelThread,
+    DEFAULT_CONTEXT_HEADING: actual.DEFAULT_CONTEXT_HEADING,
     BUILTIN_PERMISSION_DEFAULTS: {
       read: "always",
       write: "ask",
@@ -163,11 +164,30 @@ vi.mock("@burnless/ai", async () => {
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
+  buildDomainToolCategories: () => ({}),
 }));
 
 // MCP tools assembly (spec §3.4): empty for these tests — no connected servers.
 vi.mock("@/lib/ai-tools/mcp", () => ({
   assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], handlers: {} }),
+}));
+
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => []),
+    getActivePromptSections: vi.fn(async () => []),
+    getActiveContextContributors: vi.fn(async () => [
+      {
+        id: "finance-snapshot",
+        domain: "finance",
+        sections: async (ctx: { companyId: string }) => {
+          const { buildAiContext } = await import("@/lib/build-ai-context");
+          const { contextText } = await buildAiContext(ctx.companyId, { id: "base", name: "Baseline", source: "base" });
+          return [{ heading: "Current Financial Data", body: contextText }];
+        },
+      },
+    ]),
+  },
 }));
 
 vi.mock("@/lib/chat-stream", () => ({

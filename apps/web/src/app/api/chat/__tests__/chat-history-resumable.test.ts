@@ -31,7 +31,13 @@ vi.mock("@burnless/db", () => ({
   getOpenGate: mockGetOpenGate,
 }));
 
-vi.mock("@/lib/ai-tools", () => ({ describeToolAction: vi.fn((tool: string) => `do ${tool}`) }));
+vi.mock("@/lib/ai-tools", () => ({
+  describeToolAction: vi.fn((tool: string) => `do ${tool}`),
+  buildDomainToolCategories: vi.fn(() => ({})),
+}));
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: { getActiveTools: vi.fn(async () => []) },
+}));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), desc: vi.fn(), asc: vi.fn(), lt: vi.fn() }));
 vi.mock("@/lib/pagination", () => ({
   parsePaginationParams: vi.fn().mockReturnValue({ limit: 20, cursor: null }),

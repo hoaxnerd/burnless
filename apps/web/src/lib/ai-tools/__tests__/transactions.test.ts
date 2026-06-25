@@ -105,7 +105,7 @@ describe("record_transaction classification", () => {
     const { MUTATION_TOOL_NAMES } = await import("@burnless/ai");
     expect(MUTATION_TOOL_NAMES.has("record_transaction")).toBe(true);
     const { __testables } = await import("../index");
-    expect(__testables.NON_FACADE_MUTATION_TOOLS.has("record_transaction")).toBe(true);
+    expect(__testables.isNonFacadeMutationTool("record_transaction")).toBe(true);
   });
 });
 

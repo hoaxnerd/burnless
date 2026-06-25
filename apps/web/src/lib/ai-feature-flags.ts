@@ -56,7 +56,7 @@ export async function getAiFlags(
     masterEnabled: row.masterEnabled,
     dataMode: row.dataMode as AiFeatureFlagsState["dataMode"],
     writeMode: (row.writeMode ?? "confirm") as AiWriteMode,
-    features: row.features as AiFeatureConfig,
+    features: (row.features ?? {}) as AiFeatureConfig,
     companionName: row.companionName ?? DEFAULT_AI_FLAGS.companionName,
   };
 }
@@ -123,7 +123,7 @@ export async function checkAiFeatureAllowed(
     return { allowed: false, reason: "AI features are disabled for this company" };
   }
 
-  if (!flags.features[feature]) {
+  if (flags.features[feature] === false) {
     return { allowed: false, reason: `AI feature "${feature}" is disabled` };
   }
 

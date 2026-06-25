@@ -3,9 +3,11 @@
  * exact JSON input and require `Proceed? (y/N)` unless --yes/-y. Non-TTY
  * without --yes refuses with exit 2 (CI must be explicit). Category comes from
  * a deliberately tiny local prefix heuristic — pinned in the design:
- * delete_ → delete; create_ / update_ / record_ → write; everything else →
- * read. (record_ covers record_transaction, the one mutation tool that does not
- * use a create_/update_/delete_ prefix.)
+ * delete_ / forget_ → delete; create_ / update_ / record_ / remember_ → write;
+ * everything else → read. (record_ covers record_transaction, the one finance
+ * mutation tool that does not use a create_/update_/delete_ prefix; forget_ /
+ * remember_ cover cross-domain write tools like the company-knowledge facts,
+ * which are NOT in @burnless/ai's finance-only MUTATION_TOOL_NAMES.)
  *
  * The heuristic stays runtime-dependency-free on purpose (importing the
  * authoritative @burnless/ai `categorizeToolName` would bundle the whole AI
@@ -23,8 +25,14 @@ import { UsageError } from "./errors";
 export type ToolCategory = "read" | "write" | "delete";
 
 export function categorizeTool(name: string): ToolCategory {
-  if (name.startsWith("delete_")) return "delete";
-  if (name.startsWith("create_") || name.startsWith("update_") || name.startsWith("record_")) return "write";
+  if (name.startsWith("delete_") || name.startsWith("forget_")) return "delete";
+  if (
+    name.startsWith("create_") ||
+    name.startsWith("update_") ||
+    name.startsWith("record_") ||
+    name.startsWith("remember_")
+  )
+    return "write";
   return "read";
 }
 

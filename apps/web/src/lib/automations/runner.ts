@@ -4,7 +4,7 @@
  * allowlist. No live session: all context (companyId, createdByUserId, audit
  * link) is explicit. Mirrors the headless precedent in lib/cron/batch-regenerate.ts.
  */
-import { MUTATION_TOOL_NAMES, getFinancialTools, chat, type ToolDefinition, type ChatMessage } from "@burnless/ai";
+import { MUTATION_TOOL_NAMES, chat, type ToolDefinition, type ChatMessage } from "@burnless/ai";
 import {
   getScheduledJobById,
   startScheduledJobRun,
@@ -26,10 +26,20 @@ import { logger } from "@/lib/logger";
 
 const log = logger("automations-runner");
 
-/** Frozen toolset offered to the provider: allowlisted financial + (pre-filtered) MCP tools. */
-export function assembleAllowedTools(allowedTools: string[], mcpTools: ToolDefinition[]): ToolDefinition[] {
+/** Frozen toolset offered to the provider: allowlisted financial + (pre-filtered) MCP tools.
+ * A3a-3: resolves the base tool set from domainRegistry.getActiveTools(ctx) so future
+ * domains contribute their tools to the scheduler (byte-identical for finance-only).
+ * Dynamic import keeps domains/finance.ts out of the module parse graph so existing
+ * test mocks of @/lib/ai-tools (which finance.ts references) work unchanged. */
+export async function assembleAllowedTools(
+  allowedTools: string[],
+  mcpTools: ToolDefinition[],
+  ctx: { companyId: string }
+): Promise<ToolDefinition[]> {
   const allow = new Set(allowedTools);
-  const financial = getFinancialTools().filter((t) => allow.has(t.name));
+  const { domainRegistry } = await import("@/lib/domains");
+  const allDomainTools = await domainRegistry.getActiveTools({ companyId: ctx.companyId });
+  const financial = allDomainTools.filter((t) => allow.has(t.name));
   const mcp = mcpTools.filter((t) => allow.has(t.name));
   return [...financial, ...mcp];
 }
@@ -196,7 +206,7 @@ export async function runScheduledJob(jobId: string, trigger: ScheduledJobRunTri
     );
     const providerConfig = await getCompanyProviderConfig(job.companyId);
     const { tools: mcpTools } = await assembleMcpTools(job.companyId, job.createdByUserId);
-    const toolsOverride = assembleAllowedTools(job.allowedTools, mcpTools);
+    const toolsOverride = await assembleAllowedTools(job.allowedTools, mcpTools, { companyId: job.companyId });
 
     if (job.allowedTools.length > 0 && toolsOverride.length === 0) {
       await finishScheduledJobRun(run.id, job.companyId, {
@@ -292,7 +302,7 @@ export async function dryRunJobDraft(draft: JobDraft): Promise<{ response: strin
   );
   const providerConfig = await getCompanyProviderConfig(draft.companyId);
   const { tools: mcpTools } = await assembleMcpTools(draft.companyId, draft.createdByUserId);
-  const toolsOverride = assembleAllowedTools(draft.allowedTools, mcpTools);
+  const toolsOverride = await assembleAllowedTools(draft.allowedTools, mcpTools, { companyId: draft.companyId });
   const ctx: ToolContext = {
     companyId: draft.companyId,
     userId: draft.createdByUserId,
@@ -330,7 +340,7 @@ export async function runJobDraftForReal(draft: JobDraft): Promise<{ response: s
   );
   const providerConfig = await getCompanyProviderConfig(draft.companyId);
   const { tools: mcpTools } = await assembleMcpTools(draft.companyId, draft.createdByUserId);
-  const toolsOverride = assembleAllowedTools(draft.allowedTools, mcpTools);
+  const toolsOverride = await assembleAllowedTools(draft.allowedTools, mcpTools, { companyId: draft.companyId });
   const ctx: ToolContext = {
     companyId: draft.companyId,
     userId: draft.createdByUserId,

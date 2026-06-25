@@ -9,7 +9,7 @@ import { z } from "zod";
 import { db, getOverrideCount, getPermissionDefaults, getSessionGrants, getSessionDisabledTools, getDisabledBuiltinTools, appendTurnEvent, getOpenGate, resolveOpenGate, getTurnEvents } from "@burnless/db";
 import { aiConversations, scenarios as scenariosTable } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
-import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent } from "@burnless/ai";
+import { type ChatMessage, BUILTIN_PERMISSION_DEFAULTS, type PermissionDefaults, projectModelThread, type TurnEvent, DEFAULT_CONTEXT_HEADING } from "@burnless/ai";
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
@@ -18,6 +18,7 @@ import { getDefaultScenario } from "@/lib/data";
 import { resolveWriteScenarioId } from "@/lib/ai-write-target";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse } from "@/lib/chat-stream";
+import { buildDomainToolCategories } from "@/lib/ai-tools";
 import { assembleMcpTools } from "@/lib/ai-tools/mcp";
 import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
 
@@ -190,8 +191,8 @@ export const POST = withErrorHandler(async (request: Request) => {
   // falls back to.
   const writeScenarioId = resolveWriteScenarioId(body.scenarioId, found ?? null);
 
-  // Build financial context
-  const { contextText: baseContextText, nowContext } = await buildAiContext(ctx.companyId, {
+  // buildAiContext is retained for nowContext (+ cache-priming); the context body now comes from getActiveContextContributors
+  const { nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",
@@ -202,7 +203,40 @@ export const POST = withErrorHandler(async (request: Request) => {
   const scenarioContext = overrideCount > 0
     ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
     : "";
-  const contextText = scenarioContext + baseContextText;
+
+  // Registry: resolve tools, prompt sections, AND context sections through the
+  // DomainRegistry so future domains (e.g. company-knowledge) automatically
+  // contribute their sections without touching this route.
+  //
+  // Dynamic import keeps domains/finance.ts out of the module parse graph so
+  // existing test mocks of @/lib/ai-tools (which finance.ts references) work.
+  //
+  // buildAiContext above is kept for nowContext (and cache-priming); the finance
+  // contributor internally re-calls buildAiContext — React.cache / unstable_cache
+  // deduplicates the heavy work (computeDashboardData, cachedQuery) within the request.
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCtx = { companyId: ctx.companyId };
+  const contributeCtx = {
+    companyId: ctx.companyId,
+    scenarioId: scenario.id,
+    scenarioRef: { id: scenario.id, name: scenario.name, source: scenario.source ?? "blank" },
+  };
+  const [baseTools, promptSections, contributors] = await Promise.all([
+    domainRegistry.getActiveTools(domainCtx),
+    domainRegistry.getActivePromptSections(domainCtx),
+    domainRegistry.getActiveContextContributors(domainCtx),
+  ]);
+  // Permission categories for the active domain tools (A3b-3): their `mutates`
+  // metadata drives the write-confirm gate / read_only clamp / plan-mode safety.
+  const domainCategories = buildDomainToolCategories(baseTools);
+  const rawSections = (await Promise.all(contributors.map((c) => c.sections(contributeCtx)))).flat();
+  // Prepend the scenario-override prefix to the first DEFAULT_CONTEXT_HEADING section
+  // (the finance snapshot) — identical to the single-block behaviour before this change.
+  const contextSections = rawSections.map((s, i) =>
+    i === 0 && s.heading === DEFAULT_CONTEXT_HEADING
+      ? { ...s, body: scenarioContext + s.body }
+      : s
+  );
 
   // Load company's custom AI provider config (if any)
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
@@ -239,13 +273,16 @@ export const POST = withErrorHandler(async (request: Request) => {
     conversationId,
     turnId,
     messages,
-    financialContext: contextText,
+    contextSections,
+    baseTools,
+    promptSections,
     companionName: aiFlags.companionName,
     providerConfig,
     defaults,
     sessionGrants,
     writeMode: aiCheck.writeMode ?? "confirm",
     mcp,
+    domainCategories,
     disabledToolNames,
     creditWarning,
     nowContext,

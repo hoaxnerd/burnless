@@ -13,6 +13,14 @@ vi.mock("@/lib/data", () => ({ getDefaultScenario: vi.fn().mockResolvedValue({ i
 vi.mock("@/lib/build-ai-context", () => ({ buildAiContext: vi.fn().mockResolvedValue({ snapshot: {}, contextText: "CTX" }) }));
 vi.mock("@/lib/ai-tools/mcp", () => ({ assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], categories: {} }) }));
 vi.mock("@/lib/ai-tools", () => ({ executeToolCall: vi.fn().mockResolvedValue("{}") }));
+// A3a-3: assembleAllowedTools resolves tools via domainRegistry.getActiveTools.
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => [
+      { name: "update_revenue_stream", description: "", inputSchema: { type: "object", properties: {} } },
+    ]),
+  },
+}));
 
 import { runJobDraftForReal } from "../runner";
 const draft = { companyId: "c1", createdByUserId: "u1", prompt: "do it", actionKind: "write" as const, allowedTools: ["update_revenue_stream"], boundConnectionIds: [] };

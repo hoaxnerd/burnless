@@ -8,6 +8,7 @@
 import type { ChatMessage, StreamChunk, ToolCallResult, PauseState, PendingToolUse } from "./types";
 import { getFinancialTools } from "./tools";
 import { buildSystemMessage } from "./prompts";
+import { type ContextSection, type PromptSection, DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
 import {
   type LlmProvider,
   type LlmMessage,
@@ -34,7 +35,10 @@ function resolveProvider(options: ChatOptions): LlmProvider | null {
 
 interface ChatOptions {
   messages: ChatMessage[];
-  financialContext: string;
+  /** @deprecated pass `contextSections` instead; auto-wrapped into one "Current Financial Data" section. */
+  financialContext?: string;
+  /** Ordered context blocks composed into the system message. Preferred over `financialContext`. */
+  contextSections?: ContextSection[];
   onToolCall?: (toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** Decide whether a tool may run without prompting. Default: everything "allow". */
   resolvePermission?: (toolName: string, input: Record<string, unknown>) => "allow" | "ask" | "deny";
@@ -72,6 +76,17 @@ interface ChatOptions {
    */
   disabledToolNames?: ReadonlySet<string>;
   /**
+   * Registry-provided base tool set (subject to filterTools + extraTools).
+   * Defaults to `getFinancialTools()` when absent — preserving today's behavior.
+   */
+  baseTools?: ToolDefinition[];
+  /**
+   * Extra domain prompt sections appended after the core prompt and before the
+   * context separator. Sorted by `order` ascending. Provided by the DomainRegistry
+   * in A3a-3; until then callers leave this unset (no behavior change).
+   */
+  promptSections?: PromptSection[];
+  /**
    * Live "current date and time" context injected into the system message per
    * request. Must NOT be baked into the cached financial context (it would go
    * stale via unstable_cache). When present, buildSystemMessage inserts a
@@ -101,6 +116,17 @@ function filterTools(
 // Max tool-use round-trips per call comes from getAiLimits().maxToolIterations
 // (env BURNLESS_AI_MAX_TOOL_ITERATIONS, default 25). Read once per invocation.
 
+/** Pick the context source: explicit sections win; else wrap the legacy
+ *  financialContext string into a single section. Exported for unit testing. */
+export function resolveContextSections(
+  options: Pick<ChatOptions, "contextSections" | "financialContext">
+): ContextSection[] {
+  if (options.contextSections && options.contextSections.length > 0) {
+    return options.contextSections;
+  }
+  return [{ heading: DEFAULT_CONTEXT_HEADING, body: options.financialContext ?? "" }];
+}
+
 /** Non-streaming chat — sends message and returns complete response. */
 export async function chat(options: ChatOptions): Promise<{
   response: string;
@@ -118,12 +144,13 @@ export async function chat(options: ChatOptions): Promise<{
   // The `toolsOverride` path (scheduled jobs) bypasses the disabled-tools filter
   // by design — it is a frozen allowlist (S3a Plan 4 §6 / S3b §11). Only the
   // interactive assembly is filtered.
+  const base = options.baseTools ?? getFinancialTools();
   const tools = options.toolsOverride
     ? options.toolsOverride
-    : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+    : filterTools([...base, ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
+  const system = buildSystemMessage(resolveContextSections(options), options.companionName, options.mode, scenarioToolsPresent, options.nowContext, options.promptSections ?? []);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,
@@ -226,12 +253,13 @@ export async function* chatStream(options: ChatOptions): AsyncGenerator<StreamCh
   const maxIterations = getAiLimits().maxToolIterations;
   // Interactive assembly is filtered by disabledToolNames (S3b §11); a
   // toolsOverride frozen allowlist (jobs), if ever passed, bypasses the filter.
+  const base = options.baseTools ?? getFinancialTools();
   const tools = options.toolsOverride
     ? options.toolsOverride
-    : filterTools([...getFinancialTools(), ...(options.extraTools ?? [])], options.disabledToolNames);
+    : filterTools([...base, ...(options.extraTools ?? [])], options.disabledToolNames);
 
   const scenarioToolsPresent = tools.some((t) => t.name === "activate_scenario" || t.name === "create_scenario");
-  const system = buildSystemMessage(options.financialContext, options.companionName, options.mode, scenarioToolsPresent, options.nowContext);
+  const system = buildSystemMessage(resolveContextSections(options), options.companionName, options.mode, scenarioToolsPresent, options.nowContext, options.promptSections ?? []);
 
   const messages: LlmMessage[] = options.messages.map((m) => ({
     role: m.role,

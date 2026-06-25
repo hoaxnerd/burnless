@@ -24,6 +24,7 @@ import {
   categorizeToolName,
   BUILTIN_PERMISSION_DEFAULTS,
   projectModelThread,
+  DEFAULT_CONTEXT_HEADING,
   type ChatMessage,
   type PermissionDefaults,
   type AiWriteMode,
@@ -33,7 +34,7 @@ import type { ContentBlock, InputFormSpec, FormField, PlanSpec } from "@burnless
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
-import { executeToolCall, logDeniedToolCall } from "@/lib/ai-tools";
+import { executeToolCall, logDeniedToolCall, buildDomainToolCategories } from "@/lib/ai-tools";
 import { assembleMcpTools, type AssembledMcpTools } from "@/lib/ai-tools/mcp";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
@@ -145,16 +146,50 @@ async function resumeStream(args: {
     (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
   ) as ChatMessage[];
 
-  const { contextText: baseContext, nowContext } = await buildAiContext(ctx.companyId, {
+  // buildAiContext is retained for nowContext (+ cache-priming); the context body now comes from getActiveContextContributors
+  const { nowContext } = await buildAiContext(ctx.companyId, {
     id: scenario.id,
     name: scenario.name,
     source: scenario.source ?? "blank",
   });
   const overrideCount = await getOverrideCount(scenario.id);
-  const financialContext =
-    (overrideCount > 0
-      ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
-      : "") + baseContext;
+  const scenarioContext = overrideCount > 0
+    ? `You are working inside scenario "${scenario.name}". ${overrideCount} changes from base.\nAll changes are overrides — base data will not be modified.\n\n`
+    : "";
+
+  // Registry: resolve tools, prompt sections, AND context sections through the
+  // DomainRegistry so future domains (e.g. company-knowledge) automatically
+  // contribute their sections without touching this route.
+  //
+  // Dynamic import keeps domains/finance.ts out of the module parse graph so
+  // existing test mocks of @/lib/ai-tools (which finance.ts references) work.
+  //
+  // buildAiContext above is kept for nowContext (and cache-priming); the finance
+  // contributor internally re-calls buildAiContext — React.cache / unstable_cache
+  // deduplicates the heavy work (computeDashboardData, cachedQuery) within the request.
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCtx = { companyId: ctx.companyId };
+  const contributeCtx = {
+    companyId: ctx.companyId,
+    scenarioId: scenario.id,
+    scenarioRef: { id: scenario.id, name: scenario.name, source: scenario.source ?? "blank" },
+  };
+  const [baseTools, promptSections, contributors] = await Promise.all([
+    domainRegistry.getActiveTools(domainCtx),
+    domainRegistry.getActivePromptSections(domainCtx),
+    domainRegistry.getActiveContextContributors(domainCtx),
+  ]);
+  // Permission categories for the active domain tools (A3b-3): mirrors the chat
+  // route so a resumed turn gates domain write tools identically.
+  const domainCategories = buildDomainToolCategories(baseTools);
+  const rawSections = (await Promise.all(contributors.map((c) => c.sections(contributeCtx)))).flat();
+  // Prepend the scenario-override prefix to the first DEFAULT_CONTEXT_HEADING section
+  // (the finance snapshot) — identical to the single-block behaviour before this change.
+  const contextSections = rawSections.map((s, i) =>
+    i === 0 && s.heading === DEFAULT_CONTEXT_HEADING
+      ? { ...s, body: scenarioContext + s.body }
+      : s
+  );
 
   const providerConfig = await getCompanyProviderConfig(ctx.companyId);
   const savedDefaults = await getPermissionDefaults(ctx.userId, ctx.companyId);
@@ -180,13 +215,16 @@ async function resumeStream(args: {
     // the whole multi-pause turn as ONE group (review finding #7).
     turnId,
     messages,
-    financialContext,
+    contextSections,
+    baseTools,
+    promptSections,
     companionName,
     providerConfig,
     defaults,
     sessionGrants,
     writeMode: writeMode ?? "confirm",
     mcp,
+    domainCategories,
     disabledToolNames,
     nowContext,
   });
@@ -362,6 +400,20 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!body.decisions || body.decisions.length === 0) {
     return errorResponse("decisions required to resume a permission pause", 400);
   }
+
+  // Per-turn dynamic categories for non-finance tools (A3b-3): domain tools
+  // (their `mutates` metadata) UNDER MCP tools (an MCP tool name can shadow a
+  // domain one; mcp.categories wins, mirroring chat-stream's merge order).
+  // Without the domain half, a domain write like forget_fact categorizes as
+  // "read" here — the decision-4 overlay-write check and the session-grant
+  // category below would both mis-handle it. Resolved in the permission branch
+  // only (the input/plan pauses above return before reaching it).
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCategories = buildDomainToolCategories(
+    await domainRegistry.getActiveTools({ companyId: ctx.companyId }),
+  );
+  const dynamicCategories = { ...domainCategories, ...mcp.categories };
+
   // The gated action batch comes from the gate event's `actions` (the enriched
   // pending batch — {requestId, toolName, toolInput, override?}).
   const pending = (gatePayload!.actions ?? []) as PendingActionRecord[];
@@ -391,7 +443,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     // External MCP tools write EXTERNAL systems, never the scenario overlay — a
     // mid-pause scenario switch can't endanger them, so they never arm the gate.
     if (a.toolName.startsWith("mcp__")) return false;
-    const cat = categorizeToolName(a.toolName, mcp.categories);
+    const cat = categorizeToolName(a.toolName, dynamicCategories);
     return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
   });
   // Decision-4 reads the read/write scenario ids from the GATE (gate-preferred,
@@ -425,9 +477,10 @@ export const POST = withErrorHandler(async (request: Request) => {
   let nextWriteScenarioId = gateWriteScenarioId;
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
-    // Dynamic map first (MCP): the granted category must match what the
-    // permission card showed (e.g. an MCP refund classified "delete").
-    const category = categorizeToolName(action.toolName, mcp.categories);
+    // Dynamic map first (domain tools + MCP): the granted category must match
+    // what the permission card showed (e.g. an MCP refund or a domain
+    // forget_fact classified "delete").
+    const category = categorizeToolName(action.toolName, dynamicCategories);
 
     if (decision === "deny") {
       logDeniedToolCall(

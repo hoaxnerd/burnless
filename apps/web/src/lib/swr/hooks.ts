@@ -13,6 +13,7 @@ import { KEYS } from "./keys";
 import { subscribeMutation, FINANCIAL_DOMAINS } from "@/lib/mutation-bus";
 import type { ApiTokenDto, McpConnectionDto, McpToolDto, OauthGrantDto } from "@/components/mcp/types";
 import type { AiProviderPublic, AiProviderModelRow } from "@burnless/db";
+import type { DomainToolControl } from "@burnless/ai";
 
 // ── Type imports ────────────────────────────────────────────────────────────
 
@@ -259,6 +260,15 @@ export function useAiPermissions(
   config?: SWRConfiguration<{ defaults: AiPermissionDefaults }>,
 ) {
   return useSWR<{ defaults: AiPermissionDefaults }>(KEYS.aiPermissions, { ...config });
+}
+
+/** Active non-finance domain tools for the Tools pane (A3b-3). The pane lists
+ *  finance tools statically (bundled client-side); this adds domain-registered
+ *  tools with their mutation class. Route wraps as `{ tools }`. */
+export function useAiDomainTools(
+  config?: SWRConfiguration<{ tools: DomainToolControl[] }>,
+) {
+  return useSWR<{ tools: DomainToolControl[] }>(KEYS.aiDomainTools, { ...config });
 }
 
 /** Proactive AI alerts (dashboard command center). Route wraps as `{ alerts }`. */

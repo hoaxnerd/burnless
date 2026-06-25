@@ -27,14 +27,18 @@ import {
   AddFundingRoundInvestorSchema,
   MarkGrantMilestoneHitSchema,
   ModelDilutionSchema,
-  MUTATION_TOOL_NAMES,
+  getFinancialTools,
 } from "@burnless/ai";
+import type { ToolDefinition, PermissionCategory } from "@burnless/ai";
+import { domainRegistry } from "@/lib/domains/registry";
 import { forecastingSchemas, forecastingHandlers } from "./forecasting";
 import { analyticsSchemas, analyticsHandlers } from "./analytics";
 import { webSearchSchemas, webSearchHandlers } from "./web-search";
 import { webScrapingSchemas, webScrapingHandlers } from "./web-scraping";
 import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
 import { transactionSchemas, transactionHandlers } from "./transactions";
+import { companyKnowledgeSchemas, companyKnowledgeHandlers } from "./company-knowledge";
+import { skillsSchemas, skillsHandlers } from "./skills";
 // NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
 // and is loaded lazily inside executeToolCall instead.
 import { describeMcpToolAction } from "./mcp-describe";
@@ -71,6 +75,8 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...webScrapingSchemas,
   ...genuiDisplaySchemas,
   ...transactionSchemas,
+  ...companyKnowledgeSchemas,
+  ...skillsSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -84,38 +90,53 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...webScrapingHandlers,
   ...genuiDisplayHandlers,
   ...transactionHandlers,
+  ...companyKnowledgeHandlers,
+  ...skillsHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
 
-/** Tools that create, update, or delete data. Single source of truth: the
- *  permission layer's MUTATION_TOOL_NAMES (WRITE_TOOLS ∪ DELETE_TOOLS). Deriving
- *  it here keeps the diff-gate, cache invalidation, and permission resolver from
- *  drifting (spec §4.4 "unify the two mutation sets"). */
-const MUTATION_TOOLS: ReadonlySet<string> = MUTATION_TOOL_NAMES;
+/** All ToolDefinitions across every REGISTERED domain (enablement-agnostic — a
+ *  disabled tool never executes, so classifying it is harmless). Falls back to
+ *  finance-only until registerDomains() has run (both the chat and MCP routes
+ *  trigger it before any tool executes). Memoized once the registry is populated.
+ *
+ *  Generalizes mutation classification from finance-static to registry-wide: any
+ *  active domain tool's `mutates`/`nonFacade`/`cacheTags` metadata is honored
+ *  exactly like a finance mutation. The registry module imports only ./contracts
+ *  + @/lib/capabilities — no static edge back here — so this introduces no cycle. */
+let _registeredTools: ToolDefinition[] | null = null;
+function registeredTools(): ToolDefinition[] {
+  if (_registeredTools) return _registeredTools;
+  const tools = domainRegistry.getAll().flatMap((m) => m.tools);
+  if (tools.length === 0) return getFinancialTools(); // pre-registration fallback (don't memoize)
+  _registeredTools = tools;
+  return tools;
+}
 
+/** Tools that create, update, or delete data — `mutates` is "write" or "delete".
+ *  Registry-derived so a domain write tool (defined in apps/web) gates the
+ *  diff-gate / cache invalidation / permission resolver just like a finance one. */
 function isMutationTool(toolName: string): boolean {
-  return MUTATION_TOOLS.has(toolName);
+  return registeredTools().some(
+    (t) => t.name === toolName && (t.mutates === "write" || t.mutates === "delete"),
+  );
 }
 
 /** Mutation tools that DON'T route through the scenario-mutate facade — they
  *  write non-overridable tables directly (scenario CRUD writes `scenarios`;
- *  investor writes `fundingRoundInvestors`) and ignore ctx.mode. They cannot be
- *  previewed as a scenario-override diff, so plan mode must not run them (it would
- *  write while auditing pending_apply). See worklog Plan 3 / carry-over follow-up a. */
-const NON_FACADE_MUTATION_TOOLS: ReadonlySet<string> = new Set<string>([
-  "create_scenario",
-  "update_scenario",
-  "delete_scenario",
-  "create_funding_round_investor",
-  // Base-table actuals writer (S3a Plan 3): writes `transactions` directly, not a
-  // scenario overlay → plan mode must return the empty envelope, not a diff.
-  "record_transaction",
-]);
+ *  investor writes `fundingRoundInvestors`; remember_fact/forget_fact write
+ *  `memory`) and ignore ctx.mode. They cannot be previewed as a scenario-override
+ *  diff, so plan mode must not run them (it would write while auditing
+ *  pending_apply). See worklog Plan 3 / carry-over follow-up a. Derived from
+ *  ToolDefinition.nonFacade. */
+function isNonFacadeMutationTool(toolName: string): boolean {
+  return registeredTools().some((t) => t.name === toolName && t.nonFacade === true);
+}
 
 /** A mutation whose plan mode yields a real scenario-override delta (diff-gate). */
 function isDiffableMutationTool(toolName: string): boolean {
-  return isMutationTool(toolName) && !NON_FACADE_MUTATION_TOOLS.has(toolName);
+  return isMutationTool(toolName) && !isNonFacadeMutationTool(toolName);
 }
 
 /** Tools where `scenarioId` is the tool's OWN required operand (the scenario to
@@ -126,40 +147,17 @@ const SCENARIO_ID_OPERAND_TOOLS: ReadonlySet<string> = new Set<string>([
   "activate_scenario",
 ]);
 
-/** Maps mutation tool names to the cache tags they should invalidate.
- *  Scenario-override changes also invalidate "scenario-overrides" so the
- *  banner / diff views refresh. */
-const MUTATION_CACHE_TAGS: Record<string, string[]> = {
-  create_scenario: ["scenarios"],
-  update_scenario: ["scenarios"],
-  delete_scenario: ["scenarios"],
-  create_headcount: ["headcount-plans", "scenario-overrides"],
-  update_headcount: ["headcount-plans", "scenario-overrides"],
-  delete_headcount: ["headcount-plans", "scenario-overrides"],
-  create_salary_change: ["headcount-plans", "scenario-overrides"],
-  create_bonus: ["headcount-plans", "scenario-overrides"],
-  create_equity_grant: ["headcount-plans", "scenario-overrides"],
-  create_department: ["departments", "scenario-overrides"],
-  update_department: ["departments", "scenario-overrides"],
-  delete_department: ["departments", "headcount-plans", "scenario-overrides"],
-  create_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  update_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  delete_revenue_stream: ["revenue-streams", "scenario-overrides"],
-  create_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  update_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  delete_funding_round: ["funding-rounds", "scenario-overrides", "cap-table"],
-  create_funding_round_investor: ["funding-rounds", "cap-table"],
-  update_grant_milestone: ["funding-rounds", "scenario-overrides", "cap-table"],
-  create_forecast_line: ["forecast-lines", "scenario-overrides"],
-  update_forecast_line: ["forecast-lines", "scenario-overrides"],
-  delete_forecast_line: ["forecast-lines", "scenario-overrides"],
-  create_account: ["accounts", "scenario-overrides"],
-  update_account: ["accounts", "scenario-overrides"],
-  delete_account: ["accounts", "scenario-overrides"],
-};
+/** The cache tags a mutation tool should invalidate, from ToolDefinition.cacheTags.
+ *  Scenario-override changes also invalidate "scenario-overrides" so the banner /
+ *  diff views refresh. Registry-derived. record_transaction is intentionally
+ *  absent (no cacheTags annotation) — it writes the uncached transactions ledger. */
+function cacheTagsForTool(toolName: string): string[] | undefined {
+  const t = registeredTools().find((t) => t.name === toolName);
+  return t?.cacheTags && t.cacheTags.length > 0 ? t.cacheTags : undefined;
+}
 
 function invalidateCacheForTool(toolName: string): void {
-  const tags = MUTATION_CACHE_TAGS[toolName];
+  const tags = cacheTagsForTool(toolName);
   if (tags) {
     for (const tag of tags) {
       revalidateTag(tag, { expire: 0 });
@@ -167,15 +165,40 @@ function invalidateCacheForTool(toolName: string): void {
   }
 }
 
+/** Permission categories for active domain tools, from their `mutates` metadata.
+ *  Fed into resolvePermission's dynamicCategories (the same hook MCP tools use) so
+ *  a domain write tool defined in apps/web is gated like a finance mutation. */
+export function buildDomainToolCategories(
+  tools: ToolDefinition[],
+): Record<string, PermissionCategory> {
+  const out: Record<string, PermissionCategory> = {};
+  for (const t of tools) {
+    if (t.mutates === "delete") out[t.name] = "delete";
+    else if (t.mutates === "write") out[t.name] = "write";
+  }
+  return out;
+}
+
 function describeMutation(toolName: string, input: Record<string, unknown>): string {
-  const action = toolName.startsWith("create_") || toolName.startsWith("add_")
-    ? "create"
-    : toolName.startsWith("update_")
-      ? "update"
-      : toolName.startsWith("record_")
-        ? "record"
-        : "delete";
-  const entity = toolName.replace(/^(create_|add_|update_|delete_|record_)/, "").replace(/_/g, " ");
+  // Tool names follow a verb_noun convention (create_forecast_line,
+  // record_transaction, remember_fact, forget_fact). Derive the human verb from
+  // the first segment and the entity from the rest — generic across finance AND
+  // domain tools. The previous fixed-prefix table fell through to "delete" for
+  // any unrecognized verb, mislabeling domain writes like remember_fact as
+  // "delete remember fact" on the permission card. For a name with no underscore
+  // (none today), fall back to the registry's mutation class so the verb still
+  // reflects intent rather than defaulting to "delete".
+  const sep = toolName.indexOf("_");
+  let action: string;
+  let entity: string;
+  if (sep > 0) {
+    action = toolName.slice(0, sep);
+    entity = toolName.slice(sep + 1).replace(/_/g, " ");
+  } else {
+    const mutates = registeredTools().find((t) => t.name === toolName)?.mutates;
+    action = mutates === "delete" ? "delete" : "update";
+    entity = toolName.replace(/_/g, " ");
+  }
   const id = input.id as string | undefined;
   const name = (input.name ?? input.title) as string | undefined;
   const label = name ? ` "${name}"` : id ? ` (ID: ${id})` : "";
@@ -370,10 +393,40 @@ export function logDeniedToolCall(
 // Re-export types for consumers
 export type { ToolContext } from "./types";
 
-/** Internal handles exposed for regression guards only — not a public API. */
+/**
+ * Merged tool handler map for all financial tools (A3a-2: exposed for DomainModule).
+ * Internal — do not use outside of domain module wiring.
+ */
+export { toolHandlers };
+
+/** Internal handles exposed for regression guards only — not a public API.
+ *  Registry-derived (A3b-3): the raw Set/Record are gone — guards consume the
+ *  predicates / snapshot getters, which read the same lazy `registeredTools()`
+ *  source the live execution path uses. The snapshot getters reconstruct the
+ *  pre-A3b shapes (Set / Record) so the existing membership guards stay valid. */
 export const __testables = {
-  MUTATION_TOOLS,
-  MUTATION_CACHE_TAGS: MUTATION_CACHE_TAGS as Readonly<Record<string, string[]>>,
-  NON_FACADE_MUTATION_TOOLS,
+  isMutationTool,
+  isNonFacadeMutationTool,
   isDiffableMutationTool,
+  cacheTagsForTool,
+  /** Set of every registry mutation tool name (write ∪ delete). */
+  get MUTATION_TOOLS(): ReadonlySet<string> {
+    return new Set(
+      registeredTools()
+        .filter((t) => t.mutates === "write" || t.mutates === "delete")
+        .map((t) => t.name),
+    );
+  },
+  /** Set of every registry non-facade mutation tool name. */
+  get NON_FACADE_MUTATION_TOOLS(): ReadonlySet<string> {
+    return new Set(registeredTools().filter((t) => t.nonFacade === true).map((t) => t.name));
+  },
+  /** tool → cacheTags map for every registry tool that declares cacheTags. */
+  get MUTATION_CACHE_TAGS(): Readonly<Record<string, string[]>> {
+    return Object.fromEntries(
+      registeredTools()
+        .filter((t) => t.cacheTags && t.cacheTags.length > 0)
+        .map((t) => [t.name, t.cacheTags!]),
+    );
+  },
 };

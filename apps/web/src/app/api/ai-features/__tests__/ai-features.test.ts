@@ -81,6 +81,14 @@ vi.mock("@/lib/ai-feature-flags", () => ({
   getCreditStatus: mockGetCreditStatus,
 }));
 
+// A3a-2: domainRegistry is imported by route.ts to return enabledDomains.
+// Finance is core → always enabled; mock returns ["finance"].
+vi.mock("@/lib/domains/index", () => ({
+  domainRegistry: {
+    getEnabled: vi.fn(async () => [{ id: "finance" }]),
+  },
+}));
+
 // ── Chain setup ──────────────────────────────────────────────────────────────
 
 mockSelect.mockReturnValue({ from: mockFrom });
@@ -289,6 +297,78 @@ describe("PATCH /api/ai-features", () => {
     expect(body).not.toHaveProperty("aiProvider");
     expect(body).not.toHaveProperty("aiApiKey");
     expect(body).not.toHaveProperty("byokEnabled");
+  });
+
+  it("persists weeklyDigest toggle (regression: was silently stripped by the closed zod schema)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(CTX);
+    mockRequireRole.mockReturnValue(null);
+    // getOrCreateFlags finds existing
+    mockLimit.mockResolvedValue([
+      {
+        masterEnabled: true,
+        dataMode: "full",
+        features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
+        monthlyBudgetCents: 5000,
+      },
+    ]);
+    mockReturning.mockResolvedValue([
+      {
+        masterEnabled: true,
+        dataMode: "full",
+        features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: false },
+        monthlyBudgetCents: 5000,
+      },
+    ]);
+    mockGetCreditStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      new Request("http://localhost/api/ai-features", {
+        method: "PATCH",
+        body: JSON.stringify({ features: { weeklyDigest: false } }),
+      })
+    );
+    expect(res.status).toBe(200);
+    // The merged features object written to the DB must carry weeklyDigest: false.
+    const setArg = mockSet.mock.calls[0]?.[0] as { features?: Record<string, boolean> };
+    expect(setArg.features?.weeklyDigest).toBe(false);
+    const body = await res.json();
+    expect(body.features.weeklyDigest).toBe(false);
+  });
+
+  it("persists a domain feature key (regression: domain keys survive the zod schema + merge)", async () => {
+    mockRequireCompanyAccess.mockResolvedValue(CTX);
+    mockRequireRole.mockReturnValue(null);
+    mockLimit.mockResolvedValue([
+      {
+        masterEnabled: true,
+        dataMode: "full",
+        features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true },
+        monthlyBudgetCents: 5000,
+      },
+    ]);
+    mockReturning.mockResolvedValue([
+      {
+        masterEnabled: true,
+        dataMode: "full",
+        features: { onboarding: true, chat: true, insights: true, uiPersonalization: true, autoCategorization: true, weeklyDigest: true, "company-knowledge": false },
+        monthlyBudgetCents: 5000,
+      },
+    ]);
+    mockGetCreditStatus.mockResolvedValue({ percentUsed: 0, warning: false, exceeded: false });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      new Request("http://localhost/api/ai-features", {
+        method: "PATCH",
+        body: JSON.stringify({ features: { "company-knowledge": false } }),
+      })
+    );
+    expect(res.status).toBe(200);
+    const setArg = mockSet.mock.calls[0]?.[0] as { features?: Record<string, boolean> };
+    expect(setArg.features?.["company-knowledge"]).toBe(false);
+    const body = await res.json();
+    expect(body.features["company-knowledge"]).toBe(false);
   });
 
   it("validates data mode enum", async () => {

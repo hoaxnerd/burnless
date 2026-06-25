@@ -59,6 +59,10 @@ vi.mock("@burnless/db", () => ({
 
 vi.mock("@/lib/ai-tools", () => ({
   describeToolAction: vi.fn((tool: string) => `do ${tool}`),
+  buildDomainToolCategories: vi.fn(() => ({})),
+}));
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: { getActiveTools: vi.fn(async () => []) },
 }));
 
 vi.mock("drizzle-orm", () => ({

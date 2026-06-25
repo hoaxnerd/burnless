@@ -39,6 +39,15 @@ vi.mock("@/lib/data", () => ({ getDefaultScenario: vi.fn().mockResolvedValue({ i
 vi.mock("@/lib/build-ai-context", () => ({ buildAiContext: vi.fn().mockResolvedValue({ snapshot: {}, contextText: "CTX", nowContext: { iso: "2020-01-01T00:00:00.000Z", timezone: "UTC" } }) }));
 vi.mock("@/lib/ai-tools/mcp", () => ({ assembleMcpTools: vi.fn().mockResolvedValue({ tools: [], categories: {} }) }));
 vi.mock("@/lib/ai-tools", () => ({ executeToolCall: vi.fn().mockResolvedValue("{}") }));
+// A3a-3: assembleAllowedTools resolves tools via domainRegistry.getActiveTools.
+// Stub the registry so the test's @burnless/ai mock drives the tool list.
+vi.mock("@/lib/domains", () => ({
+  domainRegistry: {
+    getActiveTools: vi.fn(async () => [
+      { name: "update_revenue_stream", description: "", inputSchema: { type: "object", properties: {} } },
+    ]),
+  },
+}));
 
 import { runScheduledJob } from "../runner";
 

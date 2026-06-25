@@ -42,11 +42,12 @@ async function handle(request: Request): Promise<Response> {
     sessions: getMcpSessionManager(),
     credentialKey: `${auth.credentialType}:${auth.credentialId}`,
     scopes: auth.scopes,
-    buildServer: (state, clientInfo) =>
+    buildServer: async (state, clientInfo) =>
       createBurnlessMcpServer({
-        tools: getExposedMcpToolDefs(),
+        // TODO(A3b): pass companyId so a future per-company-gated non-core domain's advertised MCP tool list matches the executable set (buildMcpExecuteTool already passes companyId). Byte-identical today: finance is core/always-enabled.
+        tools: await getExposedMcpToolDefs(),
         resources: MCP_RESOURCES,
-        executeTool: buildMcpExecuteTool({ auth, state, clientInfo }),
+        executeTool: await buildMcpExecuteTool({ auth, state, clientInfo }),
         readResource: buildMcpReadResource({ auth, state }),
         serverInfo: { name: "burnless", version: "1.0.0" },
       }),

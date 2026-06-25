@@ -37,6 +37,11 @@ export type { InsightPage, PageInsightContext, PageInsight } from "./page-insigh
 // Prompts
 export { SYSTEM_PROMPT, AUTONOMOUS_SYSTEM_PROMPT, buildSystemPrompt, buildSystemMessage, type PromptMode } from "./prompts";
 
+// Domain leaf contracts (A1: ContextSection; A3a adds the registry/port types)
+export type { ContextSection } from "./domain-contracts";
+export type { PromptSection, ContextContributor, ContributeCtx } from "./domain-contracts";
+export { DEFAULT_CONTEXT_HEADING } from "./domain-contracts";
+
 // Input sanitization
 export { sanitizeUserMessage, detectInjectionAttempt } from "./sanitize";
 
@@ -177,6 +182,7 @@ export type {
   PermissionDefaults,
   ResolvePermissionContext,
   BuiltinToolControl,
+  DomainToolControl,
 } from "./permissions";
 
 // Durable chat-turn event log types (single source of truth)

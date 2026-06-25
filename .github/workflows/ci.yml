@@ -11,6 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege for GITHUB_TOKEN: every job here only checks out code and runs
+# tests/builds — none push, comment, or release. Set at the workflow level so all
+# jobs (and any workflow_call consumer) inherit read-only access.
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: "24"
   PNPM_VERSION: "10.26.1"
@@ -22,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -40,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -52,13 +58,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm type-check
 
+  # Fast web unit tests — the `unit` vitest project carries NO DB setup, so it
+  # skips the per-file PGLite migrate that the `db` project pays. Sharded across
+  # parallel runners (the suite is ~427 files); see apps/web/vitest.config.mts
+  # for the unit/db partition.
   test-unit:
-    name: Unit Tests
+    name: Unit Tests (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run web unit tests (no DB) — shard ${{ matrix.shard }}/4
+        run: pnpm --filter @burnless/web exec vitest run --project=unit --shard=${{ matrix.shard }}/4
+
+  # DB-backed integration tests (the ~30 web `db`-project files that spin up
+  # PGLite) plus the pure-TS engine suite. Kept off the unit shards so the
+  # PGLite-migrate cost is paid by these files only.
+  test-integration:
+    name: Integration Tests (engine + web DB)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -72,8 +109,8 @@ jobs:
       - name: Run engine tests
         run: pnpm --filter @burnless/engine test
 
-      - name: Run web tests
-        run: pnpm --filter @burnless/web test
+      - name: Run web DB-integration tests
+        run: pnpm --filter @burnless/web exec vitest run --project=db
 
   npm-package:
     name: NPM Package Smoke
@@ -81,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -103,7 +140,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, type-check, test-unit]
+    needs: [lint, type-check, test-unit, test-integration]
     env:
       # Stub env vars required by Next.js build (not real secrets)
       DATABASE_URL: "postgresql://stub:stub@localhost:5432/stub"
@@ -112,7 +149,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -152,7 +189,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 

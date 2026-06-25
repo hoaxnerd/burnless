@@ -15,6 +15,11 @@ const CONTROL_TOOLS = new Set(["activate_scenario", "exit_scenario", "list_scena
 // a mutation) but "record" reads more naturally than "create" for booking an
 // actual that occurred. Allowlisted so it isn't forced into a create_* rename.
 const DOMAIN_VERB_WRITE_TOOLS = new Set(["record_transaction"]);
+// flavor:"core" — always-on, domain-less primitives (e.g. calculate()). These
+// tools are exempt from CRUD-prefix and family-set requirements because they are
+// not domain CRUD operations. Any tool with flavor:"core" is allowed regardless
+// of its name shape. The hook is wired in Workstream 2.
+const isCoreFlavorTool = (t: { flavor?: string }) => t.flavor === "core";
 
 describe("tool naming convention", () => {
   const tools = getFinancialTools();
@@ -25,11 +30,14 @@ describe("tool naming convention", () => {
       // intentional family — they are allowed only if registered in their set, so a
       // stray show_*/request_* name still fails (guards correct registration).
       // Plan tools (propose_plan) are a separate family registered in PLAN_TOOL_NAMES.
+      // Core tools (flavor:"core") are always-on domain-less primitives — exempt
+      // from CRUD-prefix and family-set requirements (Workstream 2 hook).
       const isGenui = DISPLAY_TOOL_NAMES.has(t.name) || INPUT_TOOL_NAMES.has(t.name);
       const isPlan = PLAN_TOOL_NAMES.has(t.name);
       const ok =
         isGenui ||
         isPlan ||
+        isCoreFlavorTool(t) ||
         WEB_TOOLS.has(t.name) ||
         CONTROL_TOOLS.has(t.name) ||
         DOMAIN_VERB_WRITE_TOOLS.has(t.name) ||
