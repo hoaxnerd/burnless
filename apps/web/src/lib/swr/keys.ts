@@ -52,7 +52,15 @@ export const KEYS = {
   scenario: (id: string) => `/api/scenarios/${id}`,
   fundingRounds: () => "/api/funding-rounds",
   departments: () => "/api/departments",
-  transactions: () => "/api/transactions",
+  transactions: (filters?: { accountId?: string; startDate?: string; endDate?: string; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (filters?.accountId) qs.set("accountId", filters.accountId);
+    if (filters?.startDate) qs.set("startDate", filters.startDate);
+    if (filters?.endDate) qs.set("endDate", filters.endDate);
+    if (filters?.cursor) qs.set("cursor", filters.cursor);
+    const s = qs.toString();
+    return s ? `/api/transactions?${s}` : "/api/transactions";
+  },
   scenarioComparison: (baseId: string, compareId: string) =>
     `/api/scenarios/compare?baseId=${baseId}&compareId=${compareId}`,
   scenarioOverrides: (scenarioId: string) =>

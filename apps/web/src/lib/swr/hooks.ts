@@ -148,6 +148,37 @@ export interface Paginated<T> {
   hasMore: boolean;
 }
 
+/** A transaction row as returned by GET /api/transactions (JSON: Date→ISO string,
+ *  numeric amount→string). */
+export interface TransactionRow {
+  id: string;
+  companyId: string;
+  accountId: string;
+  date: string;
+  amount: string;
+  description: string | null;
+  vendor: string | null;
+  notes: string | null;
+  source: "manual" | "import" | "integration" | "forecast";
+  externalId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Nested paginated payload from GET /api/transactions (PaginatedResponse). */
+export interface TransactionsPayload {
+  data: TransactionRow[];
+  pagination: { hasMore: boolean; nextCursor: string | null; count: number };
+}
+
+export interface TransactionFilters {
+  accountId?: string;
+  startDate?: string;
+  endDate?: string;
+  cursor?: string;
+}
+
 /** An admin invite code with its redemptions (settings → invite-codes tab). */
 export interface InviteCode {
   id: string;
@@ -225,6 +256,14 @@ export function useDepartments(config?: SWRConfiguration<Department[]>) {
 /** Import history (DATA-02). Server returns a paginated payload. */
 export function useImports(config?: SWRConfiguration<Paginated<ImportBatch>>) {
   return useSWR<Paginated<ImportBatch>>(KEYS.imports, { ...config });
+}
+
+/** Transactions for the current company, filtered + cursor-paginated. */
+export function useTransactions(
+  filters?: TransactionFilters,
+  config?: SWRConfiguration<TransactionsPayload>,
+) {
+  return useSWR<TransactionsPayload>(KEYS.transactions(filters), { ...config });
 }
 
 /** Admin invite codes with redemptions (settings). */
