@@ -14,7 +14,21 @@ const { mockExecuteToolCall, mockGetAiFlags } = vi.hoisted(() => ({
   mockGetAiFlags: vi.fn(async () => ({ writeMode: "full" })),
 }));
 
-vi.mock("@/lib/ai-tools", () => ({ executeToolCall: mockExecuteToolCall }));
+// buildDomainToolCategories is pure (reads ToolDefinition.mutates) and the real
+// buildMcpExecuteTool calls it to classify domain tools for the scope gate
+// (A3b-3). Provide a faithful inline copy so the gate sees real categories
+// without importOriginal pulling the whole ai-tools graph into this test.
+vi.mock("@/lib/ai-tools", () => ({
+  executeToolCall: mockExecuteToolCall,
+  buildDomainToolCategories: (tools: { name: string; mutates?: "write" | "delete" }[]) => {
+    const out: Record<string, "write" | "delete"> = {};
+    for (const t of tools) {
+      if (t.mutates === "delete") out[t.name] = "delete";
+      else if (t.mutates === "write") out[t.name] = "write";
+    }
+    return out;
+  },
+}));
 vi.mock("@/lib/ai-feature-flags", () => ({ getAiFlags: mockGetAiFlags }));
 // Module-load shim only (never invoked here): resources.ts imports
 // @/lib/compute-cap-table → data.ts → ./auth → next-auth, whose env.js imports
