@@ -131,6 +131,9 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.5.2
         version: 0.5.2
+      '@electric-sql/pglite-pgvector':
+        specifier: ^0.0.3
+        version: 0.0.3(@electric-sql/pglite@0.5.2)
       '@next/bundle-analyzer':
         specifier: ^16.2.0
         version: 16.2.0

@@ -30,8 +30,10 @@
  */
 
 import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
+import { sql } from "drizzle-orm";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, afterAll } from "vitest";
@@ -44,7 +46,11 @@ import * as schema from "../../packages/db/src/schema";
 // ── Synchronous top-level setup ───────────────────────────────────────────────
 // These three lines run BEFORE any test-file import resolves @burnless/db.
 
-const pglite = new PGlite();
+// Load the pgvector extension so migrations that declare `vector(...)` columns
+// (e.g. the `memory` table) apply — mirrors the production client in
+// packages/db/src/client/create.ts and the @db-test setup. CREATE EXTENSION is
+// issued in beforeAll (below) before migrations run.
+const pglite = new PGlite({ extensions: { vector } });
 const testDb = drizzle(pglite, { schema });
 
 // CRITICAL: assign before @burnless/db/index.ts first evaluates.
@@ -69,6 +75,7 @@ async function runMigrations(client: PGlite) {
 }
 
 beforeAll(async () => {
+  await testDb.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   await runMigrations(pglite);
 });
 

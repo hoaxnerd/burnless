@@ -1,7 +1,9 @@
 import { beforeAll, afterAll } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
+import { sql } from "drizzle-orm";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as schema from "../schema";
@@ -59,7 +61,12 @@ beforeAll(async () => {
     return;
   }
 
-  pglite = new PGlite();
+  // Load the pgvector extension so migrations that declare `vector(...)` columns
+  // (e.g. the `memory` table) apply — mirrors the production client in
+  // src/client/create.ts. In the vitest (node, unbundled) context the standard
+  // `@electric-sql/pglite-pgvector` import resolves fine.
+  pglite = new PGlite({ extensions: { vector } });
+  await drizzle(pglite, { schema }).execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   await runMigrations(pglite);
   testDb = drizzle(pglite, { schema });
   // Seed the globalThis singleton so packages/db/src/index.ts (and any

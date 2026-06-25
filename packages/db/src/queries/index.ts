@@ -145,6 +145,15 @@ export {
 } from "./notifications";
 
 export {
+  insertMemory,
+  listMemory,
+  deleteMemoryById,
+  type MemoryRow,
+  type InsertMemoryInput,
+  type ListMemoryFilter,
+} from "./memory";
+
+export {
   createOauthClient,
   getOauthClientById,
   createAuthCode,
