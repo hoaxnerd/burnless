@@ -148,9 +148,11 @@ export {
   insertMemory,
   listMemory,
   deleteMemoryById,
+  searchMemoryByEmbedding,
   type MemoryRow,
   type InsertMemoryInput,
   type ListMemoryFilter,
+  type SearchMemoryOpts,
 } from "./memory";
 
 export {

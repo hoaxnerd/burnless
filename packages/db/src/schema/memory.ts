@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -47,5 +48,15 @@ export const memory = pgTable(
     index("memory_company_idx").on(table.companyId),
     index("memory_company_domain_kind_idx").on(table.companyId, table.domain, table.kind),
     index("memory_company_tier_idx").on(table.companyId, table.tier),
+    // Recall-tier cosine search (searchMemoryByEmbedding). Partial: only rows
+    // with a non-null embedding (block-tier rows leave embedding null). HNSW was
+    // VERIFY-THEN-DECIDE for self-host safety: probed against PGlite's bundled
+    // pgvector (CREATE INDEX ... USING hnsw (... vector_cosine_ops) WHERE ... IS
+    // NOT NULL) and it builds + is queryable, so the additive migration applies
+    // cleanly on both PGlite and Postgres. (vector_cosine_ops because the search
+    // orders by cosine distance.)
+    index("memory_embedding_hnsw")
+      .using("hnsw", table.embedding.op("vector_cosine_ops"))
+      .where(sql`${table.embedding} IS NOT NULL`),
   ]
 );

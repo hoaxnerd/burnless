@@ -6,7 +6,14 @@ vi.mock("../../index", () => ({ get db() { return getTestDb(); } }));
 import { eq } from "drizzle-orm";
 import { createCompanyContext } from "../../__tests__/factories";
 import { companies } from "../../schema";
-import { insertMemory, listMemory, deleteMemoryById } from "../memory";
+import { insertMemory, listMemory, deleteMemoryById, searchMemoryByEmbedding } from "../memory";
+
+/** A 1536-dim unit vector with a single 1.0 at `hot`, the rest 0. */
+function unitVec(hot: number): number[] {
+  const v = new Array(1536).fill(0);
+  v[hot] = 1;
+  return v;
+}
 
 describe("memory query helpers", () => {
   it("insertMemory persists a block-tier company fact with null embedding + sane defaults", async () => {
@@ -141,5 +148,104 @@ describe("memory query helpers", () => {
       content: "no user",
     });
     expect(row.userId).toBeNull();
+  });
+
+  describe("searchMemoryByEmbedding", () => {
+    it("returns the closest recall rows in ascending-distance order, excludes null-embedding + other companies", async () => {
+      const a = await createCompanyContext();
+      const other = await createCompanyContext();
+
+      // Recall rows with distinct 1536-dim unit vectors.
+      const near = await insertMemory({
+        companyId: a.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "near",
+        embedding: unitVec(0),
+      });
+      const mid = await insertMemory({
+        companyId: a.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "mid",
+        embedding: unitVec(1),
+      });
+      // A third recall row whose vector is a 50/50 blend of dims 0 and 1, so it
+      // sits between `near` and `mid` for a query aligned with dim 0.
+      const blend = new Array(1536).fill(0);
+      blend[0] = 1;
+      blend[1] = 1;
+      await insertMemory({
+        companyId: a.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "blend",
+        embedding: blend,
+      });
+      // Block-tier row with NULL embedding — must be excluded.
+      await insertMemory({
+        companyId: a.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "block",
+        content: "block-fact",
+      });
+      // Other company's recall row — must never leak.
+      await insertMemory({
+        companyId: other.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "elsewhere",
+        embedding: unitVec(0),
+      });
+
+      // Query aligned exactly with `near` (dim 0).
+      const results = await searchMemoryByEmbedding(a.company.id, unitVec(0), { topK: 2 });
+
+      expect(results).toHaveLength(2);
+      // Closest first: `near` (distance 0) then `blend` (closer than `mid`).
+      expect(results.map((r) => r.content)).toEqual([near.content, "blend"]);
+      // Ascending distance.
+      expect(results[0]!.distance).toBeLessThanOrEqual(results[1]!.distance);
+      expect(typeof results[0]!.distance).toBe("number");
+      expect(results[0]!.distance).toBeCloseTo(0, 5);
+      // The null-embedding block row and other-company row are absent.
+      expect(results.some((r) => r.content === "block-fact")).toBe(false);
+      expect(results.some((r) => r.content === "elsewhere")).toBe(false);
+      // `mid` is excluded by topK=2 (it's farther than `blend`).
+      expect(results.some((r) => r.content === mid.content)).toBe(false);
+    });
+
+    it("narrows by domain/kind and defaults topK to 5", async () => {
+      const ctx = await createCompanyContext();
+      await insertMemory({
+        companyId: ctx.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "finance-note",
+        embedding: unitVec(0),
+      });
+      await insertMemory({
+        companyId: ctx.company.id,
+        domain: "people",
+        kind: "note",
+        tier: "recall",
+        content: "people-note",
+        embedding: unitVec(0),
+      });
+
+      const onlyFinance = await searchMemoryByEmbedding(ctx.company.id, unitVec(0), {
+        domain: "finance",
+      });
+      expect(onlyFinance.map((r) => r.content)).toEqual(["finance-note"]);
+
+      const all = await searchMemoryByEmbedding(ctx.company.id, unitVec(0));
+      expect(all.map((r) => r.content).sort()).toEqual(["finance-note", "people-note"]);
+    });
   });
 });

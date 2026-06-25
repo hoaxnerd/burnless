@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "../index";
 import { memory } from "../schema";
 
@@ -57,6 +57,41 @@ export async function listMemory(filter: ListMemoryFilter): Promise<MemoryRow[]>
     .from(memory)
     .where(and(...conds))
     .orderBy(desc(memory.createdAt));
+}
+
+export interface SearchMemoryOpts {
+  domain?: string;
+  kind?: string;
+  topK?: number;
+}
+
+/**
+ * Cosine-similarity search over recall-tier rows with a non-null embedding, for
+ * ONE company. Returns rows ordered by ascending cosine distance (closest
+ * first), each annotated with its numeric `distance`. Pure DB query — no
+ * embedding logic (the caller passes an already-computed 1536-dim query
+ * vector). Block-tier and null-embedding rows are never returned.
+ */
+export async function searchMemoryByEmbedding(
+  companyId: string,
+  queryEmbedding: number[],
+  opts: SearchMemoryOpts = {},
+): Promise<Array<MemoryRow & { distance: number }>> {
+  const distance = sql<number>`${cosineDistance(memory.embedding, queryEmbedding)}`;
+  const conds = [
+    eq(memory.companyId, companyId),
+    eq(memory.tier, "recall"),
+    isNotNull(memory.embedding),
+  ];
+  if (opts.domain !== undefined) conds.push(eq(memory.domain, opts.domain));
+  if (opts.kind !== undefined) conds.push(eq(memory.kind, opts.kind));
+  const rows = await db
+    .select({ row: memory, distance })
+    .from(memory)
+    .where(and(...conds))
+    .orderBy(distance)
+    .limit(opts.topK ?? 5);
+  return rows.map((r) => ({ ...r.row, distance: r.distance }));
 }
 
 /** Tenancy-safe delete: only deletes if the row belongs to companyId. Returns the row or null. */
