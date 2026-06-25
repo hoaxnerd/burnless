@@ -1,4 +1,5 @@
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { registerKey, registerModel, registerProvider } from "./commands/ai-config";
 import { registerBootstrap } from "./commands/bootstrap";
@@ -37,8 +38,29 @@ export function buildProgram(): Command {
   return program;
 }
 
-const isMain =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+/**
+ * True when `argv1` resolves to the same real file as this module (`selfUrl`).
+ * BOTH sides are realpath'd before comparison: Node already symlink-resolves
+ * `import.meta.url`, but `process.argv[1]` is the raw invocation path. A symlink
+ * anywhere in that path — npm global-bin shims, version managers
+ * (nvm/volta/asdf), or macOS `/tmp` → `/private/tmp` — would otherwise make the
+ * two differ, so the entry guard would be false and the CLI would exit 0 doing
+ * nothing. The launcher script already passes a realpath, so this only hardens
+ * direct/symlinked `node cli/index.js` invocations; the failure mode (a silent
+ * no-op) is bad enough to warrant the guard. Exported for the regression test.
+ */
+export function isEntryPoint(selfUrl: string, argv1: string | undefined): boolean {
+  if (argv1 === undefined) return false;
+  try {
+    return realpathSync(fileURLToPath(selfUrl)) === realpathSync(argv1);
+  } catch {
+    // realpathSync throws if argv1 is not a real file (rare); fall back to the
+    // raw URL comparison so behaviour is never worse than before.
+    return selfUrl === pathToFileURL(argv1).href;
+  }
+}
+
+const isMain = isEntryPoint(import.meta.url, process.argv[1]);
 
 if (isMain) {
   const program = buildProgram();
