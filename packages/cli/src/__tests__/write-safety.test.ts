@@ -23,6 +23,16 @@ describe("categorizeTool (local prefix heuristic, spec §7.4)", () => {
     expect(categorizeTool("list_scenarios")).toBe("read");
     expect(categorizeTool("activate_scenario")).toBe("read"); // view change, not a mutation
   });
+
+  // Cross-domain write tools (e.g. company-knowledge facts) are NOT in
+  // @burnless/ai's finance-only MUTATION_TOOL_NAMES, so the drift guard below
+  // can't cover them — pin their prefixes explicitly so the CLI write gate
+  // confirms a fact write/delete instead of waving it through as a read.
+  it("classifies remember_/forget_ domain tools as write/delete", () => {
+    expect(categorizeTool("remember_fact")).toBe("write");
+    expect(categorizeTool("forget_fact")).toBe("delete");
+    expect(categorizeTool("list_facts")).toBe("read");
+  });
 });
 
 // Registry drift guard (major #1/#2): the local prefix heuristic must never let

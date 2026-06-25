@@ -400,6 +400,20 @@ export const POST = withErrorHandler(async (request: Request) => {
   if (!body.decisions || body.decisions.length === 0) {
     return errorResponse("decisions required to resume a permission pause", 400);
   }
+
+  // Per-turn dynamic categories for non-finance tools (A3b-3): domain tools
+  // (their `mutates` metadata) UNDER MCP tools (an MCP tool name can shadow a
+  // domain one; mcp.categories wins, mirroring chat-stream's merge order).
+  // Without the domain half, a domain write like forget_fact categorizes as
+  // "read" here — the decision-4 overlay-write check and the session-grant
+  // category below would both mis-handle it. Resolved in the permission branch
+  // only (the input/plan pauses above return before reaching it).
+  const { domainRegistry } = await import("@/lib/domains");
+  const domainCategories = buildDomainToolCategories(
+    await domainRegistry.getActiveTools({ companyId: ctx.companyId }),
+  );
+  const dynamicCategories = { ...domainCategories, ...mcp.categories };
+
   // The gated action batch comes from the gate event's `actions` (the enriched
   // pending batch — {requestId, toolName, toolInput, override?}).
   const pending = (gatePayload!.actions ?? []) as PendingActionRecord[];
@@ -429,7 +443,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     // External MCP tools write EXTERNAL systems, never the scenario overlay — a
     // mid-pause scenario switch can't endanger them, so they never arm the gate.
     if (a.toolName.startsWith("mcp__")) return false;
-    const cat = categorizeToolName(a.toolName, mcp.categories);
+    const cat = categorizeToolName(a.toolName, dynamicCategories);
     return (cat === "write" || cat === "delete") && !NON_OVERLAY_MUTATIONS.has(a.toolName);
   });
   // Decision-4 reads the read/write scenario ids from the GATE (gate-preferred,
@@ -463,9 +477,10 @@ export const POST = withErrorHandler(async (request: Request) => {
   let nextWriteScenarioId = gateWriteScenarioId;
   for (const action of pending) {
     const decision = decisionMap.get(action.requestId) ?? "deny";
-    // Dynamic map first (MCP): the granted category must match what the
-    // permission card showed (e.g. an MCP refund classified "delete").
-    const category = categorizeToolName(action.toolName, mcp.categories);
+    // Dynamic map first (domain tools + MCP): the granted category must match
+    // what the permission card showed (e.g. an MCP refund or a domain
+    // forget_fact classified "delete").
+    const category = categorizeToolName(action.toolName, dynamicCategories);
 
     if (decision === "deny") {
       logDeniedToolCall(

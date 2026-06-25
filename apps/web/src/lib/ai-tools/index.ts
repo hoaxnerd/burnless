@@ -180,14 +180,25 @@ export function buildDomainToolCategories(
 }
 
 function describeMutation(toolName: string, input: Record<string, unknown>): string {
-  const action = toolName.startsWith("create_") || toolName.startsWith("add_")
-    ? "create"
-    : toolName.startsWith("update_")
-      ? "update"
-      : toolName.startsWith("record_")
-        ? "record"
-        : "delete";
-  const entity = toolName.replace(/^(create_|add_|update_|delete_|record_)/, "").replace(/_/g, " ");
+  // Tool names follow a verb_noun convention (create_forecast_line,
+  // record_transaction, remember_fact, forget_fact). Derive the human verb from
+  // the first segment and the entity from the rest — generic across finance AND
+  // domain tools. The previous fixed-prefix table fell through to "delete" for
+  // any unrecognized verb, mislabeling domain writes like remember_fact as
+  // "delete remember fact" on the permission card. For a name with no underscore
+  // (none today), fall back to the registry's mutation class so the verb still
+  // reflects intent rather than defaulting to "delete".
+  const sep = toolName.indexOf("_");
+  let action: string;
+  let entity: string;
+  if (sep > 0) {
+    action = toolName.slice(0, sep);
+    entity = toolName.slice(sep + 1).replace(/_/g, " ");
+  } else {
+    const mutates = registeredTools().find((t) => t.name === toolName)?.mutates;
+    action = mutates === "delete" ? "delete" : "update";
+    entity = toolName.replace(/_/g, " ");
+  }
   const id = input.id as string | undefined;
   const name = (input.name ?? input.title) as string | undefined;
   const label = name ? ` "${name}"` : id ? ` (ID: ${id})` : "";

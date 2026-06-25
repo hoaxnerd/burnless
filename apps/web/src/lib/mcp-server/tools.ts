@@ -13,7 +13,7 @@
 import { categorizeToolName } from "@burnless/ai";
 import type { BurnlessToolDef, McpClientInfo, McpSessionState } from "@burnless/mcp/server";
 import { getScenarioForCompany } from "@burnless/db";
-import { executeToolCall } from "@/lib/ai-tools";
+import { executeToolCall, buildDomainToolCategories } from "@/lib/ai-tools";
 import { getAiFlags } from "@/lib/ai-feature-flags";
 import type { McpAuthResult } from "./auth";
 
@@ -42,6 +42,14 @@ export async function buildMcpExecuteTool(
   const { domainRegistry } = await import("@/lib/domains");
   const exposedTools = await domainRegistry.getActiveMcpExposedTools({ companyId: deps.auth.companyId });
   const exposed = new Set(exposedTools.map((t) => t.name));
+  // Permission categories for domain-registered tools (A3b-3): finance writes
+  // live in @burnless/ai's static set, but cross-domain write/delete tools
+  // (e.g. company-knowledge's remember_fact/forget_fact) are only known via
+  // their `mutates` metadata. Without this map categorizeToolName would call
+  // them "read", so a read-scoped MCP credential would pass the scope gate
+  // below and execute a write/delete. Built from the SAME ToolDefinitions the
+  // exposed set comes from.
+  const domainCategories = buildDomainToolCategories(exposedTools);
 
   return async (toolName, input) => {
     // Gate refusals THROW (not return-as-string): createBurnlessMcpServer turns a
@@ -54,7 +62,7 @@ export async function buildMcpExecuteTool(
 
     // Scope gate (spec §4.3 step 5). web_search/browser_use cannot appear —
     // the exclusion set keeps those tools out — but guard defensively.
-    const category = categorizeToolName(toolName);
+    const category = categorizeToolName(toolName, domainCategories);
     if (category === "web_search" || category === "browser_use") {
       throw new Error(`Tool ${toolName} is not available over MCP.`);
     }

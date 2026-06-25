@@ -16,7 +16,20 @@ const { mockExecuteToolCall, mockGetAiFlags } = vi.hoisted(() => ({
   mockGetAiFlags: vi.fn(async () => ({ writeMode: "full" })),
 }));
 
-vi.mock("@/lib/ai-tools", () => ({ executeToolCall: mockExecuteToolCall }));
+// buildDomainToolCategories is pure (reads ToolDefinition.mutates) — provide a
+// faithful inline copy so the scope gate sees real domain-tool categories
+// without importOriginal pulling the whole ai-tools graph into this test.
+vi.mock("@/lib/ai-tools", () => ({
+  executeToolCall: mockExecuteToolCall,
+  buildDomainToolCategories: (tools: { name: string; mutates?: "write" | "delete" }[]) => {
+    const out: Record<string, "write" | "delete"> = {};
+    for (const t of tools) {
+      if (t.mutates === "delete") out[t.name] = "delete";
+      else if (t.mutates === "write") out[t.name] = "write";
+    }
+    return out;
+  },
+}));
 vi.mock("@/lib/ai-feature-flags", () => ({ getAiFlags: mockGetAiFlags }));
 
 // A3a-3: stub domainRegistry so the tools.ts module resolves MCP tools without

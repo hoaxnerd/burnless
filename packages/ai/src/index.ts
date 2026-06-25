@@ -182,6 +182,7 @@ export type {
   PermissionDefaults,
   ResolvePermissionContext,
   BuiltinToolControl,
+  DomainToolControl,
 } from "./permissions";
 
 // Durable chat-turn event log types (single source of truth)

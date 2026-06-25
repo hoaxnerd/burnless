@@ -5,7 +5,7 @@ import { Eye, SquarePen, Trash2, ChevronDown, ChevronRight, Search } from "lucid
 import { listBuiltinToolsForControl } from "@burnless/ai";
 import { apiFetch } from "@/lib/api-fetch";
 import { KEYS, revalidate } from "@/lib/swr";
-import { useAiPermissions } from "@/lib/swr/hooks";
+import { useAiPermissions, useAiDomainTools } from "@/lib/swr/hooks";
 import { PermClassTag } from "@/components/mcp/perm-class-tag";
 import { CategorySection } from "./category-section";
 import { PostureControl, type PostureMode } from "./posture-control";
@@ -45,13 +45,19 @@ function toPermClass(category: string): "read" | "write" | "delete" {
 }
 
 export function WorkspaceCategory({ ctx }: { ctx: ToolsCtx }) {
-  // Controllable built-ins, excluding the web tools (owned by the Web category).
+  // Active non-finance domain tools (A3b-3) — fetched server-side because which
+  // domains are active is company-scoped. Finance tools are bundled client-side
+  // (listBuiltinToolsForControl reads them statically). Absent/loading → finance
+  // only, so domain tools just stream in when the fetch resolves.
+  const { data: domainData } = useAiDomainTools();
+  // Controllable built-ins (finance + domain), excluding the web tools (owned by
+  // the Web category).
   const tools = useMemo(
     () =>
-      listBuiltinToolsForControl().filter(
+      listBuiltinToolsForControl(domainData?.tools ?? []).filter(
         (t) => t.category !== "web_search" && t.category !== "browser_use",
       ),
-    [],
+    [domainData],
   );
 
   const offCount = tools.reduce((n, t) => {

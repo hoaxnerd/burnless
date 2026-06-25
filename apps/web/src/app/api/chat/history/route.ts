@@ -11,9 +11,9 @@ import { db, getTurnEvents, getOpenGate } from "@burnless/db";
 import { aiConversations } from "@burnless/db";
 import { eq, and, desc, lt } from "drizzle-orm";
 import { categorizeToolName, projectTimeline } from "@burnless/ai";
-import type { ProjectedMessage, ProjectedNode, TurnEvent } from "@burnless/ai";
+import type { PermissionCategory, ProjectedMessage, ProjectedNode, TurnEvent } from "@burnless/ai";
 import { requireCompanyAccess, withErrorHandler } from "@/lib/api-helpers";
-import { describeToolAction } from "@/lib/ai-tools";
+import { describeToolAction, buildDomainToolCategories } from "@/lib/ai-tools";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 
 /** Raw gate-action shape as persisted on the gate event (chat-stream.ts onPause):
@@ -27,12 +27,18 @@ type RawGateAction = {
 
 /** Map a raw persisted gate action → the client PermissionAction shape the
  *  permission card renders (tool / category / description / input / override).
- *  This is the SAME mapping the pre-turn-log reader applied to a pending row. */
-function mapPermissionActions(actions: unknown[]) {
+ *  This is the SAME mapping the pre-turn-log reader applied to a pending row.
+ *  `categories` carries the domain-tool `mutates` map so a restored card shows
+ *  the same category icon the live gate did (a domain forget_fact = delete,
+ *  not the bare-categorizer's "read" fallback). */
+function mapPermissionActions(
+  actions: unknown[],
+  categories: Record<string, PermissionCategory>,
+) {
   return (actions as RawGateAction[]).map((a) => ({
     requestId: a.requestId,
     tool: a.toolName,
-    category: categorizeToolName(a.toolName),
+    category: categorizeToolName(a.toolName, categories),
     description: describeToolAction(a.toolName, a.toolInput),
     input: a.toolInput,
     // Diff-gate delta persisted at pause-time (worklog Plan 3); null if none.
@@ -44,22 +50,28 @@ function mapPermissionActions(actions: unknown[]) {
  *  (projectTimeline defers the client mapping to the caller). Rewrite any
  *  diff_gate node's `pending.actions` into the client PermissionAction shape so
  *  the per-turn timeline renders the card identically to the live SSE path. */
-function mapNodeGateActions(node: ProjectedNode): ProjectedNode {
+function mapNodeGateActions(
+  node: ProjectedNode,
+  categories: Record<string, PermissionCategory>,
+): ProjectedNode {
   if (node.kind === "diff_gate" && node.pending) {
     return {
       ...node,
       pending: {
         ...node.pending,
-        actions: mapPermissionActions(node.pending.actions),
+        actions: mapPermissionActions(node.pending.actions, categories),
       },
     };
   }
   return node;
 }
 
-function mapMessageGateActions(message: ProjectedMessage): ProjectedMessage {
+function mapMessageGateActions(
+  message: ProjectedMessage,
+  categories: Record<string, PermissionCategory>,
+): ProjectedMessage {
   if (!message.timeline) return message;
-  return { ...message, timeline: message.timeline.map(mapNodeGateActions) };
+  return { ...message, timeline: message.timeline.map((n) => mapNodeGateActions(n, categories)) };
 }
 
 export const GET = withErrorHandler(async (request: Request) => {
@@ -95,7 +107,14 @@ export const GET = withErrorHandler(async (request: Request) => {
       // TurnEvent. Same bridge cast the resume route uses (Task 3.2).
       (await getTurnEvents(conversationId)) as unknown as TurnEvent[]
     );
-    const messages = projected.map(mapMessageGateActions);
+    // Domain-tool category map (A3b-3) so restored permission cards label a
+    // domain write/delete the same as the live gate did. Resolved once and
+    // threaded through every gate-action mapping below.
+    const { domainRegistry } = await import("@/lib/domains");
+    const domainCategories = buildDomainToolCategories(
+      await domainRegistry.getActiveTools({ companyId: ctx.companyId }),
+    );
+    const messages = projected.map((m) => mapMessageGateActions(m, domainCategories));
 
     // The open gate pauses for one of three reasons (kind): "permission" (a
     // write/tool approval), "input" (a form the model asked the user to fill),
@@ -110,7 +129,7 @@ export const GET = withErrorHandler(async (request: Request) => {
         ? {
             pauseId: openGate.pauseId,
             conversationId,
-            actions: mapPermissionActions(gatePayload?.actions ?? []),
+            actions: mapPermissionActions(gatePayload?.actions ?? [], domainCategories),
           }
         : null;
     const pendingInput =
