@@ -8,16 +8,33 @@ import { monetaryAmount } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import { parseISODate } from "@/lib/date-validation";
+import { getActiveScenario } from "@/lib/scenario-middleware";
 
-const createSchema = z.object({
+export const createSchema = z.object({
   accountId: z.string(),
   date: z.string().transform((s) => new Date(s)),
   amount: monetaryAmount(),
   description: z.string().nullable().default(null),
+  vendor: z.string().nullable().default(null),
+  notes: z.string().nullable().default(null),
   source: z.enum(["manual", "import", "integration", "forecast"]).default("manual"),
   externalId: z.string().nullable().default(null),
   metadata: z.record(z.unknown()).nullable().default(null),
 });
+
+/**
+ * Partial update schema for PATCH /api/transactions/[id]. Transactions are flat
+ * actuals, so (unlike forecast lines) the account MAY change — `accountId` is
+ * editable and re-runs the AUTHZ-02 ownership check in the [id] route.
+ */
+export const updateTransactionSchema = z.object({
+  accountId: z.string(),
+  date: z.string().transform((s) => new Date(s)),
+  amount: monetaryAmount(),
+  description: z.string().nullable(),
+  vendor: z.string().nullable(),
+  notes: z.string().nullable(),
+}).partial();
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -56,6 +73,13 @@ export const GET = withErrorHandler(async (request: Request) => {
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyWrite();
   if ("error" in ctx) return ctx.error;
+
+  // §3: transactions are actuals-only. A non-base scenario active ⇒ refuse the
+  // write rather than silently landing it on base. getActiveScenario also runs
+  // the dual-channel safety check (throws ScenarioSafetyError → 409).
+  if (getActiveScenario(request)) {
+    return errorResponse("Transactions are actuals — switch to base view to add or edit.", 409);
+  }
 
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;
