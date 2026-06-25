@@ -4,7 +4,8 @@ export type Capability =
   | "marketingSite" | "billing" | "multiTenant" | "selfServeSignup"
   | "oauthLogin" | "autoLogin" | "stdioMcp" | "planEnforcement"
   | "emailVerification" | "managedAiProvider" | "integrations"
-  | "inviteCodes" | "semanticSearch" | "dataResidency";
+  | "inviteCodes" | "semanticSearch" | "dataResidency"
+  | "skills";
 
 export type Capabilities = Record<Capability, boolean>;
 export type Edition = "self_host" | "cloud";
@@ -15,6 +16,8 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
     oauthLogin: false, autoLogin: true, stdioMcp: true, planEnforcement: false,
     emailVerification: false, managedAiProvider: false, integrations: false,
     inviteCodes: false, semanticSearch: false, dataResidency: false,
+    // Filesystem-backed; cloud/DB-backed skills are a later consumer.
+    skills: true,
   },
   cloud: {
     marketingSite: true, billing: true, multiTenant: true, selfServeSignup: true,
@@ -24,6 +27,8 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
     // its default Ollama embedder is 768-dim, incompatible with the vector(1536) column —
     // operators enable it via BURNLESS_CAP_SEMANTIC_SEARCH=true once a 1536-dim embedder is set.
     inviteCodes: true, semanticSearch: true, dataResidency: true,
+    // Filesystem-backed; cloud/DB-backed skills are a later consumer.
+    skills: false,
   },
 };
 
@@ -42,6 +47,7 @@ const CAP_ENV: Record<Capability, string> = {
   inviteCodes: "BURNLESS_CAP_INVITE_CODES",
   semanticSearch: "BURNLESS_CAP_SEMANTIC_SEARCH",
   dataResidency: "BURNLESS_CAP_DATA_RESIDENCY",
+  skills: "BURNLESS_CAP_SKILLS",
 };
 
 function envFlag(name: string): boolean | undefined {
@@ -137,6 +143,12 @@ export async function isDomainEnabled(
 
   // 1. Core domains are always enabled.
   if (mod?.core) return true;
+
+  // 1b. Deployment capability gate — if the module declares a `capability` and that
+  //     capability is explicitly off in the current edition/env, block the domain.
+  //     Only affects modules that declare `capability`; existing domains (finance=core,
+  //     company-knowledge/memory with no capability) are unaffected.
+  if (mod?.capability && getCapabilities()[mod.capability as Capability] === false) return false;
 
   // 2. Deployment-level capability check.
   const deploymentEnabled = domainEnvFlag(domainId) ?? true;
