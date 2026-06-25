@@ -268,7 +268,20 @@ export function useTransactions(
   filters?: TransactionFilters,
   config?: SWRConfiguration<TransactionsPayload>,
 ) {
-  return useSWR<TransactionsPayload>(KEYS.transactions(filters), { ...config });
+  const swr = useSWR<TransactionsPayload>(KEYS.transactions(filters), { ...config });
+  // B1: the table must update the instant an add/edit/delete lands — not only on
+  // manual reload. SWR ignores `fallbackData` changes after mount, and the form
+  // modal / delete handler only call router.refresh() (RSC, not the client cache).
+  // A transaction mutation writes through apiFetch, which publishes a financial
+  // MutationEvent (/transactions → "expenses"); revalidate the list on it
+  // (same-tab AND cross-tab), mirroring useOverrideCount.
+  const { mutate } = swr;
+  useEffect(() => {
+    return subscribeMutation((e) => {
+      if (FINANCIAL_DOMAINS.has(e.domain)) void mutate();
+    });
+  }, [mutate]);
+  return swr;
 }
 
 /** Admin invite codes with redemptions (settings). */
