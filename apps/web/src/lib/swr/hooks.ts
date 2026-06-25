@@ -36,12 +36,17 @@ export interface FinancialAccount {
   id: string;
   companyId: string;
   name: string;
+  /** Account type enum: income | expense | asset | liability | equity. */
   type: string;
-  subtype: string | null;
-  balance: number;
-  currency: string;
+  /** Account category enum: revenue | cogs | operating_expense | other_income | other_expense | asset | liability | equity. */
+  category: string;
+  parentId: string | null;
+  isSystem: boolean;
   sortOrder: number;
-  isActive: boolean;
+  coversHeadcount: boolean;
+  /** Per-account transaction count (base-table actuals), attached by GET /api/accounts.
+   *  Drives the # Transactions column and the guard-hard delete gate (B2 §0.3). */
+  transactionCount: number;
   createdAt: string;
   updatedAt: string;
 }
