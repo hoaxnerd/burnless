@@ -50,7 +50,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     // skills is OFF in cloud edition.
     registryModules = [{ id: "skills", capability: "skills" }];
     process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud" };
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     const result = await isDomainEnabled("skills", {});
     expect(result).toBe(false);
   });
@@ -59,7 +59,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     // skills is ON in self_host edition.
     registryModules = [{ id: "skills", capability: "skills" }];
     process.env = { ...ORIG }; delete process.env["BURNLESS_DEPLOYMENT"]; // self_host
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     const result = await isDomainEnabled("skills", {});
     expect(result).toBe(true);
   });
@@ -67,7 +67,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
   it("skills capability can be overridden on via BURNLESS_CAP_SKILLS=on in cloud", async () => {
     registryModules = [{ id: "skills", capability: "skills" }];
     process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud", BURNLESS_CAP_SKILLS: "on" };
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     const result = await isDomainEnabled("skills", {});
     expect(result).toBe(true);
   });
@@ -76,7 +76,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     registryModules = [{ id: "skills", capability: "skills" }];
     process.env = { ...ORIG, BURNLESS_CAP_SKILLS: "off" };
     delete process.env["BURNLESS_DEPLOYMENT"]; // ensure self_host
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     const result = await isDomainEnabled("skills", {});
     expect(result).toBe(false);
   });
@@ -86,7 +86,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     registryModules = [{ id: "company-knowledge" }];
     // Even in cloud, no capability declared → gate is skipped.
     process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud" };
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     // companyId not provided → per-company check skipped → returns true.
     const result = await isDomainEnabled("company-knowledge", {});
     expect(result).toBe(true);
@@ -97,7 +97,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     // Core short-circuit must win → always enabled even if capability is off.
     registryModules = [{ id: "finance", core: true, capability: "skills" }];
     process.env = { ...ORIG, BURNLESS_DEPLOYMENT: "cloud" }; // skills off in cloud
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     const result = await isDomainEnabled("finance", {});
     expect(result).toBe(true);
   });
@@ -106,7 +106,7 @@ describe("isDomainEnabled — capability gate (A6-1)", () => {
     // No module for this domain → mod is undefined → capability gate is skipped.
     registryModules = [];
     process.env = { ...ORIG };
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     // No companyId → per-company check skipped → true.
     const result = await isDomainEnabled("nonexistent-domain", {});
     expect(result).toBe(true);

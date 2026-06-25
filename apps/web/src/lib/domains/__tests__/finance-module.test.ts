@@ -75,10 +75,13 @@ vi.mock("@/lib/skills/source", () => ({
 
 // capabilities mock: finance is core → isDomainEnabled always returns true
 vi.mock("@/lib/capabilities", () => ({
-  isDomainEnabled: vi.fn(async () => true),
-  requireDomainEnabled: vi.fn(async () => null),
   getCapabilities: vi.fn(() => ({})),
   requireCapability: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/domain-gating", () => ({
+  isDomainEnabled: vi.fn(async () => true),
+  requireDomainEnabled: vi.fn(async () => null),
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -144,10 +147,12 @@ describe("domainRegistry with only finance — getActiveTools parity", () => {
     vi.resetModules();
     // Re-apply mocks after resetModules
     vi.mock("@/lib/capabilities", () => ({
-      isDomainEnabled: vi.fn(async () => true),
-      requireDomainEnabled: vi.fn(async () => null),
       getCapabilities: vi.fn(() => ({})),
       requireCapability: vi.fn(() => null),
+    }));
+    vi.mock("@/lib/domain-gating", () => ({
+      isDomainEnabled: vi.fn(async () => true),
+      requireDomainEnabled: vi.fn(async () => null),
     }));
     vi.mock("@/lib/build-ai-context", () => ({
       buildAiContext: vi.fn(async () => ({
@@ -188,7 +193,7 @@ describe("domainRegistry with only finance — getActiveTools parity", () => {
   it("getActiveTools({companyId}) deep-equals getFinancialTools() (finance only enabled)", async () => {
     // A3b-2: company-knowledge is now also registered, so to keep this a pure
     // finance-parity proof we enable only finance for this company.
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "finance");
 
     // Import fresh registry (populated by registerDomains() at module load)
@@ -200,7 +205,7 @@ describe("domainRegistry with only finance — getActiveTools parity", () => {
   });
 
   it("getActiveMcpExposedTools deep-equals getMcpExposedTools() (finance only enabled)", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "finance");
 
     const { domainRegistry } = await import("../index");

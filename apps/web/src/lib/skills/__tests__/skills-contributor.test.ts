@@ -13,9 +13,12 @@ const capsMock: ReturnType<typeof vi.fn> = vi.fn(() => ({ skills: true } as Part
 
 vi.mock("@/lib/capabilities", () => ({
   getCapabilities: () => capsMock() as PartialCaps,
+  requireCapability: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/domain-gating", () => ({
   isDomainEnabled: vi.fn(async () => true),
   requireDomainEnabled: vi.fn(async () => null),
-  requireCapability: vi.fn(() => null),
 }));
 
 // ── SkillSource mock ──────────────────────────────────────────────────────────

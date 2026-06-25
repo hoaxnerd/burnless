@@ -11,7 +11,7 @@
 
 import type { ToolDefinition, ContextContributor, PromptSection } from "@burnless/ai";
 import type { DomainModule } from "./contracts";
-import { isDomainEnabled } from "@/lib/capabilities";
+import { isDomainEnabled } from "@/lib/domain-gating";
 
 /** Context passed to getActive* queries (mirrors ContributeCtx but only needs companyId). */
 export interface DomainQueryCtx {

@@ -13,7 +13,7 @@ import type { ToolDefinition, ContextContributor, PromptSection } from "@burnles
 // Must be declared before the registry import (hoisted by vitest).
 const enabledDomains = new Set<string>(["always-on"]);
 
-vi.mock("@/lib/capabilities", () => ({
+vi.mock("@/lib/domain-gating", () => ({
   isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
   requireDomainEnabled: vi.fn(async () => null),
 }));
@@ -62,7 +62,7 @@ describe("DomainRegistry", () => {
   beforeEach(async () => {
     vi.resetModules();
     // Re-mock after resetModules
-    vi.mock("@/lib/capabilities", () => ({
+    vi.mock("@/lib/domain-gating", () => ({
       isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
       requireDomainEnabled: vi.fn(async () => null),
     }));
@@ -119,7 +119,7 @@ describe("DomainRegistry", () => {
 
   it("core modules are always enabled (isDomainEnabled must return true for them)", async () => {
     // Simulate: isDomainEnabled returns true for core domains.
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) =>
       id === "core-mod" ? true : false
     );
@@ -131,7 +131,7 @@ describe("DomainRegistry", () => {
   });
 
   it("non-core disabled domain is excluded from getEnabled", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) =>
       id === "finance" ? true : false
     );
@@ -145,7 +145,7 @@ describe("DomainRegistry", () => {
   // ── getActiveTools ──────────────────────────────────────────────────────────
 
   it("getActiveTools returns tools from enabled modules only", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "enabled-mod");
 
     const enabled = makeModule("enabled-mod", {}, ["tool-x"]);
@@ -161,7 +161,7 @@ describe("DomainRegistry", () => {
   // ── getActiveContextContributors ────────────────────────────────────────────
 
   it("getActiveContextContributors returns contributors from enabled modules only", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "contrib-mod");
 
     const contributor = makeContributor("c1");
@@ -180,7 +180,7 @@ describe("DomainRegistry", () => {
   // ── getActivePromptSections ─────────────────────────────────────────────────
 
   it("getActivePromptSections returns sections from enabled modules only", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "ps-mod");
 
     const section: PromptSection = { id: "sec1", domain: "ps-mod", body: "hi" };
@@ -199,7 +199,7 @@ describe("DomainRegistry", () => {
   // ── getActiveMcpExposedTools ────────────────────────────────────────────────
 
   it("getActiveMcpExposedTools excludes tools matching mcpExclude predicate", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async () => true);
 
     const m = makeModule("mcp-mod", {
@@ -213,7 +213,7 @@ describe("DomainRegistry", () => {
   });
 
   it("getActiveMcpExposedTools exposes all tools when no mcpExclude is set", async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async () => true);
 
     const m = makeModule("no-exclude-mod", {}, ["tool-a", "tool-b"]);

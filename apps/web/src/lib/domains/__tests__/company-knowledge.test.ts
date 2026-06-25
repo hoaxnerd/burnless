@@ -8,7 +8,7 @@
  * generically (not finance/company-knowledge-specific).
  *
  * Mocking mirrors finance-module.test.ts: the DB/Next deps pulled in transitively
- * by domains/index.ts → finance.ts are stubbed, and @/lib/capabilities.isDomainEnabled
+ * by domains/index.ts → finance.ts are stubbed, and @/lib/domain-gating.isDomainEnabled
  * is mocked so we control the per-company toggle.
  */
 
@@ -19,10 +19,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const enabledDomains = new Set<string>(["finance", "company-knowledge"]);
 
 vi.mock("@/lib/capabilities", () => ({
-  isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
-  requireDomainEnabled: vi.fn(async () => null),
   getCapabilities: vi.fn(() => ({})),
   requireCapability: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/domain-gating", () => ({
+  isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
+  requireDomainEnabled: vi.fn(async () => null),
 }));
 
 // ── DB / Next stubs (finance.ts + company-knowledge.ts transitively import) ────
@@ -96,7 +99,7 @@ beforeEach(async () => {
   listMemoryMock.mockResolvedValue([]);
   // Reset isDomainEnabled to the default set-driven impl (a prior block may have
   // overridden it via mockImplementation, which otherwise persists).
-  const { isDomainEnabled } = await import("@/lib/capabilities");
+  const { isDomainEnabled } = await import("@/lib/domain-gating");
   vi.mocked(isDomainEnabled).mockImplementation(async (id: string) => enabledDomains.has(id));
 });
 
@@ -177,7 +180,7 @@ describe("company-knowledge contributor.sections()", () => {
 
 describe("company-knowledge — toggle OFF removes all surfaces (finance unaffected)", () => {
   beforeEach(async () => {
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     // finance stays enabled; company-knowledge disabled for this company.
     vi.mocked(isDomainEnabled).mockImplementation(async (id) => id === "finance");
   });
@@ -208,7 +211,7 @@ describe("finance unaffected by company-knowledge toggle", () => {
   it("finance tools count + contributor present whether company-knowledge is on or off", async () => {
     const { domainRegistry } = await import("../index");
     const { getFinancialTools, DEFAULT_CONTEXT_HEADING } = await import("@burnless/ai");
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
 
     const financeToolNames = new Set(getFinancialTools().map((t) => t.name));
 
@@ -237,7 +240,7 @@ describe("finance unaffected by company-knowledge toggle", () => {
 describe("fake-domain regression — contract holds generically", () => {
   it("a throwaway module's surfaces appear when enabled and vanish when disabled; dup id / dup tool throw", async () => {
     const { DomainRegistry } = await import("../registry");
-    const { isDomainEnabled } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     type DomainModule = import("../contracts").DomainModule;
     type ToolDefinition = import("@burnless/ai").ToolDefinition;
     type ContextContributor = import("@burnless/ai").ContextContributor;

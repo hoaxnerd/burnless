@@ -22,10 +22,13 @@ const enabledDomains = new Set<string>(["finance", "company-knowledge", "memory"
 let skillsCapEnabled = true;
 
 vi.mock("@/lib/capabilities", () => ({
-  isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
-  requireDomainEnabled: vi.fn(async () => null),
   getCapabilities: vi.fn(() => ({ skills: skillsCapEnabled })),
   requireCapability: vi.fn(() => null),
+}));
+
+vi.mock("@/lib/domain-gating", () => ({
+  isDomainEnabled: vi.fn(async (id: string) => enabledDomains.has(id)),
+  requireDomainEnabled: vi.fn(async () => null),
 }));
 
 // ── DB / Next stubs ───────────────────────────────────────────────────────────
@@ -94,7 +97,8 @@ beforeEach(async () => {
   enabledDomains.add("skills");
   skillsCapEnabled = true;
 
-  const { isDomainEnabled, getCapabilities } = await import("@/lib/capabilities");
+  const { getCapabilities } = await import("@/lib/capabilities");
+  const { isDomainEnabled } = await import("@/lib/domain-gating");
   vi.mocked(isDomainEnabled).mockImplementation(async (id: string) => {
     // If skills capability is off, isDomainEnabled should return false for skills
     // (mirroring what the real isDomainEnabled does via the capability gate).
@@ -152,7 +156,8 @@ describe("skills — capability ON → surfaces appear", () => {
 describe("skills — capability OFF → all skills surfaces absent, finance/company-knowledge/memory remain", () => {
   beforeEach(async () => {
     skillsCapEnabled = false;
-    const { isDomainEnabled, getCapabilities } = await import("@/lib/capabilities");
+    const { getCapabilities } = await import("@/lib/capabilities");
+    const { isDomainEnabled } = await import("@/lib/domain-gating");
     vi.mocked(isDomainEnabled).mockImplementation(async (id: string) => {
       if (id === "skills") return false; // cap gate blocks it
       return enabledDomains.has(id);
