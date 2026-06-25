@@ -80,6 +80,40 @@ describe("resolveFeatureStatus", () => {
       expect(status.enabled).toBe(true);
     }
   });
+
+  // Default-on semantics: a missing feature key is ENABLED; only explicit
+  // `false` disables. This is the migration-safety crux — an absent key must
+  // not read as OFF.
+  it("treats a missing feature key as ENABLED (default-on)", () => {
+    const flags: AiFeatureFlagsState = {
+      ...allOn,
+      features: {} as AiFeatureFlagsState["features"],
+    };
+    const status = resolveFeatureStatus(flags, "chat");
+    expect(status).toEqual({ enabled: true, canGenerate: true, showCached: true });
+  });
+
+  it("treats an explicit false feature key as disabled", () => {
+    const flags: AiFeatureFlagsState = {
+      ...allOn,
+      features: { chat: false } as AiFeatureFlagsState["features"],
+    };
+    const status = resolveFeatureStatus(flags, "chat");
+    expect(status).toEqual({ enabled: false, canGenerate: false, showCached: false });
+  });
+
+  it("reads a domain key independently — explicit false disables it while an absent feature stays enabled", () => {
+    const flags: AiFeatureFlagsState = {
+      ...allOn,
+      features: { "company-knowledge": false } as AiFeatureFlagsState["features"],
+    };
+    // The domain key is explicitly off…
+    expect(
+      resolveFeatureStatus(flags, "company-knowledge" as AiFeatureName).enabled,
+    ).toBe(false);
+    // …while an absent legacy feature ("chat" not present) stays default-on.
+    expect(resolveFeatureStatus(flags, "chat").enabled).toBe(true);
+  });
 });
 
 describe("canMakeLlmCall", () => {
@@ -118,6 +152,14 @@ describe("canFeatureCallLlm", () => {
   it("returns false when master is off", () => {
     const flags: AiFeatureFlagsState = { ...allOn, masterEnabled: false };
     expect(canFeatureCallLlm(flags, "chat")).toBe(false);
+  });
+
+  it("returns true for a missing feature key (default-on)", () => {
+    const flags: AiFeatureFlagsState = {
+      ...allOn,
+      features: {} as AiFeatureFlagsState["features"],
+    };
+    expect(canFeatureCallLlm(flags, "chat")).toBe(true);
   });
 });
 

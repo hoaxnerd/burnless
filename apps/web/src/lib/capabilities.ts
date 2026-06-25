@@ -159,8 +159,8 @@ export async function isDomainEnabled(
 
   const { getAiFlags } = await import("@/lib/ai-feature-flags");
   const flags = await getAiFlags(opts.companyId);
-  const companyEnabled = (flags.features as unknown as Record<string, boolean | undefined>)[domainId] ?? true;
-  return companyEnabled;
+  // Default-on: a domain is enabled unless its key is explicitly `false`.
+  return flags.features[domainId] !== false;
 }
 
 /**

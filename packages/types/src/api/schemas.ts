@@ -404,15 +404,12 @@ export const updateAiFeaturesSchema = z.object({
   masterEnabled: z.boolean().optional(),
   dataMode: aiDataModeEnum.optional(),
   writeMode: aiWriteModeEnum.optional(),
-  features: z
-    .object({
-      onboarding: z.boolean().optional(),
-      chat: z.boolean().optional(),
-      insights: z.boolean().optional(),
-      uiPersonalization: z.boolean().optional(),
-      autoCategorization: z.boolean().optional(),
-    })
-    .optional(),
+  // Open record: the 6 known features plus any domain-declared per-company
+  // keys. Default-on semantics live in the read paths; only an explicit `false`
+  // disables. Fixes the pre-existing bug where weeklyDigest/mcp/domain keys were
+  // silently stripped on PATCH. Authenticated + company-scoped, so accepting
+  // arbitrary boolean keys is safe (harmless junk at worst).
+  features: z.record(z.boolean()).optional(),
   companionName: z.string().min(1).max(50).optional(),
   // S6 W1.1: legacy single-provider BYOK fields removed — AI provider config
   // lives in the aiProviders model (managed via /api/ai-providers).

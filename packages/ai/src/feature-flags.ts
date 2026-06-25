@@ -20,14 +20,13 @@ export type AiDataMode = "full" | "show_cached" | "hide_all";
 
 export type AiWriteMode = "full" | "confirm" | "read_only";
 
-export interface AiFeatureConfig {
-  onboarding: boolean;
-  chat: boolean;
-  insights: boolean;
-  uiPersonalization: boolean;
-  autoCategorization: boolean;
-  weeklyDigest: boolean;
-}
+/**
+ * Open feature-flag record. Keys are feature/domain identifiers; a key is
+ * ENABLED unless its value is explicitly `false` (default-on / missing-key-on).
+ * The 6 known features (see `AiFeatureName`) are seeded in every row; domains
+ * declare additional per-company keys here first-class (no cast needed).
+ */
+export type AiFeatureConfig = Record<string, boolean>;
 
 export interface AiFeatureFlagsState {
   masterEnabled: boolean;
@@ -119,8 +118,8 @@ export function resolveFeatureStatus(
     return { enabled: false, canGenerate: false, showCached: false };
   }
 
-  // Level 2: per-feature switch
-  if (!flags.features[feature]) {
+  // Level 2: per-feature switch (default-on — only an explicit `false` disables)
+  if (flags.features[feature] === false) {
     return { enabled: false, canGenerate: false, showCached: false };
   }
 
@@ -150,5 +149,5 @@ export function canFeatureCallLlm(
   flags: AiFeatureFlagsState,
   feature: AiFeatureName
 ): boolean {
-  return canMakeLlmCall(flags) && flags.features[feature];
+  return canMakeLlmCall(flags) && flags.features[feature] !== false;
 }

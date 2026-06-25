@@ -63,7 +63,7 @@ export const PATCH = withErrorHandler(async (request: Request) => {
   }
   if (body.features) {
     updates.features = {
-      ...(existing.features as AiFeatureConfig),
+      ...existing.features,
       ...body.features,
     };
   }
@@ -114,7 +114,7 @@ async function getOrCreateFlags(companyId: string) {
       masterEnabled: existing.masterEnabled,
       dataMode: existing.dataMode as "full" | "show_cached" | "hide_all",
       writeMode: (existing.writeMode ?? "confirm") as "full" | "confirm" | "read_only",
-      features: existing.features as AiFeatureConfig,
+      features: (existing.features ?? {}) as AiFeatureConfig,
       companionName: existing.companionName ?? DEFAULT_AI_FLAGS.companionName,
     };
   }

@@ -151,8 +151,8 @@ export function AiFeaturesTab({ flags, updateFlags, credits }: AiFeaturesTabProp
           </div>
           <div className="divide-y divide-surface-100">
             {AI_FEATURE_LIST.map((feat) => {
-              const isOn =
-                flags.features[feat.name as keyof typeof flags.features];
+              // Default-on: a feature shows ON unless explicitly false.
+              const isOn = flags.features[feat.name] !== false;
               return (
                 <div
                   key={feat.name}
