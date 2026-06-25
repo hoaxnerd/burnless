@@ -20,7 +20,10 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
     marketingSite: true, billing: true, multiTenant: true, selfServeSignup: true,
     oauthLogin: true, autoLogin: false, stdioMcp: false, planEnforcement: true,
     emailVerification: true, managedAiProvider: true, integrations: true,
-    inviteCodes: true, semanticSearch: false, dataResidency: true,
+    // semanticSearch ON for cloud (managed 1536-dim embedder). Self-host stays false:
+    // its default Ollama embedder is 768-dim, incompatible with the vector(1536) column —
+    // operators enable it via BURNLESS_CAP_SEMANTIC_SEARCH=true once a 1536-dim embedder is set.
+    inviteCodes: true, semanticSearch: true, dataResidency: true,
   },
 };
 

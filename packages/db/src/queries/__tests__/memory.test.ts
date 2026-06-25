@@ -6,7 +6,7 @@ vi.mock("../../index", () => ({ get db() { return getTestDb(); } }));
 import { eq } from "drizzle-orm";
 import { createCompanyContext } from "../../__tests__/factories";
 import { companies } from "../../schema";
-import { insertMemory, listMemory, deleteMemoryById, searchMemoryByEmbedding } from "../memory";
+import { insertMemory, listMemory, deleteMemoryById, searchMemoryByEmbedding, hasRecallMemory } from "../memory";
 
 /** A 1536-dim unit vector with a single 1.0 at `hot`, the rest 0. */
 function unitVec(hot: number): number[] {
@@ -148,6 +148,44 @@ describe("memory query helpers", () => {
       content: "no user",
     });
     expect(row.userId).toBeNull();
+  });
+
+  describe("hasRecallMemory", () => {
+    it("is true when a recall row exists, false with only block rows or for another company", async () => {
+      const a = await createCompanyContext();
+      const other = await createCompanyContext();
+
+      // `other` has only a block row + `a` has a block row → neither counts as recall.
+      await insertMemory({
+        companyId: a.company.id,
+        domain: "company-knowledge",
+        kind: "company_fact",
+        tier: "block",
+        content: "block fact",
+      });
+      await insertMemory({
+        companyId: other.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "other-company recall",
+        embedding: unitVec(0),
+      });
+
+      // `a` has no recall yet (block only); `other`'s recall must not leak.
+      expect(await hasRecallMemory(a.company.id)).toBe(false);
+
+      // Add a recall row to `a` → now true.
+      await insertMemory({
+        companyId: a.company.id,
+        domain: "finance",
+        kind: "note",
+        tier: "recall",
+        content: "a recall",
+        embedding: unitVec(1),
+      });
+      expect(await hasRecallMemory(a.company.id)).toBe(true);
+    });
   });
 
   describe("searchMemoryByEmbedding", () => {

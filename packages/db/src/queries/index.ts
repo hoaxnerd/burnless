@@ -149,6 +149,7 @@ export {
   listMemory,
   deleteMemoryById,
   searchMemoryByEmbedding,
+  hasRecallMemory,
   type MemoryRow,
   type InsertMemoryInput,
   type ListMemoryFilter,

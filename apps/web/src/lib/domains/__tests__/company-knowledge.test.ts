@@ -42,6 +42,7 @@ vi.mock("@burnless/db", () => ({
   listMemory: (...args: unknown[]) => listMemoryMock(...(args as [])),
   insertMemory: (...args: unknown[]) => insertMemoryMock(...(args as [])),
   deleteMemoryById: (...args: unknown[]) => deleteMemoryByIdMock(...(args as [])),
+  hasRecallMemory: vi.fn(async () => false), // memory domain (A5-3) imports this transitively
 }));
 
 vi.mock("@/lib/build-ai-context", () => ({
@@ -115,6 +116,18 @@ describe("company-knowledge — registration (REACH)", () => {
     const mcp = await domainRegistry.getActiveMcpExposedTools({ companyId: "c1" });
     // No mcpExclude → all 3 tools exposed over MCP.
     expect(mcp.map((t) => t.name)).toEqual(expect.arrayContaining(CK_TOOL_NAMES));
+  });
+});
+
+describe("memory domain — registration (A5-3)", () => {
+  it("registerDomains() registers the core memory module with the recall contributor and no tools", async () => {
+    const { domainRegistry } = await import("../index");
+    const { recallContributor } = await import("@/lib/memory/recall-contributor");
+    const mod = domainRegistry.getAll().find((m) => m.id === "memory");
+    expect(mod).toBeDefined();
+    expect(mod!.core).toBe(true);
+    expect(mod!.tools).toEqual([]);
+    expect(mod!.contextContributors).toEqual([recallContributor]);
   });
 });
 

@@ -94,6 +94,21 @@ export async function searchMemoryByEmbedding(
   return rows.map((r) => ({ ...r.row, distance: r.distance }));
 }
 
+/**
+ * Cheap existence check: does this company have ANY recall-tier memory row?
+ * A single indexed `SELECT 1 ... LIMIT 1` — used as a cost guard BEFORE embedding,
+ * so the recall context contributor never calls the embedding API for an empty
+ * recall-tier (which is the production state in Part 1).
+ */
+export async function hasRecallMemory(companyId: string): Promise<boolean> {
+  const rows = await db
+    .select({ one: sql<number>`1` })
+    .from(memory)
+    .where(and(eq(memory.companyId, companyId), eq(memory.tier, "recall")))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** Tenancy-safe delete: only deletes if the row belongs to companyId. Returns the row or null. */
 export async function deleteMemoryById(id: string, companyId: string): Promise<MemoryRow | null> {
   const [row] = await db
