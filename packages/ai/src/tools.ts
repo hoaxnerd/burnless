@@ -880,7 +880,7 @@ const FINANCIAL_TOOLS: ToolDefinition[] = [
   {
     name: "record_transaction",
     description:
-      "Record an ACTUAL transaction (real money that occurred) on an account — e.g. a Stripe charge or a bank debit. This writes the actuals ledger, NOT a forecast or projection. The account (accountId) determines whether it counts as revenue or expense — call list_accounts first to get the id. Pass externalId (e.g. the source system's id) to make re-runs idempotent: the same externalId updates the existing transaction instead of duplicating it. To change projections/assumptions use update_revenue_stream or update_forecast_line instead.",
+      "Record an ACTUAL transaction (real money that occurred) on an account — e.g. a Stripe charge or a bank debit. This writes the actuals ledger, NOT a forecast or projection. The account (accountId) determines whether it counts as revenue or expense — call list_accounts first to get the id. Pass externalId (e.g. the source system's id) to make re-runs idempotent: the same externalId updates the existing transaction instead of duplicating it. To change projections/assumptions use update_revenue_stream or update_forecast_line instead. Transactions ALWAYS write the BASE actuals ledger regardless of the active scenario — do NOT record a transaction while a scenario is active; switch to base view first (use update_revenue_stream / update_forecast_line for scenario projections).",
     inputSchema: {
       type: "object",
       properties: {
