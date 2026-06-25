@@ -69,6 +69,7 @@ vi.mock("@/lib/ai-tools", () => ({
   // exactly as the first resume would have appended it.)
   executeToolCall: vi.fn(async () => JSON.stringify({ success: true, id: "rev-1" })),
   logDeniedToolCall: vi.fn(),
+  buildDomainToolCategories: () => ({}),
 }));
 vi.mock("@/lib/domains", () => ({
   domainRegistry: {

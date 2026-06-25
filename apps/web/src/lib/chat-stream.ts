@@ -55,6 +55,10 @@ export interface ChatStreamParams {
   writeMode?: AiWriteMode;
   /** MCP tools assembled for this turn (assembleMcpTools) — spec §3.4. */
   mcp?: { tools: ToolDefinition[]; categories: Record<string, PermissionCategory> };
+  /** Permission categories for active domain tools (A3b-3), from their `mutates`
+   *  metadata. Merged with the MCP categories into one dynamicCategories map so a
+   *  domain write tool defined in apps/web is gated like a finance/MCP mutation. */
+  domainCategories?: Record<string, PermissionCategory>;
   /** Built-in tools the user has disabled for this turn (per-built-in disables +
    *  session-disabled built-ins). Filtered out of the interactive tool set
    *  before the loop (S3b §11). */
@@ -131,6 +135,15 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController, obj: unknown) =>
     controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+
+  // Per-turn category overrides for dynamically-sourced tools: domain tools
+  // (A3b-3, from their `mutates` metadata) ∪ MCP tools. MCP wins on any overlap
+  // (there is none — disjoint name spaces). Fed into resolvePermission /
+  // categorizeToolName so a domain write tool gates like a finance/MCP mutation.
+  const dynamicCategories: Record<string, PermissionCategory> = {
+    ...params.domainCategories,
+    ...params.mcp?.categories,
+  };
 
   let fullResponse = "";
 
@@ -269,7 +282,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               defaults: params.defaults,
               sessionGrants: params.sessionGrants,
               writeMode: params.writeMode ?? "confirm",
-              dynamicCategories: params.mcp?.categories,
+              dynamicCategories,
             }),
           extraTools: params.mcp?.tools,
           disabledToolNames: params.disabledToolNames,
@@ -393,7 +406,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
                 // dispatch hits the LIVE server regardless of mode — never "preview"
                 // one here (it would execute before approval AND again on resume).
                 if (action.toolName.startsWith("mcp__")) return action;
-                const category = categorizeToolName(action.toolName, params.mcp?.categories);
+                const category = categorizeToolName(action.toolName, dynamicCategories);
                 if (category !== "write" && category !== "delete") return action;
                 try {
                   const raw = await executeToolCall(action.toolName, action.toolInput, {
@@ -548,7 +561,7 @@ export function buildChatSSEResponse(params: ChatStreamParams): Response {
               const actions = (chunk.actions ?? []).map((a) => ({
                 requestId: a.requestId,
                 tool: a.toolName,
-                category: categorizeToolName(a.toolName, params.mcp?.categories),
+                category: categorizeToolName(a.toolName, dynamicCategories),
                 description: describeToolAction(a.toolName, a.toolInput),
                 input: a.toolInput,
                 // Diff-gate delta (spec §4.2); null for non-facade mutations.

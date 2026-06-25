@@ -97,6 +97,7 @@ vi.mock("@/lib/ai-tools", () => ({
     return JSON.stringify({ success: true, scenarioId: context.scenarioId });
   }),
   logDeniedToolCall: vi.fn(),
+  buildDomainToolCategories: () => ({}),
 }));
 
 vi.mock("@/lib/domains", () => ({

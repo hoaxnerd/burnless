@@ -69,6 +69,7 @@ vi.mock("@/lib/ai-tools", () => ({
     }
   ),
   logDeniedToolCall: vi.fn(),
+  buildDomainToolCategories: () => ({}),
 }));
 vi.mock("@/lib/domains", () => ({
   domainRegistry: {

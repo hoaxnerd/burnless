@@ -60,6 +60,7 @@ vi.mock("@/lib/ai-usage-tracker", () => ({
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: vi.fn(async () => JSON.stringify({ success: true })),
   logDeniedToolCall: vi.fn(),
+  buildDomainToolCategories: () => ({}),
 }));
 
 vi.mock("@/lib/domains", () => ({

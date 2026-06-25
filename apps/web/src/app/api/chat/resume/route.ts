@@ -34,7 +34,7 @@ import type { ContentBlock, InputFormSpec, FormField, PlanSpec } from "@burnless
 import { requireCompanyAccess, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { applyRateLimit } from "@/lib/api-rate-limit";
 import { checkAiFeatureAllowed, getCompanyProviderConfig, getAiFlags } from "@/lib/ai-feature-flags";
-import { executeToolCall, logDeniedToolCall } from "@/lib/ai-tools";
+import { executeToolCall, logDeniedToolCall, buildDomainToolCategories } from "@/lib/ai-tools";
 import { assembleMcpTools, type AssembledMcpTools } from "@/lib/ai-tools/mcp";
 import { buildAiContext } from "@/lib/build-ai-context";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
@@ -179,6 +179,9 @@ async function resumeStream(args: {
     domainRegistry.getActivePromptSections(domainCtx),
     domainRegistry.getActiveContextContributors(domainCtx),
   ]);
+  // Permission categories for the active domain tools (A3b-3): mirrors the chat
+  // route so a resumed turn gates domain write tools identically.
+  const domainCategories = buildDomainToolCategories(baseTools);
   const rawSections = (await Promise.all(contributors.map((c) => c.sections(contributeCtx)))).flat();
   // Prepend the scenario-override prefix to the first DEFAULT_CONTEXT_HEADING section
   // (the finance snapshot) — identical to the single-block behaviour before this change.
@@ -221,6 +224,7 @@ async function resumeStream(args: {
     sessionGrants,
     writeMode: writeMode ?? "confirm",
     mcp,
+    domainCategories,
     disabledToolNames,
     nowContext,
   });

@@ -18,6 +18,7 @@ import { getDefaultScenario } from "@/lib/data";
 import { resolveWriteScenarioId } from "@/lib/ai-write-target";
 import { setTrackingCompanyId } from "@/lib/ai-usage-tracker";
 import { buildChatSSEResponse } from "@/lib/chat-stream";
+import { buildDomainToolCategories } from "@/lib/ai-tools";
 import { assembleMcpTools } from "@/lib/ai-tools/mcp";
 import { getActiveScenario, ScenarioSafetyError } from "@/lib/scenario-middleware";
 
@@ -225,6 +226,9 @@ export const POST = withErrorHandler(async (request: Request) => {
     domainRegistry.getActivePromptSections(domainCtx),
     domainRegistry.getActiveContextContributors(domainCtx),
   ]);
+  // Permission categories for the active domain tools (A3b-3): their `mutates`
+  // metadata drives the write-confirm gate / read_only clamp / plan-mode safety.
+  const domainCategories = buildDomainToolCategories(baseTools);
   const rawSections = (await Promise.all(contributors.map((c) => c.sections(contributeCtx)))).flat();
   // Prepend the scenario-override prefix to the first DEFAULT_CONTEXT_HEADING section
   // (the finance snapshot) — identical to the single-block behaviour before this change.
@@ -278,6 +282,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     sessionGrants,
     writeMode: aiCheck.writeMode ?? "confirm",
     mcp,
+    domainCategories,
     disabledToolNames,
     creditWarning,
     nowContext,

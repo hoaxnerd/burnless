@@ -164,6 +164,7 @@ vi.mock("@burnless/ai", async () => {
 
 vi.mock("@/lib/ai-tools", () => ({
   executeToolCall: mockExecuteToolCall,
+  buildDomainToolCategories: () => ({}),
 }));
 
 // MCP tools assembly (spec §3.4): empty for these tests — no connected servers.
