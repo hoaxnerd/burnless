@@ -73,6 +73,17 @@ vi.mock("@/lib/ai-tools/genui-display", () => ({ genuiDisplaySchemas: {}, genuiD
 vi.mock("@/lib/ai-tools/transactions", () => ({ transactionSchemas: {}, transactionHandlers: {} }));
 vi.mock("@/lib/ai-tools/mcp-describe", () => ({ describeMcpToolAction: vi.fn(() => null) }));
 vi.mock("@/lib/ai-tools/resolve-tool-scenario", () => ({ resolveToolScenario: vi.fn() }));
+// A6-2: stub skills tool handler (no FS access in unit tests)
+vi.mock("@/lib/ai-tools/skills", () => ({
+  skillsSchemas: { load_skill: {} },
+  skillsHandlers: { load_skill: vi.fn() },
+}));
+// A6-2: stub SkillSource (no FS in unit tests)
+vi.mock("@/lib/skills/source", () => ({
+  getSkillSource: vi.fn(() => ({ list: vi.fn(async () => []), load: vi.fn(async () => null) })),
+  skillsDir: vi.fn(() => "/fake/skills"),
+  FileSystemSkillSource: vi.fn(),
+}));
 
 const CK_DOMAIN = "company-knowledge";
 const CK_TOOL_NAMES = ["remember_fact", "list_facts", "forget_fact"];
