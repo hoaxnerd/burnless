@@ -9,7 +9,9 @@ const WEB_TOOLS = new Set(["search_web", "read_webpage"]);
 // they either change the user's UI view (e.g. active scenario) or list entities
 // without mutating data, so they do not fit the CRUD verb prefixes (`list_*` is
 // a read, not a CRUD verb). Allowlisted like WEB_TOOLS.
-const CONTROL_TOOLS = new Set(["activate_scenario", "exit_scenario", "list_scenarios", "list_accounts"]);
+// `calculate` is a finance-domain utility primitive (spec §0.4 founder override:
+// ships without flavor:"core" so the isCoreFlavorTool hook does not apply).
+const CONTROL_TOOLS = new Set(["activate_scenario", "exit_scenario", "list_scenarios", "list_accounts", "calculate"]);
 // Write tools that legitimately use a domain verb instead of a CRUD prefix.
 // `record_transaction` writes the actuals ledger (it is in WRITE_TOOLS / gated as
 // a mutation) but "record" reads more naturally than "create" for booking an

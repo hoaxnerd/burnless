@@ -200,8 +200,11 @@ describe("A2b: MUTATION_TOOL_NAMES derived from mutates annotations", () => {
 // ── A2c: core tool flavor hook ────────────────────────────────────────────────
 //
 // Validates the registry rules for the "core" flavor: always-on, domain-less,
-// MCP-exposed (not excluded by flavor), read-categorized by default. No real
-// core tool exists yet (YAGNI); this locks the predicates for Workstream 2.
+// MCP-exposed (not excluded by flavor), read-categorized by default.
+// `calculate` shipped as a finance-domain READ tool (spec §0.4 founder override),
+// NOT flavor:"core" — the real derivation is locked in the "calculate tool
+// (finance domain, shipped)" block below. This block keeps the flavor:"core"
+// predicate path documented for if a finance-less context ever needs it.
 
 describe("core tool flavor hook", () => {
   it("a core-flavored tool is read-categorized, not display/input/plan, and not MCP-excluded by flavor", () => {
@@ -227,5 +230,42 @@ describe("core tool flavor hook", () => {
     expect(wouldBeExcluded).toBe(false);
     // absent from WRITE/DELETE → categorizeToolName returns "read"
     expect(categorizeToolName(core.name)).toBe("read");
+  });
+});
+
+// ── Slice C: the real, shipped `calculate` tool ───────────────────────────────
+//
+// Founder override (spec §0.4): calculate ships as a finance-domain READ tool,
+// NOT flavor:"core". The synthetic core-flavor block above documents the reserved
+// hook; this block locks the ACTUAL shipped tool's registry derivation.
+
+describe("calculate tool (finance domain, shipped)", () => {
+  const calc = () => getFinancialTools().find((t) => t.name === "calculate");
+
+  it("is registered in the finance tool set", () => {
+    expect(calc()).toBeDefined();
+  });
+
+  it("is read-categorized (no mutates) and not in the mutation set", () => {
+    const t = calc()!;
+    expect(t.mutates).toBeUndefined();
+    expect(categorizeToolName("calculate")).toBe("read");
+    expect(MUTATION_TOOL_NAMES.has("calculate")).toBe(false);
+  });
+
+  it("is not scenario-targetable and carries no flavor", () => {
+    const t = calc()!;
+    expect(t.scenarioTargetable).toBeFalsy();
+    expect((t as { flavor?: string }).flavor).toBeUndefined();
+  });
+
+  it("is MCP-exposed (not excluded)", () => {
+    expect(MCP_SERVER_EXCLUDED_TOOLS.has("calculate")).toBe(false);
+  });
+
+  it("requires a single `expression` string argument", () => {
+    const t = calc()!;
+    expect(t.inputSchema.required).toEqual(["expression"]);
+    expect(t.inputSchema.properties.expression).toBeDefined();
   });
 });
