@@ -43,4 +43,17 @@ describe("TransactionsView", () => {
     expect(screen.queryByRole("button", { name: /add transaction/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /edit transaction/i })).toBeNull();
   });
+
+  it("links to the accounts page (forward nav, mirrors Funding → cap table)", () => {
+    const { rerender } = render(
+      <TransactionsView companyId="c1" accounts={accounts} initialData={base} scenarioActive={false} />,
+    );
+    const link = screen.getByRole("link", { name: /manage accounts/i });
+    expect(link.getAttribute("href")).toBe("/transactions/accounts");
+    // Still reachable while a scenario is active (account management is not gated).
+    rerender(<TransactionsView companyId="c1" accounts={accounts} initialData={base} scenarioActive />);
+    expect(screen.getByRole("link", { name: /manage accounts/i }).getAttribute("href")).toBe(
+      "/transactions/accounts",
+    );
+  });
 });

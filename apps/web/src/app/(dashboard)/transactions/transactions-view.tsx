@@ -10,8 +10,9 @@
  */
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Wallet } from "lucide-react";
 import { DataTable, Button, Input, Select, useConfirm } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
 import { useTransactions, type TransactionRow, type TransactionsPayload } from "@/lib/swr";
@@ -146,7 +147,19 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
           <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Transactions</h1>
           <p className="mt-1 text-sm text-surface-500">Your actuals ledger</p>
         </div>
-        {!scenarioActive && <TransactionFormModal mode="add" accounts={accounts} />}
+        <div className="flex items-center gap-3">
+          {/* Forward entry point to the chart of accounts — mirrors the
+              Funding → "View cap table" pattern. Always reachable (account
+              management is useful regardless of an active scenario). */}
+          <Link
+            href="/transactions/accounts"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-surface-600 hover:text-surface-900"
+          >
+            <Wallet className="h-4 w-4" />
+            Manage accounts
+          </Link>
+          {!scenarioActive && <TransactionFormModal mode="add" accounts={accounts} />}
+        </div>
       </div>
 
       {scenarioActive && (
