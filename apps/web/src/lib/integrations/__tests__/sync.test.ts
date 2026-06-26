@@ -19,7 +19,7 @@ const {
   getDecryptedIntegrationSecret,
   registerConnectors,
   integrationRegistry,
-  resolveAccountId,
+  getAccounts,
   ingestRecords,
   mockSelect,
   mockFrom,
@@ -28,11 +28,14 @@ const {
   mockUpdate,
   mockSet,
   mockUpdWhere,
+  mockInsert,
+  mockValues,
+  mockReturning,
 } = vi.hoisted(() => ({
   getDecryptedIntegrationSecret: vi.fn(),
   registerConnectors: vi.fn(),
   integrationRegistry: { get: vi.fn() },
-  resolveAccountId: vi.fn(),
+  getAccounts: vi.fn(),
   ingestRecords: vi.fn(),
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
@@ -41,18 +44,25 @@ const {
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
   mockUpdWhere: vi.fn(),
+  mockInsert: vi.fn(),
+  mockValues: vi.fn(),
+  mockReturning: vi.fn(),
 }));
 
 vi.mock("@burnless/db", () => ({
-  db: { select: mockSelect, update: mockUpdate },
+  db: { select: mockSelect, update: mockUpdate, insert: mockInsert },
   integrations: { id: "id", companyId: "companyId", type: "type" },
+  financialAccounts: { companyId: "companyId", name: "name" },
   getDecryptedIntegrationSecret,
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn() }));
 
 vi.mock("../registry", () => ({ registerConnectors, integrationRegistry }));
-vi.mock("../accounts", () => ({ resolveAccountId }));
+// NOTE: ../accounts is NOT mocked — we exercise the REAL buildAccountResolver
+// (the once-per-run resolver) so the duplicate-fees regression is genuine. Its
+// deps (`@/lib/data` getAccounts + the financialAccounts insert) are mocked.
+vi.mock("@/lib/data", () => ({ getAccounts }));
 vi.mock("../ingest", () => ({ ingestRecords }));
 
 import { runIntegrationSync } from "../sync";
@@ -63,6 +73,8 @@ import type { IngestRow } from "../ingest";
 let updatedSet: Record<string, unknown> | null;
 /** The integrations row the SELECT returns. */
 let existingRow: { id: string; metadata: unknown } | null;
+/** Captured financialAccounts insert() payloads (fees account create). */
+let createdAccounts: Array<Record<string, unknown>>;
 
 function source(records: MappedRecord[]) {
   return {
@@ -93,6 +105,7 @@ function rec(over: Partial<MappedRecord> = {}): MappedRecord {
 beforeEach(() => {
   vi.clearAllMocks();
   updatedSet = null;
+  createdAccounts = [];
   existingRow = { id: "i1", metadata: { livemode: true } };
 
   // SELECT chain → existing integrations row.
@@ -110,9 +123,29 @@ beforeEach(() => {
   mockUpdWhere.mockImplementation(async () => undefined);
 
   getDecryptedIntegrationSecret.mockResolvedValue({ apiKey: "rk_test_x" });
-  resolveAccountId.mockImplementation(async (_c: string, hint: string) =>
-    hint === "payment_processing_fees" ? "fee-acc" : "rev-acc"
-  );
+
+  // Default account list: an existing revenue account AND fees account, so the
+  // common case resolves both hints without any create.
+  getAccounts.mockResolvedValue([
+    { id: "rev-acc", name: "Revenue", type: "income", category: "revenue" },
+    {
+      id: "fee-acc",
+      name: "Payment processing fees",
+      type: "expense",
+      category: "operating_expense",
+    },
+  ]);
+
+  // financialAccounts insert chain → capture .values() and return a new id.
+  mockInsert.mockReturnValue({ values: mockValues });
+  mockValues.mockImplementation((vals: Record<string, unknown>) => {
+    createdAccounts.push(vals);
+    return { returning: mockReturning };
+  });
+  mockReturning.mockImplementation(async () => [
+    { id: "fee-new", ...createdAccounts[createdAccounts.length - 1] },
+  ]);
+
   ingestRecords.mockResolvedValue({ inserted: 2, skipped: 0 });
   integrationRegistry.get.mockReturnValue(source([]));
 });
@@ -149,6 +182,39 @@ describe("runIntegrationSync", () => {
     // Amounts are strings (Decimal boundary) — no number leaks through.
     expect(typeof rows[0]?.amount).toBe("string");
     expect(typeof rows[1]?.amount).toBe("string");
+  });
+
+  it("creates the fees account ONCE for a multi-fee backfill (no duplicate fees account)", async () => {
+    // The fees account does NOT exist yet — only a revenue account.
+    getAccounts.mockResolvedValue([
+      { id: "rev-acc", name: "Revenue", type: "income", category: "revenue" },
+    ]);
+    // Two fee records in a SINGLE run.
+    integrationRegistry.get.mockReturnValue(
+      source([
+        rec({ externalId: "stripe:fee_1", amount: -2.9, categoryHint: "payment_processing_fees" }),
+        rec({ externalId: "stripe:fee_2", amount: -3.1, categoryHint: "payment_processing_fees" }),
+      ])
+    );
+
+    await runIntegrationSync("c1", "stripe", { mode: "backfill" });
+
+    // The fees account is INSERTed exactly once across the whole run...
+    expect(createdAccounts).toHaveLength(1);
+    expect(createdAccounts[0]).toMatchObject({
+      name: "Payment processing fees",
+      type: "expense",
+    });
+
+    // ...and getAccounts is read exactly once (per-run resolver, not per-record).
+    expect(getAccounts).toHaveBeenCalledTimes(1);
+
+    // ...and BOTH fee IngestRows carry the SAME (just-created) accountId.
+    const [, rows] = ingestRecords.mock.calls[0] as [string, IngestRow[]];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.accountId).toBe("fee-new");
+    expect(rows[1]?.accountId).toBe("fee-new");
+    expect(rows[0]?.accountId).toBe(rows[1]?.accountId);
   });
 
   it("merges metadata.sync without dropping livemode, and advances the cursor to max record date", async () => {

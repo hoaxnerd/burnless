@@ -1,5 +1,5 @@
 /**
- * resolveAccountId() — C2.4 account resolution.
+ * buildAccountResolver() — C2.4 account resolution (ONCE per sync run).
  *
  * Web vitest mocks the DB (happy-dom, no PGlite). We mock `getAccounts` to
  * supply the company's account list and a minimal Drizzle insert chain to
@@ -10,7 +10,7 @@
  *  - "payment_processing_fees" → an existing case-insensitive "Payment
  *    processing fees" expense account when present
  *  - "payment_processing_fees" → CREATE the fees account once when absent
- *    (find-before-create idempotent)
+ *    (find-or-create), captured directly without re-reading getAccounts
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -28,7 +28,7 @@ vi.mock("@burnless/db", () => ({
   financialAccounts: { companyId: "companyId", name: "name" },
 }));
 
-import { resolveAccountId } from "../accounts";
+import { buildAccountResolver } from "../accounts";
 
 interface Acct {
   id: string;
@@ -59,27 +59,32 @@ beforeEach(() => {
   mockReturning.mockImplementation(async () => [{ id: "fee-new", ...created[created.length - 1] }]);
 });
 
-describe("resolveAccountId", () => {
+describe("buildAccountResolver", () => {
   it("resolves revenue/refund/dispute to the first income/revenue account", async () => {
-    getAccounts.mockResolvedValue([OTHER_INCOME, REVENUE]);
+    getAccounts.mockResolvedValue([OTHER_INCOME, REVENUE, FEES]);
 
-    expect(await resolveAccountId("c1", "revenue")).toBe("rev-1");
-    expect(await resolveAccountId("c1", "refund")).toBe("rev-1");
-    expect(await resolveAccountId("c1", "dispute")).toBe("rev-1");
-    expect(mockInsert).not.toHaveBeenCalled();
+    const resolve = await buildAccountResolver("c1");
+
+    expect(resolve("revenue")).toBe("rev-1");
+    expect(resolve("refund")).toBe("rev-1");
+    expect(resolve("dispute")).toBe("rev-1");
+    expect(mockInsert).not.toHaveBeenCalled(); // fees already exists
   });
 
   it("resolves payment_processing_fees to an existing fees account (case-insensitive)", async () => {
     getAccounts.mockResolvedValue([REVENUE, { ...FEES, name: "PAYMENT PROCESSING FEES" }]);
 
-    expect(await resolveAccountId("c1", "payment_processing_fees")).toBe("fee-1");
+    const resolve = await buildAccountResolver("c1");
+
+    expect(resolve("payment_processing_fees")).toBe("fee-1");
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it("creates the fees account once when absent (find-before-create)", async () => {
+  it("creates the fees account once when absent (find-or-create, captured directly)", async () => {
     getAccounts.mockResolvedValue([REVENUE]);
 
-    const id = await resolveAccountId("c1", "payment_processing_fees");
+    const resolve = await buildAccountResolver("c1");
+    const id = resolve("payment_processing_fees");
 
     expect(id).toBe("fee-new");
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -90,5 +95,22 @@ describe("resolveAccountId", () => {
       category: "operating_expense",
       isSystem: false,
     });
+  });
+
+  it("reads accounts ONCE and creates the fees account ONCE across many resolutions", async () => {
+    getAccounts.mockResolvedValue([REVENUE]);
+
+    const resolve = await buildAccountResolver("c1");
+    const ids = [
+      resolve("payment_processing_fees"),
+      resolve("payment_processing_fees"),
+      resolve("payment_processing_fees"),
+    ];
+
+    // getAccounts read exactly once; fees account inserted exactly once.
+    expect(getAccounts).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    // Every fee resolution returns the same (just-created) id.
+    expect(new Set(ids)).toEqual(new Set(["fee-new"]));
   });
 });

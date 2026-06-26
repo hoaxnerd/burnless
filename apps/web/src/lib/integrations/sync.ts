@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, integrations, getDecryptedIntegrationSecret } from "@burnless/db";
 import { integrationRegistry, registerConnectors } from "./registry";
-import { resolveAccountId } from "./accounts";
+import { buildAccountResolver } from "./accounts";
 import { ingestRecords, type IngestRow, type IngestResult } from "./ingest";
 import type { MappedRecord, SyncCtx, SyncCursor } from "./contracts";
 
@@ -74,14 +74,21 @@ export async function runIntegrationSync(
     const iterable: AsyncIterable<MappedRecord> =
       mode === "backfill" ? source.backfill(ctx) : source.incremental(ctx, cursor);
 
+    // Resolve accounts ONCE per run (not per record). Reads the account list a
+    // single time and find-or-creates the fees account exactly once, so a
+    // multi-fee backfill can't insert a duplicate fees account off a stale
+    // `unstable_cache`-wrapped `getAccounts` read. See accounts.ts for the
+    // accepted cross-run race caveat.
+    const resolveAccount = await buildAccountResolver(companyId);
+
     const rows: IngestRow[] = [];
     for await (const record of iterable) {
-      const accountId = await resolveAccountId(companyId, record.categoryHint);
+      const accountId = resolveAccount(record.categoryHint);
       rows.push({
         accountId,
         date: record.date,
         amount: String(record.amount), // Decimal at the boundary — STRING, never number math.
-        description: record.description ?? null,
+        description: record.description,
         vendor: record.vendor ?? null,
         source: "integration",
         externalId: record.externalId,
