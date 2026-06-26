@@ -73,6 +73,35 @@ export const integrations = pgTable(
   ]
 );
 
+/** Per-company encrypted credentials for a data integration (one row per company+type).
+ *  `secret` is encryptJson({ apiKey }) — AES-256-GCM via crypto.ts. Never plaintext. */
+export const integrationCredentials = pgTable(
+  "integration_credentials",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    integrationType: integrationTypeEnum("integration_type").notNull(),
+    secret: text("secret").notNull(),
+    livemode: boolean("livemode").notNull().default(false),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("integration_credentials_company_type_idx").on(
+      table.companyId,
+      table.integrationType
+    ),
+  ]
+);
+
 // ── MCP Connections ──────────────────────────────────────────────────────────
 
 /** A configured external MCP server (company-shared or personal). */

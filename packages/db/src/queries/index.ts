@@ -117,6 +117,13 @@ export {
 } from "./turn-events";
 export type { NewTurnEvent, TurnEventRow } from "./turn-events";
 
+export {
+  saveIntegrationCredentials,
+  getDecryptedIntegrationSecret,
+  deleteIntegrationCredentials,
+  type IntegrationSecret,
+} from "./integration-credentials";
+
 export * from "./local-user";
 
 export * from "./mcp";
