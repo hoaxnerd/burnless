@@ -25,6 +25,10 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 
 vi.mock("@/lib/integrations/sync", () => ({ runIntegrationSync }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: () => ({ error: vi.fn() }),
+}));
+
 import { runAllIntegrationSyncs } from "../run-all-syncs";
 
 const ACTIVE_ROWS = [
@@ -66,5 +70,16 @@ describe("runAllIntegrationSyncs", () => {
     // Both were attempted — the first failure did not stop the second.
     expect(runIntegrationSync).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ synced: 1, failed: 1 });
+  });
+
+  it("does not throw when the initial db.select() rejects; returns { synced: 0, failed: 0 }", async () => {
+    // Simulate a DB connection error on the outer select
+    mockWhere.mockRejectedValue(new Error("db connection lost"));
+
+    // Must not throw
+    await expect(runAllIntegrationSyncs()).resolves.toEqual({ synced: 0, failed: 0 });
+
+    // No integration sync should have been attempted
+    expect(runIntegrationSync).not.toHaveBeenCalled();
   });
 });
