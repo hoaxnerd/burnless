@@ -170,6 +170,11 @@ const ALLOWED = [
   // Fixture values in tests, not display code.
   "apps/web/src/app/(dashboard)/team/__tests__/",
 
+  // ── Transactions view tests (Workstream 2 B1) ─────────────────────────────
+  // transactions-view.test.tsx uses `$${n.toFixed(2)}` inside a vi.mock()
+  // fmtCurrency stub — fixture values in a test, not display code.
+  "apps/web/src/app/(dashboard)/transactions/__tests__/",
+
   // ── E2E (Playwright) tests ────────────────────────────────────────────────
   // E2E tests assert text visible in the browser, which includes formatted
   // currency output from formatters and AI responses. Dollar amounts here are

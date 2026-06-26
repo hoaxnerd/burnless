@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Receipt,
+  ArrowLeftRight,
   TrendingUp,
   Landmark,
   Users,
@@ -31,6 +32,7 @@ export interface NavItem {
 export const coreNavItems: NavItem[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "expenses", href: "/expenses", label: "Expenses", icon: Receipt },
+  { id: "transactions", href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
   { id: "revenue", href: "/revenue", label: "Revenue", icon: TrendingUp },
   { id: "funding", href: "/funding", label: "Funding", icon: Landmark },
   { id: "team", href: "/team", label: "Team", icon: Users },

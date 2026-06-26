@@ -39,6 +39,7 @@ import { genuiDisplaySchemas, genuiDisplayHandlers } from "./genui-display";
 import { transactionSchemas, transactionHandlers } from "./transactions";
 import { companyKnowledgeSchemas, companyKnowledgeHandlers } from "./company-knowledge";
 import { skillsSchemas, skillsHandlers } from "./skills";
+import { calculateSchemas, calculateHandlers } from "./calculate";
 // NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
 // and is loaded lazily inside executeToolCall instead.
 import { describeMcpToolAction } from "./mcp-describe";
@@ -77,6 +78,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...transactionSchemas,
   ...companyKnowledgeSchemas,
   ...skillsSchemas,
+  ...calculateSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -92,6 +94,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...transactionHandlers,
   ...companyKnowledgeHandlers,
   ...skillsHandlers,
+  ...calculateHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────

@@ -43,6 +43,13 @@ function isExpenseCategory(category: string): boolean {
 }
 
 async function recordTransaction(input: Record<string, unknown>, context: ToolContext): Promise<string> {
+  // §3: transactions are actuals — they always write the BASE ledger and are never
+  // scenario-overlaid. If a scenario is active, refuse rather than silently writing
+  // base (which would confuse the user). Precedent: handler-level scenario guards
+  // (scenario-mutate.ts requireScenario). Stays mutates:"write", nonFacade:true.
+  if (context.scenarioId) {
+    return JSON.stringify({ error: "Transactions are actuals and can't be recorded while a scenario is active. Switch to base view." });
+  }
   const ctx = requireCompanyId(context);
   const data = recordTransactionSchema.parse(input);
 

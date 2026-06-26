@@ -138,6 +138,36 @@ describe("record_transaction (idempotent upsert)", () => {
   });
 });
 
+describe("record_transaction scenario guard (§3)", () => {
+  it("refuses to record while a scenario is active and does NOT write", async () => {
+    const { ctx, revenueAccountId, companyId } = await setup();
+    const scenarioCtx: ToolContext = { ...ctx, scenarioId: "scenario-1" };
+    const out = JSON.parse(await transactionHandlers.record_transaction!(
+      { accountId: revenueAccountId, date: "2026-06-08", amount: 999 },
+      scenarioCtx,
+    ));
+    expect(out.error).toMatch(/scenario/i);
+    expect(out.id).toBeUndefined();
+
+    const rows = await getTestDb()
+      .select()
+      .from(transactions)
+      .where(eq(transactions.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("records normally when scenarioId is null (base view)", async () => {
+    const { ctx, revenueAccountId } = await setup();
+    const baseCtx: ToolContext = { ...ctx, scenarioId: null };
+    const out = JSON.parse(await transactionHandlers.record_transaction!(
+      { accountId: revenueAccountId, date: "2026-06-08", amount: 42 },
+      baseCtx,
+    ));
+    expect(out.error).toBeUndefined();
+    expect(out.id).toBeTruthy();
+  });
+});
+
 // REGRESSION (S3a): the real executeToolCall path validates input with the schema
 // (transforming/parsing it) BEFORE handing `data` to the handler, which re-parses
 // the same schema. A `z.string().transform(s => new Date(s))` field is NOT

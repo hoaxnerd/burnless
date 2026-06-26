@@ -16,6 +16,13 @@ const { mockFindByIdForCompany, mockScenarioUpdate, mockScenarioDelete } = vi.ho
   mockScenarioDelete: vi.fn(),
 }));
 
+const { mockSelect, mockFrom, mockWhere, mockGroupBy } = vi.hoisted(() => ({
+  mockSelect: vi.fn(),
+  mockFrom: vi.fn(),
+  mockWhere: vi.fn(),
+  mockGroupBy: vi.fn(),
+}));
+
 const { mockGetActiveScenario } = vi.hoisted(() => ({
   mockGetActiveScenario: vi.fn(),
 }));
@@ -32,11 +39,14 @@ vi.mock("@/lib/api-helpers", () => ({
 }));
 
 vi.mock("@burnless/db", () => ({
+  db: { select: mockSelect },
+  transactions: { companyId: "companyId", accountId: "accountId" },
   financialAccounts: { companyId: "companyId", id: "id", sortOrder: "sortOrder" },
   findByIdForCompany: mockFindByIdForCompany,
   scenarioUpdate: mockScenarioUpdate,
   scenarioDelete: mockScenarioDelete,
 }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn(), sql: vi.fn() }));
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
@@ -128,7 +138,11 @@ describe("DELETE /api/accounts/[id]", () => {
     mockRequireCompanyAccess.mockResolvedValue({ userId: "user-1", companyId: "company-1", role: "admin" });
   });
 
-  it("deletes via scenarioDelete", async () => {
+  it("deletes via scenarioDelete (clean, empty, non-system account)", async () => {
+    mockFindByIdForCompany.mockResolvedValue({ id: "acc-1", isSystem: false });
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockResolvedValue([{ count: 0 }]);
     mockScenarioDelete.mockResolvedValue(true);
     const res = await DELETE(
       makeRequest("http://localhost/api/accounts/acc-1", { method: "DELETE" }),
@@ -138,6 +152,44 @@ describe("DELETE /api/accounts/[id]", () => {
     const body = await res.json();
     expect(body.deleted).toBe(true);
     expect(mockScenarioDelete).toHaveBeenCalledWith("financial_account", expect.anything(), "acc-1", null, "company-1");
+  });
+
+  it("refuses to delete a system account (403) without calling scenarioDelete", async () => {
+    mockFindByIdForCompany.mockResolvedValue({ id: "acc-1", isSystem: true });
+    const res = await DELETE(
+      makeRequest("http://localhost/api/accounts/acc-1", { method: "DELETE" }),
+      makeParams("acc-1"),
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/system/i);
+    expect(mockScenarioDelete).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete an account with transactions (409) without calling scenarioDelete", async () => {
+    mockFindByIdForCompany.mockResolvedValue({ id: "acc-1", isSystem: false });
+    // count query: db.select(...).from(...).where(...) resolves to [{ count: 3 }]
+    mockSelect.mockReturnValue({ from: mockFrom });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockWhere.mockResolvedValue([{ count: 3 }]);
+    const res = await DELETE(
+      makeRequest("http://localhost/api/accounts/acc-1", { method: "DELETE" }),
+      makeParams("acc-1"),
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/transaction/i);
+    expect(mockScenarioDelete).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the account does not exist", async () => {
+    mockFindByIdForCompany.mockResolvedValue(null);
+    const res = await DELETE(
+      makeRequest("http://localhost/api/accounts/missing", { method: "DELETE" }),
+      makeParams("missing"),
+    );
+    expect(res.status).toBe(404);
+    expect(mockScenarioDelete).not.toHaveBeenCalled();
   });
 
   it("returns 403 for editor role (requires admin)", async () => {

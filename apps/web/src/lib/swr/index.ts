@@ -18,6 +18,7 @@ export {
   // Phase-2 hooks
   useDepartments,
   useImports,
+  useTransactions,
   useInviteCodes,
   useTwoFactorStatus,
   useSecurityStatus,
@@ -43,6 +44,9 @@ export type {
   Department,
   ImportBatch,
   Paginated,
+  TransactionRow,
+  TransactionsPayload,
+  TransactionFilters,
   InviteCode,
   TwoFactorStatus,
   WeeklyDigest,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -48,11 +48,23 @@ describe("body-supplied FK ids are ownership-checked (AUTHZ-02)", () => {
     const offenders: string[] = [];
 
     for (const rel of TARGET_ROUTES) {
-      const src = readFileSync(path.join(API_DIR, rel), "utf8");
+      const routePath = path.join(API_DIR, rel);
+      const src = readFileSync(routePath, "utf8");
+
+      // The Zod body schema may live inline in route.ts OR in a sibling
+      // schemas.ts — Next.js 16 forbids non-handler exports from a route file,
+      // so an extracted `<route-dir>/schemas.ts` is the canonical home for the
+      // request schema (e.g. transactions/schemas.ts holds `accountId: z.string()`).
+      // Scan both for the field-presence check; the ownership-token check below
+      // still asserts against route.ts, where the handler performs the lookup.
+      const schemaPath = routePath.replace(/route\.ts$/, "schemas.ts");
+      const fieldSrc = existsSync(schemaPath)
+        ? `${src}\n${readFileSync(schemaPath, "utf8")}`
+        : src;
 
       // Confirm the route really takes accountId from the body (guards the test
       // against silently passing if the route is refactored away).
-      const takesBodyAccountId = /accountId\s*:\s*z\.string\(\)/.test(src);
+      const takesBodyAccountId = /accountId\s*:\s*z\.string\(\)/.test(fieldSrc);
       if (!takesBodyAccountId) {
         offenders.push(
           `apps/web/src/app/api/${rel}: expected a body \`accountId: z.string()\` field (test target moved?)`

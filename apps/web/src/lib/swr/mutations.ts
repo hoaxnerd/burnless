@@ -107,9 +107,11 @@ export async function deleteScenario(id: string) {
 export async function createAccount(data: {
   name: string;
   type: string;
-  subtype?: string;
-  balance?: number;
-  currency?: string;
+  category: string;
+  parentId?: string | null;
+  isSystem?: boolean;
+  sortOrder?: number;
+  coversHeadcount?: boolean;
 }) {
   const result = await apiCall(KEYS.accounts, "POST", data);
   await mutate(KEYS.accounts);
@@ -118,7 +120,7 @@ export async function createAccount(data: {
 
 export async function updateAccount(
   id: string,
-  data: Partial<{ name: string; type: string; balance: number; isActive: boolean; sortOrder: number }>,
+  data: Partial<{ name: string; type: string; category: string; parentId: string | null; sortOrder: number; coversHeadcount: boolean }>,
 ) {
   const result = await apiCall(`/api/accounts/${id}`, "PATCH", data);
   await mutate(KEYS.accounts);

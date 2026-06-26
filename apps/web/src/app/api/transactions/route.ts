@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { db, transactions, financialAccounts } from "@burnless/db";
-import { eq, and, gte, lte, gt } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { requireCompanyAccess, requireCompanyWrite, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
-import { monetaryAmount } from "@/lib/financial-validation";
 import { logAudit } from "@/lib/audit";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import { parseISODate } from "@/lib/date-validation";
-
-const createSchema = z.object({
-  accountId: z.string(),
-  date: z.string().transform((s) => new Date(s)),
-  amount: monetaryAmount(),
-  description: z.string().nullable().default(null),
-  source: z.enum(["manual", "import", "integration", "forecast"]).default("manual"),
-  externalId: z.string().nullable().default(null),
-  metadata: z.record(z.unknown()).nullable().default(null),
-});
+import { getActiveScenario } from "@/lib/scenario-middleware";
+import { createSchema } from "./schemas";
 
 export const GET = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyAccess();
@@ -27,7 +17,13 @@ export const GET = withErrorHandler(async (request: Request) => {
   const accountId = url.searchParams.get("accountId");
   const startDateStr = url.searchParams.get("startDate");
   const endDateStr = url.searchParams.get("endDate");
-  const { limit, cursor } = parsePaginationParams(request);
+  // `id` is a random UUID (not time-sortable), so the ledger is ordered by the
+  // transaction DATE (newest first) with `id` only as a deterministic tiebreaker
+  // for same-date rows. The page seeds the first window from SSR with the IDENTICAL
+  // ordering, and "Load more" grows the limit (up to MAX_PAGE_SIZE) — so each page
+  // is a strict superset of the previous one and rows never skip or duplicate.
+  // (A prior id-ASC cursor against a date-DESC seed produced exactly that drift.)
+  const { limit } = parsePaginationParams(request);
 
   const conditions = [eq(transactions.companyId, ctx.companyId)];
   if (accountId) conditions.push(eq(transactions.accountId, accountId));
@@ -41,13 +37,12 @@ export const GET = withErrorHandler(async (request: Request) => {
     if (!d) return errorResponse("Invalid endDate format. Expected YYYY-MM-DD.", 400);
     conditions.push(lte(transactions.date, d));
   }
-  if (cursor) conditions.push(gt(transactions.id, cursor));
 
   const rows = await db
     .select()
     .from(transactions)
     .where(and(...conditions))
-    .orderBy(transactions.id)
+    .orderBy(desc(transactions.date), desc(transactions.id))
     .limit(limit + 1);
 
   return NextResponse.json(paginatedResponse(rows, limit));
@@ -56,6 +51,13 @@ export const GET = withErrorHandler(async (request: Request) => {
 export const POST = withErrorHandler(async (request: Request) => {
   const ctx = await requireCompanyWrite();
   if ("error" in ctx) return ctx.error;
+
+  // §3: transactions are actuals-only. A non-base scenario active ⇒ refuse the
+  // write rather than silently landing it on base. getActiveScenario also runs
+  // the dual-channel safety check (throws ScenarioSafetyError → 409).
+  if (getActiveScenario(request)) {
+    return errorResponse("Transactions are actuals — switch to base view to add or edit.", 409);
+  }
 
   const parsed = await parseBody(request, createSchema);
   if ("error" in parsed) return parsed.error;

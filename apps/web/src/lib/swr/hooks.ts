@@ -36,12 +36,17 @@ export interface FinancialAccount {
   id: string;
   companyId: string;
   name: string;
+  /** Account type enum: income | expense | asset | liability | equity. */
   type: string;
-  subtype: string | null;
-  balance: number;
-  currency: string;
+  /** Account category enum: revenue | cogs | operating_expense | other_income | other_expense | asset | liability | equity. */
+  category: string;
+  parentId: string | null;
+  isSystem: boolean;
   sortOrder: number;
-  isActive: boolean;
+  coversHeadcount: boolean;
+  /** Per-account transaction count (base-table actuals), attached by GET /api/accounts.
+   *  Drives the # Transactions column and the guard-hard delete gate (B2 §0.3). */
+  transactionCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,6 +153,38 @@ export interface Paginated<T> {
   hasMore: boolean;
 }
 
+/** A transaction row as returned by GET /api/transactions (JSON: Date→ISO string,
+ *  numeric amount→string). */
+export interface TransactionRow {
+  id: string;
+  companyId: string;
+  accountId: string;
+  date: string;
+  amount: string;
+  description: string | null;
+  vendor: string | null;
+  notes: string | null;
+  source: "manual" | "import" | "integration" | "forecast";
+  externalId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Nested paginated payload from GET /api/transactions (PaginatedResponse). */
+export interface TransactionsPayload {
+  data: TransactionRow[];
+  pagination: { hasMore: boolean; nextCursor: string | null; count: number };
+}
+
+export interface TransactionFilters {
+  accountId?: string;
+  startDate?: string;
+  endDate?: string;
+  /** Page window size — "Load more" grows this (newest-first, strict superset). */
+  limit?: number;
+}
+
 /** An admin invite code with its redemptions (settings → invite-codes tab). */
 export interface InviteCode {
   id: string;
@@ -225,6 +262,27 @@ export function useDepartments(config?: SWRConfiguration<Department[]>) {
 /** Import history (DATA-02). Server returns a paginated payload. */
 export function useImports(config?: SWRConfiguration<Paginated<ImportBatch>>) {
   return useSWR<Paginated<ImportBatch>>(KEYS.imports, { ...config });
+}
+
+/** Transactions for the current company, filtered + cursor-paginated. */
+export function useTransactions(
+  filters?: TransactionFilters,
+  config?: SWRConfiguration<TransactionsPayload>,
+) {
+  const swr = useSWR<TransactionsPayload>(KEYS.transactions(filters), { ...config });
+  // B1: the table must update the instant an add/edit/delete lands — not only on
+  // manual reload. SWR ignores `fallbackData` changes after mount, and the form
+  // modal / delete handler only call router.refresh() (RSC, not the client cache).
+  // A transaction mutation writes through apiFetch, which publishes a financial
+  // MutationEvent (/transactions → "expenses"); revalidate the list on it
+  // (same-tab AND cross-tab), mirroring useOverrideCount.
+  const { mutate } = swr;
+  useEffect(() => {
+    return subscribeMutation((e) => {
+      if (FINANCIAL_DOMAINS.has(e.domain)) void mutate();
+    });
+  }, [mutate]);
+  return swr;
 }
 
 /** Admin invite codes with redemptions (settings). */

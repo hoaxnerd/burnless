@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { db, financialAccounts, resolveEntities, scenarioInsert } from "@burnless/db";
-import { eq, and, gt } from "drizzle-orm";
+import { db, financialAccounts, transactions, resolveEntities, scenarioInsert } from "@burnless/db";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { createAccountSchema } from "@burnless/types";
 import { requireCompanyAccess, requireRole, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
@@ -26,14 +26,24 @@ export const GET = withErrorHandler(async (request: Request) => {
   // Resolve with scenario overrides
   const resolved = await resolveEntities("financial_account", base, scenarioId);
 
+  // Per-account transaction count — base-table actuals (scenario-independent, §0.2).
+  // Powers the # Transactions column and the guard-hard delete gate (§0.3).
+  const counts = await db
+    .select({ accountId: transactions.accountId, count: sql<number>`count(*)::int` })
+    .from(transactions)
+    .where(eq(transactions.companyId, ctx.companyId))
+    .groupBy(transactions.accountId);
+  const countByAccount = new Map(counts.map((c) => [c.accountId, c.count]));
+  const withCounts = resolved.map((a) => ({ ...a, transactionCount: countByAccount.get(a.id) ?? 0 }));
+
   const usePagination = url.searchParams.has("limit");
   if (usePagination) {
     const { limit, cursor } = parsePaginationParams(request);
-    const filtered = cursor ? resolved.filter((r) => r.id > cursor) : resolved;
+    const filtered = cursor ? withCounts.filter((r) => r.id > cursor) : withCounts;
     return NextResponse.json(paginatedResponse(filtered.slice(0, limit + 1), limit));
   }
 
-  return NextResponse.json(resolved);
+  return NextResponse.json(withCounts);
 });
 
 export const POST = withErrorHandler(async (request: Request) => {

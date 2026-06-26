@@ -7,6 +7,14 @@ const { mockRequireCompanyAccess, mockRequireWrite, mockRequireRole } = vi.hoist
   mockRequireRole: vi.fn().mockReturnValue(null),
 }));
 
+const { mockGetActiveScenario } = vi.hoisted(() => ({
+  mockGetActiveScenario: vi.fn(),
+}));
+vi.mock("@/lib/scenario-middleware", () => ({ getActiveScenario: mockGetActiveScenario }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
+vi.mock("@/lib/date-validation", () => ({ parseISODate: (s: string) => new Date(s) }));
+
 const {
   mockSelect,
   mockFrom,
@@ -74,7 +82,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   gte: vi.fn(),
   lte: vi.fn(),
-  gt: vi.fn(),
+  desc: vi.fn(),
 }));
 
 vi.mock("@/lib/pagination", () => ({
@@ -93,7 +101,7 @@ vi.mock("@/lib/pagination", () => ({
     })),
 }));
 
-// GET chain: db.select().from(transactions).where(and(...)).orderBy(transactions.id).limit(limit + 1)
+// GET chain: db.select().from(transactions).where(and(...)).orderBy(desc(date), desc(id)).limit(limit + 1)
 // POST chain (AUTHZ-02 ownership): db.select({...}).from(financialAccounts).where(...) — awaited.
 // So mockWhere returns a thenable that ALSO exposes .orderBy (GET) and resolves to
 // the financialAccounts ownership rows (POST). By default: one row found (owned).
@@ -240,6 +248,9 @@ describe("POST /api/transactions", () => {
       companyId: "company-1",
       role: "editor",
     });
+
+    // Default: base view active (no scenario) — POST is allowed.
+    mockGetActiveScenario.mockReturnValue(null);
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -350,5 +361,37 @@ describe("POST /api/transactions", () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe("Validation failed");
+  });
+
+  it("persists vendor on create", async () => {
+    const createdRow = {
+      id: "txn-v", companyId: "company-1", accountId: "acc-1",
+      date: new Date("2026-03-15"), amount: "250.00", description: "Lunch",
+      vendor: "Acme", notes: null, source: "manual", externalId: null, metadata: null,
+    };
+    mockReturning.mockResolvedValue([createdRow]);
+    const req = makeRequest("http://localhost/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: "acc-1", date: "2026-03-15", amount: 250, description: "Lunch", vendor: "Acme" }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(201);
+    expect(body.vendor).toBe("Acme");
+  });
+
+  it("refuses POST with 409 when a non-base scenario is active", async () => {
+    mockGetActiveScenario.mockReturnValue("scenario-99");
+    const req = makeRequest("http://localhost/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: "acc-1", date: "2026-03-15", amount: 250 }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(res.status).toBe(409);
+    expect(body.error).toMatch(/base view/i);
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 });
