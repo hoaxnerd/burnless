@@ -183,9 +183,9 @@ describe("integrations/[id] DELETE", () => {
 });
 
 // ── Capability gate (REAL requireCapability) — both editions ─────────────────
-// integrations is OFF on self_host (default) and ON on cloud. The [id] mutation
-// handlers must be server-authoritative: a self_host user with admin role + auth
-// still gets a 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+// integrations is ON by default in both self_host and cloud; it is only OFF when
+// BURNLESS_CAP_INTEGRATIONS=false. The [id] mutation handlers must be
+// server-authoritative.
 
 describe("integrations/[id] — capability gate (both editions)", () => {
   afterEach(() => {
@@ -199,9 +199,9 @@ describe("integrations/[id] — capability gate (both editions)", () => {
     mockReturning.mockResolvedValue([{ id: "int-1" }]);
   });
 
-  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+  describe("integrations capability disabled (BURNLESS_CAP_INTEGRATIONS=false)", () => {
     beforeEach(() => {
-      process.env = { ...ORIG_ENV };
+      process.env = { ...ORIG_ENV, BURNLESS_CAP_INTEGRATIONS: "false" };
       delete process.env.BURNLESS_DEPLOYMENT;
     });
 
@@ -225,6 +225,22 @@ describe("integrations/[id] — capability gate (both editions)", () => {
       const data = await res.json();
       expect(data.code).toBe("CAPABILITY_DISABLED");
       expect(data.capability).toBe("integrations");
+    });
+  });
+
+  describe("self_host default (not a 403)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+      delete process.env.BURNLESS_CAP_INTEGRATIONS;
+    });
+
+    it("PATCH passes the capability gate (not a 403)", async () => {
+      const res = await PATCH(
+        makeRequest("/api/integrations/int-1", "PATCH", { status: "active" }),
+        makeParams("int-1"),
+      );
+      expect(res.status).not.toBe(403);
     });
   });
 

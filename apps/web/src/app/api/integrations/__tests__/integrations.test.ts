@@ -79,6 +79,7 @@ vi.mock("@burnless/db", () => {
       lastSyncAt: "lastSyncAt",
       metadata: "metadata",
     },
+    deleteIntegrationCredentials: vi.fn(),
   };
 });
 
@@ -474,9 +475,8 @@ describe("DELETE /api/integrations/[id]", () => {
 });
 
 // ── Capability gate (REAL requireCapability) — both editions ─────────────────
-// integrations is OFF on self_host (default) and ON on cloud. The handlers must
-// be server-authoritative: a self_host user with admin role + auth still gets a
-// 403 CAPABILITY_DISABLED, because UI hiding is not the gate.
+// integrations is ON by default in both self_host and cloud; it is only OFF when
+// BURNLESS_CAP_INTEGRATIONS=false. The handlers must be server-authoritative.
 
 describe("Integrations API — capability gate (both editions)", () => {
   afterEach(() => {
@@ -495,9 +495,9 @@ describe("Integrations API — capability gate (both editions)", () => {
     dbResultIdx = 0;
   });
 
-  describe("self_host (BURNLESS_DEPLOYMENT unset)", () => {
+  describe("integrations capability disabled (BURNLESS_CAP_INTEGRATIONS=false)", () => {
     beforeEach(() => {
-      process.env = { ...ORIG_ENV };
+      process.env = { ...ORIG_ENV, BURNLESS_CAP_INTEGRATIONS: "false" };
       delete process.env.BURNLESS_DEPLOYMENT;
     });
 
@@ -515,6 +515,19 @@ describe("Integrations API — capability gate (both editions)", () => {
       const data = await res.json();
       expect(data.code).toBe("CAPABILITY_DISABLED");
       expect(data.capability).toBe("integrations");
+    });
+  });
+
+  describe("self_host default (BURNLESS_DEPLOYMENT unset, no override)", () => {
+    beforeEach(() => {
+      process.env = { ...ORIG_ENV };
+      delete process.env.BURNLESS_DEPLOYMENT;
+      delete process.env.BURNLESS_CAP_INTEGRATIONS;
+    });
+
+    it("GET passes the capability gate (not a 403)", async () => {
+      const res = await GET(makeRequest("http://localhost/api/integrations"));
+      expect(res.status).not.toBe(403);
     });
   });
 
