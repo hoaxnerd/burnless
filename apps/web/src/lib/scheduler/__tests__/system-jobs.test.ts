@@ -14,6 +14,10 @@ vi.mock("@/lib/cron/weekly-digest", () => ({
 vi.mock("@/lib/cron/batch-regenerate", () => ({
   runBatchRegenerate: vi.fn().mockResolvedValue({ ok: true, processed: 0, results: [] }),
 }));
+// run-all-syncs pulls @burnless/db transitively; stub it so its run() resolves.
+vi.mock("@/lib/integrations/run-all-syncs", () => ({
+  runAllIntegrationSyncs: vi.fn().mockResolvedValue({ synced: 0, failed: 0 }),
+}));
 
 describe("SYSTEM_JOBS registry", () => {
   it("has unique ids", () => {
@@ -56,5 +60,16 @@ describe("batch-regenerate system job", () => {
     expect(job!.schedule).toBe("*/5 * * * *");
     const result = await job!.run();
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("integration-sync system job", () => {
+  it("is registered with the hourly schedule and its run() resolves ok", async () => {
+    const job = SYSTEM_JOBS.find((j) => j.id === "integration-sync");
+    expect(job).toBeDefined();
+    expect(job!.schedule).toBe("0 * * * *");
+    const result = await job!.run();
+    expect(result.ok).toBe(true);
+    expect(result.summary).toContain("Synced");
   });
 });
