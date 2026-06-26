@@ -1,5 +1,7 @@
+import type Stripe from "stripe";
 import type { IntegrationConnector, ValidateResult, MappedRecord, SyncCtx, SyncCursor } from "../contracts";
 import { getStripe } from "./client";
+import { mapBalanceTransaction } from "./map";
 
 async function validate(creds: Record<string, string>): Promise<ValidateResult> {
   const apiKey = (creds.apiKey ?? "").trim();
@@ -15,9 +17,25 @@ async function validate(creds: Record<string, string>): Promise<ValidateResult> 
   }
 }
 
-// Real generators land in C2.3; placeholders keep C1 shippable (connect works, sync yields nothing).
-async function* backfill(_ctx: SyncCtx): AsyncIterable<MappedRecord> { /* C2.3 */ }
-async function* incremental(_ctx: SyncCtx, _cursor: SyncCursor): AsyncIterable<MappedRecord> { /* C2.3 */ }
+// Page over balance_transactions, expanding `source` so the mapper can read the
+// originating charge/refund description. `.list()` auto-paginates under `for await`
+// (every page fetched lazily — never buffered into an array). Each txn yields 0/1/2
+// mapped records via the pure mapper.
+async function* backfill(ctx: SyncCtx): AsyncIterable<MappedRecord> {
+  const stripe = await getStripe(ctx.apiKey);
+  const params: Stripe.BalanceTransactionListParams = { limit: 100, expand: ["data.source"] };
+  for await (const txn of stripe.balanceTransactions.list(params)) yield* mapBalanceTransaction(txn);
+}
+
+async function* incremental(ctx: SyncCtx, cursor: SyncCursor): AsyncIterable<MappedRecord> {
+  const stripe = await getStripe(ctx.apiKey);
+  // `gt` is strictly greater-than the high-water mark (unix seconds) so the
+  // last-seen txn isn't re-emitted; a null cursor means a full incremental sweep.
+  const params: Stripe.BalanceTransactionListParams = cursor
+    ? { limit: 100, expand: ["data.source"], created: { gt: cursor.created } }
+    : { limit: 100, expand: ["data.source"] };
+  for await (const txn of stripe.balanceTransactions.list(params)) yield* mapBalanceTransaction(txn);
+}
 
 export const stripeConnector: IntegrationConnector = {
   id: "stripe",
