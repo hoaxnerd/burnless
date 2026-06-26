@@ -1,4 +1,5 @@
 import type { IntegrationConnector, CatalogEntry } from "./contracts";
+import { stripeConnector } from "./stripe/connector";
 
 export class IntegrationRegistry {
   private connectors = new Map<string, IntegrationConnector>();
@@ -22,5 +23,5 @@ let registered = false;
 export function registerConnectors(): void {
   if (registered) return;
   registered = true;
-  // Stripe connector registered in Task C1.3.
+  integrationRegistry.register(stripeConnector);
 }
