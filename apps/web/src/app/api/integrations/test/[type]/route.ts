@@ -10,7 +10,7 @@ import {
 import { requireCapability, getCapabilities } from "@/lib/capabilities";
 import { integrationRegistry, registerConnectors } from "@/lib/integrations/registry";
 
-// ── POST /api/integrations/[type]/test ──────────────────────────────────────
+// ── POST /api/integrations/test/[type] ──────────────────────────────────────
 // Re-validate the STORED (decrypted) key via the connector's credentialSpec
 // WITHOUT writing anything. NEVER logs the key.
 export const POST = withErrorHandler(

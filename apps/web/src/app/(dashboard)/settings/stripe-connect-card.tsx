@@ -8,7 +8,7 @@ import { useLocale } from "@/components/locale/locale-context";
 import { integrationRegistry, registerConnectors } from "@/lib/integrations/registry";
 
 // ── Stripe connect card (C1.6) ──────────────────────────────────────────────
-// Paste a restricted key → POST /api/integrations/stripe/connect. The scope
+// Paste a restricted key → POST /api/integrations/connect/stripe. The scope
 // checklist text comes straight from the connector's credentialSpec help (no
 // hardcoded copy — single source of truth). The key is a PASSWORD input and is
 // NEVER rendered back. When connected we show status + last-sync + Disconnect.
@@ -52,7 +52,7 @@ export function StripeConnectCard({ onConnected, connected, onDisconnect }: Stri
     setSubmitting(true);
     setError(null);
     try {
-      const res = await apiFetch("/api/integrations/stripe/connect", {
+      const res = await apiFetch("/api/integrations/connect/stripe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey }),

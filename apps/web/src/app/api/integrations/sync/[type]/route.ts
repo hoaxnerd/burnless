@@ -11,7 +11,7 @@ import { requireCapability, getCapabilities } from "@/lib/capabilities";
 import { integrationRegistry, registerConnectors } from "@/lib/integrations/registry";
 import { runIntegrationSync } from "@/lib/integrations/sync";
 
-// ── POST /api/integrations/[type]/sync ───────────────────────────────────────
+// ── POST /api/integrations/sync/[type] ───────────────────────────────────────
 // Manually trigger an INCREMENTAL inbound sync (uses the stored cursor). Gated
 // exactly like /connect: company access → admin → capability("integrations")
 // → (cloud-only) plan feature. NEVER logs credentials.

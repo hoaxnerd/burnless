@@ -76,7 +76,7 @@ vi.mock("@/lib/integrations/registry", () => ({
 
 import { POST } from "../route";
 
-describe("POST /api/integrations/[type]/connect", () => {
+describe("POST /api/integrations/connect/[type]", () => {
   beforeEach(() => {
     save.mockClear();
     validate.mockClear();
@@ -88,7 +88,7 @@ describe("POST /api/integrations/[type]/connect", () => {
   });
 
   it("validates the key, stores encrypted creds, upserts the row, returns 200", async () => {
-    const req = new Request("http://x/api/integrations/stripe/connect", {
+    const req = new Request("http://x/api/integrations/connect/stripe", {
       method: "POST",
       body: JSON.stringify({ apiKey: "rk_test_ok" }),
     });
@@ -103,7 +103,7 @@ describe("POST /api/integrations/[type]/connect", () => {
   });
 
   it("returns 404 for an unknown integration type", async () => {
-    const req = new Request("http://x/api/integrations/nope/connect", {
+    const req = new Request("http://x/api/integrations/connect/nope", {
       method: "POST",
       body: JSON.stringify({ apiKey: "rk_test_ok" }),
     });
@@ -114,7 +114,7 @@ describe("POST /api/integrations/[type]/connect", () => {
 
   it("returns 400 with the friendly error when validate fails", async () => {
     validate.mockResolvedValueOnce({ ok: false, error: "Invalid API key" });
-    const req = new Request("http://x/api/integrations/stripe/connect", {
+    const req = new Request("http://x/api/integrations/connect/stripe", {
       method: "POST",
       body: JSON.stringify({ apiKey: "rk_test_bad" }),
     });
@@ -125,7 +125,7 @@ describe("POST /api/integrations/[type]/connect", () => {
 
   // ── C1.5 folded fixes ──────────────────────────────────────────────────────
   it("kicks off a backfill on connect (mode:backfill) and does NOT set lastSyncAt (fix A)", async () => {
-    const req = new Request("http://x/api/integrations/stripe/connect", {
+    const req = new Request("http://x/api/integrations/connect/stripe", {
       method: "POST",
       body: JSON.stringify({ apiKey: "rk_test_ok" }),
     });
@@ -143,7 +143,7 @@ describe("POST /api/integrations/[type]/connect", () => {
       id: "i1",
       metadata: { livemode: false, sync: { cursor: 1700000000, lastRecordCount: 5 } },
     };
-    const req = new Request("http://x/api/integrations/stripe/connect", {
+    const req = new Request("http://x/api/integrations/connect/stripe", {
       method: "POST",
       body: JSON.stringify({ apiKey: "rk_test_ok" }),
     });

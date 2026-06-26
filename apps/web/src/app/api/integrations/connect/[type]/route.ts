@@ -17,7 +17,7 @@ import { connectSchema } from "./schemas";
 
 const log = logger("integrations/connect");
 
-// ── POST /api/integrations/[type]/connect ───────────────────────────────────
+// ── POST /api/integrations/connect/[type] ───────────────────────────────────
 // Validate a pasted API key via the connector's credentialSpec, encrypt+store it,
 // and upsert the integrations row to status:"active". NEVER logs the key.
 export const POST = withErrorHandler(

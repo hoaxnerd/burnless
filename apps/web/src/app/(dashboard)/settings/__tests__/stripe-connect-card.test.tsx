@@ -50,7 +50,7 @@ describe("StripeConnectCard", () => {
     const call = apiFetch.mock.calls[0]!;
     const url = call[0] as string;
     const init = call[1] as RequestInit;
-    expect(url).toBe("/api/integrations/stripe/connect");
+    expect(url).toBe("/api/integrations/connect/stripe");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ apiKey: "rk_test_abc" });
     await waitFor(() => expect(onConnected).toHaveBeenCalled());
