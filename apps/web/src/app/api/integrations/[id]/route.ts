@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { db, integrations } from "@burnless/db";
+import { db, integrations, deleteIntegrationCredentials } from "@burnless/db";
 import { eq, and } from "drizzle-orm";
 import { requireCompanyAccess, requireRole, parseBody, errorResponse, withErrorHandler } from "@/lib/api-helpers";
 import { requireCapability } from "@/lib/capabilities";
@@ -70,6 +70,11 @@ export const DELETE = withErrorHandler(async (
     .returning();
 
   if (!deleted) return errorResponse("Integration not found", 404);
+
+  // Also clear the encrypted stored credentials for this integration type.
+  // Synced `transactions` rows are intentionally LEFT in place — they're real
+  // actuals, not derived data, so disconnecting must not delete them.
+  await deleteIntegrationCredentials(ctx.companyId, deleted.type);
 
   return NextResponse.json({ success: true });
 });

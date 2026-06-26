@@ -32,7 +32,9 @@ vi.mock("@burnless/db", () => ({
       where: vi.fn().mockReturnValue({ returning: mockReturning }),
     }),
   },
-  integrations: { id: "id", companyId: "companyId", status: "status", metadata: "metadata", lastSyncAt: "lastSyncAt" },
+  integrations: { id: "id", companyId: "companyId", type: "type", status: "status", metadata: "metadata", lastSyncAt: "lastSyncAt" },
+  // DELETE also clears the encrypted stored credentials (C1.5).
+  deleteIntegrationCredentials: vi.fn(),
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn() }));
