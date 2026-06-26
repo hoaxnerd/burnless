@@ -219,4 +219,25 @@ test.describe.serial("MCP connections", () => {
     await expect(sw).toHaveAttribute("aria-checked", "true");
     expect((await patchOn).ok()).toBe(true);
   });
+
+  // Integrations relocated from Settings → the Connections page's third tab
+  // (gated on caps.integrations, which both edition presets enable). Mirrors the
+  // old e2e/settings.spec.ts integrations coverage against its new home.
+  test("Integrations tab lists Stripe + CSV Import and the coming-soon connectors", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.goto("/connections");
+    // SegmentedControl renders each segment as role=radio with the label text.
+    const integrationsTab = page.getByRole("radio", { name: "Integrations" });
+    await expect(integrationsTab).toBeVisible({ timeout: 30_000 });
+    await integrationsTab.click();
+
+    // Available section: the live Stripe connector + the static CSV-import tile.
+    await expect(page.getByText("Stripe")).toBeVisible();
+    await expect(page.getByText("CSV Import")).toBeVisible();
+    // Coming-soon section: cloud-only connectors from the registry.
+    await expect(page.getByText("Plaid")).toBeVisible();
+    await expect(page.getByText("QuickBooks")).toBeVisible();
+  });
 });

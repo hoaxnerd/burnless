@@ -87,9 +87,6 @@ const baseCompanyGET = mockResponse(true, 200, {
   fiscalYearEnd: 12,
 });
 
-// Integrations GET response (page also fetches /api/integrations)
-const integrationsGET = mockResponse(true, 200, []);
-
 // 409 response for currency change
 const conflictResponse = mockResponse(false, 409, {
   error:
@@ -110,14 +107,12 @@ describe("Currency change confirm dialog", () => {
   });
 
   it("shows confirm dialog on 409, retries with ?confirm=true on accept", async () => {
-    // Call order:
+    // Call order (integrations moved to /connections — Settings no longer GETs them):
     //  1st: GET /api/company
-    //  2nd: GET /api/integrations
-    //  3rd: PATCH /api/company (→ 409)
-    //  4th: PATCH /api/company?confirm=true (→ 200)
+    //  2nd: PATCH /api/company (→ 409)
+    //  3rd: PATCH /api/company?confirm=true (→ 200)
     mockApiFetch
       .mockResolvedValueOnce(baseCompanyGET)   // GET /api/company
-      .mockResolvedValueOnce(integrationsGET)  // GET /api/integrations
       .mockResolvedValueOnce(conflictResponse) // PATCH → 409
       .mockResolvedValueOnce(successPatchResponse); // PATCH?confirm=true → 200
     // Any trailing SWR revalidation (e.g. revalidate(KEYS.company) after save)
@@ -170,7 +165,6 @@ describe("Currency change confirm dialog", () => {
   it("reverts the currency field on cancel", async () => {
     mockApiFetch
       .mockResolvedValueOnce(baseCompanyGET)   // GET /api/company
-      .mockResolvedValueOnce(integrationsGET)  // GET /api/integrations
       .mockResolvedValueOnce(conflictResponse); // PATCH → 409
     // Any further SWR read resolves to the company shape (defensive default).
     mockApiFetch.mockResolvedValue(baseCompanyGET);

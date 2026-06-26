@@ -43,13 +43,6 @@ test.describe("Settings page UI (requires auth)", () => {
     ).toBeVisible();
   });
 
-  test("Integrations tab is visible", async ({ page }) => {
-    await page.goto("/settings");
-    await expect(
-      page.getByRole("tab", { name: /integrations/i })
-    ).toBeVisible();
-  });
-
   test("switching to AI Features tab shows toggle controls", async ({
     page,
   }) => {
@@ -74,21 +67,5 @@ test.describe("Settings page UI (requires auth)", () => {
     // Should show individual feature toggles
     await expect(page.getByText("Chat Companion")).toBeVisible();
     await expect(page.getByText("AI Insights")).toBeVisible();
-  });
-
-  test("switching to Integrations tab shows integration list", async ({
-    page,
-  }) => {
-    await page.goto("/settings");
-    await page.getByRole("tab", { name: /integrations/i }).click();
-    await expect(page.getByText("CSV Import")).toBeVisible();
-    await expect(page.getByText("Stripe")).toBeVisible();
-  });
-
-  test("integrations shows coming soon items", async ({ page }) => {
-    await page.goto("/settings");
-    await page.getByRole("tab", { name: /integrations/i }).click();
-    await expect(page.getByText("Plaid")).toBeVisible();
-    await expect(page.getByText("QuickBooks")).toBeVisible();
   });
 });

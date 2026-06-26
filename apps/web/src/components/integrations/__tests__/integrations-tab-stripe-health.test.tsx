@@ -8,8 +8,8 @@ vi.mock("@/components/locale/locale-context", () => ({
   useLocale: () => ({ fmtDate: (d: Date | string) => `DATE(${String(d)})` }),
 }));
 
-import { IntegrationsTab } from "../integrations-tab";
-import type { ConnectedIntegration } from "../settings-data";
+import { IntegrationsTab } from "@/components/integrations/integrations-tab";
+import type { ConnectedIntegration } from "@/components/integrations/integrations-data";
 import { CapabilityProvider } from "@/components/providers/capability-context";
 import { EDITION_PRESETS } from "@/lib/capabilities";
 

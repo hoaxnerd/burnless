@@ -7,7 +7,7 @@ import {
   AVAILABLE_INTEGRATIONS,
   COMING_SOON_INTEGRATIONS,
   type ConnectedIntegration,
-} from "./settings-data";
+} from "./integrations-data";
 import { StripeConnectCard } from "./stripe-connect-card";
 import { useCapabilities } from "@/components/providers/capability-context";
 
@@ -20,6 +20,9 @@ interface IntegrationsTabProps {
   onConnected: () => void;
   getIntegrationStatus: (type: string, implemented: boolean) => "available" | "coming_soon" | "connected";
   getConnectedId: (type: string) => string | null;
+  /** When true, the Stripe connect card opens on mount — honors the
+   *  `?connect=stripe` deep-link (the container reads the search param). */
+  autoOpenConnect?: boolean;
 }
 
 export function IntegrationsTab({
@@ -30,12 +33,16 @@ export function IntegrationsTab({
   onConnected,
   getIntegrationStatus,
   getConnectedId,
+  autoOpenConnect = false,
 }: IntegrationsTabProps) {
   // Task 12: the coming-soon (cloud-only) integration tiles are gated.
   const caps = useCapabilities();
   // The Stripe connect card is opened inline from the Stripe row's "Connect"
-  // affordance (which still deep-links to /settings?connect=stripe for parity).
-  const [openConnect, setOpenConnect] = useState<string | null>(null);
+  // affordance (which still deep-links to /connections?tab=integrations&connect=stripe
+  // for parity), or on mount when `autoOpenConnect` reflects ?connect=stripe.
+  const [openConnect, setOpenConnect] = useState<string | null>(
+    autoOpenConnect ? "stripe" : null,
+  );
   return (
     <div className="max-w-3xl space-y-8">
       {/* Available Integrations */}
@@ -108,7 +115,7 @@ export function IntegrationsTab({
                           </button>
                         ) : (
                           <Link
-                            href={`/settings?connect=${integration.type}`}
+                            href={`/connections?tab=integrations&connect=${integration.type}`}
                             onClick={(e) => {
                               e.preventDefault();
                               setOpenConnect("stripe");
@@ -136,7 +143,7 @@ export function IntegrationsTab({
                         </button>
                       ) : (
                         <Link
-                          href={`/settings?connect=${integration.type}`}
+                          href={`/connections?tab=integrations&connect=${integration.type}`}
                           className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 transition-colors shadow-sm shadow-brand-600/20"
                         >
                           Connect
