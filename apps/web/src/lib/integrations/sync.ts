@@ -70,9 +70,18 @@ export async function runIntegrationSync(
   let maxCreated: number | null = null;
 
   try {
-    const cursor: SyncCursor = prevCursor != null ? { created: prevCursor } : null;
+    // Trailing-window reconciliation (incremental ONLY): re-scan the last N days
+    // so late mutations whose own balance_transaction predates the cursor (e.g. a
+    // refund of an old charge) are reliably re-ingested. Re-ingest is idempotent
+    // via the `(companyId, externalId)` upsert in ingestRecords. The effective
+    // fetch floor is `min(cursor, now − TRAILING_DAYS)` — never ABOVE the cursor,
+    // so we never skip forward and lose records. Backfill is unchanged (no floor).
+    const TRAILING_DAYS = 7;
+    const nowSec = Math.floor(Date.now() / 1000); // app code, not a workflow script.
+    const effectiveCursor: SyncCursor =
+      prevCursor != null ? { created: Math.min(prevCursor, nowSec - TRAILING_DAYS * 86400) } : null;
     const iterable: AsyncIterable<MappedRecord> =
-      mode === "backfill" ? source.backfill(ctx) : source.incremental(ctx, cursor);
+      mode === "backfill" ? source.backfill(ctx) : source.incremental(ctx, effectiveCursor);
 
     // Resolve accounts ONCE per run (not per record). Reads the account list a
     // single time and find-or-creates the fees account exactly once, so a
@@ -101,8 +110,11 @@ export async function runIntegrationSync(
 
     const result = await ingestRecords(companyId, rows);
 
-    // No records ⇒ keep the old cursor (don't rewind the high-water mark).
-    const newCursor = maxCreated != null ? maxCreated : prevCursor;
+    // Cursor stays MONOTONIC: the trailing re-scan can surface records OLDER than
+    // the prior high-water mark, so the new cursor is the max of the prior cursor
+    // and the max record date seen — never a rewind. No new records ⇒ keep prevCursor.
+    const newCursor =
+      maxCreated != null ? Math.max(prevCursor ?? 0, maxCreated) : prevCursor;
     await writeSyncState(existing?.id, prevMeta, {
       cursor: newCursor,
       lastSyncAt: new Date().toISOString(),

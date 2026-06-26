@@ -85,4 +85,37 @@ describe("StripeConnectCard", () => {
     fireEvent.click(btn);
     expect(onDisconnect).toHaveBeenCalledWith("int_1");
   });
+
+  it("when connected with a sync error, shows an inline error indicator (C3.2 health)", () => {
+    render(
+      <StripeConnectCard
+        onConnected={() => {}}
+        connected={{
+          id: "int_1",
+          lastSyncAt: "2026-06-26T00:00:00.000Z",
+          lastError: "Stripe API timed out",
+        }}
+        onDisconnect={() => {}}
+      />,
+    );
+    // Last sync still rendered via fmtDate...
+    expect(screen.getByText(/DATE\(/)).toBeTruthy();
+    // ...and the error surfaces inline.
+    expect(screen.getByText(/Stripe API timed out/)).toBeTruthy();
+  });
+
+  it("when connected and healthy (no lastError), shows no error indicator", () => {
+    render(
+      <StripeConnectCard
+        onConnected={() => {}}
+        connected={{
+          id: "int_1",
+          lastSyncAt: "2026-06-26T00:00:00.000Z",
+          lastError: null,
+        }}
+        onDisconnect={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

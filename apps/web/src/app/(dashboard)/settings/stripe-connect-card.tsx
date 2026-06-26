@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Unplug, Loader2 } from "lucide-react";
+import { Check, Unplug, Loader2, AlertCircle } from "lucide-react";
 import { Input, Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import { useLocale } from "@/components/locale/locale-context";
@@ -32,8 +32,9 @@ function scopesFromHelp(help: string | undefined): string[] {
 export interface StripeConnectCardProps {
   /** Called after a successful connect so the parent can revalidate its list. */
   onConnected: () => void;
-  /** Present when Stripe is already connected (drives the connected view). */
-  connected?: { id: string; lastSyncAt: string | null } | null;
+  /** Present when Stripe is already connected (drives the connected view).
+   *  `lastError` surfaces the last sync failure from `metadata.sync.lastError`. */
+  connected?: { id: string; lastSyncAt: string | null; lastError?: string | null } | null;
   /** Called with the integration id when the user clicks Disconnect. */
   onDisconnect?: (id: string) => void;
 }
@@ -85,6 +86,15 @@ export function StripeConnectCard({ onConnected, connected, onDisconnect }: Stri
             </span>
           )}
         </div>
+        {connected.lastError && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-lg bg-danger-50 px-3 py-2 text-xs text-danger-700"
+          >
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>Last sync failed: {connected.lastError}</span>
+          </div>
+        )}
         <Button
           variant="danger"
           size="sm"
