@@ -88,6 +88,31 @@ export interface ConnectedIntegration {
   type: string;
   status: string;
   lastSyncAt: string | null;
+  /** Last sync failure, projected from `metadata.sync.lastError` (drives the
+   *  connected-integration health view). Null when the last sync succeeded. */
+  lastError: string | null;
+}
+
+/** Raw `/api/integrations` row shape — the GET returns the DB rows verbatim, so
+ *  `metadata.sync.lastError` is the source for the projected `lastError`. */
+export interface IntegrationRow {
+  id: string;
+  type: string;
+  status: string;
+  lastSyncAt: string | null;
+  metadata?: { sync?: { lastError?: string | null } | null } | null;
+}
+
+/** Project the raw API rows into `ConnectedIntegration[]`, surfacing the last
+ *  sync error from sync-state metadata so the connected health view can render. */
+export function toConnectedIntegrations(rows: IntegrationRow[]): ConnectedIntegration[] {
+  return rows.map((row) => ({
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    lastSyncAt: row.lastSyncAt,
+    lastError: row.metadata?.sync?.lastError ?? null,
+  }));
 }
 
 export interface CompanyProfile {

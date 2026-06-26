@@ -7,7 +7,12 @@ import { apiFetch } from "@/lib/api-fetch";
 import { KEYS, revalidate } from "@/lib/swr";
 import { toUserMessage } from "@/lib/api-error";
 import { useAiFlags } from "@/components/ai/ai-feature-context";
-import { type CompanyProfile, type ConnectedIntegration, visibleTabs } from "./settings-data";
+import {
+  type CompanyProfile,
+  type IntegrationRow,
+  toConnectedIntegrations,
+  visibleTabs,
+} from "./settings-data";
 import { useCapabilities } from "@/components/providers/capability-context";
 import { GeneralTab } from "./general-tab";
 import { AiFeaturesTab } from "./ai-features-tab";
@@ -67,8 +72,10 @@ export default function SettingsPage() {
     useSWR<CompanyProfile & { currency?: string }>(KEYS.company);
   const companyLoaded = !companyLoading && companyData !== undefined;
 
-  const { data: integrationsData } = useSWR<ConnectedIntegration[]>(KEYS.integrations);
-  const connectedIntegrations = integrationsData ?? [];
+  // The GET returns the integration rows verbatim; project them into
+  // ConnectedIntegration[] so `lastError` (from metadata.sync) reaches the UI.
+  const { data: integrationsData } = useSWR<IntegrationRow[]>(KEYS.integrations);
+  const connectedIntegrations = toConnectedIntegrations(integrationsData ?? []);
 
   // Seed the editable company form once the read resolves (and re-seed if the
   // server copy changes). Local edits live in `company`; the SWR entry stays the

@@ -23,7 +23,7 @@ interface IntegrationsTabProps {
 }
 
 export function IntegrationsTab({
-  connectedIntegrations: _connectedIntegrations,
+  connectedIntegrations,
   notifiedIntegrations,
   setNotifiedIntegrations,
   disconnectIntegration,
@@ -50,7 +50,16 @@ export function IntegrationsTab({
             // server capability guard). When not connected and opened, the row
             // expands to the card; otherwise the row shows a "Connect" button.
             const isStripe = integration.type === "stripe";
-            const stripeCardOpen = isStripe && caps.integrations && status !== "connected" && openConnect === "stripe";
+            // The connect card doubles as the connected health view: render it
+            // when Stripe is connected (shows last-sync + error + Disconnect) OR
+            // when the not-connected row's "Connect" affordance has been opened.
+            const stripeConnected =
+              isStripe && caps.integrations && status === "connected"
+                ? connectedIntegrations.find((i) => i.type === "stripe") ?? null
+                : null;
+            const stripeCardOpen =
+              (isStripe && caps.integrations && status !== "connected" && openConnect === "stripe") ||
+              stripeConnected !== null;
             return (
               <div
                 key={integration.type}
@@ -138,6 +147,16 @@ export function IntegrationsTab({
                 </div>
                 {stripeCardOpen && (
                   <StripeConnectCard
+                    connected={
+                      stripeConnected
+                        ? {
+                            id: stripeConnected.id,
+                            lastSyncAt: stripeConnected.lastSyncAt,
+                            lastError: stripeConnected.lastError,
+                          }
+                        : null
+                    }
+                    onDisconnect={disconnectIntegration}
                     onConnected={() => {
                       setOpenConnect(null);
                       onConnected();
