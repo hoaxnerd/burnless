@@ -8,6 +8,7 @@ import { applyRateLimit } from "@/lib/api-rate-limit";
 import { categorizeWithMemory, type MerchantMapping } from "@burnless/engine";
 import { monetaryAmount } from "@/lib/financial-validation";
 import { trackDataMutation } from "@/lib/data-mutation-tracker";
+import { ingestRecords, type IngestRow } from "@/lib/integrations/ingest";
 import type { FundingRoundColumnMapping } from "@/app/(dashboard)/import/import-utils";
 import crypto from "crypto";
 
@@ -337,43 +338,42 @@ export const POST = withErrorHandler(async (request: Request) => {
     });
   }
 
-  // 3. Check for duplicates
-  const allExternalIds = prepared.map((p) => p.externalId);
-  const existingDuplicates = new Set<string>();
-
-  if (allExternalIds.length > 0) {
-    const idChunks = chunk(allExternalIds, 500);
-    for (const idChunk of idChunks) {
-      const existing = await db
-        .select({ externalId: transactions.externalId })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.companyId, ctx.companyId),
-            inArray(transactions.externalId, idChunk)
-          )
-        );
-      for (const row of existing) {
-        if (row.externalId) existingDuplicates.add(row.externalId);
+  // 3. Dry run — return preview with AI categorization. The preview needs to
+  // flag which rows already exist + which are in-batch dupes, so compute the
+  // same dedup set the shared core uses (chunked existing-id lookup).
+  if (dryRun) {
+    const allExternalIds = prepared.map((p) => p.externalId);
+    const existingDuplicates = new Set<string>();
+    if (allExternalIds.length > 0) {
+      const idChunks = chunk(allExternalIds, 500);
+      for (const idChunk of idChunks) {
+        const existing = await db
+          .select({ externalId: transactions.externalId })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.companyId, ctx.companyId),
+              inArray(transactions.externalId, idChunk)
+            )
+          );
+        for (const row of existing) {
+          if (row.externalId) existingDuplicates.add(row.externalId);
+        }
       }
     }
-  }
 
-  const seenInBatch = new Set<string>();
-  const toInsert: typeof prepared = [];
-  let skipped = 0;
-
-  for (const row of prepared) {
-    if (existingDuplicates.has(row.externalId) || seenInBatch.has(row.externalId)) {
-      skipped++;
-      continue;
+    const seenInBatch = new Set<string>();
+    let previewImported = 0;
+    let previewSkipped = 0;
+    for (const row of prepared) {
+      if (existingDuplicates.has(row.externalId) || seenInBatch.has(row.externalId)) {
+        previewSkipped++;
+        continue;
+      }
+      seenInBatch.add(row.externalId);
+      previewImported++;
     }
-    seenInBatch.add(row.externalId);
-    toInsert.push(row);
-  }
 
-  // 4. Dry run — return preview with AI categorization
-  if (dryRun) {
     const preview = prepared.map(({ index: _index, suggestedCategory, categoryConfidence, categorySource, importBatchId: _importBatchId, ...rest }) => ({
       ...rest,
       // `prepared.amount` is a string (Drizzle numeric column shape).
@@ -387,14 +387,14 @@ export const POST = withErrorHandler(async (request: Request) => {
       categorySource,
     }));
     return NextResponse.json({
-      imported: toInsert.length,
-      skipped,
+      imported: previewImported,
+      skipped: previewSkipped,
       errors,
       transactions: preview,
     });
   }
 
-  // 5. Create import batch record
+  // 4. Create import batch record
   const [batch] = await db
     .insert(importBatches)
     .values({
@@ -407,23 +407,32 @@ export const POST = withErrorHandler(async (request: Request) => {
     })
     .returning();
 
-  // 6. Batch insert with batchId
+  // 5. Delegate dedup + chunked insert to the shared ingestion core. The route
+  // owns categorization + account resolution; ingestRecords owns the
+  // (companyId, externalId) dedup and the chunked insert (carrying batchId).
   try {
-    const insertChunks = chunk(toInsert, 100);
-    for (const batchChunk of insertChunks) {
-      const values = batchChunk.map(({ index: _index, suggestedCategory: _suggestedCategory, categoryConfidence: _categoryConfidence, categorySource: _categorySource, ...rest }) => ({
-        ...rest,
-        importBatchId: batch!.id,
-      }));
-      await db.insert(transactions).values(values);
-    }
+    const ingestRows: IngestRow[] = prepared.map((row) => ({
+      accountId: row.accountId,
+      date: row.date,
+      amount: row.amount,
+      description: row.description,
+      vendor: row.vendor,
+      notes: row.notes,
+      source: row.source,
+      externalId: row.externalId,
+      metadata: row.metadata,
+    }));
+
+    const { inserted, skipped } = await ingestRecords(ctx.companyId, ingestRows, {
+      importBatchId: batch!.id,
+    });
 
     // Update batch to completed
     await db
       .update(importBatches)
       .set({
         status: "completed",
-        importedCount: toInsert.length,
+        importedCount: inserted,
         skippedCount: skipped,
         errorCount: errors.length,
         errors: errors.length > 0 ? errors : null,
@@ -433,7 +442,7 @@ export const POST = withErrorHandler(async (request: Request) => {
     await trackDataMutation(ctx.companyId, "expenses");
 
     return NextResponse.json({
-      imported: toInsert.length,
+      imported: inserted,
       skipped,
       errors,
       batchId: batch!.id,
