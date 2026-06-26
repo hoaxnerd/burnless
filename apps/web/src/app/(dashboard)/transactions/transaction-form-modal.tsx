@@ -12,8 +12,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Modal, Input, Select, Button } from "@/components/ui";
-import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
+import { submitCreateOrUpdate } from "@/lib/submit-create-or-update";
 
 export interface TransactionFormRow {
   id: string;
@@ -77,21 +77,12 @@ export function TransactionFormModal(props: TransactionFormModalProps) {
     };
     setSubmitting(true);
     try {
-      const res = isAdd
-        ? await apiFetch("/api/transactions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await apiFetch(`/api/transactions/${(props as EditProps).initialValue.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `Failed to ${isAdd ? "create" : "update"} transaction`);
-      }
+      await submitCreateOrUpdate({
+        basePath: "/api/transactions",
+        id: isAdd ? null : (props as EditProps).initialValue.id,
+        payload,
+        entityLabel: "transaction",
+      });
       close();
       router.refresh();
     } catch (err) {

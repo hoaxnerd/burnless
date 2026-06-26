@@ -12,8 +12,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Modal, Input, Select, Button } from "@/components/ui";
-import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
+import { submitCreateOrUpdate } from "@/lib/submit-create-or-update";
 
 export interface AccountFormRow {
   id: string;
@@ -62,21 +62,12 @@ export function AccountFormModal(props: AccountFormModalProps) {
     const payload = { name: name.trim(), type, category, coversHeadcount };
     setSubmitting(true);
     try {
-      const res = isAdd
-        ? await apiFetch("/api/accounts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await apiFetch(`/api/accounts/${(props as EditProps).initialValue.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? `Failed to ${isAdd ? "create" : "update"} account`);
-      }
+      await submitCreateOrUpdate({
+        basePath: "/api/accounts",
+        id: isAdd ? null : (props as EditProps).initialValue.id,
+        payload,
+        entityLabel: "account",
+      });
       close();
       router.refresh();
     } catch (err) {
