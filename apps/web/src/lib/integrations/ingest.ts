@@ -105,7 +105,16 @@ export async function ingestRecords(
       importBatchId,
       metadata: row.metadata,
     }));
-    await db.insert(transactions).values(values);
+    // DB-layer backstop for the read-then-skip dedup above: a concurrent backfill
+    // + hourly job can both pre-check-miss the same externalId, so without this a
+    // racing insert would violate the (companyId, externalId) unique index and
+    // abort the whole chunk (→ partial backfill). onConflictDoNothing makes the
+    // insert idempotent at the DB layer. (`inserted` is the post-dedup toInsert
+    // length; a rare race-skip slightly over-counts it — acceptable.)
+    await db
+      .insert(transactions)
+      .values(values)
+      .onConflictDoNothing({ target: [transactions.companyId, transactions.externalId] });
   }
 
   return { inserted: toInsert.length, skipped };

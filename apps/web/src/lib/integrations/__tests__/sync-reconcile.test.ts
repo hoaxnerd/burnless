@@ -63,6 +63,9 @@ vi.mock("drizzle-orm", () => ({ eq: vi.fn(), and: vi.fn() }));
 vi.mock("../registry", () => ({ registerConnectors, integrationRegistry }));
 vi.mock("@/lib/data", () => ({ getAccounts }));
 vi.mock("../ingest", () => ({ ingestRecords }));
+// runIntegrationSync now fires trackDataMutation after inserts>0 (M1). Stub it so
+// the reconcile tests don't reach the real insight-invalidation path (unmocked db).
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation: vi.fn() }));
 
 import { runIntegrationSync } from "../sync";
 import type { MappedRecord } from "../contracts";

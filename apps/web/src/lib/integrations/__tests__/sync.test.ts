@@ -21,6 +21,7 @@ const {
   integrationRegistry,
   getAccounts,
   ingestRecords,
+  trackDataMutation,
   mockSelect,
   mockFrom,
   mockWhere,
@@ -37,6 +38,7 @@ const {
   integrationRegistry: { get: vi.fn() },
   getAccounts: vi.fn(),
   ingestRecords: vi.fn(),
+  trackDataMutation: vi.fn(),
   mockSelect: vi.fn(),
   mockFrom: vi.fn(),
   mockWhere: vi.fn(),
@@ -64,6 +66,7 @@ vi.mock("../registry", () => ({ registerConnectors, integrationRegistry }));
 // deps (`@/lib/data` getAccounts + the financialAccounts insert) are mocked.
 vi.mock("@/lib/data", () => ({ getAccounts }));
 vi.mock("../ingest", () => ({ ingestRecords }));
+vi.mock("@/lib/data-mutation-tracker", () => ({ trackDataMutation }));
 
 import { runIntegrationSync } from "../sync";
 import type { MappedRecord } from "../contracts";
@@ -147,6 +150,7 @@ beforeEach(() => {
   ]);
 
   ingestRecords.mockResolvedValue({ inserted: 2, skipped: 0 });
+  trackDataMutation.mockResolvedValue(undefined);
   integrationRegistry.get.mockReturnValue(source([]));
 });
 
@@ -272,6 +276,25 @@ describe("runIntegrationSync", () => {
     const meta = updatedSet!.metadata as { livemode: boolean; sync: { lastError: string } };
     expect(meta.livemode).toBe(true); // still preserved on the error write
     expect(meta.sync.lastError).toContain("boom");
+  });
+
+  it("invalidates insight/cache surfaces via trackDataMutation when rows are inserted (M1)", async () => {
+    integrationRegistry.get.mockReturnValue(source([rec()]));
+    ingestRecords.mockResolvedValue({ inserted: 1, skipped: 0 });
+
+    await runIntegrationSync("c1", "stripe", { mode: "backfill" });
+
+    expect(trackDataMutation).toHaveBeenCalledTimes(1);
+    expect(trackDataMutation).toHaveBeenCalledWith("c1", "expenses");
+  });
+
+  it("does NOT track a mutation when nothing was inserted (M1)", async () => {
+    integrationRegistry.get.mockReturnValue(source([]));
+    ingestRecords.mockResolvedValue({ inserted: 0, skipped: 0 });
+
+    await runIntegrationSync("c1", "stripe", { mode: "incremental" });
+
+    expect(trackDataMutation).not.toHaveBeenCalled();
   });
 
   it("throws a clear error when no credentials are stored", async () => {

@@ -22,6 +22,7 @@ const {
   mockInsert,
   mockValues,
   mockReturning,
+  mockOnConflict,
   mockUpdate,
   mockSet,
   mockLimit,
@@ -32,6 +33,7 @@ const {
   mockInsert: vi.fn(),
   mockValues: vi.fn(),
   mockReturning: vi.fn(),
+  mockOnConflict: vi.fn(),
   mockUpdate: vi.fn(),
   mockSet: vi.fn(),
   mockLimit: vi.fn(),
@@ -110,10 +112,13 @@ function setupDbChains() {
   const defaultWhereResult = Object.assign([] as unknown[], { limit: mockLimit });
   mockWhere.mockReturnValue(defaultWhereResult);
 
-  // INSERT chain: db.insert(...).values(...).returning()
+  // INSERT chain: db.insert(...).values(...).returning()  — batches use .returning();
+  // the shared ingest core (M2) chains .onConflictDoNothing() instead, so the
+  // values() result carries BOTH terminators.
   mockInsert.mockReturnValue({ values: mockValues });
-  mockValues.mockReturnValue({ returning: mockReturning });
+  mockValues.mockReturnValue({ returning: mockReturning, onConflictDoNothing: mockOnConflict });
   mockReturning.mockResolvedValue([{ id: "batch-1" }]);
+  mockOnConflict.mockResolvedValue(undefined);
 
   // UPDATE chain: db.update(...).set(...).where(...)
   mockUpdate.mockReturnValue({ set: mockSet });
@@ -358,7 +363,7 @@ describe("POST /api/import", () => {
     // Insert batch returns batch record
     mockReturning.mockResolvedValue([{ id: "batch-123" }]);
     // Insert transactions succeeds
-    mockValues.mockReturnValue({ returning: mockReturning });
+    mockValues.mockReturnValue({ returning: mockReturning, onConflictDoNothing: mockOnConflict });
 
     const res = await POST(
       makeRequest({
@@ -522,7 +527,7 @@ describe("POST /api/import", () => {
     const valuesCalls: unknown[][] = [];
     mockValues.mockImplementation((v: unknown) => {
       valuesCalls.push(Array.isArray(v) ? (v as unknown[]) : [v]);
-      return { returning: mockReturning };
+      return { returning: mockReturning, onConflictDoNothing: mockOnConflict };
     });
 
     const res = await POST(
@@ -573,7 +578,7 @@ describe("POST /api/import", () => {
     const valuesCalls: { target: unknown; values: unknown }[] = [];
     mockValues.mockImplementation((v: unknown) => {
       valuesCalls.push({ target: insertTargets[insertTargets.length - 1], values: v });
-      return { returning: mockReturning };
+      return { returning: mockReturning, onConflictDoNothing: mockOnConflict };
     });
 
     // Call order: 1=valid accounts, 2=merchant memory, 3=ensureImportedAccount lookup, 4=duplicates
@@ -717,7 +722,7 @@ describe("POST /api/import", () => {
     const valuesCalls: unknown[][] = [];
     mockValues.mockImplementation((v: unknown) => {
       valuesCalls.push(Array.isArray(v) ? (v as unknown[]) : [v]);
-      return { returning: mockReturning };
+      return { returning: mockReturning, onConflictDoNothing: mockOnConflict };
     });
 
     const res = await POST(
@@ -787,7 +792,7 @@ describe("POST /api/import", () => {
     const valuesCalls1: unknown[][] = [];
     mockValues.mockImplementation((v: unknown) => {
       valuesCalls1.push(Array.isArray(v) ? (v as unknown[]) : [v]);
-      return { returning: mockReturning };
+      return { returning: mockReturning, onConflictDoNothing: mockOnConflict };
     });
 
     const dry = await POST(

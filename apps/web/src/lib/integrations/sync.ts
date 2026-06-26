@@ -3,6 +3,7 @@ import { db, integrations, getDecryptedIntegrationSecret } from "@burnless/db";
 import { integrationRegistry, registerConnectors } from "./registry";
 import { buildAccountResolver } from "./accounts";
 import { ingestRecords, type IngestRow, type IngestResult } from "./ingest";
+import { trackDataMutation } from "@/lib/data-mutation-tracker";
 import type { MappedRecord, SyncCtx, SyncCursor } from "./contracts";
 
 /** Per-integration sync state, persisted under `integrations.metadata.sync`. */
@@ -121,6 +122,16 @@ export async function runIntegrationSync(
       lastError: null,
       lastRecordCount: recordCount,
     });
+
+    // Cache invalidation after fresh inserts. trackDataMutation is callable in any
+    // async context (Redis/memory write + insight-invalidation queue) — safe in the
+    // fire-and-forget backfill-on-connect path, where revalidateTag has no request
+    // context. The expense/dashboard surfaces (`expense-details`) and the cached
+    // accounts list (`accounts`, a fees account may have been find-or-created) are
+    // revalidated by the MANUAL sync route, which DOES have a request context.
+    if (result.inserted > 0) {
+      await trackDataMutation(companyId, "expenses");
+    }
 
     return result;
   } catch (err) {

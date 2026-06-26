@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import {
   requireCompanyAccess,
   requireRole,
@@ -34,6 +35,22 @@ export const POST = withErrorHandler(
     if (!connector) return errorResponse("Unknown integration", 404);
 
     const result = await runIntegrationSync(ctx.companyId, type, { mode: "incremental" });
+
+    // Invalidate cached surfaces when a sync inserted rows. This route has a
+    // request context (unlike the fire-and-forget backfill-on-connect), so
+    // revalidateTag is safe here. `accounts` — a "Payment processing fees" account
+    // may have been find-or-created; `expense-details` — the server-rendered
+    // expense/transaction table. trackDataMutation already fired inside the sync.
+    // Wrapped defensively so a revalidation hiccup never fails the sync response.
+    if (result.inserted > 0) {
+      try {
+        revalidateTag("accounts", { expire: 0 });
+        revalidateTag("expense-details", { expire: 0 });
+      } catch {
+        /* never fail the sync because revalidation threw */
+      }
+    }
+
     return NextResponse.json({ ok: true, ...result });
   },
 );

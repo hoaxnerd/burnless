@@ -12,13 +12,14 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockSelect, mockFrom, mockWhere, mockInsert, mockValues } = vi.hoisted(
+const { mockSelect, mockFrom, mockWhere, mockInsert, mockValues, mockOnConflict } = vi.hoisted(
   () => ({
     mockSelect: vi.fn(),
     mockFrom: vi.fn(),
     mockWhere: vi.fn(),
     mockInsert: vi.fn(),
     mockValues: vi.fn(),
+    mockOnConflict: vi.fn(),
   })
 );
 
@@ -54,12 +55,15 @@ function setupDbChains() {
     existingExternalIds.map((externalId) => ({ externalId }))
   );
 
-  // INSERT chain: db.insert(transactions).values(rows)
+  // INSERT chain: db.insert(transactions).values(rows).onConflictDoNothing(...)
+  // The DB-layer dedup backstop (M2) chains .onConflictDoNothing after .values,
+  // so .values returns a thenable carrying that method.
   mockInsert.mockReturnValue({ values: mockValues });
   mockValues.mockImplementation((rows: IngestRow[]) => {
     insertedRows.push(rows);
-    return Promise.resolve();
+    return { onConflictDoNothing: mockOnConflict };
   });
+  mockOnConflict.mockResolvedValue(undefined);
 }
 
 function row(externalId: string, overrides: Partial<IngestRow> = {}): IngestRow {
