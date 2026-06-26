@@ -100,6 +100,23 @@ describe("back-compat alias", () => {
   });
 });
 
+describe("integrations capability by edition", () => {
+  const ORIG = process.env;
+  afterEach(() => { process.env = ORIG; });
+  it("is ON for self-host by default", async () => {
+    process.env = { ...ORIG };
+    delete process.env.BURNLESS_DEPLOYMENT; // self_host
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().integrations).toBe(true);
+  });
+  it("honors the env override OFF", async () => {
+    process.env = { ...ORIG, BURNLESS_CAP_INTEGRATIONS: "false" };
+    delete process.env.BURNLESS_DEPLOYMENT; // self_host
+    const { getCapabilities } = await import("../capabilities");
+    expect(getCapabilities().integrations).toBe(false);
+  });
+});
+
 describe("requireCapability", () => {
   const ORIG = process.env;
   afterEach(() => { process.env = ORIG; });
