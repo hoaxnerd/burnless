@@ -52,12 +52,12 @@ export const KEYS = {
   scenario: (id: string) => `/api/scenarios/${id}`,
   fundingRounds: () => "/api/funding-rounds",
   departments: () => "/api/departments",
-  transactions: (filters?: { accountId?: string; startDate?: string; endDate?: string; cursor?: string }) => {
+  transactions: (filters?: { accountId?: string; startDate?: string; endDate?: string; limit?: number }) => {
     const qs = new URLSearchParams();
     if (filters?.accountId) qs.set("accountId", filters.accountId);
     if (filters?.startDate) qs.set("startDate", filters.startDate);
     if (filters?.endDate) qs.set("endDate", filters.endDate);
-    if (filters?.cursor) qs.set("cursor", filters.cursor);
+    if (filters?.limit) qs.set("limit", String(filters.limit));
     const s = qs.toString();
     return s ? `/api/transactions?${s}` : "/api/transactions";
   },

@@ -181,7 +181,8 @@ export interface TransactionFilters {
   accountId?: string;
   startDate?: string;
   endDate?: string;
-  cursor?: string;
+  /** Page window size — "Load more" grows this (newest-first, strict superset). */
+  limit?: number;
 }
 
 /** An admin invite code with its redemptions (settings → invite-codes tab). */

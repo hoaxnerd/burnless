@@ -16,6 +16,7 @@ import { Pencil, Trash2, Wallet } from "lucide-react";
 import { DataTable, Button, Input, Select, useConfirm } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
 import { useTransactions, type TransactionRow, type TransactionsPayload } from "@/lib/swr";
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "@/lib/pagination";
 import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
 import { TransactionFormModal, type TransactionFormRow } from "./transaction-form-modal";
@@ -53,18 +54,26 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
   const [accountId, setAccountId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  // "Load more" grows the page window (newest-first). Each larger window is a strict
+  // superset of the previous one (server orders date DESC, id DESC consistently), so
+  // rows never skip or duplicate — unlike the previous id-cursor against a date seed.
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Reset the window back to the first page whenever a filter changes.
+  const resetWindow = () => setLimit(DEFAULT_PAGE_SIZE);
 
   const filters = useMemo(
     () => ({
       accountId: accountId || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      cursor,
+      // Omit at the default so the first key stays `/api/transactions` and the
+      // SSR fallbackData seed applies; only a grown window adds `?limit=`.
+      limit: limit > DEFAULT_PAGE_SIZE ? limit : undefined,
     }),
-    [accountId, startDate, endDate, cursor],
+    [accountId, startDate, endDate, limit],
   );
 
   // Seed the first page from SSR; only the unfiltered/first-cursor key matches the
@@ -177,7 +186,7 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="tx-filter-account" className="block text-xs font-medium text-surface-500 mb-1">Account</label>
-          <Select id="tx-filter-account" value={accountId} onChange={(e) => { setAccountId(e.target.value); setCursor(undefined); }}>
+          <Select id="tx-filter-account" value={accountId} onChange={(e) => { setAccountId(e.target.value); resetWindow(); }}>
             <option value="">All accounts</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
@@ -186,11 +195,11 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
         </div>
         <div>
           <label htmlFor="tx-filter-start" className="block text-xs font-medium text-surface-500 mb-1">From</label>
-          <Input id="tx-filter-start" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setCursor(undefined); }} />
+          <Input id="tx-filter-start" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); resetWindow(); }} />
         </div>
         <div>
           <label htmlFor="tx-filter-end" className="block text-xs font-medium text-surface-500 mb-1">To</label>
-          <Input id="tx-filter-end" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setCursor(undefined); }} />
+          <Input id="tx-filter-end" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); resetWindow(); }} />
         </div>
       </div>
 
@@ -203,9 +212,20 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
         />
       </div>
 
-      {pagination.hasMore && pagination.nextCursor && (
+      {pagination.hasMore && (
         <div className="flex justify-center">
-          <Button variant="secondary" onClick={() => setCursor(pagination.nextCursor ?? undefined)}>Load more</Button>
+          {limit < MAX_PAGE_SIZE ? (
+            <Button
+              variant="secondary"
+              onClick={() => setLimit((n) => Math.min(n + DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE))}
+            >
+              Load more
+            </Button>
+          ) : (
+            <p className="text-sm text-surface-500" role="status">
+              Showing the {MAX_PAGE_SIZE} most recent — narrow with the account or date filters to see older transactions.
+            </p>
+          )}
         </div>
       )}
 

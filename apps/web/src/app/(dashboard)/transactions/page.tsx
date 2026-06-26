@@ -35,7 +35,13 @@ async function TransactionsContent({ companyId, scenarioActive }: { companyId: s
   // in the same nested PaginatedResponse shape the view + SWR hook consume. Dates
   // arrive as Date objects here, so they serialize to ISO across the RSC→client
   // prop boundary automatically — hence the documented cast to TransactionsPayload.
-  const sorted = [...txRaw].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // The sort MUST match GET /api/transactions exactly — date DESC, then id DESC as a
+  // deterministic tiebreaker — so "Load more" (which grows the limit) returns a strict
+  // superset of this seed and rows never skip or duplicate at the page boundary.
+  const sorted = [...txRaw].sort((a, b) => {
+    const byDate = new Date(b.date).getTime() - new Date(a.date).getTime();
+    return byDate !== 0 ? byDate : b.id.localeCompare(a.id);
+  });
   const initialData = paginatedResponse(
     sorted.slice(0, DEFAULT_PAGE_SIZE + 1) as Array<Record<string, unknown>>,
     DEFAULT_PAGE_SIZE,

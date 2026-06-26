@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { TransactionsView } from "../transactions-view";
 import type { TransactionsPayload } from "@/lib/swr";
 
@@ -7,10 +7,19 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/components/locale/locale-context", () => ({
   useLocale: () => ({ fmtCurrency: (n: number) => `$${n.toFixed(2)}`, fmtDate: (d: string | Date) => String(d) }),
 }));
+// Capture the `limit` filter each render requests, so we can assert that
+// "Load more" GROWS the window (50 → 100) rather than swapping in a cursor page.
+const captured = vi.hoisted(() => ({ limits: [] as Array<number | undefined> }));
 // useTransactions returns the SSR-seeded initialData via fallbackData; stub to echo it.
 vi.mock("@/lib/swr", async (orig) => {
   const actual = await orig<typeof import("@/lib/swr")>();
-  return { ...actual, useTransactions: (_f: unknown, cfg: { fallbackData?: TransactionsPayload }) => ({ data: cfg?.fallbackData, mutate: vi.fn() }) };
+  return {
+    ...actual,
+    useTransactions: (f: { limit?: number } | undefined, cfg: { fallbackData?: TransactionsPayload }) => {
+      captured.limits.push(f?.limit);
+      return { data: cfg?.fallbackData, mutate: vi.fn() };
+    },
+  };
 });
 
 const accounts = [{ id: "acc-1", name: "Cash & Bank" }];
@@ -42,6 +51,20 @@ describe("TransactionsView", () => {
     expect(screen.getByText(/switch to base view/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /add transaction/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /edit transaction/i })).toBeNull();
+  });
+
+  it("'Load more' grows the page window (50 → 100), not a cursor swap", () => {
+    captured.limits.length = 0;
+    const withMore: TransactionsPayload = {
+      ...base,
+      pagination: { hasMore: true, nextCursor: null, count: 2 },
+    };
+    render(<TransactionsView companyId="c1" accounts={accounts} initialData={withMore} scenarioActive={false} />);
+    // First render asks for the default window → no explicit limit param.
+    expect(captured.limits.at(-1)).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+    // After "Load more" it requests a LARGER window (100), a strict superset.
+    expect(captured.limits.at(-1)).toBe(100);
   });
 
   it("links to the accounts page (forward nav, mirrors Funding → cap table)", () => {

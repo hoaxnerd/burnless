@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, transactions, financialAccounts } from "@burnless/db";
-import { eq, and, gte, lte, gt } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { requireCompanyAccess, requireCompanyWrite, errorResponse, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { parsePaginationParams, paginatedResponse } from "@/lib/pagination";
 import { logAudit } from "@/lib/audit";
@@ -17,7 +17,13 @@ export const GET = withErrorHandler(async (request: Request) => {
   const accountId = url.searchParams.get("accountId");
   const startDateStr = url.searchParams.get("startDate");
   const endDateStr = url.searchParams.get("endDate");
-  const { limit, cursor } = parsePaginationParams(request);
+  // `id` is a random UUID (not time-sortable), so the ledger is ordered by the
+  // transaction DATE (newest first) with `id` only as a deterministic tiebreaker
+  // for same-date rows. The page seeds the first window from SSR with the IDENTICAL
+  // ordering, and "Load more" grows the limit (up to MAX_PAGE_SIZE) — so each page
+  // is a strict superset of the previous one and rows never skip or duplicate.
+  // (A prior id-ASC cursor against a date-DESC seed produced exactly that drift.)
+  const { limit } = parsePaginationParams(request);
 
   const conditions = [eq(transactions.companyId, ctx.companyId)];
   if (accountId) conditions.push(eq(transactions.accountId, accountId));
@@ -31,13 +37,12 @@ export const GET = withErrorHandler(async (request: Request) => {
     if (!d) return errorResponse("Invalid endDate format. Expected YYYY-MM-DD.", 400);
     conditions.push(lte(transactions.date, d));
   }
-  if (cursor) conditions.push(gt(transactions.id, cursor));
 
   const rows = await db
     .select()
     .from(transactions)
     .where(and(...conditions))
-    .orderBy(transactions.id)
+    .orderBy(desc(transactions.date), desc(transactions.id))
     .limit(limit + 1);
 
   return NextResponse.json(paginatedResponse(rows, limit));

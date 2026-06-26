@@ -82,7 +82,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
   gte: vi.fn(),
   lte: vi.fn(),
-  gt: vi.fn(),
+  desc: vi.fn(),
 }));
 
 vi.mock("@/lib/pagination", () => ({
@@ -101,7 +101,7 @@ vi.mock("@/lib/pagination", () => ({
     })),
 }));
 
-// GET chain: db.select().from(transactions).where(and(...)).orderBy(transactions.id).limit(limit + 1)
+// GET chain: db.select().from(transactions).where(and(...)).orderBy(desc(date), desc(id)).limit(limit + 1)
 // POST chain (AUTHZ-02 ownership): db.select({...}).from(financialAccounts).where(...) — awaited.
 // So mockWhere returns a thenable that ALSO exposes .orderBy (GET) and resolves to
 // the financialAccounts ownership rows (POST). By default: one row found (owned).
