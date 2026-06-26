@@ -130,7 +130,7 @@ beforeEach(() => {
 // ── contributor.sections() ────────────────────────────────────────────────────
 
 describe("integrations contributor.sections()", () => {
-  it("renders one 'Connected data sources' section naming Stripe with sync + tx count", async () => {
+  it("renders one 'Connected data sources' section naming Stripe with sync + tx count at section footer", async () => {
     const { integrationsContributor } = await import("../integrations");
     activeIntegrationsMock.mockResolvedValueOnce([
       {
@@ -145,9 +145,11 @@ describe("integrations contributor.sections()", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0]!.heading).toBe("Connected data sources");
     expect(sections[0]!.body).toContain("Stripe");
-    // Relative-time + tx count surfaced in the bullet.
+    // Relative-time in the bullet.
     expect(sections[0]!.body.toLowerCase()).toContain("ago");
-    expect(sections[0]!.body).toContain("1,240");
+    // Total tx count appears exactly once at the section footer.
+    expect(sections[0]!.body).toContain("Total integration-sourced transactions: 1,240");
+    expect(sections[0]!.body.match(/1,240/g)).toHaveLength(1);
   });
 
   it("returns [] when there are no active integrations", async () => {

@@ -105,14 +105,16 @@ export const integrationsContributor: ContextContributor = {
         .map((row) => {
           const label = labelFor(row.type);
           const synced = relativeTime(row.lastSyncAt);
-          return `- ${label} — last synced ${synced}, ${formatCount(txCount)} transactions`;
+          return `- ${label} — last synced ${synced}`;
         })
         .join("\n");
+
+      const body = `${bullets}\n\nTotal integration-sourced transactions: ${formatCount(txCount)}`;
 
       return [
         {
           heading: "Connected data sources",
-          body: bullets,
+          body,
         },
       ];
     } catch {
