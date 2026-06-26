@@ -209,6 +209,7 @@ export default function SettingsPage() {
           notifiedIntegrations={notifiedIntegrations}
           setNotifiedIntegrations={setNotifiedIntegrations}
           disconnectIntegration={disconnectIntegration}
+          onConnected={reloadIntegrations}
           getIntegrationStatus={getIntegrationStatus}
           getConnectedId={getConnectedId}
         />

@@ -5,9 +5,11 @@ import {
   CreditCard,
   Building2,
   DollarSign,
+  Plug,
 } from "lucide-react";
 import { CURRENCIES, DATA_REGIONS, type DataRegion } from "@burnless/types";
 import type { Capabilities } from "@/lib/capabilities";
+import { integrationRegistry, registerConnectors } from "@/lib/integrations/registry";
 
 export interface IntegrationDef {
   type: string;
@@ -18,7 +20,17 @@ export interface IntegrationDef {
   implemented: boolean;
 }
 
-export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = [
+// ── Integration catalog (C1.6) ──────────────────────────────────────────────
+// The settings catalog is DERIVED from `integrationRegistry.catalog()` — the
+// single source of truth — so connectors can never silently drift out of the UI
+// (guarded by integrations-catalog.test.ts). The registry's `icon` is a lucide
+// NAME string; the tiles need JSX, so we keep one icon map keyed by `type` and
+// look up the rendered glyph by type. The only non-connector entry is the static
+// CSV-import tile (it is not a registry connector — it is a first-party import
+// surface), which we prepend.
+
+/** Static, always-available entries that are NOT registry connectors. */
+const STATIC_AVAILABLE: IntegrationDef[] = [
   {
     type: "csv_import",
     name: "CSV Import",
@@ -29,57 +41,47 @@ export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = [
   },
 ];
 
-export const COMING_SOON_INTEGRATIONS: IntegrationDef[] = [
-  {
-    type: "stripe",
-    name: "Stripe",
-    description: "Sync revenue and payment data from Stripe",
-    icon: <CreditCard className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "plaid",
-    name: "Plaid",
-    description: "Connect bank accounts directly for transaction import",
-    icon: <Landmark className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "quickbooks",
-    name: "QuickBooks",
-    description: "Sync your QuickBooks accounting data automatically",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "xero",
-    name: "Xero",
-    description: "Connect your Xero accounting for real-time sync",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "freshbooks",
-    name: "FreshBooks",
-    description: "Import invoices and expenses from FreshBooks",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "mercury",
-    name: "Mercury",
-    description: "Sync your Mercury banking transactions automatically",
-    icon: <Building2 className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "gusto",
-    name: "Gusto",
-    description: "Import payroll data and employee costs from Gusto",
-    icon: <DollarSign className="h-5 w-5" />,
-    implemented: false,
-  },
-];
+/** JSX icon per connector `type` (registry stores lucide NAMES, the UI needs JSX). */
+const INTEGRATION_ICONS: Record<string, React.ReactNode> = {
+  stripe: <CreditCard className="h-5 w-5" />,
+  plaid: <Landmark className="h-5 w-5" />,
+  quickbooks: <BookOpen className="h-5 w-5" />,
+  xero: <BookOpen className="h-5 w-5" />,
+  freshbooks: <BookOpen className="h-5 w-5" />,
+  mercury: <Building2 className="h-5 w-5" />,
+  gusto: <DollarSign className="h-5 w-5" />,
+};
+
+const FALLBACK_ICON = <Plug className="h-5 w-5" />;
+
+/**
+ * Source of truth for the Settings → Integrations catalog. Merges the static
+ * CSV-import entry with every connector from `integrationRegistry.catalog()`,
+ * mapping the registry's `status` ("available" | "coming_soon") to the UI's
+ * `implemented` flag and resolving the JSX icon by `type`. Drift between the
+ * registry and the settings UI is impossible by construction (and asserted by a
+ * test). Callers may filter on `implemented` for the Available vs Coming Soon
+ * sections.
+ */
+export function catalogForSettings(): IntegrationDef[] {
+  registerConnectors();
+  const fromRegistry: IntegrationDef[] = integrationRegistry.catalog().map((c) => ({
+    type: c.type,
+    name: c.displayName,
+    description: c.description,
+    icon: INTEGRATION_ICONS[c.type] ?? FALLBACK_ICON,
+    implemented: c.status === "available",
+  }));
+  return [...STATIC_AVAILABLE, ...fromRegistry];
+}
+
+export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = catalogForSettings().filter(
+  (i) => i.implemented,
+);
+
+export const COMING_SOON_INTEGRATIONS: IntegrationDef[] = catalogForSettings().filter(
+  (i) => !i.implemented,
+);
 
 export interface ConnectedIntegration {
   id: string;
