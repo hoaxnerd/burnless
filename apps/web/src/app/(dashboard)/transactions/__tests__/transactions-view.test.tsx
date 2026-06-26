@@ -71,7 +71,7 @@ describe("TransactionsView", () => {
     const withIntegration: TransactionsPayload = {
       data: [
         // one manual row → should have Edit + Delete buttons
-        base.data[0],
+        base.data[0]!,
         // one integration (Stripe-synced) row → read-only, no Edit/Delete
         {
           id: "t3",
