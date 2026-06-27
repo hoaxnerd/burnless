@@ -67,6 +67,43 @@ describe("TransactionsView", () => {
     expect(captured.limits.at(-1)).toBe(100);
   });
 
+  it("renders integration-source rows with a badge and no edit/delete affordances", () => {
+    const withIntegration: TransactionsPayload = {
+      data: [
+        // one manual row → should have Edit + Delete buttons
+        base.data[0]!,
+        // one integration (Stripe-synced) row → read-only, no Edit/Delete
+        {
+          id: "t3",
+          companyId: "c1",
+          accountId: "acc-1",
+          date: "2026-01-03",
+          amount: "299.00",
+          description: "Stripe revenue sync",
+          vendor: "Stripe",
+          notes: null,
+          source: "integration",
+          externalId: "stripe_ch_xxx",
+          metadata: null,
+          createdAt: "2026-01-03",
+          updatedAt: "2026-01-03",
+        },
+      ],
+      pagination: { hasMore: false, nextCursor: null, count: 2 },
+    };
+    render(<TransactionsView companyId="c1" accounts={accounts} initialData={withIntegration} scenarioActive={false} />);
+
+    // 1. The integration row renders (description is visible)
+    expect(screen.getByText("Stripe revenue sync")).toBeTruthy();
+
+    // 2. The SourcePill renders the "integration" label (uppercased via CSS, text node is lowercase)
+    expect(screen.getByText("integration")).toBeTruthy();
+
+    // 3. Only the manual row gets Edit/Delete buttons — the integration row gets none
+    expect(screen.getAllByRole("button", { name: /edit transaction/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /delete transaction/i })).toHaveLength(1);
+  });
+
   it("links to the accounts page (forward nav, mirrors Funding → cap table)", () => {
     const { rerender } = render(
       <TransactionsView companyId="c1" accounts={accounts} initialData={base} scenarioActive={false} />,

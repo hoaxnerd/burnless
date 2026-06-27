@@ -16,6 +16,7 @@ import { Pencil, Trash2, Wallet } from "lucide-react";
 import { DataTable, Button, Input, Select, useConfirm } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
 import { useTransactions, type TransactionRow, type TransactionsPayload } from "@/lib/swr";
+import { integrationNameFromExternalId } from "@/lib/integrations/registry";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "@/lib/pagination";
 import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
@@ -29,8 +30,10 @@ interface TransactionsViewProps {
 }
 
 /** Reuse-only source pill — no @/components/ui badge component exists, so a
- *  token-styled <span> (matches the expense-table flag pills). NOT a new component. */
-function SourcePill({ source }: { source: TransactionRow["source"] }) {
+ *  token-styled <span> (matches the expense-table flag pills). NOT a new component.
+ *  Integration rows show the specific provider (e.g. "Stripe", derived from the
+ *  externalId prefix) rather than the generic "integration" label. */
+function SourcePill({ source, externalId }: { source: TransactionRow["source"]; externalId: TransactionRow["externalId"] }) {
   const cls =
     source === "manual"
       ? "bg-surface-100 text-surface-600"
@@ -39,9 +42,10 @@ function SourcePill({ source }: { source: TransactionRow["source"] }) {
         : source === "integration"
           ? "bg-violet-50 text-violet-600"
           : "bg-amber-50 text-amber-600";
+  const label = source === "integration" ? integrationNameFromExternalId(externalId) ?? source : source;
   return (
     <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium uppercase ${cls}`}>
-      {source}
+      {label}
     </span>
   );
 }
@@ -120,7 +124,7 @@ export function TransactionsView({ companyId: _companyId, accounts, initialData,
       render: (r: TransactionRow) => <span className="tabular-nums">{fmtCurrency(Number(r.amount))}</span>,
       sortValue: (r: TransactionRow) => Number(r.amount),
     },
-    { key: "source", header: "Source", render: (r: TransactionRow) => <SourcePill source={r.source} /> },
+    { key: "source", header: "Source", render: (r: TransactionRow) => <SourcePill source={r.source} externalId={r.externalId} /> },
     {
       key: "actions",
       header: "",

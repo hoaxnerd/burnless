@@ -3,6 +3,7 @@ import type { SystemJob } from "./types";
 import { cleanupExpiredData } from "@/lib/data-retention";
 import { runWeeklyDigest } from "@/lib/cron/weekly-digest";
 import { runBatchRegenerate } from "@/lib/cron/batch-regenerate";
+import { runAllIntegrationSyncs } from "@/lib/integrations/run-all-syncs";
 
 /**
  * Operational jobs registered in code (NOT in the scheduledJobs table). The
@@ -35,6 +36,14 @@ export const SYSTEM_JOBS: SystemJob[] = [
     run: async () => {
       const r = await runBatchRegenerate();
       return { ok: true, summary: `Regenerated ${r.processed} stale insight(s)` };
+    },
+  },
+  {
+    id: "integration-sync",
+    schedule: "0 * * * *", // hourly
+    run: async () => {
+      const r = await runAllIntegrationSyncs();
+      return { ok: true, summary: `Synced ${r.synced} integration(s), ${r.failed} failed` };
     },
   },
 ];

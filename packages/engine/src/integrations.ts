@@ -1,3 +1,11 @@
+/**
+ * @deprecated Legacy integration catalog stubs. The authoritative integration registry
+ * now lives at `apps/web/src/lib/integrations/registry.ts` (IntegrationConnector + IntegrationRegistry).
+ * Do NOT add new connectors here — register them on the app-level registry instead.
+ * Kept temporarily because removing these exports ripples through @burnless/engine's public API;
+ * a clean deletion is a separate follow-up once confirmed no runtime consumers remain.
+ */
+
 // Integration provider framework
 // Pure TypeScript plugin interface for data integrations — no DB dependencies.
 

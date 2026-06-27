@@ -1,92 +1,5 @@
-import {
-  BookOpen,
-  FileSpreadsheet,
-  Landmark,
-  CreditCard,
-  Building2,
-  DollarSign,
-} from "lucide-react";
 import { CURRENCIES, DATA_REGIONS, type DataRegion } from "@burnless/types";
 import type { Capabilities } from "@/lib/capabilities";
-
-export interface IntegrationDef {
-  type: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  href?: string;
-  implemented: boolean;
-}
-
-export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = [
-  {
-    type: "csv_import",
-    name: "CSV Import",
-    description: "Import transactions from bank statements and spreadsheets",
-    icon: <FileSpreadsheet className="h-5 w-5" />,
-    href: "/import",
-    implemented: true,
-  },
-];
-
-export const COMING_SOON_INTEGRATIONS: IntegrationDef[] = [
-  {
-    type: "stripe",
-    name: "Stripe",
-    description: "Sync revenue and payment data from Stripe",
-    icon: <CreditCard className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "plaid",
-    name: "Plaid",
-    description: "Connect bank accounts directly for transaction import",
-    icon: <Landmark className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "quickbooks",
-    name: "QuickBooks",
-    description: "Sync your QuickBooks accounting data automatically",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "xero",
-    name: "Xero",
-    description: "Connect your Xero accounting for real-time sync",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "freshbooks",
-    name: "FreshBooks",
-    description: "Import invoices and expenses from FreshBooks",
-    icon: <BookOpen className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "mercury",
-    name: "Mercury",
-    description: "Sync your Mercury banking transactions automatically",
-    icon: <Building2 className="h-5 w-5" />,
-    implemented: false,
-  },
-  {
-    type: "gusto",
-    name: "Gusto",
-    description: "Import payroll data and employee costs from Gusto",
-    icon: <DollarSign className="h-5 w-5" />,
-    implemented: false,
-  },
-];
-
-export interface ConnectedIntegration {
-  id: string;
-  type: string;
-  status: string;
-  lastSyncAt: string | null;
-}
 
 export interface CompanyProfile {
   name: string;
@@ -168,7 +81,6 @@ export const tabs = [
   // (two-gates contract); the company-level writeMode default is `confirm`.
   { key: "ai" as const, label: "AI Features" },
   { key: "ai-dashboard" as const, label: "AI Dashboard" },
-  { key: "integrations" as const, label: "Integrations" },
   { key: "invite-codes" as const, label: "Invite Codes" },
   { key: "billing" as const, label: "Billing" },
 ];

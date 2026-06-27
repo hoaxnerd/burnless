@@ -14,7 +14,7 @@ export const EDITION_PRESETS: Record<Edition, Capabilities> = {
   self_host: {
     marketingSite: false, billing: false, multiTenant: false, selfServeSignup: false,
     oauthLogin: false, autoLogin: true, stdioMcp: true, planEnforcement: false,
-    emailVerification: false, managedAiProvider: false, integrations: false,
+    emailVerification: false, managedAiProvider: false, integrations: true,
     inviteCodes: false, semanticSearch: false, dataResidency: false,
     // Filesystem-backed; cloud/DB-backed skills are a later consumer.
     skills: true,
