@@ -25,7 +25,7 @@ export interface IntegrationDef {
 // NAME string; the tiles need JSX, so we keep one icon map keyed by `type` and
 // look up the rendered glyph by type. The only non-connector entry is the static
 // CSV-import tile (it is not a registry connector — it is a first-party import
-// surface), which we prepend.
+// surface), which we append so the live connectors (e.g. Stripe) lead the list.
 
 /** Static, always-available entries that are NOT registry connectors. */
 const STATIC_AVAILABLE: IntegrationDef[] = [
@@ -53,8 +53,8 @@ const INTEGRATION_ICONS: Record<string, React.ReactNode> = {
 const FALLBACK_ICON = <Plug className="h-5 w-5" />;
 
 /**
- * Source of truth for the Integrations catalog. Merges the static CSV-import
- * entry with every connector from `integrationRegistry.catalog()`, mapping the
+ * Source of truth for the Integrations catalog. Merges every connector from
+ * `integrationRegistry.catalog()` with the static CSV-import entry, mapping the
  * registry's `status` ("available" | "coming_soon") to the UI's `implemented`
  * flag and resolving the JSX icon by `type`. Drift between the registry and the
  * integrations UI is impossible by construction (and asserted by a test).
@@ -69,7 +69,7 @@ export function integrationsCatalog(): IntegrationDef[] {
     icon: INTEGRATION_ICONS[c.type] ?? FALLBACK_ICON,
     implemented: c.status === "available",
   }));
-  return [...STATIC_AVAILABLE, ...fromRegistry];
+  return [...fromRegistry, ...STATIC_AVAILABLE];
 }
 
 export const AVAILABLE_INTEGRATIONS: IntegrationDef[] = integrationsCatalog().filter(

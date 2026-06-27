@@ -37,6 +37,10 @@ export function IntegrationsTab({
 }: IntegrationsTabProps) {
   // Task 12: the coming-soon (cloud-only) integration tiles are gated.
   const caps = useCapabilities();
+  // Only show the "Available" / "Coming Soon" section headings when there is a
+  // Coming Soon section to distinguish from. With no coming-soon connectors
+  // registered, the list is a single ungrouped set — labelling it is redundant.
+  const hasComingSoon = caps.integrations && COMING_SOON_INTEGRATIONS.length > 0;
   // The Stripe connect card is opened inline from the Stripe row's "Connect"
   // affordance (which still deep-links to /connections?tab=integrations&connect=stripe
   // for parity), or on mount when `autoOpenConnect` reflects ?connect=stripe.
@@ -47,7 +51,9 @@ export function IntegrationsTab({
     <div className="max-w-3xl space-y-8">
       {/* Available Integrations */}
       <div>
-        <h2 className="text-sm font-semibold text-surface-900 mb-3">Available</h2>
+        {hasComingSoon && (
+          <h2 className="text-sm font-semibold text-surface-900 mb-3">Available</h2>
+        )}
         <div className="space-y-3">
           {AVAILABLE_INTEGRATIONS.map((integration) => {
             const status = getIntegrationStatus(integration.type, integration.implemented);
@@ -176,8 +182,10 @@ export function IntegrationsTab({
         </div>
       </div>
 
-      {/* Coming Soon Integrations — Task 12: gated on integrations capability */}
-      {caps.integrations && (
+      {/* Coming Soon — only when coming-soon connectors are registered (gated on
+          the integrations capability too). When absent, the "Available" heading
+          above is dropped as well — no need to label a single ungrouped list. */}
+      {hasComingSoon && (
       <div>
         <h2 className="text-sm font-semibold text-surface-500 mb-3">Coming Soon</h2>
         <div className="space-y-3">
