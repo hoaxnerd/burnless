@@ -1,7 +1,7 @@
 import type { Command } from "commander";
-import { green, red } from "../ansi";
+import { green, red, yellow } from "../ansi";
 import { runAction } from "../context";
-import { doctor } from "../local/preflight";
+import { doctor, hasFatalFailure } from "../local/preflight";
 
 /** `burnless doctor` — deep preflight (spec §3). */
 export function registerDoctor(program: Command): void {
@@ -19,10 +19,15 @@ export function registerDoctor(program: Command): void {
             process.stdout.write(JSON.stringify({ checks }) + "\n");
           } else {
             for (const c of checks) {
-              process.stderr.write(`${c.ok ? green("✓") : red("✗")} ${c.name}: ${c.detail}\n`);
+              // A non-fatal failing check (port busy / key to be generated) shows as a
+              // warning, not an error — it never blocks an update.
+              const mark = c.ok ? green("✓") : c.fatal === false ? yellow("⚠") : red("✗");
+              process.stderr.write(`${mark} ${c.name}: ${c.detail}\n`);
             }
           }
-          if (checks.some((c) => !c.ok)) process.exitCode = 1;
+          // Exit non-zero only on a fatal failure (node / db driver). `update` execs this
+          // (`doctor --json`) as its post-swap gate, so a busy port must not roll back.
+          if (hasFatalFailure(checks)) process.exitCode = 1;
         },
         { allowMissingProfile: true },
       );
