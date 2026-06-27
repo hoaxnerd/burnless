@@ -29,6 +29,21 @@ export interface CheckResult {
   name: string;
   ok: boolean;
   detail: string;
+  /** When `false`, a failing (ok:false) check is informational — it is reported but does
+   *  NOT make a doctor/health-probe run "fatal". Port contention and a not-yet-generated
+   *  secrets key are surfaced but must never block the `update` post-swap gate (the old
+   *  instance still holds the port during an update; the key is created on first start).
+   *  `start` enforces the port independently — it must bind — so a busy port still blocks
+   *  `start`. Defaults to fatal when omitted. */
+  fatal?: boolean;
+}
+
+/** The post-swap gate's contract: a doctor/health run is "fatal" only when a check both
+ *  failed and is not flagged `fatal:false`. The new fat-artifact is unhealthy only on real
+ *  problems (node / db driver) — never on a busy port or a first-start-generated key. This
+ *  is what `burnless update` execs (`doctor --json`) to decide keep-vs-rollback. */
+export function hasFatalFailure(checks: CheckResult[]): boolean {
+  return checks.some((c) => !c.ok && c.fatal !== false);
 }
 
 export function isPortFree(port: number, host: string): Promise<boolean> {
@@ -53,6 +68,9 @@ function keyCheck(home?: string): CheckResult {
   return {
     name: "secrets_key",
     ok: present,
+    // Non-fatal: an absent key is generated on first start, so it must not fail the
+    // post-swap gate (mirrors `start`, which already excludes secrets_key from preflight).
+    fatal: false,
     detail: present ? "SECRETS_ENCRYPTION_KEY resolved" : "will be generated on first start",
   };
 }
@@ -85,6 +103,10 @@ export async function doctor(opts: PreflightOptions): Promise<CheckResult[]> {
     {
       name: "port",
       ok: free,
+      // Non-fatal for the health probe: during `update` the OLD instance still holds the
+      // port, so a busy port is expected and must NOT trigger a rollback. `start` enforces
+      // the port separately (it has to bind), so a busy port still blocks `start`.
+      fatal: false,
       detail: free ? `${opts.host}:${opts.port} is free` : `${opts.host}:${opts.port} is in use`,
     },
   ];

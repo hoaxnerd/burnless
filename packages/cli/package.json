@@ -1,6 +1,6 @@
 {
   "name": "burnless",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The Burnless CLI — drive your Burnless instance from the terminal over MCP",
   "license": "Apache-2.0",
   "type": "module",
@@ -20,7 +20,8 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build && node ./scripts/assert-dist-version.mjs"
   },
   "comment": "No runtime dependencies: tsup bundles everything into dist/ (the thin bin imports only Node built-ins). The packages below are build-time only, hence devDependencies — keeping them out of the published runtime deps (workspace:* refs are unresolvable on npm).",
   "devDependencies": {
