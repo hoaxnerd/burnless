@@ -142,7 +142,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1.5 text-sm text-surface-500">
-          Manage your company, integrations, and billing
+          Manage your company, AI, and billing
         </p>
       </div>
 
