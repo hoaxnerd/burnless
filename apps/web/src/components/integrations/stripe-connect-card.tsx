@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Unplug, Loader2, AlertCircle } from "lucide-react";
+import { Check, Unplug, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Input, Button } from "@/components/ui";
 import { apiFetch } from "@/lib/api-fetch";
 import { useLocale } from "@/components/locale/locale-context";
@@ -44,6 +44,8 @@ export function StripeConnectCard({ onConnected, connected, onDisconnect }: Stri
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   const scopes = scopesFromHelp(credentialField?.help);
   const keyLabel = credentialField?.label ?? "Restricted API key";
@@ -71,6 +73,33 @@ export function StripeConnectCard({ onConnected, connected, onDisconnect }: Stri
     }
   }
 
+  /** Trigger an immediate incremental sync, then revalidate so "Last synced"
+   *  (and any new rows) refresh. POST carries no body — the route uses the
+   *  stored cursor. */
+  async function sync() {
+    setSyncing(true);
+    setSyncNote(null);
+    try {
+      const res = await apiFetch("/api/integrations/sync/stripe", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSyncNote(data?.error ?? "Sync failed. Try again.");
+        return;
+      }
+      const inserted = typeof data?.inserted === "number" ? data.inserted : 0;
+      setSyncNote(
+        inserted > 0
+          ? `Synced — ${inserted} new transaction${inserted === 1 ? "" : "s"}.`
+          : "Already up to date.",
+      );
+      onConnected();
+    } catch {
+      setSyncNote("Couldn't reach the server. Try again.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   // ── Connected view ────────────────────────────────────────────────────────
   if (connected) {
     return (
@@ -95,14 +124,26 @@ export function StripeConnectCard({ onConnected, connected, onDisconnect }: Stri
             <span>Last sync failed: {connected.lastError}</span>
           </div>
         )}
-        <Button
-          variant="danger"
-          size="sm"
-          icon={<Unplug className="h-3.5 w-3.5" />}
-          onClick={() => onDisconnect?.(connected.id)}
-        >
-          Disconnect
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={syncing}
+            icon={<RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />}
+            onClick={sync}
+          >
+            {syncing ? "Syncing…" : "Sync now"}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={<Unplug className="h-3.5 w-3.5" />}
+            onClick={() => onDisconnect?.(connected.id)}
+          >
+            Disconnect
+          </Button>
+        </div>
+        {syncNote && <p className="text-xs text-surface-500">{syncNote}</p>}
       </div>
     );
   }

@@ -21,9 +21,14 @@ async function validate(creds: Record<string, string>): Promise<ValidateResult> 
 // originating charge/refund description. `.list()` auto-paginates under `for await`
 // (every page fetched lazily — never buffered into an array). Each txn yields 0/1/2
 // mapped records via the pure mapper.
+// Expand `data.source` (the originating charge/refund/dispute — for description)
+// and `data.source.customer` (the paying customer — for vendor attribution).
+// The customer expand is ignored on sources that have no customer field.
+const EXPAND = ["data.source", "data.source.customer"];
+
 async function* backfill(ctx: SyncCtx): AsyncIterable<MappedRecord> {
   const stripe = await getStripe(ctx.apiKey);
-  const params: Stripe.BalanceTransactionListParams = { limit: 100, expand: ["data.source"] };
+  const params: Stripe.BalanceTransactionListParams = { limit: 100, expand: EXPAND };
   for await (const txn of stripe.balanceTransactions.list(params)) yield* mapBalanceTransaction(txn);
 }
 
@@ -32,8 +37,8 @@ async function* incremental(ctx: SyncCtx, cursor: SyncCursor): AsyncIterable<Map
   // `gt` is strictly greater-than the high-water mark (unix seconds) so the
   // last-seen txn isn't re-emitted; a null cursor means a full incremental sweep.
   const params: Stripe.BalanceTransactionListParams = cursor
-    ? { limit: 100, expand: ["data.source"], created: { gt: cursor.created } }
-    : { limit: 100, expand: ["data.source"] };
+    ? { limit: 100, expand: EXPAND, created: { gt: cursor.created } }
+    : { limit: 100, expand: EXPAND };
   for await (const txn of stripe.balanceTransactions.list(params)) yield* mapBalanceTransaction(txn);
 }
 

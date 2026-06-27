@@ -35,6 +35,24 @@ function toMajor(minor: number, currency: string): number {
   return minor / 100;
 }
 
+/** Counterparty name for a charge-like source (the paying customer). Reads only
+ *  fields available on the expanded `source` (the connector expands
+ *  `data.source` and `data.source.customer`): the card's billing name, then the
+ *  customer's name, then any email. Returns null when none are present. */
+function customerVendor(source: Stripe.BalanceTransaction["source"]): string | null {
+  const s = source as {
+    billing_details?: { name?: string | null } | null;
+    customer?: unknown;
+    receipt_email?: string | null;
+  } | null;
+  if (!s) return null;
+  const cust =
+    s.customer && typeof s.customer === "object"
+      ? (s.customer as { name?: string | null; email?: string | null })
+      : null;
+  return s.billing_details?.name ?? cust?.name ?? s.receipt_email ?? cust?.email ?? null;
+}
+
 export function mapBalanceTransaction(txn: Stripe.BalanceTransaction): MappedRecord[] {
   const category = txn.reporting_category;
 
@@ -52,6 +70,9 @@ export function mapBalanceTransaction(txn: Stripe.BalanceTransaction): MappedRec
     exchangeRate: txn.exchange_rate,
     feeDetails: txn.fee_details,
   };
+  // Counterparty for charge-like rows = the paying customer; processing fees are
+  // paid to "Stripe" (set per-record below).
+  const vendor = customerVendor(txn.source);
 
   switch (category) {
     case "charge":
@@ -64,12 +85,14 @@ export function mapBalanceTransaction(txn: Stripe.BalanceTransaction): MappedRec
           amount: toMajor(txn.amount, currency),
           currency,
           description,
+          vendor,
           categoryHint: "revenue",
           metadata,
         },
       ];
       // (b) fee expense — Stripe `fee` is a POSITIVE integer; emit as a negative
-      //     major-unit expense. Only when there's actually a fee.
+      //     major-unit expense. Only when there's actually a fee. Vendor = Stripe
+      //     (the fee is money paid to the processor, not the customer).
       if (txn.fee > 0) {
         records.push({
           externalId: `stripe:${txn.id}:fee`,
@@ -77,6 +100,7 @@ export function mapBalanceTransaction(txn: Stripe.BalanceTransaction): MappedRec
           amount: -toMajor(txn.fee, currency),
           currency,
           description,
+          vendor: "Stripe",
           categoryHint: "payment_processing_fees",
           metadata,
         });
@@ -85,20 +109,20 @@ export function mapBalanceTransaction(txn: Stripe.BalanceTransaction): MappedRec
     }
 
     case "refund": {
-      // net is already signed (refund net < 0).
-      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, categoryHint: "refund", metadata }];
+      // net is already signed (refund net < 0). Counterparty = the refunded customer.
+      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, vendor, categoryHint: "refund", metadata }];
     }
 
     case "dispute":
     case "dispute_reversal": {
       // dispute net < 0 (loss); dispute_reversal net > 0 (recovery). Both carry
       // the "dispute" hint — sign distinguishes them.
-      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, categoryHint: "dispute", metadata }];
+      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, vendor, categoryHint: "dispute", metadata }];
     }
 
     case "fee": {
-      // standalone stripe_fee / stripe_fx_fee — net already signed negative.
-      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, categoryHint: "payment_processing_fees", metadata }];
+      // standalone stripe_fee / stripe_fx_fee — net already signed negative. Paid to Stripe.
+      return [{ externalId: `stripe:${txn.id}`, date, amount: toMajor(txn.net, currency), currency, description, vendor: "Stripe", categoryHint: "payment_processing_fees", metadata }];
     }
 
     default:

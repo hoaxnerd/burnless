@@ -25,3 +25,17 @@ export function registerConnectors(): void {
   registered = true;
   integrationRegistry.register(stripeConnector);
 }
+
+/** Display name of the integration that produced an externalId like
+ *  "stripe:txn_…" (the prefix before the first colon). Returns null for
+ *  non-integration externalIds (e.g. "import:…") or unknown providers, so
+ *  callers can fall back to the generic source label. */
+export function integrationNameFromExternalId(
+  externalId: string | null | undefined,
+): string | null {
+  if (!externalId) return null;
+  const prefix = externalId.split(":")[0];
+  if (!prefix) return null;
+  registerConnectors();
+  return integrationRegistry.get(prefix)?.displayName ?? null;
+}

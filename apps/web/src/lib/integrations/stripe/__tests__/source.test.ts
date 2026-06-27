@@ -74,9 +74,9 @@ describe("stripeConnector.source.backfill", () => {
     expect(records[0]).toMatchObject({ externalId: "stripe:txn_charge1", categoryHint: "revenue" });
     expect(records[1]).toMatchObject({ externalId: "stripe:txn_charge1:fee", categoryHint: "payment_processing_fees" });
 
-    // auto-paginates over balance_transactions, expanding the source.
+    // auto-paginates over balance_transactions, expanding the source + its customer.
     expect(list).toHaveBeenCalledTimes(1);
-    expect(captured).toMatchObject({ limit: 100, expand: ["data.source"] });
+    expect(captured).toMatchObject({ limit: 100, expand: ["data.source", "data.source.customer"] });
     expect(captured).not.toHaveProperty("created");
   });
 });
@@ -97,7 +97,7 @@ describe("stripeConnector.source.incremental", () => {
     expect(list).toHaveBeenCalledTimes(1);
     expect(captured).toMatchObject({
       limit: 100,
-      expand: ["data.source"],
+      expand: ["data.source", "data.source.customer"],
       created: { gt: 1_699_999_999 },
     });
   });
@@ -114,7 +114,7 @@ describe("stripeConnector.source.incremental", () => {
 
     expect(records).toHaveLength(2);
     expect(list).toHaveBeenCalledTimes(1);
-    expect(captured).toMatchObject({ limit: 100, expand: ["data.source"] });
+    expect(captured).toMatchObject({ limit: 100, expand: ["data.source", "data.source.customer"] });
     expect(captured).not.toHaveProperty("created");
   });
 });

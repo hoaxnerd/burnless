@@ -178,4 +178,58 @@ describe("mapBalanceTransaction", () => {
     );
     expect(out[0]!.date).toEqual(new Date(1_650_000_000 * 1000));
   });
+
+  // ── vendor (counterparty) attribution ─────────────────────────────────────
+  it("vendor: charge gross is the payer (billing name); the fee row is Stripe", () => {
+    const out = mapBalanceTransaction(
+      bt({
+        id: "txn_v1", reporting_category: "charge", amount: 10000, fee: 320, net: 9680,
+        source: { billing_details: { name: "Ada Lovelace" } } as unknown as Stripe.BalanceTransaction["source"],
+      }),
+    );
+    expect(out[0]!.vendor).toBe("Ada Lovelace"); // gross revenue → the customer
+    expect(out[1]!.vendor).toBe("Stripe");       // processing fee → paid to Stripe
+  });
+
+  it("vendor: falls back to expanded customer name, then email", () => {
+    const byCustomer = mapBalanceTransaction(
+      bt({
+        id: "txn_v2", reporting_category: "charge", amount: 5000, net: 5000,
+        source: { customer: { name: "Acme Inc", email: "ap@acme.test" } } as unknown as Stripe.BalanceTransaction["source"],
+      }),
+    );
+    expect(byCustomer[0]!.vendor).toBe("Acme Inc");
+
+    const byEmail = mapBalanceTransaction(
+      bt({
+        id: "txn_v3", reporting_category: "charge", amount: 5000, net: 5000,
+        source: { receipt_email: "buyer@acme.test" } as unknown as Stripe.BalanceTransaction["source"],
+      }),
+    );
+    expect(byEmail[0]!.vendor).toBe("buyer@acme.test");
+  });
+
+  it("vendor: null when the source carries no counterparty", () => {
+    const out = mapBalanceTransaction(
+      bt({ id: "txn_v4", reporting_category: "charge", amount: 2500, net: 2500 }),
+    );
+    expect(out[0]!.vendor).toBeNull();
+  });
+
+  it("vendor: standalone fee is attributed to Stripe", () => {
+    const out = mapBalanceTransaction(
+      bt({ id: "txn_v5", reporting_category: "fee", amount: -1200, net: -1200 }),
+    );
+    expect(out[0]!.vendor).toBe("Stripe");
+  });
+
+  it("vendor: refund uses the customer when the source carries one", () => {
+    const out = mapBalanceTransaction(
+      bt({
+        id: "txn_v6", reporting_category: "refund", amount: -5000, net: -5000,
+        source: { billing_details: { name: "Ada Lovelace" } } as unknown as Stripe.BalanceTransaction["source"],
+      }),
+    );
+    expect(out[0]!.vendor).toBe("Ada Lovelace");
+  });
 });
