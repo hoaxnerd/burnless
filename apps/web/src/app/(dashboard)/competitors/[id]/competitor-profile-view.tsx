@@ -20,7 +20,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, RefreshCw } from "lucide-react";
 import { DataTable, Button, WidgetCard } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
-import { formatCurrency, type CurrencyCode } from "@burnless/types";
+import { formatCurrency, isValidCurrency, type CurrencyCode } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
 import {
@@ -198,7 +198,7 @@ export function CompetitorProfileView({
       render: (p: PlanDto) => (
         <span className="text-surface-900">
           {p.price.amount != null
-              ? formatCurrency(p.price.amount, ((p.price.currency as CurrencyCode) ?? currency), locale)
+              ? formatCurrency(p.price.amount, (isValidCurrency(p.price.currency ?? "") ? p.price.currency as CurrencyCode : currency), locale)
               : "—"}
           {p.price.period ? (
             <span className="text-surface-500">{` / ${p.price.period}`}</span>
