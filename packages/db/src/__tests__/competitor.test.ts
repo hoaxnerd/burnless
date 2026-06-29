@@ -34,7 +34,7 @@ describe("competitor queries", () => {
   it("creates and lists competitors scoped by company", async () => {
     await createCompetitor({ companyId, name: "Acme", url: "https://acme.com" });
     const list = await listCompetitors(companyId);
-    expect(list.length).toBeGreaterThanOrEqual(1);
+    expect(list).toHaveLength(1);
     expect(list.some((c) => c.name === "Acme")).toBe(true);
   });
 
@@ -63,7 +63,7 @@ describe("competitor queries", () => {
     });
     const due = await getDueSources(new Date());
     // lastRunAt is null → due immediately
-    expect(due.length).toBeGreaterThanOrEqual(1);
+    expect(due).toHaveLength(1);
   });
 
   it("insertSnapshot + getLatestSnapshot returns the most recent by source", async () => {
@@ -106,7 +106,7 @@ describe("competitor queries", () => {
       },
     ]);
     const changes = await listChanges(companyId);
-    expect(changes.length).toBeGreaterThanOrEqual(1);
+    expect(changes).toHaveLength(1);
     expect(changes.some((ch) => ch.changeType === "price_increase")).toBe(true);
   });
 
