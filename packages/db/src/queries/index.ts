@@ -3,6 +3,7 @@ export {
   getUserWithCompany,
   getCompanyById,
   listCompaniesForUser,
+  getCompanyNotifyUserIds,
 } from "./company";
 
 export {

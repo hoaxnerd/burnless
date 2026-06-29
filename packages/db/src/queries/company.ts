@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { companies, companyMembers, users } from "../schema";
 
@@ -46,6 +46,24 @@ export async function getCompanyById(companyId: string) {
     .where(eq(companies.id, companyId))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Return the userIds of all owner and admin members for a company.
+ * Used to fan-out notifications (e.g. competitor change alerts) to the right
+ * recipients without exposing editor/viewer members to ops events.
+ */
+export async function getCompanyNotifyUserIds(companyId: string): Promise<string[]> {
+  const rows = await db
+    .select({ userId: companyMembers.userId })
+    .from(companyMembers)
+    .where(
+      and(
+        eq(companyMembers.companyId, companyId),
+        inArray(companyMembers.role, ["owner", "admin"]),
+      ),
+    );
+  return rows.map((r) => r.userId);
 }
 
 /** All memberships of a user with company display fields — used by the OAuth
