@@ -16,7 +16,8 @@ export const GET = withErrorHandler(async (
 
   const url = new URL(request.url);
   const limitParam = url.searchParams.get("limit");
-  const limit = limitParam ? Math.max(1, parseInt(limitParam, 10)) : 50;
+  const parsed = parseInt(limitParam ?? "", 10);
+  const limit = Number.isFinite(parsed) ? Math.max(1, parsed) : 50;
 
   const changes = await listChanges(ctx.companyId, { competitorId: id, limit });
   return NextResponse.json({ changes });
