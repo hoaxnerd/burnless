@@ -40,6 +40,7 @@ import { transactionSchemas, transactionHandlers } from "./transactions";
 import { companyKnowledgeSchemas, companyKnowledgeHandlers } from "./company-knowledge";
 import { skillsSchemas, skillsHandlers } from "./skills";
 import { calculateSchemas, calculateHandlers } from "./calculate";
+import { competitorSchemas, competitorHandlers } from "./competitor";
 // NOTE: "./mcp-describe" only — "./mcp" pulls next-auth via ai-feature-flags
 // and is loaded lazily inside executeToolCall instead.
 import { describeMcpToolAction } from "./mcp-describe";
@@ -79,6 +80,7 @@ const toolSchemas: Record<string, z.ZodType> = {
   ...companyKnowledgeSchemas,
   ...skillsSchemas,
   ...calculateSchemas,
+  ...competitorSchemas,
 };
 
 const toolHandlers: Record<string, ToolHandler> = {
@@ -95,6 +97,7 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...companyKnowledgeHandlers,
   ...skillsHandlers,
   ...calculateHandlers,
+  ...competitorHandlers,
 };
 
 // ── Mutation tagging (for guardrail enforcement) ────────────────────────────
