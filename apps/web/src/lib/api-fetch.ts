@@ -10,7 +10,7 @@
  * so reintroduces a second, drift-prone source (a stale server-rendered prop or
  * a per-tab sessionStorage value) and causes spurious 409 ScenarioSafetyErrors.
  */
-import { publishMutation, domainFromUrl, FINANCIAL_DOMAINS } from "./mutation-bus";
+import { publishMutation, domainFromUrl, FINANCIAL_DOMAINS, COMPETITOR_DOMAINS } from "./mutation-bus";
 
 const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
@@ -31,10 +31,13 @@ export async function apiFetch(
   try {
     const method = (init?.method ?? "GET").toUpperCase();
     const domain = domainFromUrl(url);
-    // Emit only financial-data mutations. Non-financial endpoints (notably the
-    // insights regen POST itself) map to "other" and are NOT emitted — this is what
-    // prevents the auto-regen from retriggering the badge/countdown in a loop.
-    if (res.ok && MUTATING.has(method) && FINANCIAL_DOMAINS.has(domain)) {
+    // Emit financial-data mutations AND competitor mutations. Non-financial endpoints
+    // (notably the insights regen POST itself) map to "other" and are NOT emitted —
+    // this is what prevents the auto-regen from retriggering the badge/countdown in a
+    // loop. Competitor mutations are kept separate from FINANCIAL_DOMAINS so competitor
+    // syncs do not reset the AI-insight stale countdown.
+    if (res.ok && MUTATING.has(method) &&
+        (FINANCIAL_DOMAINS.has(domain) || COMPETITOR_DOMAINS.has(domain))) {
       publishMutation({ domain, method, at: Date.now() });
     }
   } catch {
