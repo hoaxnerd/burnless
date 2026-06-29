@@ -58,14 +58,28 @@ function fromDomHeuristic(html: string): Plan[] {
   return plans;
 }
 
+/** A plan is "well-formed" for DOM blocks iff it has a real name (not the generic fallback) AND a numeric price. */
+function isWellFormedDom(p: Plan): boolean {
+  return p.name !== "Plan" && p.price.amount !== null;
+}
+
 export const pricingCollector: Collector = {
   type: "pricing",
   fetch: (source) => httpFetch(source.url),
   parse(raw: RawCapture): ParseResult {
+    // JSON-LD path: keep only Products whose offer has a numeric price.
+    // If JSON-LD Products were found but none have a price → 0.1 (priceless Product, e.g. Sentry-style).
     const jsonld = fromJsonLd(raw.raw);
-    if (jsonld.length > 0) return { structured: { plans: jsonld }, confidence: 0.9 };
+    if (jsonld.length > 0) {
+      const priced = jsonld.filter((p) => p.price.amount !== null);
+      return { structured: { plans: priced }, confidence: priced.length > 0 ? 0.9 : 0.1 };
+    }
+
+    // DOM-heuristic path: keep only blocks with a real name AND a price.
+    // Implausibly many well-formed plans (> 8) = noise, not a real pricing page.
     const dom = fromDomHeuristic(raw.raw);
-    if (dom.length > 0) return { structured: { plans: dom }, confidence: 0.5 };
-    return { structured: { plans: [] }, confidence: 0.1 };
+    const wellFormed = dom.filter(isWellFormedDom);
+    const confidence = wellFormed.length === 0 || wellFormed.length > 8 ? 0.1 : 0.5;
+    return { structured: { plans: wellFormed }, confidence };
   },
 };

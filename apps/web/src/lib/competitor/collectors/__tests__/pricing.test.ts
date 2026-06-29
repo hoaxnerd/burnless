@@ -27,4 +27,20 @@ describe("pricingCollector.parse", () => {
     const r = pricingCollector.parse(cap(fx("pricing-broken.html")), src);
     expect(r.confidence).toBeLessThan(0.4);
   });
+
+  it("returns low confidence for JSON-LD Product without an offer price (no real tiers)", () => {
+    const r = pricingCollector.parse(cap(fx("pricing-jsonld-noprice.html")), src);
+    expect(r.confidence).toBeLessThan(0.4);
+  });
+
+  it("returns low confidence for noisy DOM with many unnamed/implausible plan blocks", () => {
+    const r = pricingCollector.parse(cap(fx("pricing-dom-noise.html")), src);
+    expect(r.confidence).toBeLessThan(0.4);
+  });
+
+  it("still parses a clean 2-tier DOM pricing page with moderate confidence", () => {
+    const r = pricingCollector.parse(cap(fx("pricing-dom.html")), src);
+    expect((r.structured as any).plans.length).toBeGreaterThan(0);
+    expect(r.confidence).toBeGreaterThan(0.3);
+  });
 });
