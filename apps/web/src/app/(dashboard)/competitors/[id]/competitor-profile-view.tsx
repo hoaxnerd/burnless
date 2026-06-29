@@ -8,10 +8,10 @@
  * fallbackData) for a live-updating timeline, and inline token-styled status
  * spans following the StatusPill precedent (no new badge component).
  *
- * Pricing snapshots are competitor-scraped data; prices are rendered ONLY via
- * useLocale().fmtCurrency (the company's configured currency/locale) — never a
- * hardcoded symbol. See the report for the per-plan-currency note: fmtCurrency
- * formats in the company currency by design (the hook takes no currency arg).
+ * Pricing snapshots are competitor-scraped data; prices are rendered via
+ * formatCurrency() from @burnless/types using the plan's OWN scraped currency
+ * (falling back to the company currency) — never a hardcoded symbol and never
+ * forcing the company currency onto a competitor's price.
  */
 
 import { useState } from "react";
@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, RefreshCw } from "lucide-react";
 import { DataTable, Button, WidgetCard } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
+import { formatCurrency, type CurrencyCode } from "@burnless/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { toUserMessage } from "@/lib/api-error";
 import {
@@ -34,7 +35,6 @@ export interface CompetitorProfileDto {
   id: string;
   name: string;
   url: string;
-  status: string;
 }
 
 export interface SourceDto {
@@ -117,7 +117,7 @@ export function CompetitorProfileView({
   initialChanges,
 }: CompetitorProfileViewProps) {
   const router = useRouter();
-  const { fmtCurrency, fmtDate } = useLocale();
+  const { fmtDate, currency, locale } = useLocale();
   const { data, mutate } = useCompetitorChanges(competitor.id, {
     fallbackData: initialChanges,
   });
@@ -197,7 +197,9 @@ export function CompetitorProfileView({
       align: "right" as const,
       render: (p: PlanDto) => (
         <span className="text-surface-900">
-          {p.price.amount != null ? fmtCurrency(p.price.amount) : "—"}
+          {p.price.amount != null
+              ? formatCurrency(p.price.amount, ((p.price.currency as CurrencyCode) ?? currency), locale)
+              : "—"}
           {p.price.period ? (
             <span className="text-surface-500">{` / ${p.price.period}`}</span>
           ) : null}

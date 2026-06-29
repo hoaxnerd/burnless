@@ -70,7 +70,6 @@ async function CompetitorContent({
     id: competitor.id,
     name: competitor.name,
     url: competitor.url,
-    status: competitor.status,
   };
 
   const sourceDtos: SourceDto[] = sources.map((s) => ({
