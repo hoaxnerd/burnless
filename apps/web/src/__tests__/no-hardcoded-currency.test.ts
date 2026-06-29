@@ -49,6 +49,12 @@ const ALLOWED = [
   // static bound labels on range inputs (min/max markers), not user data.
   "apps/web/src/app/(dashboard)/funding/funding-details.tsx",
 
+  // ── Competitor pricing collector ─────────────────────────────────────────
+  // pricing.ts: /(\$|€|EUR|£|GBP)?/ and /(\$|€|£)/ regex patterns used to
+  // PARSE currency symbols from third-party competitor HTML pages.
+  // symbolToCurrency map normalises parsed glyphs to ISO codes. Not display code.
+  "apps/web/src/lib/competitor/collectors/pricing.ts",
+
   // ── CSV import parser ─────────────────────────────────────────────────────
   // import-flow.tsx line 134: /[$,€£()]/ in a regex to STRIP currency
   // characters from user-supplied CSV amounts. Not display code.
