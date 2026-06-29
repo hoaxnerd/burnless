@@ -128,7 +128,7 @@ describe("list_competitor_changes", () => {
         snapshotId: snap!.id,
         companyId,
         changeType: "price_change",
-        summary: "Starter plan dropped from $49 to $39",
+        summary: "Starter plan dropped from 49 to 39",
         severity: "high",
       },
     ]);
