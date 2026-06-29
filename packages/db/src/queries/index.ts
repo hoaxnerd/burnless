@@ -182,6 +182,24 @@ export {
 } from "./oauth";
 
 export {
+  createCompetitor,
+  listCompetitors,
+  getCompetitor,
+  updateCompetitor,
+  deleteCompetitor,
+  createSource,
+  listSources,
+  updateSource,
+  deleteSource,
+  getDueSources,
+  getLatestSnapshot,
+  insertSnapshot,
+  insertChanges,
+  listChanges,
+  ackChange,
+} from "./competitor";
+
+export {
   createScheduledJob,
   getScheduledJob,
   getScheduledJobById,
