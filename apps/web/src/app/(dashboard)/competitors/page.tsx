@@ -3,47 +3,64 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { listCompetitors } from "@burnless/db";
+import { listCompetitors, listSources, listChanges, getLatestSnapshot } from "@burnless/db";
 import { getCompany } from "@/lib/data";
 import { isDomainEnabled } from "@/lib/domain-gating";
 import { SetupPrompt } from "@/components/ui/empty-state";
 import { ReportContentSkeleton } from "@/components/reports/report-skeleton";
-import { CompetitorsView } from "./competitors-view";
-import type { CompetitorsPayload } from "@/lib/swr";
+import { CompetitorsDashboard, type CompetitorCardData } from "./competitors-dashboard";
+import type { CompetitorChangesPayload } from "@/lib/swr";
+import type { CompetitorProfileDto, SourceDto, SnapshotDto } from "./[id]/competitor-profile-view";
+
+const THIRTY_DAYS_MS = 30 * 24 * 3_600_000;
 
 export default async function CompetitorsPage() {
   const company = await getCompany();
   if (!company) return <SetupPrompt context="tracking competitors" />;
-
-  // Page-level domain gate — mirrors the requireDomainEnabled guard the REST
-  // routes use. If the competitor domain is off for this company/deployment,
-  // the route 404s (same surface the disabled nav entry implies).
-  if (!(await isDomainEnabled("competitor", { companyId: company.id }))) {
-    notFound();
-  }
-
+  if (!(await isDomainEnabled("competitor", { companyId: company.id }))) notFound();
   return (
     <Suspense fallback={<ReportContentSkeleton />}>
-      <CompetitorsContent companyId={company.id} />
+      <DashboardContent companyId={company.id} />
     </Suspense>
   );
 }
 
-async function CompetitorsContent({ companyId }: { companyId: string }) {
+async function DashboardContent({ companyId }: { companyId: string }) {
   const competitors = await listCompetitors(companyId);
-  // Shape to the JSON-safe DTO the SWR hook serves (Date → ISO string) so the
-  // SSR seed matches the client fetch exactly and fallbackData applies cleanly.
-  const initialData: CompetitorsPayload = {
-    competitors: competitors.map((c) => ({
-      id: c.id,
-      companyId: c.companyId,
-      name: c.name,
-      url: c.url,
-      status: c.status,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-    })),
-  };
+  const cutoff = Date.now() - THIRTY_DAYS_MS;
 
-  return <CompetitorsView initialData={initialData} />;
+  const cards: CompetitorCardData[] = await Promise.all(
+    competitors.map(async (c) => {
+      const [sources, changesRaw] = await Promise.all([
+        listSources(c.id, companyId),
+        listChanges(companyId, { competitorId: c.id, limit: 50 }),
+      ]);
+      const snapshots = await Promise.all(sources.map((s) => getLatestSnapshot(s.id)));
+
+      const competitor: CompetitorProfileDto = { id: c.id, name: c.name, url: c.url };
+      const sourceDtos: SourceDto[] = sources.map((s) => ({
+        id: s.id, type: s.type, url: s.url, enabled: s.enabled,
+        lastRunAt: s.lastRunAt ? s.lastRunAt.toISOString() : null,
+        lastStatus: s.lastStatus, healthState: s.healthState,
+      }));
+      const latestSnapshots: (SnapshotDto | null)[] = snapshots.map((snap) =>
+        snap ? { id: snap.id, sourceId: snap.sourceId, capturedAt: snap.capturedAt.toISOString(), structured: snap.structured as SnapshotDto["structured"] } : null,
+      );
+      const initialChanges: CompetitorChangesPayload = {
+        changes: changesRaw.map((ch) => ({
+          id: ch.id, competitorId: ch.competitorId, sourceId: ch.sourceId, snapshotId: ch.snapshotId, companyId: ch.companyId,
+          detectedAt: ch.detectedAt.toISOString(), changeType: ch.changeType, summary: ch.summary,
+          before: ch.before as Record<string, unknown> | null, after: ch.after as Record<string, unknown> | null,
+          severity: ch.severity, acknowledgedAt: ch.acknowledgedAt ? ch.acknowledgedAt.toISOString() : null,
+          createdAt: ch.createdAt.toISOString(),
+        })),
+      };
+      const changeCount30d = changesRaw.filter((ch) => ch.detectedAt.getTime() >= cutoff).length;
+      const latestChange = initialChanges.changes[0] ?? null;
+
+      return { competitor, sources: sourceDtos, latestSnapshots, initialChanges, changeCount30d, latestChange };
+    }),
+  );
+
+  return <CompetitorsDashboard cards={cards} />;
 }
