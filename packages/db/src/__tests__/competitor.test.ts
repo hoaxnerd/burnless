@@ -77,6 +77,8 @@ describe("competitor queries", () => {
       rawHash: "h1",
       structured: { v: 1 },
       structuredHash: "sh1",
+      normalized: "n/a",
+      normalizedHash: "n/a",
     });
     const latest = await getLatestSnapshot(s.id);
     expect(latest?.structuredHash).toBe("sh1");
@@ -93,6 +95,8 @@ describe("competitor queries", () => {
       rawHash: "h",
       structured: {},
       structuredHash: "sh",
+      normalized: "n/a",
+      normalizedHash: "n/a",
     });
     await insertChanges([
       {
