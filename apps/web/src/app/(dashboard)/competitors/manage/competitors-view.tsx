@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Swords, Trash2, ExternalLink } from "lucide-react";
+import { Swords, Trash2, ExternalLink, ArrowLeft } from "lucide-react";
 import {
   DataTable,
   Button,
@@ -131,7 +131,14 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Competitors</h1>
+          <Link
+            href="/competitors"
+            className="inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Competitors
+          </Link>
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-surface-900">Competitors</h1>
           <p className="mt-1 text-sm text-surface-500">
             Track competitors and get notified when their pricing or positioning changes
           </p>
@@ -198,6 +205,7 @@ function AddCompetitorModal({
   const [url, setUrl] = useState("");
   const [pricingUrl, setPricingUrl] = useState("");
   const [socialUrl, setSocialUrl] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -209,6 +217,7 @@ function AddCompetitorModal({
       const sources = [
         ...(pricingUrl ? [{ type: "pricing" as const, url: pricingUrl }] : []),
         ...(socialUrl ? [{ type: "social" as const, url: socialUrl }] : []),
+        ...(pageUrl ? [{ type: "page" as const, url: pageUrl }] : []),
       ];
       const res = await apiFetch("/api/competitors", {
         method: "POST",
@@ -261,6 +270,15 @@ function AddCompetitorModal({
           value={socialUrl}
           onChange={(e) => setSocialUrl(e.target.value)}
           placeholder="https://x.com/acme"
+        />
+        <Input
+          label="Watch a page"
+          showOptional
+          type="url"
+          value={pageUrl}
+          onChange={(e) => setPageUrl(e.target.value)}
+          placeholder="https://acme.com/changelog"
+          hint="Any page (changelog, careers, TOS) — we'll alert you when its content changes."
         />
 
         {error && (
