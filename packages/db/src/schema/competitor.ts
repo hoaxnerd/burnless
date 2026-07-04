@@ -84,6 +84,11 @@ export const competitorSnapshots = pgTable(
     rawHash: text("raw_hash").notNull(),
     structured: jsonb("structured").notNull(),
     structuredHash: text("structured_hash").notNull(),
+    // Tier-1 detection floor (spec §4): the normalized visible text + its hash.
+    // Nullable → additive, non-destructive; existing rows keep NULL and re-baseline
+    // once on the next run. Store-on-change now keys on normalizedHash, not rawHash.
+    normalized: text("normalized"),
+    normalizedHash: text("normalized_hash"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [

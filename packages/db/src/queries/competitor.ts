@@ -158,6 +158,8 @@ export async function insertSnapshot(input: {
   rawHash: string;
   structured: unknown;
   structuredHash: string;
+  normalized?: string | null;
+  normalizedHash?: string | null;
 }): Promise<CompetitorSnapshot> {
   const [row] = await db
     .insert(competitorSnapshots)

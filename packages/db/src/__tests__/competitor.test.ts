@@ -115,4 +115,26 @@ describe("competitor queries", () => {
     await deleteCompetitor(c.id, companyId);
     expect(await getCompetitor(c.id, companyId)).toBeUndefined();
   });
+
+  it("round-trips normalized text + hash on a snapshot", async () => {
+    const c = await createCompetitor({ companyId, name: "Acme", url: "https://acme.com" });
+    const s = await createSource({ companyId, competitorId: c.id, type: "pricing", url: "u" });
+    const snap = await insertSnapshot({
+      companyId,
+      competitorId: c.id,
+      sourceId: s.id,
+      raw: "<p>Pro $29</p>",
+      rawHash: "rawhash",
+      structured: { plans: [] },
+      structuredHash: "structhash",
+      normalized: "Pro $29",
+      normalizedHash: "normhash",
+    });
+    expect(snap.normalized).toBe("Pro $29");
+    expect(snap.normalizedHash).toBe("normhash");
+
+    const latest = await getLatestSnapshot(s.id);
+    expect(latest?.normalized).toBe("Pro $29");
+    expect(latest?.normalizedHash).toBe("normhash");
+  });
 });
