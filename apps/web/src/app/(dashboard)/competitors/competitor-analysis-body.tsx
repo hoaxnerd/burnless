@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { DataTable, Button, WidgetCard } from "@/components/ui";
 import { useLocale } from "@/components/locale/locale-context";
@@ -86,6 +87,7 @@ interface Props {
 }
 
 export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, initialChanges }: Props) {
+  const router = useRouter();
   const { fmtDate, currency, locale } = useLocale();
   const { data, mutate } = useCompetitorChanges(competitor.id, { fallbackData: initialChanges });
   const [syncing, setSyncing] = useState(false);
@@ -111,7 +113,12 @@ export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, i
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to sync");
       }
+      // mutate() refreshes the SWR changes timeline; router.refresh() re-runs
+      // the RSC props (source health / last-checked / latest-pricing snapshot),
+      // which don't come from SWR — otherwise "Sync now" leaves them stale
+      // until a manual reload. Correct for both mounts (permalink + dashboard).
       void mutate();
+      router.refresh();
     } catch (err) {
       setSyncError(toUserMessage(err));
     } finally {
