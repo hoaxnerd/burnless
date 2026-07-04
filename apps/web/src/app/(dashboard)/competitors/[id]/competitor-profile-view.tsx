@@ -35,7 +35,7 @@ export interface CompetitorProfileDto {
 
 export interface SourceDto {
   id: string;
-  /** "pricing" | "social" */
+  /** "pricing" | "social" | "page" */
   type: string;
   url: string;
   enabled: boolean;
