@@ -1,5 +1,12 @@
 import { sha256hex } from "@burnless/db";
-import { diffStructured, evaluateRules, type Alert } from "@burnless/engine";
+import {
+  diffStructured,
+  evaluateRules,
+  diffText,
+  normalizeHtml,
+  contentChangeAlert,
+  type Alert,
+} from "@burnless/engine";
 import type { CompetitorSource } from "@burnless/db";
 import {
   getDueSources,
@@ -11,34 +18,40 @@ import {
   createNotification,
   getCompanyNotifyUserIds,
 } from "@burnless/db";
-import { getCollector, type CollectorSource } from "./collectors";
+import { getCollector, httpFetch, type CollectorSource, type RawCapture } from "./collectors";
 import { buildDigest } from "./notify";
 
+/** Human page label for the Tier-1 content-change summary. */
+const SOURCE_LABELS: Record<string, string> = {
+  pricing: "Pricing page",
+  social: "Social page",
+  page: "Page",
+};
+function sourceLabel(type: string): string {
+  return SOURCE_LABELS[type] ?? "Page";
+}
+
 /**
- * Run a single competitor source through the full pipeline:
- *   fetch → parse → hash → store-on-change → diff → rules → insert changes → notify.
+ * Run a single competitor source through the reframed pipeline (spec §5):
+ *   fetch → Tier 1 (normalize → content hash → store-on-change → text-diff →
+ *   generic `content` change) → Tier 2 (confident structured parse → typed
+ *   changes) → rules → insert changes → notify.
  *
- * Returns:
- *   - changed: true if a new snapshot was stored (structured data changed)
- *   - broken: true if fetch/parse/collector failed
- *   - alerts: the rule alerts emitted (empty when no previous snapshot to diff against)
+ * Tier 1 ALWAYS runs (source-type-agnostic; `page` sources have no collector).
+ * Store-on-change is keyed on the NORMALIZED content hash (not rawHash), so
+ * nonce/CSRF/analytics churn in the raw HTML no longer counts as a change.
  */
 export async function runSource(
   source: CompetitorSource,
 ): Promise<{ changed: boolean; broken: boolean; alerts: Alert[] }> {
   const collector = getCollector(source.type);
-  if (!collector) {
-    await updateSource(source.id, source.companyId, {
-      lastRunAt: new Date(),
-      lastStatus: "no_collector",
-      healthState: "broken",
-    });
-    return { changed: false, broken: true, alerts: [] };
-  }
 
-  let raw: Awaited<ReturnType<typeof collector.fetch>>;
+  // ── Fetch (Tier 1 needs the raw regardless of a structured collector). ──
+  let raw: RawCapture;
   try {
-    raw = await collector.fetch(source as unknown as CollectorSource);
+    raw = collector
+      ? await collector.fetch(source as unknown as CollectorSource)
+      : await httpFetch(source.url);
   } catch (e) {
     await updateSource(source.id, source.companyId, {
       lastRunAt: new Date(),
@@ -48,24 +61,34 @@ export async function runSource(
     return { changed: false, broken: true, alerts: [] };
   }
 
-  const parsed = collector.parse(raw, source as unknown as CollectorSource);
-  if (parsed.confidence < 0.4) {
-    await updateSource(source.id, source.companyId, {
-      lastRunAt: new Date(),
-      lastStatus: "low_confidence",
-      healthState: "broken",
-    });
-    return { changed: false, broken: true, alerts: [] };
+  // ── Tier 1: normalize → content hash. ──
+  const normalized = normalizeHtml(raw.raw);
+  const normalizedHash = sha256hex(normalized);
+
+  // ── Tier 2 (optional, confidence-gated): structured extraction. ──
+  let structured: unknown = {};
+  let parseConfident = false;
+  if (collector) {
+    const parsed = collector.parse(raw, source as unknown as CollectorSource);
+    if (parsed.confidence >= 0.4) {
+      structured = parsed.structured;
+      parseConfident = true;
+    }
   }
+  const structuredHash = sha256hex(JSON.stringify(structured));
 
-  const structuredHash = sha256hex(JSON.stringify(parsed.structured));
   const latest = await getLatestSnapshot(source.id);
+  const okStatus = parseConfident ? "ok" : "content_only";
 
-  // Store-on-change: skip if nothing changed.
-  if (latest && latest.structuredHash === structuredHash) {
+  // ── Store-on-change: skip only when BOTH content AND structured are same. ──
+  if (
+    latest &&
+    latest.normalizedHash === normalizedHash &&
+    latest.structuredHash === structuredHash
+  ) {
     await updateSource(source.id, source.companyId, {
       lastRunAt: new Date(),
-      lastStatus: "ok",
+      lastStatus: okStatus,
       healthState: "ok",
     });
     return { changed: false, broken: false, alerts: [] };
@@ -77,52 +100,61 @@ export async function runSource(
     sourceId: source.id,
     raw: raw.raw,
     rawHash: sha256hex(raw.raw),
-    structured: parsed.structured,
+    structured,
     structuredHash,
+    normalized,
+    normalizedHash,
   });
 
-  let alerts: Alert[] = [];
-
-  // Only diff when a previous snapshot exists.
+  const alerts: Alert[] = [];
   if (latest) {
-    const changes = diffStructured(latest.structured, parsed.structured);
-    alerts = evaluateRules(source.type, changes);
+    // Tier 1 — generic content change (works on any page).
+    const contentAlert = contentChangeAlert(
+      diffText(latest.normalized ?? "", normalized),
+      sourceLabel(source.type),
+    );
+    if (contentAlert) alerts.push(contentAlert);
 
-    if (alerts.length > 0) {
-      await insertChanges(
-        alerts.map((a) => ({
-          companyId: source.companyId,
-          competitorId: source.competitorId,
-          sourceId: source.id,
-          snapshotId: snapshot.id,
-          changeType: a.changeType,
-          summary: a.summary,
-          before: a.before ?? null,
-          after: a.after ?? null,
-          severity: a.severity,
-        })),
-      );
+    // Tier 2 — typed structured changes, only when we have a confident parse.
+    if (parseConfident) {
+      alerts.push(...evaluateRules(source.type, diffStructured(latest.structured, structured)));
+    }
+  }
 
-      const competitor = await getCompetitor(source.competitorId, source.companyId);
-      const digest = buildDigest(competitor?.name ?? "competitor", alerts);
-      const userIds = await getCompanyNotifyUserIds(source.companyId);
-      for (const userId of userIds) {
-        await createNotification({
-          companyId: source.companyId,
-          userId,
-          category: "competitor",
-          title: digest.title,
-          body: digest.body,
-          severity: digest.severity,
-          link: `/competitors/${source.competitorId}`,
-        });
-      }
+  if (alerts.length > 0) {
+    await insertChanges(
+      alerts.map((a) => ({
+        companyId: source.companyId,
+        competitorId: source.competitorId,
+        sourceId: source.id,
+        snapshotId: snapshot.id,
+        changeType: a.changeType,
+        summary: a.summary,
+        before: a.before ?? null,
+        after: a.after ?? null,
+        severity: a.severity,
+      })),
+    );
+
+    const competitor = await getCompetitor(source.competitorId, source.companyId);
+    const digest = buildDigest(competitor?.name ?? "competitor", alerts);
+    const userIds = await getCompanyNotifyUserIds(source.companyId);
+    for (const userId of userIds) {
+      await createNotification({
+        companyId: source.companyId,
+        userId,
+        category: "competitor",
+        title: digest.title,
+        body: digest.body,
+        severity: digest.severity,
+        link: `/competitors/${source.competitorId}`,
+      });
     }
   }
 
   await updateSource(source.id, source.companyId, {
     lastRunAt: new Date(),
-    lastStatus: "ok",
+    lastStatus: okStatus,
     healthState: "ok",
   });
   return { changed: true, broken: false, alerts };

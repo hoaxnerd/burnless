@@ -1,5 +1,5 @@
 /**
- * Integration test for the competitor sync pipeline.
+ * Integration test for the reframed competitor sync pipeline (spec §5).
  *
  * DB WIRING: imports @db-test factories → vitest.config.mts `needsDb()` detects
  * this file as a "db" test → vitest.setup.db.ts runs first and assigns
@@ -7,67 +7,68 @@
  * evaluates. When pipeline.ts (and its @burnless/db imports) are loaded, they
  * pick up the in-memory PGlite. The @burnless/db barrel is NOT mocked.
  *
- * COLLECTOR MOCK: vi.mock("../collectors") stubs getCollector so no network
- * calls happen. The stub's parse() reads globalThis.__next at call-time so
- * tests can change the structured payload between runs.
+ * NETWORK: we do NOT mock ../collectors — the REAL collectors + real
+ * `normalizeHtml`/parse run. Both the structured collectors and the `page`
+ * fallback fetch through `httpFetch`, which calls `global.fetch`. We stub
+ * `global.fetch` with a sequenced-HTML helper so runs return controlled pages
+ * (nonce churn, visible changes, confident pricing) with zero network I/O.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createUser, createCompany, createMember } from "@db-test/factories";
 import {
+  db,
+  competitorSnapshots,
   createCompetitor,
   createSource,
   getLatestSnapshot,
   listChanges,
 } from "@burnless/db";
 
-// Stub the collector registry so no network calls happen.
-// parse() reads globalThis.__next at call-time — set it before each runSource call.
-vi.mock("../collectors", async (orig) => {
-  const actual = await (orig as () => Promise<Record<string, unknown>>)();
-  return {
-    ...actual,
-    getCollector: () => ({
-      type: "pricing",
-      fetch: async () => ({
-        contentType: "text/html",
-        raw: "<html/>",
-        fetchedAt: new Date(),
-        status: 200,
-      }),
-      parse: () => ({
-        structured: (globalThis as Record<string, unknown>).__next,
-        confidence: 0.9,
-      }),
-    }),
-  };
-});
-
-// Import AFTER the mock declaration so vitest hoisting applies.
+// Import the real pipeline (collectors are real, only global.fetch is stubbed).
 import { runSource } from "../pipeline";
 
-const PRICE_29 = {
-  plans: [
-    {
-      name: "Pro",
-      price: { amount: 29, currency: "USD", period: "month" },
-      features: [],
-    },
-  ],
-};
+/** Stub global.fetch to return each HTML page in turn (last page repeats). */
+function stubFetchSequence(pages: string[]): void {
+  let i = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      const raw = pages[Math.min(i, pages.length - 1)] ?? "";
+      i += 1;
+      return {
+        status: 200,
+        headers: { get: () => "text/html" },
+        text: async () => raw,
+      } as unknown as Response;
+    }),
+  );
+}
 
-const PRICE_39 = {
-  plans: [
-    {
-      name: "Pro",
-      price: { amount: 39, currency: "USD", period: "month" },
-      features: [],
-    },
-  ],
-};
+/** Count stored snapshots for a source (store-on-change assertions). */
+async function countSnapshots(sourceId: string): Promise<number> {
+  const rows = await db
+    .select()
+    .from(competitorSnapshots)
+    .where(eq(competitorSnapshots.sourceId, sourceId));
+  return rows.length;
+}
+
+/** HTML the pricing collector parses confidently (JSON-LD Product + visible price). */
+function pricingHtml(amount: number): string {
+  const ld = JSON.stringify({
+    "@type": "Product",
+    name: "Pro",
+    offers: { price: amount, priceCurrency: "USD" },
+  });
+  return `<html><body><script type="application/ld+json">${ld}</script><main><ul><li>Pro $${amount}/mo</li></ul></main></body></html>`;
+}
 
 describe("competitor sync pipeline", () => {
   let companyId: string;
+  let competitorId: string;
   let sourceRow: Awaited<ReturnType<typeof createSource>>;
+  let pageSource: Awaited<ReturnType<typeof createSource>>;
 
   beforeEach(async () => {
     const user = await createUser();
@@ -81,16 +82,29 @@ describe("competitor sync pipeline", () => {
       name: "Acme",
       url: "https://acme.com",
     });
+    competitorId = competitor.id;
+
     sourceRow = await createSource({
       companyId,
       competitorId: competitor.id,
       type: "pricing",
       url: "https://acme.com/pricing",
     });
+    // A `page`-type source has NO collector → Tier 1 (content diff) only.
+    pageSource = await createSource({
+      companyId,
+      competitorId: competitor.id,
+      type: "page",
+      url: "https://acme.com/features",
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("first run stores a snapshot and returns changed:true", async () => {
-    (globalThis as Record<string, unknown>).__next = PRICE_29;
+    stubFetchSequence([pricingHtml(29)]);
 
     const result = await runSource(sourceRow);
 
@@ -100,10 +114,11 @@ describe("competitor sync pipeline", () => {
     const snap = await getLatestSnapshot(sourceRow.id);
     expect(snap).toBeTruthy();
     expect(snap!.structuredHash).toBeTruthy();
+    expect(snap!.normalizedHash).toBeTruthy();
   });
 
   it("unchanged re-run creates NO new snapshot (store-on-change guard)", async () => {
-    (globalThis as Record<string, unknown>).__next = PRICE_29;
+    stubFetchSequence([pricingHtml(29), pricingHtml(29)]);
 
     // First run — stores snapshot
     await runSource(sourceRow);
@@ -117,15 +132,16 @@ describe("competitor sync pipeline", () => {
     const snapAfterSecond = await getLatestSnapshot(sourceRow.id);
     // Still the same snapshot row
     expect(snapAfterSecond!.id).toBe(snapAfterFirst!.id);
+    expect(await countSnapshots(sourceRow.id)).toBe(1);
   });
 
   it("changed price stores a new snapshot and emits a price_increase change row", async () => {
+    stubFetchSequence([pricingHtml(29), pricingHtml(39)]);
+
     // Run 1: establish baseline at price 29
-    (globalThis as Record<string, unknown>).__next = PRICE_29;
     await runSource(sourceRow);
 
     // Run 2: price bumped to 39 — should diff and emit price_increase
-    (globalThis as Record<string, unknown>).__next = PRICE_39;
     const result = await runSource(sourceRow);
 
     expect(result.changed).toBe(true);
@@ -136,5 +152,52 @@ describe("competitor sync pipeline", () => {
     const changes = await listChanges(companyId);
     expect(changes.length).toBeGreaterThan(0);
     expect(changes.some((c) => c.changeType === "price_increase")).toBe(true);
+  });
+
+  it("does NOT store a new snapshot when only a nonce changed (normalized content identical)", async () => {
+    // Identical VISIBLE text, rotated nonce attribute between the two fetches.
+    const pageA = `<html><body><nonce data-n="aaaa"></nonce><ul><li>Pro $29</li></ul></body></html>`;
+    const pageB = `<html><body><nonce data-n="zzzz"></nonce><ul><li>Pro $29</li></ul></body></html>`;
+    stubFetchSequence([pageA, pageB]);
+
+    await runSource(sourceRow); // first run stores baseline
+    const before = await countSnapshots(sourceRow.id);
+    const r = await runSource(sourceRow); // second run: nonce-only churn
+    const after = await countSnapshots(sourceRow.id);
+
+    expect(after).toBe(before);
+    expect(r.changed).toBe(false);
+    expect(r.broken).toBe(false);
+  });
+
+  it("emits ONE content change on a real visible change (page source, no structured parse)", async () => {
+    const pageA = `<html><body><main>Welcome</main></body></html>`;
+    const pageB = `<html><body><main>Welcome — now with SSO</main></body></html>`;
+    stubFetchSequence([pageA, pageB]);
+
+    await runSource(pageSource); // a source of type "page" (no collector)
+    const r = await runSource(pageSource);
+
+    expect(r.changed).toBe(true);
+    expect(r.broken).toBe(false);
+
+    const changes = await listChanges(companyId, { competitorId });
+    const content = changes.filter((c) => c.changeType === "content_changed");
+    expect(content).toHaveLength(1);
+    expect(content[0]!.severity).toBe("info");
+    // no typed pricing/social change on a page source
+    expect(changes.every((c) => c.changeType === "content_changed")).toBe(true);
+  });
+
+  it("emits BOTH a content change and a typed price change when pricing parse is confident", async () => {
+    stubFetchSequence([pricingHtml(29), pricingHtml(39)]);
+
+    await runSource(sourceRow);
+    const r = await runSource(sourceRow);
+
+    const changes = await listChanges(companyId, { competitorId });
+    expect(changes.some((c) => c.changeType === "content_changed")).toBe(true);
+    expect(changes.some((c) => c.changeType === "price_increase")).toBe(true);
+    expect(r.changed).toBe(true);
   });
 });
