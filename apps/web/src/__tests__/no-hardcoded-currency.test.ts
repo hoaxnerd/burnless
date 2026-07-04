@@ -64,7 +64,9 @@ const ALLOWED = [
   // (normalized-text fixtures), db competitor.test.ts (snapshot raw/normalized).
   "apps/web/src/lib/competitor/__tests__/",
   "packages/engine/src/competitor/__tests__/",
-  "packages/db/src/__tests__/",
+  // File-scoped (not the whole db __tests__ dir): only competitor.test.ts holds
+  // scraped-price fixtures; the DB layer has no display code to guard elsewhere.
+  "packages/db/src/__tests__/competitor.test.ts",
 
   // ── CSV import parser ─────────────────────────────────────────────────────
   // import-flow.tsx line 134: /[$,€£()]/ in a regex to STRIP currency
