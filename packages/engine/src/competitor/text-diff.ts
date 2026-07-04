@@ -60,7 +60,7 @@ export function contentChangeAlert(diff: TextDiff, label: string): Alert | null 
     changeType: "content_changed",
     summary: `${label} content changed: +${diff.addedCount} / -${diff.removedCount} lines`,
     severity: "info",
-    before: { lines: diff.removedLines, truncated: diff.truncated },
-    after: { lines: diff.addedLines, truncated: diff.truncated },
+    before: { lines: diff.removedLines, truncated: diff.removedLines.length < diff.removedCount },
+    after: { lines: diff.addedLines, truncated: diff.addedLines.length < diff.addedCount },
   };
 }

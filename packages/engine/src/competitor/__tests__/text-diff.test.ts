@@ -46,4 +46,12 @@ describe("contentChangeAlert", () => {
     expect(alert!.before).toEqual({ lines: ["Pro 29"], truncated: false });
     expect(alert!.after).toEqual({ lines: ["Pro 39"], truncated: false });
   });
+
+  it("flags truncation per side under asymmetric change sizes", () => {
+    const d = diffText(Array.from({ length: 25 }, (_, i) => `R${i}`).join("\n"), "One");
+    const a = contentChangeAlert(d, "X");
+    expect(a).not.toBeNull();
+    expect((a!.before as { truncated: boolean }).truncated).toBe(true);
+    expect((a!.after as { truncated: boolean }).truncated).toBe(false);
+  });
 });
