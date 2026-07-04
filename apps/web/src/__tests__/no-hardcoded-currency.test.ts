@@ -55,6 +55,17 @@ const ALLOWED = [
   // symbolToCurrency map normalises parsed glyphs to ISO codes. Not display code.
   "apps/web/src/lib/competitor/collectors/pricing.ts",
 
+  // ── Competitor collector-reframe tests: scraped-HTML fixtures ─────────────
+  // The Tier-1/Tier-2 tests use `$29`/`$39`/`$${amount}` INSIDE sample
+  // competitor HTML strings (what we fetch + normalize + diff) and as expected
+  // normalized-text assertions — third-party scraped-price INPUT, never app
+  // display code. Same rationale as the pricing.ts collector entry above.
+  // pipeline.test.ts (Tier-1/2 HTML fixtures), engine normalize/text-diff tests
+  // (normalized-text fixtures), db competitor.test.ts (snapshot raw/normalized).
+  "apps/web/src/lib/competitor/__tests__/",
+  "packages/engine/src/competitor/__tests__/",
+  "packages/db/src/__tests__/",
+
   // ── CSV import parser ─────────────────────────────────────────────────────
   // import-flow.tsx line 134: /[$,€£()]/ in a regex to STRIP currency
   // characters from user-supplied CSV amounts. Not display code.
