@@ -108,12 +108,16 @@ export async function runSource(
 
   const alerts: Alert[] = [];
   if (latest) {
-    // Tier 1 — generic content change (works on any page).
-    const contentAlert = contentChangeAlert(
-      diffText(latest.normalized ?? "", normalized),
-      sourceLabel(source.type),
-    );
-    if (contentAlert) alerts.push(contentAlert);
+    // Tier 1 — content change, only when a prior NORMALIZED baseline exists.
+    // A legacy snapshot from before the reframe migration has normalized == null;
+    // that's a pure one-time re-baseline, not a real content change — don't alert.
+    if (latest.normalized != null) {
+      const contentAlert = contentChangeAlert(
+        diffText(latest.normalized, normalized),
+        sourceLabel(source.type),
+      );
+      if (contentAlert) alerts.push(contentAlert);
+    }
 
     // Tier 2 — typed structured changes, only when we have a confident parse.
     if (parseConfident) {

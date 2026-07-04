@@ -18,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { createUser, createCompany, createMember } from "@db-test/factories";
 import {
   db,
+  sha256hex,
   competitorSnapshots,
   createCompetitor,
   createSource,
@@ -168,6 +169,33 @@ describe("competitor sync pipeline", () => {
     expect(after).toBe(before);
     expect(r.changed).toBe(false);
     expect(r.broken).toBe(false);
+  });
+
+  it("re-baselines silently when the prior snapshot has NULL normalized (legacy row)", async () => {
+    // Seed a legacy snapshot (pre-reframe migration): normalized == null.
+    // Insert directly — insertSnapshot() now requires normalized as a string.
+    await db.insert(competitorSnapshots).values({
+      companyId,
+      competitorId,
+      sourceId: pageSource.id,
+      raw: "<html><body><main>Old content</main></body></html>",
+      rawHash: sha256hex("<html><body><main>Old content</main></body></html>"),
+      structured: {},
+      structuredHash: sha256hex(JSON.stringify({})),
+      normalized: null,
+      normalizedHash: null,
+    });
+
+    stubFetchSequence([`<html><body><main>Fresh content — SSO</main></body></html>`]);
+    const r = await runSource(pageSource);
+
+    // The new snapshot IS stored (re-baseline), but NO content_changed alert fires.
+    expect(r.changed).toBe(true);
+    expect(r.broken).toBe(false);
+    expect(await countSnapshots(pageSource.id)).toBe(2);
+
+    const changes = await listChanges(companyId, { competitorId });
+    expect(changes.some((c) => c.changeType === "content_changed")).toBe(false);
   });
 
   it("emits ONE content change on a real visible change (page source, no structured parse)", async () => {
