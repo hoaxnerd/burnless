@@ -138,9 +138,9 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
             <ArrowLeft className="h-4 w-4" />
             Back to Competitors
           </Link>
-          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-surface-900">Competitors</h1>
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-surface-900">Manage competitors</h1>
           <p className="mt-1 text-sm text-surface-500">
-            Track competitors and get notified when their pricing or positioning changes
+            Add competitors and configure the pages we watch for changes
           </p>
         </div>
         <div className="flex items-center gap-3">
