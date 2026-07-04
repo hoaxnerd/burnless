@@ -11,7 +11,7 @@ const createCompetitorSchema = z.object({
   sources: z
     .array(
       z.object({
-        type: z.enum(["pricing", "social"]),
+        type: z.enum(["pricing", "social", "page"]),
         url: z.string().url(),
         config: z.unknown().optional(),
       }),

@@ -197,6 +197,31 @@ describe("POST /api/competitors", () => {
     });
   });
 
+  it("accepts a `page` source when creating a competitor", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockCreateCompetitor.mockResolvedValue({
+      id: "c-new",
+      companyId: "company-1",
+      name: "Rival",
+      url: "https://rival.com",
+    });
+    mockCreateSource.mockResolvedValue({ id: "src-1" });
+
+    const res = await POST(
+      makeRequest("http://localhost/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Rival",
+          url: "https://rival.com",
+          sources: [{ type: "page", url: "https://rival.com/changelog" }],
+        }),
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
   it("returns 400 for invalid body (missing url)", async () => {
     mockRequireWrite.mockResolvedValue(validCtx);
     mockRequireDomainEnabled.mockResolvedValue(null);
