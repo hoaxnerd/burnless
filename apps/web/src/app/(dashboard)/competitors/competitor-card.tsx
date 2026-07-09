@@ -18,7 +18,7 @@ export interface CompetitorCardData {
   latestChange: CompetitorChangeDto | null;
 }
 
-export function CompetitorCard({ data }: { data: CompetitorCardData }) {
+export function CompetitorCard({ data }: Readonly<{ data: CompetitorCardData }>) {
   const { fmtDate } = useLocale();
   const [open, setOpen] = useState(false);
   const { competitor, changeCount30d, latestChange } = data;

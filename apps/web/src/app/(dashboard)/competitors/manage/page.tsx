@@ -22,7 +22,7 @@ export default async function ManageCompetitorsPage() {
   );
 }
 
-async function ManageContent({ companyId }: { companyId: string }) {
+async function ManageContent({ companyId }: Readonly<{ companyId: string }>) {
   const competitors = await listCompetitors(companyId);
   const initialData: CompetitorsPayload = {
     competitors: competitors.map((c) => ({

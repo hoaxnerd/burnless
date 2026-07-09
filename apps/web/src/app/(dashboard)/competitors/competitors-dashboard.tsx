@@ -14,7 +14,7 @@ import { CompetitorCard, type CompetitorCardData } from "./competitor-card";
 
 export type { CompetitorCardData };
 
-export function CompetitorsDashboard({ cards }: { cards: CompetitorCardData[] }) {
+export function CompetitorsDashboard({ cards }: Readonly<{ cards: CompetitorCardData[] }>) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

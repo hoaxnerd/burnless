@@ -73,7 +73,7 @@ export function useCompetitors(
   const { mutate } = swr;
   useEffect(() => {
     return subscribeMutation((e) => {
-      if (COMPETITOR_DOMAINS.has(e.domain)) void mutate();
+      if (COMPETITOR_DOMAINS.has(e.domain)) mutate();
     });
   }, [mutate]);
   return swr;
@@ -96,7 +96,7 @@ export function useCompetitorChanges(
   useEffect(() => {
     if (!competitorId) return;
     return subscribeMutation((e) => {
-      if (COMPETITOR_DOMAINS.has(e.domain)) void mutate();
+      if (COMPETITOR_DOMAINS.has(e.domain)) mutate();
     });
   }, [competitorId, mutate]);
   return swr;

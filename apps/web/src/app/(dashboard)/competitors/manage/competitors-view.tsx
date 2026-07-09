@@ -24,13 +24,13 @@ import { toUserMessage } from "@/lib/api-error";
 import { useCompetitors, type CompetitorDto, type CompetitorsPayload } from "@/lib/swr";
 
 interface CompetitorsViewProps {
-  initialData: CompetitorsPayload;
+  readonly initialData: CompetitorsPayload;
 }
 
 /** Reuse-only status pill — no @/components/ui badge component exists, so a
  *  token-styled <span> (matches the transactions SourcePill precedent). NOT a
  *  new component. */
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status }: Readonly<{ status: string }>) {
   const cls =
     status === "active"
       ? "bg-success-50 text-success-700"
@@ -66,7 +66,7 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to delete competitor");
       }
-      void mutate();
+      mutate();
     } catch (err) {
       setActionError(toUserMessage(err));
     }
@@ -80,7 +80,7 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to detect feeds");
       }
-      void mutate();
+      mutate();
     } catch (err) {
       setActionError(toUserMessage(err));
     }
@@ -202,7 +202,7 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
           onClose={() => setAdding(false)}
           onAdded={() => {
             setAdding(false);
-            void mutate();
+            mutate();
           }}
         />
       )}
@@ -218,11 +218,11 @@ function AddCompetitorModal({
   open,
   onClose,
   onAdded,
-}: {
+}: Readonly<{
   open: boolean;
   onClose: () => void;
   onAdded: () => void;
-}) {
+}>) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [pricingUrl, setPricingUrl] = useState("");

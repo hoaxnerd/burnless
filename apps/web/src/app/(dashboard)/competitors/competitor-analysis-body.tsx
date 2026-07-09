@@ -31,7 +31,7 @@ import type {
 const PILL_BASE =
   "inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium uppercase";
 
-function HealthBadge({ healthState, lastStatus }: { healthState: string; lastStatus: string | null }) {
+function HealthBadge({ healthState, lastStatus }: Readonly<{ healthState: string; lastStatus: string | null }>) {
   if (healthState === "broken") {
     return (
       <span className={`${PILL_BASE} bg-danger-50 text-danger-600`} title={lastStatus ?? undefined}>
@@ -42,18 +42,14 @@ function HealthBadge({ healthState, lastStatus }: { healthState: string; lastSta
   return <span className={`${PILL_BASE} bg-success-50 text-success-700`}>Healthy</span>;
 }
 
-function SeverityBadge({ severity }: { severity: string }) {
-  const cls =
-    severity === "critical"
-      ? "bg-danger-50 text-danger-600"
-      : severity === "warning"
-        ? "bg-warning-50 text-warning-700"
-        : "bg-surface-100 text-surface-600";
+function SeverityBadge({ severity }: Readonly<{ severity: string }>) {
+  const nonCriticalCls = severity === "warning" ? "bg-warning-50 text-warning-700" : "bg-surface-100 text-surface-600";
+  const cls = severity === "critical" ? "bg-danger-50 text-danger-600" : nonCriticalCls;
   return <span className={`${PILL_BASE} ${cls}`}>{severity}</span>;
 }
 
 /** Content-change line snippet (added green / removed red) — reuse tokens only. */
-function ContentSnippet({ change }: { change: CompetitorChangeDto }) {
+function ContentSnippet({ change }: Readonly<{ change: CompetitorChangeDto }>) {
   const before = (change.before as { lines?: string[]; truncated?: boolean } | null) ?? null;
   const after = (change.after as { lines?: string[]; truncated?: boolean } | null) ?? null;
   const removed = before?.lines ?? [];
@@ -66,10 +62,10 @@ function ContentSnippet({ change }: { change: CompetitorChangeDto }) {
       </summary>
       <div className="mt-2 space-y-1 rounded-md bg-surface-50 border border-surface-200 p-2 font-mono">
         {removed.map((l, i) => (
-          <div key={`r${i}`} className="text-danger-600 truncate">- {l}</div>
+          <div key={`r${i}-${l}`} className="text-danger-600 truncate">- {l}</div>
         ))}
         {added.map((l, i) => (
-          <div key={`a${i}`} className="text-success-700 truncate">+ {l}</div>
+          <div key={`a${i}-${l}`} className="text-success-700 truncate">+ {l}</div>
         ))}
         {(before?.truncated || after?.truncated) && (
           <div className="text-surface-400">… more lines truncated</div>
@@ -80,10 +76,10 @@ function ContentSnippet({ change }: { change: CompetitorChangeDto }) {
 }
 
 interface Props {
-  competitor: CompetitorProfileDto;
-  sources: SourceDto[];
-  latestSnapshots: (SnapshotDto | null)[];
-  initialChanges: CompetitorChangesPayload;
+  readonly competitor: CompetitorProfileDto;
+  readonly sources: SourceDto[];
+  readonly latestSnapshots: (SnapshotDto | null)[];
+  readonly initialChanges: CompetitorChangesPayload;
 }
 
 export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, initialChanges }: Props) {
@@ -139,7 +135,7 @@ export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, i
       // the RSC props (source health / last-checked / latest-pricing snapshot),
       // which don't come from SWR — otherwise "Sync now" leaves them stale
       // until a manual reload. Correct for both mounts (permalink + dashboard).
-      void mutate();
+      mutate();
       router.refresh();
     } catch (err) {
       setSyncError(toUserMessage(err));
@@ -154,14 +150,17 @@ export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, i
       key: "price",
       header: "Price",
       align: "right" as const,
-      render: (p: { price: { amount: number | null; currency: string | null; period: string | null } }) => (
-        <span className="text-surface-900">
-          {p.price.amount != null
-            ? formatCurrency(p.price.amount, isValidCurrency(p.price.currency ?? "") ? (p.price.currency as CurrencyCode) : currency, locale)
-            : "—"}
-          {p.price.period ? <span className="text-surface-500">{` / ${p.price.period}`}</span> : null}
-        </span>
-      ),
+      render: (p: { price: { amount: number | null; currency: string | null; period: string | null } }) => {
+        const planCurrency = isValidCurrency(p.price.currency ?? "") ? (p.price.currency as CurrencyCode) : currency;
+        return (
+          <span className="text-surface-900">
+            {p.price.amount != null
+              ? formatCurrency(p.price.amount, planCurrency, locale)
+              : "—"}
+            {p.price.period ? <span className="text-surface-500">{` / ${p.price.period}`}</span> : null}
+          </span>
+        );
+      },
     },
   ];
 

@@ -25,7 +25,7 @@ export default async function CompetitorsPage() {
   );
 }
 
-async function DashboardContent({ companyId }: { companyId: string }) {
+async function DashboardContent({ companyId }: Readonly<{ companyId: string }>) {
   const competitors = await listCompetitors(companyId);
   const cutoff = Date.now() - THIRTY_DAYS_MS;
 

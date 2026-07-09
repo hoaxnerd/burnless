@@ -64,11 +64,11 @@ export interface SnapshotDto {
 }
 
 interface CompetitorProfileViewProps {
-  competitor: CompetitorProfileDto;
-  sources: SourceDto[];
+  readonly competitor: CompetitorProfileDto;
+  readonly sources: SourceDto[];
   /** Latest snapshot per source, aligned by index with `sources`. */
-  latestSnapshots: (SnapshotDto | null)[];
-  initialChanges: CompetitorChangesPayload;
+  readonly latestSnapshots: (SnapshotDto | null)[];
+  readonly initialChanges: CompetitorChangesPayload;
 }
 
 // ── View ────────────────────────────────────────────────────────────────────

@@ -23,9 +23,9 @@ import {
 
 export default async function CompetitorPage({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ id: string }>;
-}) {
+}>) {
   const { id } = await params;
 
   const company = await getCompany();
@@ -52,11 +52,11 @@ async function CompetitorContent({
   companyId,
   competitorId,
   competitor,
-}: {
+}: Readonly<{
   companyId: string;
   competitorId: string;
   competitor: NonNullable<Awaited<ReturnType<typeof getCompetitor>>>;
-}) {
+}>) {
   const [sources, changes] = await Promise.all([
     listSources(competitorId, companyId),
     listChanges(companyId, { competitorId, limit: 50 }),
