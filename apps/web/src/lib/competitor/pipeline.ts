@@ -27,6 +27,7 @@ const SOURCE_LABELS: Record<string, string> = {
   social: "Social page",
   page: "Page",
   feed: "Feed",
+  sitemap: "Sitemap",
 };
 function sourceLabel(type: string): string {
   return SOURCE_LABELS[type] ?? "Page";
