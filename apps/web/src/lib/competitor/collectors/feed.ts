@@ -8,14 +8,18 @@ function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 }
 function decode(s: string): string {
+  // Decode entities FIRST, then strip tags LAST — so any `<`/`>` produced by
+  // entity-decoding (e.g. `&lt;script&gt;` → `<script>`) is removed by the final
+  // strip and cannot survive in the output. `&amp;` is decoded before the strip
+  // (last among the entity decodes) to avoid double-unescaping.
   return stripCdata(s)
-    .replace(/<[^>]*>?/g, "")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#0*39;/g, "'")
     .replace(/&apos;/gi, "'")
     .replace(/&amp;/gi, "&")
+    .replace(/<[^>]*>?/g, "")
     .trim();
 }
 function firstTag(block: string, name: string): string | null {
