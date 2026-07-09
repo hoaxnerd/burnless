@@ -7,20 +7,33 @@ const MAX_ITEMS = 50;
 function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 }
+function stripTags(s: string): string {
+  // Fixpoint strip (CodeQL js/incomplete-multi-character-sanitization remediation):
+  // repeat until stable so nested / reconstructed tags (e.g. `<scr<script>ipt>`)
+  // fully collapse; the optional `>?` also removes an unterminated trailing tag
+  // like `<script` at end-of-input. Guarantees no `<…` survives.
+  let out = s;
+  let prev = "";
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(/<[^>]*>?/g, "");
+  }
+  return out;
+}
+
 function decode(s: string): string {
-  // Decode entities FIRST, then strip tags LAST — so any `<`/`>` produced by
-  // entity-decoding (e.g. `&lt;script&gt;` → `<script>`) is removed by the final
-  // strip and cannot survive in the output. `&amp;` is decoded before the strip
-  // (last among the entity decodes) to avoid double-unescaping.
-  return stripCdata(s)
+  // Decode entities first (so `&lt;script&gt;` becomes markup), then fixpoint-strip
+  // tags — the loop guarantees no `<…` survives in the output. `&amp;` is decoded
+  // last among the entities to avoid double-unescaping. The result is plain display
+  // text (React escapes it again on render); this is defence-in-depth, not the sink.
+  const decoded = stripCdata(s)
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#0*39;/g, "'")
     .replace(/&apos;/gi, "'")
-    .replace(/&amp;/gi, "&")
-    .replace(/<[^>]*>?/g, "")
-    .trim();
+    .replace(/&amp;/gi, "&");
+  return stripTags(decoded).trim();
 }
 function firstTag(block: string, name: string): string | null {
   const m = new RegExp(String.raw`<${name}\b[^>]*>([\s\S]*?)</${name}>`, "i").exec(block);
