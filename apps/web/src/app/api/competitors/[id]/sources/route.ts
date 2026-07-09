@@ -6,7 +6,7 @@ import { requireCompanyAccess, requireCompanyWrite, parseBody, withErrorHandler 
 import { requireDomainEnabled } from "@/lib/domain-gating";
 
 const createSourceSchema = z.object({
-  type: z.enum(["pricing", "social", "page"]),
+  type: z.enum(["pricing", "social", "page", "feed", "sitemap"]),
   url: z.string().url(),
   config: z.unknown().optional(),
   intervalHours: z.number().int().positive().optional(),

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createCompetitor, listCompetitors, createSource } from "@burnless/db";
 import { requireCompanyAccess, requireCompanyWrite, parseBody, withErrorHandler } from "@/lib/api-helpers";
 import { requireDomainEnabled } from "@/lib/domain-gating";
+import { discoverFeeds } from "@/lib/competitor/discover";
 
 const createCompetitorSchema = z.object({
   name: z.string().min(1),
@@ -11,7 +12,7 @@ const createCompetitorSchema = z.object({
   sources: z
     .array(
       z.object({
-        type: z.enum(["pricing", "social", "page"]),
+        type: z.enum(["pricing", "social", "page", "feed", "sitemap"]),
         url: z.string().url(),
         config: z.unknown().optional(),
       }),
@@ -53,6 +54,25 @@ export const POST = withErrorHandler(async (request: Request) => {
         config: source.config,
       });
     }
+  }
+
+  // Best-effort: deterministically discover feed/sitemap sources. Never blocks
+  // creation — a discovery failure leaves the competitor with its explicit sources.
+  try {
+    const found = await discoverFeeds(competitor.url);
+    const existing = new Set((sources ?? []).map((s) => `${s.type}:${s.url}`));
+    for (const f of found) {
+      if (existing.has(`${f.type}:${f.url}`)) continue;
+      existing.add(`${f.type}:${f.url}`);
+      await createSource({
+        companyId: ctx.companyId,
+        competitorId: competitor.id,
+        type: f.type,
+        url: f.url,
+      });
+    }
+  } catch {
+    /* discovery is best-effort */
   }
 
   revalidateTag("competitors", { expire: 0 });

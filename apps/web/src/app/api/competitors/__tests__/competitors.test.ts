@@ -14,11 +14,16 @@ const { mockRequireDomainEnabled } = vi.hoisted(() => ({
   mockRequireDomainEnabled: vi.fn(),
 }));
 
-const { mockListCompetitors, mockCreateCompetitor, mockCreateSource } = vi.hoisted(() => ({
-  mockListCompetitors: vi.fn(),
-  mockCreateCompetitor: vi.fn(),
-  mockCreateSource: vi.fn(),
-}));
+const { mockListCompetitors, mockCreateCompetitor, mockCreateSource, mockGetCompetitor, mockListSources } =
+  vi.hoisted(() => ({
+    mockListCompetitors: vi.fn(),
+    mockCreateCompetitor: vi.fn(),
+    mockCreateSource: vi.fn(),
+    mockGetCompetitor: vi.fn(),
+    mockListSources: vi.fn(),
+  }));
+
+const { mockDiscoverFeeds } = vi.hoisted(() => ({ mockDiscoverFeeds: vi.fn() }));
 
 vi.mock("@/lib/api-helpers", () => ({
   requireCompanyAccess: mockRequireCompanyAccess,
@@ -42,11 +47,16 @@ vi.mock("@burnless/db", () => ({
   listCompetitors: mockListCompetitors,
   createCompetitor: mockCreateCompetitor,
   createSource: mockCreateSource,
+  getCompetitor: mockGetCompetitor,
+  listSources: mockListSources,
 }));
+
+vi.mock("@/lib/competitor/discover", () => ({ discoverFeeds: mockDiscoverFeeds }));
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 
 import { GET, POST } from "../route";
+import { POST as DETECT } from "../[id]/detect/route";
 
 const validCtx = { userId: "user-1", companyId: "company-1", role: "editor" } as const;
 
@@ -108,6 +118,8 @@ describe("GET /api/competitors", () => {
 describe("POST /api/competitors", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Best-effort discovery on add defaults to finding nothing unless a test opts in.
+    mockDiscoverFeeds.mockResolvedValue([]);
   });
 
   it("returns 403 DOMAIN_DISABLED when competitor domain is off", async () => {
@@ -222,6 +234,94 @@ describe("POST /api/competitors", () => {
     expect(res.status).toBe(201);
   });
 
+  it("accepts feed and sitemap sources when creating a competitor", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockCreateCompetitor.mockResolvedValue({
+      id: "c-new",
+      companyId: "company-1",
+      name: "Rival",
+      url: "https://rival.com",
+    });
+    mockCreateSource.mockResolvedValue({ id: "src-1" });
+
+    const res = await POST(
+      makeRequest("http://localhost/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Rival",
+          url: "https://rival.com",
+          sources: [
+            { type: "feed", url: "https://rival.com/rss" },
+            { type: "sitemap", url: "https://rival.com/sitemap.xml" },
+          ],
+        }),
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("best-effort discovery creates newly-found sources but never blocks creation", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockCreateCompetitor.mockResolvedValue({
+      id: "c-new",
+      companyId: "company-1",
+      name: "Rival",
+      url: "https://rival.com",
+    });
+    mockCreateSource.mockResolvedValue({ id: "src-1" });
+    mockDiscoverFeeds.mockResolvedValue([
+      { type: "feed", url: "https://rival.com/rss" },
+      // duplicate of an explicit source → must be de-duped
+      { type: "pricing", url: "https://rival.com/pricing" },
+    ]);
+
+    const res = await POST(
+      makeRequest("http://localhost/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Rival",
+          url: "https://rival.com",
+          sources: [{ type: "pricing", url: "https://rival.com/pricing" }],
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    // explicit pricing + discovered feed; the discovered duplicate pricing is skipped.
+    expect(mockCreateSource).toHaveBeenCalledTimes(2);
+    expect(mockCreateSource).toHaveBeenCalledWith({
+      companyId: "company-1",
+      competitorId: "c-new",
+      type: "feed",
+      url: "https://rival.com/rss",
+    });
+  });
+
+  it("still returns 201 when discovery throws", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockCreateCompetitor.mockResolvedValue({
+      id: "c-new",
+      companyId: "company-1",
+      name: "Rival",
+      url: "https://rival.com",
+    });
+    mockDiscoverFeeds.mockRejectedValue(new Error("network down"));
+
+    const res = await POST(
+      makeRequest("http://localhost/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Rival", url: "https://rival.com" }),
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
   it("returns 400 for invalid body (missing url)", async () => {
     mockRequireWrite.mockResolvedValue(validCtx);
     mockRequireDomainEnabled.mockResolvedValue(null);
@@ -238,5 +338,85 @@ describe("POST /api/competitors", () => {
     expect(res.status).toBe(400);
     expect(body.error).toBeTruthy();
     expect(mockCreateCompetitor).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/competitors/[id]/detect", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const detect = (id = "c-1") =>
+    DETECT(makeRequest(`http://localhost/api/competitors/${id}/detect`, { method: "POST" }), {
+      params: Promise.resolve({ id }),
+    });
+
+  it("returns 403 DOMAIN_DISABLED when competitor domain is off", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(
+      NextResponse.json(
+        { error: "This domain is not available on this deployment", code: "DOMAIN_DISABLED", domainId: "competitor" },
+        { status: 403 },
+      ),
+    );
+
+    const res = await detect();
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("DOMAIN_DISABLED");
+    expect(mockGetCompetitor).not.toHaveBeenCalled();
+    expect(mockCreateSource).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the competitor does not exist", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockGetCompetitor.mockResolvedValue(undefined);
+
+    const res = await detect("missing");
+    expect(res.status).toBe(404);
+    expect(mockCreateSource).not.toHaveBeenCalled();
+  });
+
+  it("discovers and creates newly-found sources, returning { created }", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockGetCompetitor.mockResolvedValue({ id: "c-1", companyId: "company-1", url: "https://rival.com" });
+    mockListSources.mockResolvedValue([{ type: "sitemap", url: "https://rival.com/sitemap.xml" }]);
+    mockDiscoverFeeds.mockResolvedValue([
+      { type: "feed", url: "https://rival.com/rss" },
+      // already exists → idempotent skip
+      { type: "sitemap", url: "https://rival.com/sitemap.xml" },
+    ]);
+    mockCreateSource.mockResolvedValue({ id: "src-1" });
+
+    const res = await detect();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.created).toBe(1);
+    expect(mockCreateSource).toHaveBeenCalledTimes(1);
+    expect(mockCreateSource).toHaveBeenCalledWith({
+      companyId: "company-1",
+      competitorId: "c-1",
+      type: "feed",
+      url: "https://rival.com/rss",
+    });
+  });
+
+  it("is idempotent: creates nothing when all discovered sources already exist", async () => {
+    mockRequireWrite.mockResolvedValue(validCtx);
+    mockRequireDomainEnabled.mockResolvedValue(null);
+    mockGetCompetitor.mockResolvedValue({ id: "c-1", companyId: "company-1", url: "https://rival.com" });
+    mockListSources.mockResolvedValue([{ type: "feed", url: "https://rival.com/rss" }]);
+    mockDiscoverFeeds.mockResolvedValue([{ type: "feed", url: "https://rival.com/rss" }]);
+
+    const res = await detect();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.created).toBe(0);
+    expect(mockCreateSource).not.toHaveBeenCalled();
   });
 });
