@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Swords, Trash2, ExternalLink, ArrowLeft } from "lucide-react";
+import { Swords, Trash2, ExternalLink, ArrowLeft, Rss } from "lucide-react";
 import {
   DataTable,
   Button,
@@ -72,6 +72,20 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
     }
   }
 
+  async function handleDetect(row: CompetitorDto) {
+    setActionError(null);
+    try {
+      const res = await apiFetch(`/api/competitors/${row.id}/detect`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to detect feeds");
+      }
+      void mutate();
+    } catch (err) {
+      setActionError(toUserMessage(err));
+    }
+  }
+
   const columns = [
     {
       key: "name",
@@ -114,6 +128,14 @@ export function CompetitorsView({ initialData }: CompetitorsViewProps) {
       align: "right" as const,
       render: (r: CompetitorDto) => (
         <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => handleDetect(r)}
+            className="rounded-md p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+            aria-label="Detect feeds"
+            title="Detect RSS/sitemap feeds"
+          >
+            <Rss className="h-3.5 w-3.5" />
+          </button>
           <button
             onClick={() => handleDelete(r)}
             className="rounded-md p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -206,6 +228,8 @@ function AddCompetitorModal({
   const [pricingUrl, setPricingUrl] = useState("");
   const [socialUrl, setSocialUrl] = useState("");
   const [pageUrl, setPageUrl] = useState("");
+  const [feedUrl, setFeedUrl] = useState("");
+  const [sitemapUrl, setSitemapUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -218,6 +242,8 @@ function AddCompetitorModal({
         ...(pricingUrl ? [{ type: "pricing" as const, url: pricingUrl }] : []),
         ...(socialUrl ? [{ type: "social" as const, url: socialUrl }] : []),
         ...(pageUrl ? [{ type: "page" as const, url: pageUrl }] : []),
+        ...(feedUrl ? [{ type: "feed" as const, url: feedUrl }] : []),
+        ...(sitemapUrl ? [{ type: "sitemap" as const, url: sitemapUrl }] : []),
       ];
       const res = await apiFetch("/api/competitors", {
         method: "POST",
@@ -279,6 +305,24 @@ function AddCompetitorModal({
           onChange={(e) => setPageUrl(e.target.value)}
           placeholder="https://acme.com/changelog"
           hint="Any page (changelog, careers, TOS) — we'll alert you when its content changes."
+        />
+        <Input
+          label="RSS / Atom feed URL"
+          showOptional
+          type="url"
+          value={feedUrl}
+          onChange={(e) => setFeedUrl(e.target.value)}
+          placeholder="https://acme.com/blog/rss"
+          hint="Blog / news / changelog feed — we track new posts. (We also auto-detect this.)"
+        />
+        <Input
+          label="Sitemap URL"
+          showOptional
+          type="url"
+          value={sitemapUrl}
+          onChange={(e) => setSitemapUrl(e.target.value)}
+          placeholder="https://acme.com/sitemap.xml"
+          hint="We track pages appearing and disappearing."
         />
 
         {error && (
