@@ -23,18 +23,12 @@ describe("pricingCollector.parse", () => {
     expect(r.confidence).toBeGreaterThan(0.3);
   });
 
-  it("returns low confidence when nothing parses", () => {
-    const r = pricingCollector.parse(cap(fx("pricing-broken.html")), src);
-    expect(r.confidence).toBeLessThan(0.4);
-  });
-
-  it("returns low confidence for JSON-LD Product without an offer price (no real tiers)", () => {
-    const r = pricingCollector.parse(cap(fx("pricing-jsonld-noprice.html")), src);
-    expect(r.confidence).toBeLessThan(0.4);
-  });
-
-  it("returns low confidence for noisy DOM with many unnamed/implausible plan blocks", () => {
-    const r = pricingCollector.parse(cap(fx("pricing-dom-noise.html")), src);
+  it.each([
+    { fixture: "pricing-broken.html", when: "nothing parses" },
+    { fixture: "pricing-jsonld-noprice.html", when: "JSON-LD Product without an offer price (no real tiers)" },
+    { fixture: "pricing-dom-noise.html", when: "noisy DOM with many unnamed/implausible plan blocks" },
+  ])("returns low confidence when $when", ({ fixture }) => {
+    const r = pricingCollector.parse(cap(fx(fixture)), src);
     expect(r.confidence).toBeLessThan(0.4);
   });
 
