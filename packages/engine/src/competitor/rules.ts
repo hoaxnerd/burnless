@@ -9,35 +9,39 @@ function fmtInt(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+function priceAmountAlert(c: Change): Alert | null {
+  const before = num(c.before);
+  const after = num(c.after);
+  if (before === null || after === null || before <= 0) return null;
+  const pct = dRound2(D(after).minus(before).div(before).times(100));
+  const up = after > before;
+  const sev: Severity = Math.abs(pct) >= 10 ? "warning" : "info";
+  return {
+    changeType: up ? "price_increase" : "price_decrease",
+    summary: `Plan price ${before} → ${after} (${up ? "+" : ""}${pct}%)`,
+    severity: sev,
+    before,
+    after,
+  };
+}
+
 function pricingAlert(c: Change): Alert | null {
-  const last = c.path[c.path.length - 1];
-  if (c.kind === "added" && c.path[0] === "plans" && c.path.length === 2) {
+  const last = c.path.at(-1);
+  const isPlanRoot = c.path[0] === "plans" && c.path.length === 2;
+  if (c.kind === "added" && isPlanRoot) {
     return { changeType: "plan_added", summary: "New pricing plan added", severity: "info", after: c.after };
   }
-  if (c.kind === "removed" && c.path[0] === "plans" && c.path.length === 2) {
+  if (c.kind === "removed" && isPlanRoot) {
     return { changeType: "plan_removed", summary: "Pricing plan removed", severity: "info", before: c.before };
   }
   if (c.kind === "modified" && last === "amount") {
-    const before = num(c.before);
-    const after = num(c.after);
-    if (before !== null && after !== null && before > 0) {
-      const pct = dRound2(D(after).minus(before).div(before).times(100));
-      const up = after > before;
-      const sev: Severity = Math.abs(pct) >= 10 ? "warning" : "info";
-      return {
-        changeType: up ? "price_increase" : "price_decrease",
-        summary: `Plan price ${before} → ${after} (${up ? "+" : ""}${pct}%)`,
-        severity: sev,
-        before,
-        after,
-      };
-    }
+    return priceAmountAlert(c);
   }
   return null;
 }
 
 function socialAlert(c: Change): Alert | null {
-  if (c.kind === "modified" && c.path[c.path.length - 1] === "followers") {
+  if (c.kind === "modified" && c.path.at(-1) === "followers") {
     const before = num(c.before);
     const after = num(c.after);
     if (before !== null && after !== null) {
@@ -102,6 +106,19 @@ function dropNull(changes: Change[], rule: (c: Change) => Alert | null): Alert[]
   return out;
 }
 
+function overflowNoun(changeType: string): string {
+  switch (changeType) {
+    case "page_added":
+      return "pages added";
+    case "page_removed":
+      return "pages removed";
+    case "post_published":
+      return "posts published";
+    default:
+      return "changes";
+  }
+}
+
 /** Anti-flood: keep ≤25 individual alerts per changeType, collapse the rest into
  *  one summary alert for that type. Order-stable. */
 function capAlerts(alerts: Alert[]): Alert[] {
@@ -115,15 +132,7 @@ function capAlerts(alerts: Alert[]): Alert[] {
     else overflow.set(a.changeType, (overflow.get(a.changeType) ?? 0) + 1);
   }
   for (const [changeType, n] of overflow) {
-    const noun =
-      changeType === "page_added"
-        ? "pages added"
-        : changeType === "page_removed"
-          ? "pages removed"
-          : changeType === "post_published"
-            ? "posts published"
-            : "changes";
-    kept.push({ changeType, summary: `+${n} ${noun}`, severity: "info" });
+    kept.push({ changeType, summary: `+${n} ${overflowNoun(changeType)}`, severity: "info" });
   }
   return kept;
 }
@@ -132,5 +141,5 @@ export function evaluateRules(type: string, changes: Change[]): Alert[] {
   if (type === "feed") return capAlerts(dropNull(changes, feedAlert));
   if (type === "sitemap") return capAlerts(dropNull(changes, sitemapAlert));
   const specific = type === "pricing" ? pricingAlert : type === "social" ? socialAlert : null;
-  return changes.map((c) => (specific && specific(c)) ?? genericAlert(c));
+  return changes.map((c) => specific?.(c) ?? genericAlert(c));
 }

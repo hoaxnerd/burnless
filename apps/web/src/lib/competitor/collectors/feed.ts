@@ -9,7 +9,7 @@ function stripCdata(s: string): string {
 }
 function decode(s: string): string {
   return stripCdata(s)
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^>]*>?/g, "")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
@@ -19,7 +19,7 @@ function decode(s: string): string {
     .trim();
 }
 function firstTag(block: string, name: string): string | null {
-  const m = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, "i").exec(block);
+  const m = new RegExp(String.raw`<${name}\b[^>]*>([\s\S]*?)</${name}>`, "i").exec(block);
   return m ? decode(m[1]!) || null : null;
 }
 function atomHref(block: string): string | null {

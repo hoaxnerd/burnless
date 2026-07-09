@@ -19,7 +19,9 @@ function walk(prev: unknown, next: unknown, path: string[], out: Change[]): void
     return;
   }
 
-  const keys = Array.from(new Set([...Object.keys(prev), ...Object.keys(next)])).sort();
+  const keys = Array.from(new Set([...Object.keys(prev), ...Object.keys(next)])).sort((a, b) =>
+    a.localeCompare(b),
+  );
   for (const key of keys) {
     const hasPrev = key in prev;
     const hasNext = key in next;

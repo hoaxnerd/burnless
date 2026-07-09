@@ -2,12 +2,12 @@ import type { Collector, RawCapture, CollectorSource } from "./types";
 import { httpFetch } from "./types";
 
 const URL_BLOCK = /<url\b[\s\S]*?<\/url>/gi;
-const LOC = /<loc>\s*([\s\S]*?)\s*<\/loc>/i;
-const LASTMOD = /<lastmod>\s*([\s\S]*?)\s*<\/lastmod>/i;
+const LOC = /<loc>([\s\S]*?)<\/loc>/i;
+const LASTMOD = /<lastmod>([\s\S]*?)<\/lastmod>/i;
 const MAX_URLS = 2000;
 
 function decode(s: string): string {
-  return s.replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").trim();
+  return s.replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&amp;/gi, "&").trim();
 }
 
 export const sitemapCollector: Collector = {
