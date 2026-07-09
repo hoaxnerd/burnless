@@ -244,6 +244,11 @@ const ALLOWED = [
   "apps/web/src/app/(dashboard)/ai/_components/generative/diff-gate.tsx",
   "apps/web/src/__tests__/component-reachability.test.ts",
   "apps/web/src/__tests__/no-console-in-production.test.ts",
+  // feed.ts line 8: `.replace(/<![CDATA[…]]>/g, "$1")` — a String.replace()
+  // backreference stripping CDATA wrappers from RSS/Atom feed text. `$1` is a
+  // regex capture-group reference, not a currency amount. Same false-positive
+  // class as the camelCase-splitter entries above.
+  "apps/web/src/lib/competitor/collectors/feed.ts",
 ];
 
 /**
