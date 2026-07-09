@@ -1,0 +1,4 @@
+<?xml version="1.0"?><rss version="2.0"><channel><title>Blog</title>
+<item><title>Hello World</title><link>https://acme.com/p/1</link><guid>g-1</guid><pubDate>Tue, 01 Jul 2026 10:00:00 GMT</pubDate></item>
+<item><title><![CDATA[Second & Post]]></title><link>https://acme.com/p/2</link><guid>g-2</guid><pubDate>Wed, 02 Jul 2026 10:00:00 GMT</pubDate></item>
+</channel></rss>
