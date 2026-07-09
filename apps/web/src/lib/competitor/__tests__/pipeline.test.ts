@@ -70,6 +70,8 @@ describe("competitor sync pipeline", () => {
   let competitorId: string;
   let sourceRow: Awaited<ReturnType<typeof createSource>>;
   let pageSource: Awaited<ReturnType<typeof createSource>>;
+  let feedSource: Awaited<ReturnType<typeof createSource>>;
+  let sitemapSource: Awaited<ReturnType<typeof createSource>>;
 
   beforeEach(async () => {
     const user = await createUser();
@@ -97,6 +99,18 @@ describe("competitor sync pipeline", () => {
       competitorId: competitor.id,
       type: "page",
       url: "https://acme.com/features",
+    });
+    feedSource = await createSource({
+      companyId,
+      competitorId: competitor.id,
+      type: "feed",
+      url: "https://acme.com/feed.xml",
+    });
+    sitemapSource = await createSource({
+      companyId,
+      competitorId: competitor.id,
+      type: "sitemap",
+      url: "https://acme.com/sitemap.xml",
     });
   });
 
@@ -227,5 +241,29 @@ describe("competitor sync pipeline", () => {
     expect(changes.some((c) => c.changeType === "content_changed")).toBe(true);
     expect(changes.some((c) => c.changeType === "price_increase")).toBe(true);
     expect(r.changed).toBe(true);
+  });
+
+  it("emits post_published when a feed gains an item", async () => {
+    const feedA = `<rss><channel><item><title>First</title><link>https://x/1</link><guid>g1</guid></item></channel></rss>`;
+    const feedB = `<rss><channel><item><title>First</title><link>https://x/1</link><guid>g1</guid></item><item><title>Second</title><link>https://x/2</link><guid>g2</guid></item></channel></rss>`;
+    stubFetchSequence([feedA, feedB]);
+    await runSource(feedSource); // baseline
+    await runSource(feedSource); // adds g2
+    const changes = await listChanges(companyId, { competitorId });
+    expect(
+      changes.some((c) => c.changeType === "post_published" && c.summary === "New post: Second"),
+    ).toBe(true);
+  });
+
+  it("emits page_added when a sitemap gains a url", async () => {
+    const smA = `<urlset><url><loc>https://x/</loc></url></urlset>`;
+    const smB = `<urlset><url><loc>https://x/</loc></url><url><loc>https://x/new</loc></url></urlset>`;
+    stubFetchSequence([smA, smB]);
+    await runSource(sitemapSource);
+    await runSource(sitemapSource);
+    const changes = await listChanges(companyId, { competitorId });
+    expect(
+      changes.some((c) => c.changeType === "page_added" && c.summary === "Page added: https://x/new"),
+    ).toBe(true);
   });
 });
