@@ -37,4 +37,23 @@ describe("CompetitorAnalysisBody", () => {
     expect(screen.getByText(/New line/)).toBeTruthy();
     expect(screen.getByText(/Old line/)).toBeTruthy();
   });
+
+  it("renders Recent posts from a feed snapshot and Pages-tracked from a sitemap snapshot", () => {
+    const props = {
+      competitor: { id: "c1", name: "Acme", url: "https://acme.com" },
+      sources: [
+        { id: "f1", type: "feed", url: "https://acme.com/rss", enabled: true, lastRunAt: null, lastStatus: null, healthState: "ok" },
+        { id: "m1", type: "sitemap", url: "https://acme.com/sitemap.xml", enabled: true, lastRunAt: null, lastStatus: null, healthState: "ok" },
+      ],
+      latestSnapshots: [
+        { id: "sn1", sourceId: "f1", capturedAt: new Date("2026-07-01").toISOString(), structured: { items: { g1: { title: "Launch Day", link: "https://acme.com/p/1", publishedAt: new Date("2026-07-01").toISOString() } } } },
+        { id: "sn2", sourceId: "m1", capturedAt: new Date("2026-07-01").toISOString(), structured: { urls: { "https://acme.com/": 1, "https://acme.com/pricing": 1 }, count: 2 } },
+      ],
+      initialChanges: { changes: [] },
+    };
+    render(<CompetitorAnalysisBody {...props} />);
+    expect(screen.getByText("Launch Day")).toBeTruthy();
+    expect(screen.getByText(/Pages tracked/i)).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+  });
 });

@@ -55,7 +55,12 @@ export interface SnapshotDto {
   id: string;
   sourceId: string;
   capturedAt: string;
-  structured: { plans?: PlanDto[] } | null;
+  structured: {
+    plans?: PlanDto[];
+    items?: Record<string, { title: string; link: string; publishedAt: string | null }>;
+    urls?: Record<string, unknown>;
+    count?: number;
+  } | null;
 }
 
 interface CompetitorProfileViewProps {

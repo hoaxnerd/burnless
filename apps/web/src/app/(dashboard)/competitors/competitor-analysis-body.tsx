@@ -104,6 +104,28 @@ export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, i
     return null;
   })();
 
+  const feedPosts = (() => {
+    for (let i = 0; i < sources.length; i++) {
+      if (sources[i]?.type !== "feed") continue;
+      const items = latestSnapshots[i]?.structured?.items;
+      if (items && Object.keys(items).length > 0) {
+        return Object.values(items)
+          .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))
+          .slice(0, 10);
+      }
+    }
+    return null;
+  })();
+
+  const siteCount = (() => {
+    for (let i = 0; i < sources.length; i++) {
+      if (sources[i]?.type !== "sitemap") continue;
+      const c = latestSnapshots[i]?.structured?.count;
+      if (typeof c === "number") return c;
+    }
+    return null;
+  })();
+
   async function handleSync() {
     setSyncError(null);
     setSyncing(true);
@@ -204,6 +226,51 @@ export function CompetitorAnalysisBody({ competitor, sources, latestSnapshots, i
           <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
             <DataTable columns={planColumns} data={pricingPlans} rowKey={(p) => p.name} emptyMessage="No pricing plans captured." />
           </div>
+        </section>
+      )}
+
+      {feedPosts && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-surface-900">Recent posts</h2>
+          <div className="rounded-xl bg-surface-0 border border-surface-200 overflow-hidden">
+            <DataTable
+              columns={[
+                {
+                  key: "title",
+                  header: "Post",
+                  render: (p: { title: string; link: string }) =>
+                    p.link ? (
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="font-medium text-surface-900 hover:text-brand-600 transition-colors">
+                        {p.title}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-surface-900">{p.title}</span>
+                    ),
+                },
+                {
+                  key: "publishedAt",
+                  header: "Published",
+                  align: "right" as const,
+                  render: (p: { publishedAt: string | null }) => (
+                    <span className="text-surface-500">{p.publishedAt ? fmtDate(p.publishedAt) : "—"}</span>
+                  ),
+                },
+              ]}
+              data={feedPosts}
+              rowKey={(p) => p.link || p.title}
+              emptyMessage="No posts captured."
+            />
+          </div>
+        </section>
+      )}
+
+      {siteCount != null && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-surface-900">Site structure</h2>
+          <WidgetCard>
+            <p className="text-sm text-surface-500">Pages tracked</p>
+            <p className="mt-1 text-2xl font-bold text-surface-900">{siteCount}</p>
+          </WidgetCard>
         </section>
       )}
 
