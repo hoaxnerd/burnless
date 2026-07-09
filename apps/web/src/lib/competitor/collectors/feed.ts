@@ -20,17 +20,17 @@ function decode(s: string): string {
 }
 function firstTag(block: string, name: string): string | null {
   const m = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, "i").exec(block);
-  return m ? decode(m[1]) || null : null;
+  return m ? decode(m[1]!) || null : null;
 }
 function atomHref(block: string): string | null {
-  const links = [...block.matchAll(/<link\b([^>]*?)\/?>/gi)].map((m) => m[1]);
+  const links = [...block.matchAll(/<link\b([^>]*?)\/?>/gi)].map((m) => m[1]!);
   const pick =
     links.find((a) => /rel=["']?alternate/i.test(a)) ??
     links.find((a) => !/rel=/i.test(a)) ??
     links[0];
   if (!pick) return null;
   const href = /href=["']([^"']+)["']/i.exec(pick);
-  return href ? decode(href[1]) : null;
+  return href ? decode(href[1]!) : null;
 }
 function toIso(s: string | null): string | null {
   if (!s) return null;

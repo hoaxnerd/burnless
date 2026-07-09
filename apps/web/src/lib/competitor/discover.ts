@@ -28,7 +28,7 @@ export async function discoverFeeds(siteUrl: string): Promise<Candidate[]> {
   try {
     const home = await httpFetch(siteUrl);
     for (const m of home.raw.matchAll(/<link\b([^>]*)>/gi)) {
-      const attrs = m[1];
+      const attrs = m[1]!;
       if (/rel=["']?alternate/i.test(attrs) && /type=["']application\/(rss|atom)\+xml["']/i.test(attrs)) {
         const href = /href=["']([^"']+)["']/i.exec(attrs)?.[1];
         if (href) add("feed", href);
@@ -45,7 +45,7 @@ export async function discoverFeeds(siteUrl: string): Promise<Candidate[]> {
     for (const line of robots.raw.split(/\r?\n/)) {
       const m = /^\s*sitemap:\s*(\S+)/i.exec(line);
       if (m) {
-        add("sitemap", m[1]);
+        add("sitemap", m[1]!);
         robotsHadSitemap = true;
       }
     }

@@ -12,7 +12,7 @@ describe("feedCollector.parse", () => {
     const r = feedCollector.parse(raw(load("rss.xml")), src);
     expect(r.confidence).toBe(0.9);
     expect(Object.keys(r.structured.items as object).sort()).toEqual(["g-1", "g-2"]);
-    const i = (r.structured.items as Record<string, { title: string; publishedAt: string | null }>)["g-2"];
+    const i = (r.structured.items as Record<string, { title: string; publishedAt: string | null }>)["g-2"]!;
     expect(i.title).toBe("Second & Post");
     expect(i.publishedAt).toBe("2026-07-02T10:00:00.000Z");
   });
@@ -21,8 +21,8 @@ describe("feedCollector.parse", () => {
     const r = feedCollector.parse(raw(load("atom.xml")), src);
     expect(r.confidence).toBe(0.9);
     const items = r.structured.items as Record<string, { title: string; link: string }>;
-    expect(items["tag:acme,2026:1"].title).toBe("Atom Post");
-    expect(items["tag:acme,2026:1"].link).toBe("https://acme.com/a/1");
+    expect(items["tag:acme,2026:1"]!.title).toBe("Atom Post");
+    expect(items["tag:acme,2026:1"]!.link).toBe("https://acme.com/a/1");
   });
 
   it("returns low confidence for a non-feed / empty document", () => {
