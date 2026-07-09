@@ -1,14 +1,5 @@
-import { sha256hex } from "@burnless/db";
 import {
-  diffStructured,
-  evaluateRules,
-  diffText,
-  normalizeHtml,
-  contentChangeAlert,
-  type Alert,
-} from "@burnless/engine";
-import type { CompetitorSource } from "@burnless/db";
-import {
+  sha256hex,
   getDueSources,
   getLatestSnapshot,
   insertSnapshot,
@@ -18,6 +9,15 @@ import {
   createNotification,
   getCompanyNotifyUserIds,
 } from "@burnless/db";
+import {
+  diffStructured,
+  evaluateRules,
+  diffText,
+  normalizeHtml,
+  contentChangeAlert,
+  type Alert,
+} from "@burnless/engine";
+import type { CompetitorSource } from "@burnless/db";
 import { getCollector, httpFetch, type CollectorSource, type RawCapture } from "./collectors";
 import { buildDigest } from "./notify";
 
@@ -31,6 +31,47 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 function sourceLabel(type: string): string {
   return SOURCE_LABELS[type] ?? "Page";
+}
+
+/**
+ * Persist change alerts to the DB and fan-out in-app notifications to all
+ * company owners/admins. Extracted from runSource to reduce cognitive complexity.
+ */
+async function persistAlertsAndNotify(
+  source: CompetitorSource,
+  snapshotId: string,
+  alerts: Alert[],
+): Promise<void> {
+  if (alerts.length === 0) return;
+
+  await insertChanges(
+    alerts.map((a) => ({
+      companyId: source.companyId,
+      competitorId: source.competitorId,
+      sourceId: source.id,
+      snapshotId,
+      changeType: a.changeType,
+      summary: a.summary,
+      before: a.before ?? null,
+      after: a.after ?? null,
+      severity: a.severity,
+    })),
+  );
+
+  const competitor = await getCompetitor(source.competitorId, source.companyId);
+  const digest = buildDigest(competitor?.name ?? "competitor", alerts);
+  const userIds = await getCompanyNotifyUserIds(source.companyId);
+  for (const userId of userIds) {
+    await createNotification({
+      companyId: source.companyId,
+      userId,
+      category: "competitor",
+      title: digest.title,
+      body: digest.body,
+      severity: digest.severity,
+      link: `/competitors/${source.competitorId}`,
+    });
+  }
 }
 
 /**
@@ -127,36 +168,7 @@ export async function runSource(
     }
   }
 
-  if (alerts.length > 0) {
-    await insertChanges(
-      alerts.map((a) => ({
-        companyId: source.companyId,
-        competitorId: source.competitorId,
-        sourceId: source.id,
-        snapshotId: snapshot.id,
-        changeType: a.changeType,
-        summary: a.summary,
-        before: a.before ?? null,
-        after: a.after ?? null,
-        severity: a.severity,
-      })),
-    );
-
-    const competitor = await getCompetitor(source.competitorId, source.companyId);
-    const digest = buildDigest(competitor?.name ?? "competitor", alerts);
-    const userIds = await getCompanyNotifyUserIds(source.companyId);
-    for (const userId of userIds) {
-      await createNotification({
-        companyId: source.companyId,
-        userId,
-        category: "competitor",
-        title: digest.title,
-        body: digest.body,
-        severity: digest.severity,
-        link: `/competitors/${source.competitorId}`,
-      });
-    }
-  }
+  await persistAlertsAndNotify(source, snapshot.id, alerts);
 
   await updateSource(source.id, source.companyId, {
     lastRunAt: new Date(),

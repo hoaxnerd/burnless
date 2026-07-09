@@ -7,14 +7,43 @@ interface Plan {
   features: string[];
 }
 
+// Module-level regex constants (all non-global: exec() always starts at position 0).
+const PRICE_RE = /([$€£]|USD|EUR|GBP)?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(month|mo|year|yr))?/i;
+const H1_RE = /<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i;
+const PRICE_BLOCK_RE = /[$€£]\s*\d[\d.,]*\s*(?:\/\s*(?:month|mo|year|yr))?/i;
+const SYMBOL_TO_CURRENCY: Record<string, string> = { $: "USD", "€": "EUR", "£": "GBP" };
+
+function resolvePeriod(raw: string | undefined): "year" | "month" | null {
+  if (!raw) return null;
+  return raw.startsWith("y") ? "year" : "month";
+}
+
 function parsePrice(s: string): { amount: number | null; currency: string | null; period: string | null } {
-  const m = s.replace(/,/g, "").match(/(\$|USD|€|EUR|£|GBP)?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*(mo|month|yr|year))?/i);
-  const symbolToCurrency: Record<string, string> = { "$": "USD", "€": "EUR", "£": "GBP" };
+  const m = PRICE_RE.exec(s.replaceAll(",", ""));
   if (!m) return { amount: null, currency: null, period: null };
   return {
     amount: Number(m[2]),
-    currency: m[1] ? (symbolToCurrency[m[1]] ?? m[1].toUpperCase()) : null,
-    period: m[3] ? (m[3].startsWith("y") ? "year" : "month") : null,
+    currency: m[1] ? (SYMBOL_TO_CURRENCY[m[1]] ?? m[1].toUpperCase()) : null,
+    period: resolvePeriod(m[3]),
+  };
+}
+
+type JsonObj = Record<string, unknown>;
+
+function jsonLdNodeToPlan(raw: unknown): Plan | null {
+  if (raw == null || typeof raw !== "object") return null;
+  const node = raw as JsonObj;
+  if (node["@type"] !== "Product" || !node.offers) return null;
+  const offersRaw = Array.isArray(node.offers) ? node.offers[0] : node.offers;
+  const offer = (offersRaw ?? {}) as JsonObj;
+  return {
+    name: String(node.name ?? "Plan"),
+    price: {
+      amount: offer.price != null ? Number(offer.price) : null,
+      currency: (offer.priceCurrency as string | undefined) ?? null,
+      period: null,
+    },
+    features: [],
   };
 }
 
@@ -24,20 +53,11 @@ function fromJsonLd(html: string): Plan[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
     try {
-      const data = JSON.parse((m[1] ?? "").trim());
-      for (const node of Array.isArray(data) ? data : [data]) {
-        if (node && node["@type"] === "Product" && node.offers) {
-          const offer = Array.isArray(node.offers) ? node.offers[0] : node.offers;
-          plans.push({
-            name: String(node.name ?? "Plan"),
-            price: {
-              amount: offer.price != null ? Number(offer.price) : null,
-              currency: offer.priceCurrency ?? null,
-              period: null,
-            },
-            features: [],
-          });
-        }
+      const data = JSON.parse((m[1] ?? "").trim()) as unknown;
+      const nodes: unknown[] = Array.isArray(data) ? data : [data];
+      for (const node of nodes) {
+        const plan = jsonLdNodeToPlan(node);
+        if (plan) plans.push(plan);
       }
     } catch {
       /* ignore malformed block */
@@ -51,8 +71,8 @@ function fromDomHeuristic(html: string): Plan[] {
   const blockRe = /<(?:div|section|li)[^>]*class=["'][^"']*plan[^"']*["'][\s\S]*?<\/(?:div|section|li)>/gi;
   const blocks = html.match(blockRe) ?? [];
   for (const b of blocks) {
-    const name = (b.match(/<h[1-6][^>]*>([^<]+)<\/h[1-6]>/i)?.[1] ?? "Plan").trim();
-    const priceText = b.match(/(\$|€|£)\s*[0-9][0-9.,]*\s*(?:\/\s*(?:mo|month|yr|year))?/i)?.[0];
+    const name = (H1_RE.exec(b)?.[1] ?? "Plan").trim();
+    const priceText = PRICE_BLOCK_RE.exec(b)?.[0];
     if (priceText) plans.push({ name, price: parsePrice(priceText), features: [] });
   }
   return plans;
