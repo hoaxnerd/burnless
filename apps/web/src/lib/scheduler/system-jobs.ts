@@ -4,6 +4,7 @@ import { cleanupExpiredData } from "@/lib/data-retention";
 import { runWeeklyDigest } from "@/lib/cron/weekly-digest";
 import { runBatchRegenerate } from "@/lib/cron/batch-regenerate";
 import { runAllIntegrationSyncs } from "@/lib/integrations/run-all-syncs";
+import { runDueCompetitorSyncs } from "@/lib/competitor/pipeline";
 
 /**
  * Operational jobs registered in code (NOT in the scheduledJobs table). The
@@ -44,6 +45,14 @@ export const SYSTEM_JOBS: SystemJob[] = [
     run: async () => {
       const r = await runAllIntegrationSyncs();
       return { ok: true, summary: `Synced ${r.synced} integration(s), ${r.failed} failed` };
+    },
+  },
+  {
+    id: "competitor-sync",
+    schedule: "0 * * * *", // hourly tick; each source runs only when its intervalHours is due
+    run: async () => {
+      const r = await runDueCompetitorSyncs(new Date());
+      return { ok: r.ok, summary: r.summary };
     },
   },
 ];

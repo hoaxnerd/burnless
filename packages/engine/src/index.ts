@@ -247,6 +247,9 @@ export type {
   NormalizedWebhookEvent,
 } from "./payments";
 
+// Competitor analysis — diff, rules, alert layer
+export * from "./competitor";
+
 // Bank connectors — import directly from "@burnless/engine/bank-connectors" when needed.
 // Not re-exported here to avoid bundling optional plaid SDK.
 export type {

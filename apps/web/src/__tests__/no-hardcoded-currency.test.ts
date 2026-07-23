@@ -49,6 +49,25 @@ const ALLOWED = [
   // static bound labels on range inputs (min/max markers), not user data.
   "apps/web/src/app/(dashboard)/funding/funding-details.tsx",
 
+  // ── Competitor pricing collector ─────────────────────────────────────────
+  // pricing.ts: /(\$|€|EUR|£|GBP)?/ and /(\$|€|£)/ regex patterns used to
+  // PARSE currency symbols from third-party competitor HTML pages.
+  // symbolToCurrency map normalises parsed glyphs to ISO codes. Not display code.
+  "apps/web/src/lib/competitor/collectors/pricing.ts",
+
+  // ── Competitor collector-reframe tests: scraped-HTML fixtures ─────────────
+  // The Tier-1/Tier-2 tests use `$29`/`$39`/`$${amount}` INSIDE sample
+  // competitor HTML strings (what we fetch + normalize + diff) and as expected
+  // normalized-text assertions — third-party scraped-price INPUT, never app
+  // display code. Same rationale as the pricing.ts collector entry above.
+  // pipeline.test.ts (Tier-1/2 HTML fixtures), engine normalize/text-diff tests
+  // (normalized-text fixtures), db competitor.test.ts (snapshot raw/normalized).
+  "apps/web/src/lib/competitor/__tests__/",
+  "packages/engine/src/competitor/__tests__/",
+  // File-scoped (not the whole db __tests__ dir): only competitor.test.ts holds
+  // scraped-price fixtures; the DB layer has no display code to guard elsewhere.
+  "packages/db/src/__tests__/competitor.test.ts",
+
   // ── CSV import parser ─────────────────────────────────────────────────────
   // import-flow.tsx line 134: /[$,€£()]/ in a regex to STRIP currency
   // characters from user-supplied CSV amounts. Not display code.
@@ -225,6 +244,11 @@ const ALLOWED = [
   "apps/web/src/app/(dashboard)/ai/_components/generative/diff-gate.tsx",
   "apps/web/src/__tests__/component-reachability.test.ts",
   "apps/web/src/__tests__/no-console-in-production.test.ts",
+  // feed.ts line 8: `.replace(/<![CDATA[…]]>/g, "$1")` — a String.replace()
+  // backreference stripping CDATA wrappers from RSS/Atom feed text. `$1` is a
+  // regex capture-group reference, not a currency amount. Same false-positive
+  // class as the camelCase-splitter entries above.
+  "apps/web/src/lib/competitor/collectors/feed.ts",
 ];
 
 /**

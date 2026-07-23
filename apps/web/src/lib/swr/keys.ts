@@ -72,6 +72,10 @@ export const KEYS = {
   sessionDisabledTools: (conversationId: string) =>
     `/api/chat/session-tools?conversationId=${conversationId}`,
 
+  // Competitor analysis domain
+  competitors: "/api/competitors",
+  competitorChanges: (id: string) => `/api/competitors/${id}/changes`,
+
   // AI providers manager (Settings → AI Providers, #49 P3)
   aiProviders: "/api/ai-features/providers",
   aiProvider: (id: string) => `/api/ai-features/providers/${id}`,

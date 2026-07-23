@@ -37,6 +37,10 @@ const ALLOWED: { match: string; why: string }[] = [
     match: "mcp/oauth/callback",
     why: "Completes an MCP OAuth handshake and re-probes the connection, invalidating only `mcp-connections` (non-financial). Same rationale as mcp/connections — no financial data changed.",
   },
+  {
+    match: "competitors",
+    why: "Competitor CRUD invalidates only the non-financial `competitors` cache (competitor list UI). No financial metric depends on competitor data and there is no MutationSource for competitors, so trackDataMutation must NOT fire — bumping it would start a bogus insight-regeneration grace countdown for changes that affect no financial compute.",
+  },
 ];
 
 function isAllowed(rel: string): boolean {

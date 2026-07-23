@@ -22,11 +22,13 @@ const config = [
       // Next 16 bundles eslint-plugin-react-hooks v6 (React-Compiler-era) which
       // promotes these to errors. Our existing usages are intentional, benign
       // patterns (reset-optimistic-overlay-on-SWR-refresh effects; a monotonic
-      // key counter in a once-only lazy useState initializer) — keep them as
-      // warnings to match this repo's lenient lint posture. Revisit if we adopt
-      // the React Compiler.
+      // key counter in a once-only lazy useState initializer; Date.now() in async
+      // Server Components whose renders are request-scoped, not pure-functional) —
+      // keep them as warnings to match this repo's lenient lint posture. Revisit
+      // if we adopt the React Compiler.
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/refs": "warn",
+      "react-hooks/purity": "warn",
     },
   },
 ];

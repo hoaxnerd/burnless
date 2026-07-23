@@ -3,6 +3,7 @@ export {
   getUserWithCompany,
   getCompanyById,
   listCompaniesForUser,
+  getCompanyNotifyUserIds,
 } from "./company";
 
 export {
@@ -180,6 +181,24 @@ export {
   type RotateResult,
   type OauthGrantSummary,
 } from "./oauth";
+
+export {
+  createCompetitor,
+  listCompetitors,
+  getCompetitor,
+  updateCompetitor,
+  deleteCompetitor,
+  createSource,
+  listSources,
+  updateSource,
+  deleteSource,
+  getDueSources,
+  getLatestSnapshot,
+  insertSnapshot,
+  insertChanges,
+  listChanges,
+  ackChange,
+} from "./competitor";
 
 export {
   createScheduledJob,

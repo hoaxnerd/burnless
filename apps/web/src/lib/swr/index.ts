@@ -7,6 +7,16 @@
 
 export { SWRProvider } from "./provider";
 export { KEYS } from "./keys";
+export {
+  useCompetitors,
+  useCompetitorChanges,
+} from "./competitor";
+export type {
+  CompetitorDto,
+  CompetitorChangeDto,
+  CompetitorsPayload,
+  CompetitorChangesPayload,
+} from "./competitor";
 export { fetcher, FetchError } from "./fetcher";
 export {
   useScenarios,

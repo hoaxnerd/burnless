@@ -10,6 +10,7 @@ import {
   FolderOpen,
   Plug,
   Clock,
+  Swords,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,8 @@ export const coreNavItems: NavItem[] = [
   { id: "data-room", href: "/data-room", label: "Data Room", icon: FolderOpen },
   { id: "connections", href: "/connections", label: "Connections", icon: Plug },
   { id: "automations", href: "/automations", label: "Automations", icon: Clock },
+  // competitor domain (Task 10) — one acknowledged base-touch per A3 breadcrumb
+  { id: "competitors", href: "/competitors", label: "Competitors", icon: Swords },
 ];
 
 export const aiNavItem: NavItem = { id: "ai", href: "/ai", label: "Companion", icon: Sparkles };

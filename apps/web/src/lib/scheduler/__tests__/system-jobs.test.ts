@@ -18,6 +18,9 @@ vi.mock("@/lib/cron/batch-regenerate", () => ({
 vi.mock("@/lib/integrations/run-all-syncs", () => ({
   runAllIntegrationSyncs: vi.fn().mockResolvedValue({ synced: 0, failed: 0 }),
 }));
+vi.mock("@/lib/competitor/pipeline", () => ({
+  runDueCompetitorSyncs: vi.fn().mockResolvedValue({ ok: true, summary: "0 synced, 0 skipped, 0 failed" }),
+}));
 
 describe("SYSTEM_JOBS registry", () => {
   it("has unique ids", () => {
@@ -71,5 +74,16 @@ describe("integration-sync system job", () => {
     const result = await job!.run();
     expect(result.ok).toBe(true);
     expect(result.summary).toContain("Synced");
+  });
+});
+
+describe("competitor-sync system job", () => {
+  it("is registered with the hourly schedule and its run() resolves ok", async () => {
+    const job = SYSTEM_JOBS.find((j) => j.id === "competitor-sync");
+    expect(job).toBeDefined();
+    expect(job!.schedule).toBe("0 * * * *");
+    const result = await job!.run();
+    expect(result.ok).toBe(true);
+    expect(result.summary).toContain("synced");
   });
 });

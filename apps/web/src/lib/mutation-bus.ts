@@ -31,6 +31,13 @@ export const FINANCIAL_DOMAINS = new Set([
   "scenario",
 ]);
 
+/**
+ * Non-financial domains that are still published on the bus so their SWR hooks
+ * can live-update (same-tab AND cross-tab). Kept separate from FINANCIAL_DOMAINS
+ * so competitor syncs do NOT reset the AI-insight stale countdown.
+ */
+export const COMPETITOR_DOMAINS = new Set(["competitor"]);
+
 type Handler = (e: MutationEvent) => void;
 const handlers = new Set<Handler>();
 let storageBound = false;
@@ -83,6 +90,7 @@ export function domainFromUrl(url: string): string {
   if (url.includes("/revenue-streams")) return "revenue";
   if (url.includes("/funding-rounds")) return "funding";
   if (url.includes("/scenarios")) return "scenario";
+  if (url.includes("/competitors")) return "competitor";
   // Non-financial (insights regen POST, chat, ai-config, preferences, …) → "other",
   // which apiFetch does NOT emit. Critically this keeps the insights regen POST out of
   // the bus, so auto-regen can't retrigger itself into an infinite loop.

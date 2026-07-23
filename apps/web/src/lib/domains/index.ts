@@ -15,6 +15,7 @@ import { companyKnowledgeModule } from "./company-knowledge";
 import { memoryDomainModule } from "./memory";
 import { skillsDomainModule } from "./skills";
 import { integrationsDomainModule } from "./integrations";
+import { competitorDomainModule } from "./competitor";
 
 let registered = false;
 
@@ -26,6 +27,7 @@ export function registerDomains(): void {
   domainRegistry.register(memoryDomainModule);
   domainRegistry.register(skillsDomainModule);
   domainRegistry.register(integrationsDomainModule);
+  domainRegistry.register(competitorDomainModule);
 }
 
 // Auto-register at module load so any importer gets a populated registry.
